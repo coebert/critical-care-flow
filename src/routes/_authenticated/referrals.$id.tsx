@@ -228,7 +228,7 @@ function ReferralDetail() {
               <F label="Received"><DTNow value={toLocal(ref.referral_received_at)} onChange={(v) => saveTimestamp("referral_received_at", v ? new Date(v).toISOString() : null)} /></F>
               <F label="First seen"><DTNow value={toLocal(ref.first_seen_at)} onChange={(v) => saveTimestamp("first_seen_at", v ? new Date(v).toISOString() : null)} /></F>
               <F label="Decision"><DTNow value={toLocal(ref.decision_at)} onChange={(v) => saveTimestamp("decision_at", v ? new Date(v).toISOString() : null)} /></F>
-              <F label="Arrived on unit"><DTNow value={toLocal(ref.arrived_on_unit_at)} onChange={(v) => saveTimestamp("arrived_on_unit_at", v ? new Date(v).toISOString() : null)} /></F>
+              <F label="Arrived on unit"><DTNow value={toLocal(ref.arrived_on_unit_at)} onChange={(v) => saveTimestamp("arrived_on_unit_at", v ? new Date(v).toISOString() : null)} disabled={ref.status === "declined"} /></F>
             </div>
             <p className="text-xs text-muted-foreground">Timestamps save automatically.</p>
           </Card>
@@ -294,11 +294,11 @@ function nowLocal() {
   return d.toISOString().slice(0, 16);
 }
 
-function DTNow({ value, onChange }: { value: string; onChange: (v: string) => void }) {
+function DTNow({ value, onChange, disabled }: { value: string; onChange: (v: string) => void; disabled?: boolean }) {
   return (
     <div className="flex gap-2">
-      <Input type="datetime-local" value={value} onChange={(e) => onChange(e.target.value)} />
-      <Button type="button" variant="outline" size="sm" onClick={() => onChange(nowLocal())}>Now</Button>
+      <Input type="datetime-local" value={value} onChange={(e) => onChange(e.target.value)} disabled={disabled} className={disabled ? "opacity-50 cursor-not-allowed" : ""} />
+      <Button type="button" variant="outline" size="sm" onClick={() => onChange(nowLocal())} disabled={disabled}>Now</Button>
     </div>
   );
 }
