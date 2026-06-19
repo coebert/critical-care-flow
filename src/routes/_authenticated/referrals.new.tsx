@@ -114,9 +114,26 @@ function NewReferralPage() {
   const showAlert =
     priors.length > 0 && dismissedFor !== f.hospital_number.trim();
 
+  const timing = validateReferralTimings({
+    status: f.status,
+    referral_received_at: f.referral_received_at
+      ? new Date(f.referral_received_at).toISOString()
+      : null,
+    first_seen_at: f.first_seen_at ? new Date(f.first_seen_at).toISOString() : null,
+    decision_at: f.decision_at ? new Date(f.decision_at).toISOString() : null,
+    arrived_on_unit_at: f.arrived_on_unit_at
+      ? new Date(f.arrived_on_unit_at).toISOString()
+      : null,
+  });
+  const [showErrors, setShowErrors] = useState(false);
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!timing.isValid) {
+      setShowErrors(true);
+      toast.error("Please fix the highlighted timing fields before saving.");
+      return;
+    }
     setSaving(true);
     try {
       const payload: any = {
