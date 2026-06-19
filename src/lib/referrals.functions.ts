@@ -195,13 +195,14 @@ export const deleteReferral = createServerFn({ method: "POST" })
     if (error) throw new Error(error.message);
 
 
-    await supabase.from("audit_log").insert({
+    await writeAudit({
       user_id: userId,
       action: "delete",
       entity: "referral",
       entity_id: data.id,
       diff: row as any,
     });
+
     return { ok: true };
   });
 
