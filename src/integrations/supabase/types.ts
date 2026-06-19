@@ -149,6 +149,8 @@ export type Database = {
           current_ward: string | null
           decision_at: string | null
           decline_reason: string | null
+          deleted_at: string | null
+          deleted_by: string | null
           dnacpr_respect: boolean
           first_seen_at: string | null
           hospital_number: string | null
@@ -172,6 +174,8 @@ export type Database = {
           current_ward?: string | null
           decision_at?: string | null
           decline_reason?: string | null
+          deleted_at?: string | null
+          deleted_by?: string | null
           dnacpr_respect?: boolean
           first_seen_at?: string | null
           hospital_number?: string | null
@@ -195,6 +199,8 @@ export type Database = {
           current_ward?: string | null
           decision_at?: string | null
           decline_reason?: string | null
+          deleted_at?: string | null
+          deleted_by?: string | null
           dnacpr_respect?: boolean
           first_seen_at?: string | null
           hospital_number?: string | null
