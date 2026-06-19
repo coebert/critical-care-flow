@@ -74,7 +74,9 @@ function ReferralsList() {
     }
   };
 
+  useEffect(() => {
     let cancelled = false;
+
     supabase
       .from("referrals")
       .select("*")
