@@ -21,14 +21,30 @@ const refSchema = z.object({
   decline_reason: z.string().trim().max(2000).nullable().optional(),
 });
 
+async function getAdmin() {
+  const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+  return supabaseAdmin;
+}
+
+async function writeAudit(entry: {
+  user_id: string;
+  action: string;
+  entity: string;
+  entity_id: string;
+  diff?: any;
+}) {
+  const admin = await getAdmin();
+  await admin.from("audit_log").insert(entry as any);
+}
+
 async function fanOutNotifications(
-  supabase: any,
   userId: string,
   referralId: string,
   kind: "new" | "updated",
   message: string,
 ) {
-  const { data: others } = await supabase
+  const admin = await getAdmin();
+  const { data: others } = await admin
     .from("user_roles")
     .select("user_id")
     .neq("user_id", userId);
@@ -40,8 +56,9 @@ async function fanOutNotifications(
     kind,
     message,
   }));
-  await supabase.from("notifications").insert(rows);
+  await admin.from("notifications").insert(rows);
 }
+
 
 export const createReferral = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
@@ -61,7 +78,7 @@ export const createReferral = createServerFn({ method: "POST" })
       .single();
     if (error) throw new Error(error.message);
 
-    await supabase.from("audit_log").insert({
+    await writeAudit({
       user_id: userId,
       action: "create",
       entity: "referral",
@@ -70,9 +87,10 @@ export const createReferral = createServerFn({ method: "POST" })
     });
 
     const summary = `${row.referring_specialty ?? "Referral"} — ${row.current_ward ?? "ward unknown"}`;
-    await fanOutNotifications(supabase, userId, row.id, "new", `New referral: ${summary}`);
+    await fanOutNotifications(userId, row.id, "new", `New referral: ${summary}`);
     return row;
   });
+
 
 export const updateReferral = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
@@ -89,7 +107,7 @@ export const updateReferral = createServerFn({ method: "POST" })
       .single();
     if (error) throw new Error(error.message);
 
-    await supabase.from("audit_log").insert({
+    await writeAudit({
       user_id: userId,
       action: "update",
       entity: "referral",
@@ -98,9 +116,10 @@ export const updateReferral = createServerFn({ method: "POST" })
     });
 
     const summary = `${row.referring_specialty ?? "Referral"} — ${row.current_ward ?? "ward unknown"}`;
-    await fanOutNotifications(supabase, userId, row.id, "updated", `Updated: ${summary}`);
+    await fanOutNotifications(userId, row.id, "updated", `Updated: ${summary}`);
     return row;
   });
+
 
 export const addNote = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
@@ -118,7 +137,7 @@ export const addNote = createServerFn({ method: "POST" })
       .single();
     if (error) throw new Error(error.message);
 
-    await supabase.from("audit_log").insert({
+    await writeAudit({
       user_id: userId,
       action: "create",
       entity: "referral_note",
@@ -127,7 +146,6 @@ export const addNote = createServerFn({ method: "POST" })
     });
 
     await fanOutNotifications(
-      supabase,
       userId,
       data.referral_id,
       "updated",
@@ -136,12 +154,13 @@ export const addNote = createServerFn({ method: "POST" })
     return row;
   });
 
+
 export const logReferralView = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((d: unknown) => z.object({ referral_id: z.string().uuid() }).parse(d))
   .handler(async ({ data, context }) => {
-    const { supabase, userId } = context;
-    await supabase.from("audit_log").insert({
+    const { userId } = context;
+    await writeAudit({
       user_id: userId,
       action: "view",
       entity: "referral",
@@ -149,6 +168,7 @@ export const logReferralView = createServerFn({ method: "POST" })
     });
     return { ok: true };
   });
+
 
 export const deleteReferral = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
@@ -175,13 +195,14 @@ export const deleteReferral = createServerFn({ method: "POST" })
     if (error) throw new Error(error.message);
 
 
-    await supabase.from("audit_log").insert({
+    await writeAudit({
       user_id: userId,
       action: "delete",
       entity: "referral",
       entity_id: data.id,
       diff: row as any,
     });
+
     return { ok: true };
   });
 
