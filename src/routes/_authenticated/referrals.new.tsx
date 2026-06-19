@@ -1,7 +1,7 @@
-import { createFileRoute, useNavigate } from "@tanstack/react-router";
-import { useState } from "react";
+import { createFileRoute, useNavigate, Link } from "@tanstack/react-router";
+import { useState, useEffect } from "react";
 import { useServerFn } from "@tanstack/react-start";
-import { createReferral } from "@/lib/referrals.functions";
+import { createReferral, findReferralsByHospitalNumber } from "@/lib/referrals.functions";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -15,14 +15,40 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+  DialogFooter,
+} from "@/components/ui/dialog";
+import { Badge } from "@/components/ui/badge";
+import { AlertCircle } from "lucide-react";
 import { ComboboxAdd } from "@/components/combobox-add";
 import { useReferralOptions } from "@/hooks/use-referral-options";
 import { toast } from "sonner";
+import { format } from "date-fns";
+
+type PriorReferral = {
+  id: string;
+  hospital_number: string | null;
+  referral_received_at: string;
+  status: string;
+  referring_specialty: string | null;
+  current_ward: string | null;
+  current_bed: string | null;
+  reason_for_referral: string | null;
+  age: number | null;
+  sex: string | null;
+};
 
 export const Route = createFileRoute("/_authenticated/referrals/new")({
   head: () => ({ meta: [{ title: "New referral — SDH Critical Care" }] }),
   component: NewReferralPage,
 });
+
 
 function localISO() {
   const d = new Date();
