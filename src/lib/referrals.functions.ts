@@ -159,8 +159,8 @@ export const logReferralView = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((d: unknown) => z.object({ referral_id: z.string().uuid() }).parse(d))
   .handler(async ({ data, context }) => {
-    const { supabase, userId } = context;
-    await supabase.from("audit_log").insert({
+    const { userId } = context;
+    await writeAudit({
       user_id: userId,
       action: "view",
       entity: "referral",
@@ -168,6 +168,7 @@ export const logReferralView = createServerFn({ method: "POST" })
     });
     return { ok: true };
   });
+
 
 export const deleteReferral = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
