@@ -149,3 +149,34 @@ export const logReferralView = createServerFn({ method: "POST" })
     });
     return { ok: true };
   });
+
+export const deleteReferral = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d: unknown) => z.object({ id: z.string().uuid() }).parse(d))
+  .handler(async ({ data, context }) => {
+    const { supabase, userId } = context;
+    const { data: isAdmin } = await supabase.rpc("has_role", {
+      _user_id: userId,
+      _role: "admin",
+    });
+    if (!isAdmin) throw new Error("Only admins can delete referrals");
+
+    const { data: row } = await supabase
+      .from("referrals")
+      .select("*")
+      .eq("id", data.id)
+      .maybeSingle();
+
+    const { error } = await supabase.from("referrals").delete().eq("id", data.id);
+    if (error) throw new Error(error.message);
+
+    await supabase.from("audit_log").insert({
+      user_id: userId,
+      action: "delete",
+      entity: "referral",
+      entity_id: data.id,
+      diff: row as any,
+    });
+    return { ok: true };
+  });
+
