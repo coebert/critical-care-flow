@@ -285,12 +285,31 @@ function ReferralDetail() {
         <Card className="p-5 space-y-4">
           <h2 className="font-semibold">Timeline (ICNARC)</h2>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <F label="Received"><DTNow value={toLocal(ref.referral_received_at)} onChange={(v) => saveTimestamp("referral_received_at", v ? new Date(v).toISOString() : null)} /></F>
-            <F label="First seen"><DTNow value={toLocal(ref.first_seen_at)} onChange={(v) => saveTimestamp("first_seen_at", v ? new Date(v).toISOString() : null)} /></F>
-            <F label="Decision"><DTNow value={toLocal(ref.decision_at)} onChange={(v) => saveTimestamp("decision_at", v ? new Date(v).toISOString() : null)} /></F>
-            <F label="Arrived on unit"><DTNow value={toLocal(ref.arrived_on_unit_at)} onChange={(v) => saveTimestamp("arrived_on_unit_at", v ? new Date(v).toISOString() : null)} disabled={ref.status === "declined"} /></F>
+            <F label="Received" required error={timing.fieldErrors.referral_received_at}>
+              <DTNow value={toLocal(ref.referral_received_at)} onChange={(v) => saveTimestamp("referral_received_at", v ? new Date(v).toISOString() : null)} invalid={!!timing.fieldErrors.referral_received_at} />
+            </F>
+            <F label="First seen" required={ref.status !== "pending"} error={timing.fieldErrors.first_seen_at}>
+              <DTNow value={toLocal(ref.first_seen_at)} onChange={(v) => saveTimestamp("first_seen_at", v ? new Date(v).toISOString() : null)} invalid={!!timing.fieldErrors.first_seen_at} />
+            </F>
+            <F label="Decision" required={ref.status !== "pending"} error={timing.fieldErrors.decision_at}>
+              <DTNow value={toLocal(ref.decision_at)} onChange={(v) => saveTimestamp("decision_at", v ? new Date(v).toISOString() : null)} invalid={!!timing.fieldErrors.decision_at} />
+            </F>
+            <F label="Arrived on unit" required={ref.status === "admitted"} error={timing.fieldErrors.arrived_on_unit_at}>
+              <DTNow value={toLocal(ref.arrived_on_unit_at)} onChange={(v) => saveTimestamp("arrived_on_unit_at", v ? new Date(v).toISOString() : null)} disabled={ref.status === "declined"} invalid={!!timing.fieldErrors.arrived_on_unit_at} />
+            </F>
           </div>
-          <p className="text-xs text-muted-foreground">Timestamps save automatically.</p>
+          {timing.issues.length > 0 && (
+            <Alert variant="destructive">
+              <AlertCircle className="h-4 w-4" />
+              <AlertTitle>Inconsistent timings</AlertTitle>
+              <AlertDescription>
+                <ul className="list-disc pl-4 space-y-1">
+                  {timing.issues.map((m) => <li key={m}>{m}</li>)}
+                </ul>
+              </AlertDescription>
+            </Alert>
+          )}
+          <p className="text-xs text-muted-foreground">Timestamps save automatically. Fields marked <span className="text-destructive">*</span> are required for the ICNARC dataset.</p>
         </Card>
 
         <Card className="p-5 space-y-4">
