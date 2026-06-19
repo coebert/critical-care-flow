@@ -15,6 +15,8 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
+import { ComboboxAdd } from "@/components/combobox-add";
+import { useReferralOptions } from "@/hooks/use-referral-options";
 import { toast } from "sonner";
 
 export const Route = createFileRoute("/_authenticated/referrals/new")({
