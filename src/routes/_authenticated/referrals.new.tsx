@@ -174,7 +174,7 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
 function DateTimeNow({ value, onChange }: { value: string; onChange: (v: string) => void }) {
   return (
     <div className="flex gap-2">
-      <Input type="datetime-local" value={value} onChange={(e) => onChange(e.target.value)} />
+      <Input type="datetime-local" value={value} onChange={(e) => onChange(e.target.value)} className={!value ? "text-muted-foreground" : ""} />
       <Button type="button" variant="outline" size="sm" onClick={() => onChange(localISO())}>Now</Button>
     </div>
   );
