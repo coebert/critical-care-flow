@@ -30,7 +30,7 @@ import { ComboboxAdd } from "@/components/combobox-add";
 import { useReferralOptions } from "@/hooks/use-referral-options";
 import { toast } from "sonner";
 import { format } from "date-fns";
-import { validateReferralTimings, type TimingField } from "@/lib/referral-validation";
+import { validateReferralTimings } from "@/lib/referral-validation";
 import { cn } from "@/lib/utils";
 
 type PriorReferral = {
