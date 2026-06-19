@@ -52,13 +52,20 @@ function ReferralsList() {
       .channel("referrals-list")
       .on("postgres_changes", { event: "*", schema: "public", table: "referrals" }, (payload) => {
         setRows((cur) => {
-          if (payload.eventType === "INSERT") return [payload.new as Referral, ...cur];
-          if (payload.eventType === "UPDATE")
-            return cur.map((r) => (r.id === (payload.new as Referral).id ? (payload.new as Referral) : r));
+          if (payload.eventType === "INSERT") {
+            const r = payload.new as Referral;
+            return r.deleted_at ? cur : [r, ...cur];
+          }
+          if (payload.eventType === "UPDATE") {
+            const r = payload.new as Referral;
+            if (r.deleted_at) return cur.filter((x) => x.id !== r.id);
+            return cur.map((x) => (x.id === r.id ? r : x));
+          }
           if (payload.eventType === "DELETE") return cur.filter((r) => r.id !== (payload.old as Referral).id);
           return cur;
         });
       })
+
       .subscribe();
     return () => {
       cancelled = true;
