@@ -296,8 +296,8 @@ function nowLocal() {
 
 function DTNow({ value, onChange, disabled }: { value: string; onChange: (v: string) => void; disabled?: boolean }) {
   return (
-    <div className="flex gap-2">
-      <Input type="datetime-local" value={value} onChange={(e) => onChange(e.target.value)} disabled={disabled} className={`${disabled ? "opacity-50 cursor-not-allowed" : ""} ${!value ? "text-muted-foreground" : ""}`} />
+    <div className={`flex gap-2 transition-opacity ${disabled ? "opacity-50" : ""}`}>
+      <Input type="datetime-local" value={value} onChange={(e) => onChange(e.target.value)} disabled={disabled} className={`${disabled ? "bg-muted border-muted-foreground/30" : ""} ${!value ? "text-muted-foreground" : ""}`} />
       <Button type="button" variant="outline" size="sm" onClick={() => onChange(nowLocal())} disabled={disabled}>Now</Button>
     </div>
   );
