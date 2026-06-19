@@ -78,7 +78,7 @@ export const createReferral = createServerFn({ method: "POST" })
       .single();
     if (error) throw new Error(error.message);
 
-    await supabase.from("audit_log").insert({
+    await writeAudit({
       user_id: userId,
       action: "create",
       entity: "referral",
@@ -87,9 +87,10 @@ export const createReferral = createServerFn({ method: "POST" })
     });
 
     const summary = `${row.referring_specialty ?? "Referral"} — ${row.current_ward ?? "ward unknown"}`;
-    await fanOutNotifications(supabase, userId, row.id, "new", `New referral: ${summary}`);
+    await fanOutNotifications(userId, row.id, "new", `New referral: ${summary}`);
     return row;
   });
+
 
 export const updateReferral = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
