@@ -8,6 +8,7 @@ import { Card } from "@/components/ui/card";
 import { Activity } from "lucide-react";
 import { toast } from "sonner";
 import { Toaster } from "@/components/ui/sonner";
+import { retrySupabaseCall, retryWithBackoff } from "@/lib/retry";
 
 export const Route = createFileRoute("/auth")({
   ssr: false,
@@ -29,30 +30,55 @@ function AuthPage() {
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
-    supabase.auth.getSession().then(({ data }) => {
-      if (data.session) navigate({ to: "/", replace: true });
-    });
+    let cancelled = false;
+    retryWithBackoff(() => supabase.auth.getSession().then((r) => {
+      if (r.error) throw r.error;
+      return r.data;
+    }))
+      .then((data) => {
+        if (!cancelled && data.session) navigate({ to: "/", replace: true });
+      })
+      .catch(() => {
+        // Transient failure restoring session — let the user sign in manually.
+      });
+    return () => {
+      cancelled = true;
+    };
   }, [navigate]);
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
+    let notifiedRetry = false;
     try {
       if (mode === "signin") {
-        const { error } = await supabase.auth.signInWithPassword({ email, password });
+        const { error } = await retrySupabaseCall(
+          () => supabase.auth.signInWithPassword({ email, password }),
+          {
+            onRetry: (_err, attempt) => {
+              if (!notifiedRetry) {
+                notifiedRetry = true;
+                toast.message("Network hiccup — retrying sign in…");
+              }
+              console.warn(`[auth] sign-in retry attempt ${attempt}`);
+            },
+          },
+        );
         if (error) throw error;
         toast.success("Signed in");
         navigate({ to: "/", replace: true });
       } else {
-        const { error } = await supabase.auth.resetPasswordForEmail(email, {
-          redirectTo: window.location.origin + "/reset-password",
-        });
+        const { error } = await retrySupabaseCall(() =>
+          supabase.auth.resetPasswordForEmail(email, {
+            redirectTo: window.location.origin + "/reset-password",
+          }),
+        );
         if (error) throw error;
         toast.success("Password reset email sent");
         setMode("signin");
       }
     } catch (err: any) {
-      toast.error(err.message ?? "Something went wrong");
+      toast.error(err?.message ?? "Something went wrong");
     } finally {
       setLoading(false);
     }
