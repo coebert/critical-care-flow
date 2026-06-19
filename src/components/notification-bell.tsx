@@ -1,0 +1,117 @@
+import { useEffect, useState } from "react";
+import { Bell } from "lucide-react";
+import { Link } from "@tanstack/react-router";
+import { supabase } from "@/integrations/supabase/client";
+import { useAuth } from "@/hooks/use-auth";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
+import { Button } from "@/components/ui/button";
+import { formatDistanceToNow } from "date-fns";
+
+interface Notification {
+  id: string;
+  referral_id: string | null;
+  kind: string;
+  message: string;
+  read_at: string | null;
+  created_at: string;
+}
+
+export function NotificationBell() {
+  const { user } = useAuth();
+  const [items, setItems] = useState<Notification[]>([]);
+  const [open, setOpen] = useState(false);
+
+  useEffect(() => {
+    if (!user) return;
+    let cancelled = false;
+    supabase
+      .from("notifications")
+      .select("*")
+      .order("created_at", { ascending: false })
+      .limit(30)
+      .then(({ data }) => {
+        if (!cancelled && data) setItems(data);
+      });
+
+    const channel = supabase
+      .channel(`notif-${user.id}`)
+      .on(
+        "postgres_changes",
+        { event: "INSERT", schema: "public", table: "notifications", filter: `user_id=eq.${user.id}` },
+        (payload) => {
+          const n = payload.new as Notification;
+          setItems((cur) => [n, ...cur].slice(0, 30));
+          if (
+            typeof window !== "undefined" &&
+            "Notification" in window &&
+            Notification.permission === "granted" &&
+            document.visibilityState !== "visible"
+          ) {
+            new Notification("SDH Critical Care", { body: n.message });
+          }
+        },
+      )
+      .subscribe();
+
+    return () => {
+      cancelled = true;
+      supabase.removeChannel(channel);
+    };
+  }, [user]);
+
+  const unread = items.filter((i) => !i.read_at).length;
+
+  const markAllRead = async () => {
+    const ids = items.filter((i) => !i.read_at).map((i) => i.id);
+    if (!ids.length) return;
+    await supabase.from("notifications").update({ read_at: new Date().toISOString() }).in("id", ids);
+    setItems((cur) => cur.map((i) => (i.read_at ? i : { ...i, read_at: new Date().toISOString() })));
+  };
+
+  return (
+    <Popover open={open} onOpenChange={setOpen}>
+      <PopoverTrigger asChild>
+        <Button variant="ghost" size="icon" className="relative">
+          <Bell className="w-5 h-5" />
+          {unread > 0 && (
+            <span className="absolute top-1 right-1 min-w-4 h-4 px-1 rounded-full bg-destructive text-destructive-foreground text-[10px] font-semibold flex items-center justify-center">
+              {unread}
+            </span>
+          )}
+        </Button>
+      </PopoverTrigger>
+      <PopoverContent align="end" className="w-80 p-0">
+        <div className="flex items-center justify-between p-3 border-b">
+          <div className="text-sm font-semibold">Notifications</div>
+          <Button variant="ghost" size="sm" onClick={markAllRead} disabled={unread === 0}>
+            Mark all read
+          </Button>
+        </div>
+        <div className="max-h-96 overflow-auto">
+          {items.length === 0 ? (
+            <div className="p-6 text-sm text-muted-foreground text-center">No notifications yet</div>
+          ) : (
+            items.map((n) => (
+              <Link
+                key={n.id}
+                to={n.referral_id ? "/referrals/$id" : "/"}
+                params={n.referral_id ? { id: n.referral_id } : undefined as any}
+                onClick={() => setOpen(false)}
+                className={`block px-3 py-2 border-b last:border-0 hover:bg-accent ${!n.read_at ? "bg-accent/40" : ""}`}
+              >
+                <div className="text-sm">{n.message}</div>
+                <div className="text-xs text-muted-foreground">
+                  {formatDistanceToNow(new Date(n.created_at), { addSuffix: true })}
+                </div>
+              </Link>
+            ))
+          )}
+        </div>
+      </PopoverContent>
+    </Popover>
+  );
+}

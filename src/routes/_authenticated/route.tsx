@@ -1,0 +1,97 @@
+import { createFileRoute, Outlet, redirect, Link, useRouter, useNavigate } from "@tanstack/react-router";
+import { useEffect, useState } from "react";
+import { supabase } from "@/integrations/supabase/client";
+import { Activity, BarChart3, ListChecks, Shield, Bell, LogOut, Plus } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { useAuth, useRole } from "@/hooks/use-auth";
+import { NotificationBell } from "@/components/notification-bell";
+import { Toaster } from "@/components/ui/sonner";
+
+export const Route = createFileRoute("/_authenticated")({
+  ssr: false,
+  beforeLoad: async () => {
+    const { data, error } = await supabase.auth.getUser();
+    if (error || !data.user) throw redirect({ to: "/auth" });
+    return { user: data.user };
+  },
+  component: AuthedShell,
+});
+
+function AuthedShell() {
+  const { user } = useAuth();
+  const { hasRole: isAdmin } = useRole("admin");
+  const router = useRouter();
+  const navigate = useNavigate();
+  const [signingOut, setSigningOut] = useState(false);
+
+  useEffect(() => {
+    if (typeof window !== "undefined" && "Notification" in window) {
+      if (Notification.permission === "default") {
+        Notification.requestPermission().catch(() => {});
+      }
+    }
+  }, []);
+
+  const handleSignOut = async () => {
+    setSigningOut(true);
+    await supabase.auth.signOut();
+    router.invalidate();
+    navigate({ to: "/auth", replace: true });
+  };
+
+  return (
+    <div className="min-h-screen flex bg-background">
+      <aside className="w-60 border-r bg-sidebar flex flex-col">
+        <div className="px-5 py-5 border-b">
+          <div className="flex items-center gap-2">
+            <div className="w-9 h-9 rounded-md bg-primary flex items-center justify-center">
+              <Activity className="w-5 h-5 text-primary-foreground" />
+            </div>
+            <div>
+              <div className="font-semibold text-sm leading-tight">SDH Critical Care</div>
+              <div className="text-xs text-muted-foreground">Referral tracker</div>
+            </div>
+          </div>
+        </div>
+        <nav className="flex-1 px-2 py-3 space-y-1 text-sm">
+          <NavItem to="/" icon={<ListChecks className="w-4 h-4" />}>Referrals</NavItem>
+          <NavItem to="/referrals/new" icon={<Plus className="w-4 h-4" />}>New referral</NavItem>
+          <NavItem to="/analytics" icon={<BarChart3 className="w-4 h-4" />}>Analytics</NavItem>
+          {isAdmin && (
+            <NavItem to="/admin" icon={<Shield className="w-4 h-4" />}>Admin</NavItem>
+          )}
+        </nav>
+        <div className="p-3 border-t text-xs space-y-2">
+          <div className="text-muted-foreground truncate" title={user?.email ?? ""}>
+            {user?.email}
+          </div>
+          <Button variant="ghost" size="sm" className="w-full justify-start" onClick={handleSignOut} disabled={signingOut}>
+            <LogOut className="w-4 h-4 mr-2" /> Sign out
+          </Button>
+        </div>
+      </aside>
+      <div className="flex-1 flex flex-col min-w-0">
+        <header className="h-14 border-b flex items-center justify-end px-6 gap-3 bg-card">
+          <NotificationBell />
+        </header>
+        <main className="flex-1 overflow-auto">
+          <Outlet />
+        </main>
+      </div>
+      <Toaster />
+    </div>
+  );
+}
+
+function NavItem({ to, icon, children }: { to: string; icon: React.ReactNode; children: React.ReactNode }) {
+  return (
+    <Link
+      to={to}
+      className="flex items-center gap-2 px-3 py-2 rounded-md hover:bg-sidebar-accent text-sidebar-foreground [&.active]:bg-sidebar-accent [&.active]:text-sidebar-accent-foreground [&.active]:font-medium"
+      activeOptions={{ exact: to === "/" }}
+    >
+      {icon}
+      {children}
+    </Link>
+  );
+}
