@@ -369,7 +369,7 @@ function F({ label, children }: { label: string; children: React.ReactNode }) {
   return <div className="space-y-1.5"><Label className="text-xs">{label}</Label>{children}</div>;
 }
 
-function ExpandableSection({ label, children }: { label: string; children: React.ReactNode }) {
+function ExpandableSection({ label, children, command }: { label: string; children: React.ReactNode; command?: { open: boolean; id: number } | null }) {
   const [open, setOpen] = useState(true);
   const [isMobile, setIsMobile] = useState(false);
 
@@ -383,6 +383,12 @@ function ExpandableSection({ label, children }: { label: string; children: React
     mq.addEventListener("change", update);
     return () => mq.removeEventListener("change", update);
   }, []);
+
+  useEffect(() => {
+    if (command) {
+      setOpen(command.open);
+    }
+  }, [command?.id]);
 
   if (!isMobile) {
     return <F label={label}>{children}</F>;
