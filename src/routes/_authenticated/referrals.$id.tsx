@@ -273,3 +273,18 @@ function ReferralDetail() {
 function F({ label, children }: { label: string; children: React.ReactNode }) {
   return <div className="space-y-1.5"><Label className="text-xs">{label}</Label>{children}</div>;
 }
+
+function nowLocal() {
+  const d = new Date();
+  d.setMinutes(d.getMinutes() - d.getTimezoneOffset());
+  return d.toISOString().slice(0, 16);
+}
+
+function DTNow({ value, onChange }: { value: string; onChange: (v: string) => void }) {
+  return (
+    <div className="flex gap-2">
+      <Input type="datetime-local" value={value} onChange={(e) => onChange(e.target.value)} />
+      <Button type="button" variant="outline" size="sm" onClick={() => onChange(nowLocal())}>Now</Button>
+    </div>
+  );
+}
