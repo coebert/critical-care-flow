@@ -335,3 +335,162 @@ function DTNow({ value, onChange, disabled }: { value: string; onChange: (v: str
     </div>
   );
 }
+
+function NoteItem({
+  note,
+  authorName,
+  canEdit,
+  onSave,
+  onDelete,
+}: {
+  note: Note;
+  authorName: string;
+  canEdit: boolean;
+  onSave: (body: string) => Promise<void>;
+  onDelete: () => Promise<void>;
+}) {
+  const [editing, setEditing] = useState(false);
+  const [draft, setDraft] = useState(note.body);
+  const [busy, setBusy] = useState(false);
+  const edited = (note as any).edited_at as string | null | undefined;
+
+  const save = async () => {
+    if (!draft.trim() || draft.trim() === note.body) { setEditing(false); return; }
+    setBusy(true);
+    try { await onSave(draft.trim()); setEditing(false); }
+    catch (e: any) { toast.error(e.message ?? "Failed to update note"); }
+    finally { setBusy(false); }
+  };
+
+  const remove = async () => {
+    setBusy(true);
+    try { await onDelete(); }
+    catch (e: any) { toast.error(e.message ?? "Failed to delete note"); setBusy(false); }
+  };
+
+  return (
+    <div className="text-sm border-l-2 border-primary/40 pl-3 py-1 group">
+      <div className="flex items-baseline justify-between gap-3 mb-1">
+        <span className="text-xs font-medium">{authorName}</span>
+        <span className="text-[11px] text-muted-foreground" title={format(new Date(note.created_at), "PPpp")}>
+          {format(new Date(note.created_at), "d MMM yyyy, HH:mm")} · {formatDistanceToNow(new Date(note.created_at), { addSuffix: true })}
+          {edited && (
+            <span className="ml-1 italic" title={`Edited ${format(new Date(edited), "PPpp")}`}>(edited)</span>
+          )}
+        </span>
+      </div>
+      {editing ? (
+        <div className="space-y-2">
+          <Textarea rows={3} value={draft} onChange={(e) => setDraft(e.target.value)} disabled={busy} />
+          <div className="flex justify-end gap-2">
+            <Button size="sm" variant="ghost" onClick={() => { setDraft(note.body); setEditing(false); }} disabled={busy}>
+              <X className="w-3.5 h-3.5 mr-1" /> Cancel
+            </Button>
+            <Button size="sm" onClick={save} disabled={busy || !draft.trim()}>
+              <Save className="w-3.5 h-3.5 mr-1" /> {busy ? "Saving…" : "Save"}
+            </Button>
+          </div>
+        </div>
+      ) : (
+        <div className="whitespace-pre-wrap">{note.body}</div>
+      )}
+      <div className="mt-1 flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+        <NoteHistoryButton noteId={note.id} />
+        {canEdit && !editing && (
+          <>
+            <Button size="sm" variant="ghost" className="h-7 px-2 text-xs" onClick={() => { setDraft(note.body); setEditing(true); }} disabled={busy}>
+              <Pencil className="w-3.5 h-3.5 mr-1" /> Edit
+            </Button>
+            <AlertDialog>
+              <AlertDialogTrigger asChild>
+                <Button size="sm" variant="ghost" className="h-7 px-2 text-xs text-destructive hover:text-destructive" disabled={busy}>
+                  <Trash2 className="w-3.5 h-3.5 mr-1" /> Delete
+                </Button>
+              </AlertDialogTrigger>
+              <AlertDialogContent>
+                <AlertDialogHeader>
+                  <AlertDialogTitle>Delete this note?</AlertDialogTitle>
+                  <AlertDialogDescription>
+                    The note will be removed for everyone. The deletion is recorded in the audit trail.
+                  </AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                  <AlertDialogCancel disabled={busy}>Cancel</AlertDialogCancel>
+                  <AlertDialogAction onClick={remove} disabled={busy} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
+                    {busy ? "Deleting…" : "Delete note"}
+                  </AlertDialogAction>
+                </AlertDialogFooter>
+              </AlertDialogContent>
+            </AlertDialog>
+          </>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function NoteHistoryButton({ noteId }: { noteId: string }) {
+  const fetchHistory = useServerFn(getNoteHistory);
+  const [open, setOpen] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [entries, setEntries] = useState<Array<{
+    id: string; action: string; created_at: string; user_id: string; user_name: string; diff: any;
+  }>>([]);
+
+  const load = async () => {
+    setLoading(true);
+    try {
+      const res = await fetchHistory({ data: { note_id: noteId } });
+      setEntries(res as any);
+    } catch (e: any) {
+      toast.error(e.message ?? "Failed to load history");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <Dialog open={open} onOpenChange={(v) => { setOpen(v); if (v) load(); }}>
+      <DialogTrigger asChild>
+        <Button size="sm" variant="ghost" className="h-7 px-2 text-xs">
+          <History className="w-3.5 h-3.5 mr-1" /> History
+        </Button>
+      </DialogTrigger>
+      <DialogContent className="max-w-lg">
+        <DialogHeader>
+          <DialogTitle>Note audit trail</DialogTitle>
+        </DialogHeader>
+        {loading && <p className="text-sm text-muted-foreground">Loading…</p>}
+        {!loading && entries.length === 0 && (
+          <p className="text-sm text-muted-foreground">No audit entries found.</p>
+        )}
+        <div className="space-y-3 max-h-[60vh] overflow-auto">
+          {entries.map((e) => (
+            <div key={e.id} className="text-sm border-l-2 border-muted pl-3">
+              <div className="flex items-baseline justify-between gap-3 mb-1">
+                <span className="text-xs font-medium capitalize">{e.action} · {e.user_name}</span>
+                <span className="text-[11px] text-muted-foreground">
+                  {format(new Date(e.created_at), "d MMM yyyy, HH:mm:ss")}
+                </span>
+              </div>
+              {e.action === "update" && e.diff?.before?.body !== undefined && (
+                <div className="space-y-1 text-xs">
+                  <div className="text-muted-foreground">Before:</div>
+                  <div className="whitespace-pre-wrap bg-muted/50 rounded px-2 py-1">{e.diff.before.body}</div>
+                  <div className="text-muted-foreground">After:</div>
+                  <div className="whitespace-pre-wrap bg-muted/50 rounded px-2 py-1">{e.diff.after?.body}</div>
+                </div>
+              )}
+              {e.action === "create" && e.diff?.body && (
+                <div className="text-xs whitespace-pre-wrap bg-muted/50 rounded px-2 py-1">{e.diff.body}</div>
+              )}
+              {e.action === "delete" && e.diff?.body && (
+                <div className="text-xs whitespace-pre-wrap bg-muted/50 rounded px-2 py-1 line-through opacity-70">{e.diff.body}</div>
+              )}
+            </div>
+          ))}
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+}
