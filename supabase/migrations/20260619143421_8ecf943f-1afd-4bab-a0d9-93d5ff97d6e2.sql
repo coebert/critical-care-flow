@@ -1,0 +1,1 @@
+REVOKE EXECUTE ON FUNCTION public.prevent_unauthorized_soft_delete() FROM PUBLIC, anon, authenticated;
