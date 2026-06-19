@@ -191,7 +191,7 @@ function ReferralsList() {
               Restorable within {RESTORE_WINDOW_DAYS} days of deletion
             </span>
           </div>
-          <table className="w-full text-sm">
+          <div className="overflow-x-auto"><table className="w-full text-sm min-w-[640px]">
             <thead className="bg-muted/50 text-xs uppercase text-muted-foreground">
               <tr>
                 <th className="text-left px-3 py-2">Deleted</th>
