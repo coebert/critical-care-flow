@@ -155,6 +155,108 @@ export const addNote = createServerFn({ method: "POST" })
   });
 
 
+export const updateNote = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d: unknown) =>
+    z
+      .object({ id: z.string().uuid(), body: z.string().trim().min(1).max(2000) })
+      .parse(d),
+  )
+  .handler(async ({ data, context }) => {
+    const { supabase, userId } = context;
+    const { data: existing } = await supabase
+      .from("referral_notes")
+      .select("id, body, referral_id, author_id")
+      .eq("id", data.id)
+      .maybeSingle();
+    if (!existing) throw new Error("Note not found");
+
+    const { data: row, error } = await supabase
+      .from("referral_notes")
+      .update({ body: data.body, edited_at: new Date().toISOString() } as any)
+      .eq("id", data.id)
+      .select()
+      .single();
+    if (error) throw new Error(error.message);
+
+    await writeAudit({
+      user_id: userId,
+      action: "update",
+      entity: "referral_note",
+      entity_id: row.id,
+      diff: {
+        referral_id: existing.referral_id,
+        before: { body: existing.body },
+        after: { body: data.body },
+      },
+    });
+    return row;
+  });
+
+
+export const deleteNote = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d: unknown) => z.object({ id: z.string().uuid() }).parse(d))
+  .handler(async ({ data, context }) => {
+    const { supabase, userId } = context;
+    const { data: existing } = await supabase
+      .from("referral_notes")
+      .select("id, body, referral_id, author_id, created_at")
+      .eq("id", data.id)
+      .maybeSingle();
+    if (!existing) throw new Error("Note not found");
+
+    const { error } = await supabase.from("referral_notes").delete().eq("id", data.id);
+    if (error) throw new Error(error.message);
+
+    await writeAudit({
+      user_id: userId,
+      action: "delete",
+      entity: "referral_note",
+      entity_id: data.id,
+      diff: existing as any,
+    });
+    return { ok: true };
+  });
+
+
+export const getNoteHistory = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d: unknown) => z.object({ note_id: z.string().uuid() }).parse(d))
+  .handler(async ({ data, context }) => {
+    const { supabase, userId } = context;
+    const { data: access } = await supabase.rpc("has_clinical_access", { _user_id: userId });
+    if (!access) throw new Error("Forbidden");
+
+    const admin = await getAdmin();
+    const { data: rows, error } = await admin
+      .from("audit_log")
+      .select("id, user_id, action, diff, created_at")
+      .eq("entity", "referral_note")
+      .eq("entity_id", data.note_id)
+      .order("created_at", { ascending: false });
+    if (error) throw new Error(error.message);
+
+    const userIds = Array.from(new Set((rows ?? []).map((r: any) => r.user_id).filter(Boolean)));
+    let names: Record<string, string> = {};
+    if (userIds.length) {
+      const { data: profs } = await admin
+        .from("profiles")
+        .select("id, full_name")
+        .in("id", userIds as string[]);
+      profs?.forEach((p: any) => { names[p.id] = p.full_name ?? "Clinician"; });
+    }
+    return (rows ?? []).map((r: any) => ({
+      id: r.id,
+      action: r.action,
+      created_at: r.created_at,
+      user_id: r.user_id,
+      user_name: names[r.user_id] ?? "Clinician",
+      diff: r.diff,
+    }));
+  });
+
+
 export const logReferralView = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((d: unknown) => z.object({ referral_id: z.string().uuid() }).parse(d))
