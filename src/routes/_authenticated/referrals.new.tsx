@@ -117,10 +117,10 @@ function NewReferralPage() {
 
         <Section title="Timestamps">
           <div className="grid grid-cols-2 gap-4">
-            <Field label="Referral received"><Input type="datetime-local" value={f.referral_received_at} onChange={(e) => set("referral_received_at", e.target.value)} /></Field>
-            <Field label="First seen by CC"><Input type="datetime-local" value={f.first_seen_at} onChange={(e) => set("first_seen_at", e.target.value)} /></Field>
-            <Field label="Decision to admit / decline"><Input type="datetime-local" value={f.decision_at} onChange={(e) => set("decision_at", e.target.value)} /></Field>
-            <Field label="Arrived on unit"><Input type="datetime-local" value={f.arrived_on_unit_at} onChange={(e) => set("arrived_on_unit_at", e.target.value)} /></Field>
+            <Field label="Referral received"><DateTimeNow value={f.referral_received_at} onChange={(v) => set("referral_received_at", v)} /></Field>
+            <Field label="First seen by CC"><DateTimeNow value={f.first_seen_at} onChange={(v) => set("first_seen_at", v)} /></Field>
+            <Field label="Decision to admit / decline"><DateTimeNow value={f.decision_at} onChange={(v) => set("decision_at", v)} /></Field>
+            <Field label="Arrived on unit"><DateTimeNow value={f.arrived_on_unit_at} onChange={(v) => set("arrived_on_unit_at", v)} /></Field>
           </div>
         </Section>
 
