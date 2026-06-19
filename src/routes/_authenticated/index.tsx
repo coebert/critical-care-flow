@@ -191,7 +191,8 @@ function ReferralsList() {
               Restorable within {RESTORE_WINDOW_DAYS} days of deletion
             </span>
           </div>
-          <div className="overflow-x-auto"><table className="w-full text-sm min-w-[640px]">
+          {/* Desktop table */}
+          <div className="hidden md:block overflow-x-auto"><table className="w-full text-sm min-w-[640px]">
             <thead className="bg-muted/50 text-xs uppercase text-muted-foreground">
               <tr>
                 <th className="text-left px-3 py-2">Deleted</th>
@@ -233,6 +234,51 @@ function ReferralsList() {
               ))}
             </tbody>
           </table></div>
+          {/* Mobile cards */}
+          <div className="md:hidden flex flex-col gap-2 p-3">
+            {deletedLoading && (
+              <div className="text-center text-muted-foreground py-6">Loading…</div>
+            )}
+            {!deletedLoading && deletedRows.length === 0 && (
+              <div className="text-center text-muted-foreground py-6">No restorable referrals.</div>
+            )}
+            {deletedRows.map((r) => (
+              <div key={r.id} className="border rounded-lg bg-background p-3 flex flex-col gap-2">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs text-muted-foreground">
+                    Deleted {r.deleted_at ? `${formatDistanceToNow(new Date(r.deleted_at))} ago` : "—"}
+                  </span>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    disabled={restoringId === r.id}
+                    onClick={() => onRestore(r.id)}
+                  >
+                    <RotateCcw className="w-3.5 h-3.5 mr-1" />
+                    {restoringId === r.id ? "Restoring…" : "Restore"}
+                  </Button>
+                </div>
+                <div className="grid grid-cols-2 gap-x-3 gap-y-1 text-sm">
+                  <div>
+                    <span className="text-xs text-muted-foreground block">Hosp. no</span>
+                    <span className="font-medium">{r.hospital_number ?? "—"}</span>
+                  </div>
+                  <div>
+                    <span className="text-xs text-muted-foreground block">Specialty</span>
+                    <span className="font-medium">{r.referring_specialty ?? "—"}</span>
+                  </div>
+                  <div className="col-span-2">
+                    <span className="text-xs text-muted-foreground block">Location</span>
+                    <span className="font-medium">{r.current_ward ?? "—"} {r.current_bed ? `· ${r.current_bed}` : ""}</span>
+                  </div>
+                  <div className="col-span-2">
+                    <span className="text-xs text-muted-foreground block">Reason</span>
+                    <span className="font-medium line-clamp-2">{r.reason_for_referral ?? "—"}</span>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
         </div>
       )}
 
