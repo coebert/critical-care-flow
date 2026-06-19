@@ -45,8 +45,11 @@ function ReferralDetail() {
   const navigate = useNavigate();
   const update = useServerFn(updateReferral);
   const addNoteFn = useServerFn(addNote);
+  const updateNoteFn = useServerFn(updateNote);
+  const deleteNoteFn = useServerFn(deleteNote);
   const logView = useServerFn(logReferralView);
   const removeReferral = useServerFn(deleteReferral);
+  const { user } = useAuth();
   const { hasRole: isAdmin } = useRole("admin");
   const [deleting, setDeleting] = useState(false);
   const { specialties, wards } = useReferralOptions();
@@ -58,6 +61,12 @@ function ReferralDetail() {
   const [noteBody, setNoteBody] = useState("");
   const [saving, setSaving] = useState(false);
   const [posting, setPosting] = useState(false);
+
+  const upsertAuthorName = async (uid: string) => {
+    if (authors[uid]) return;
+    const { data } = await supabase.from("profiles").select("id,full_name").eq("id", uid).maybeSingle();
+    if (data) setAuthors((cur) => ({ ...cur, [data.id]: data.full_name ?? "Clinician" }));
+  };
 
   useEffect(() => {
     logView({ data: { referral_id: id } }).catch(() => {});
@@ -83,7 +92,21 @@ function ReferralDetail() {
       .on("postgres_changes", { event: "UPDATE", schema: "public", table: "referrals", filter: `id=eq.${id}` },
         (p) => setRef(p.new as Referral))
       .on("postgres_changes", { event: "INSERT", schema: "public", table: "referral_notes", filter: `referral_id=eq.${id}` },
-        (p) => setNotes((cur) => [p.new as Note, ...cur]))
+        (p) => {
+          const n = p.new as Note;
+          setNotes((cur) => (cur.some((x) => x.id === n.id) ? cur : [n, ...cur]));
+          upsertAuthorName(n.author_id);
+        })
+      .on("postgres_changes", { event: "UPDATE", schema: "public", table: "referral_notes", filter: `referral_id=eq.${id}` },
+        (p) => {
+          const n = p.new as Note;
+          setNotes((cur) => cur.map((x) => (x.id === n.id ? n : x)));
+        })
+      .on("postgres_changes", { event: "DELETE", schema: "public", table: "referral_notes", filter: `referral_id=eq.${id}` },
+        (p) => {
+          const old = p.old as { id: string };
+          setNotes((cur) => cur.filter((x) => x.id !== old.id));
+        })
       .subscribe();
     return () => { supabase.removeChannel(ch); };
   }, [id, logView]);
