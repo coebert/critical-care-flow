@@ -1,14 +1,18 @@
-import { createFileRoute, Link, useNavigate, redirect } from "@tanstack/react-router";
-import { useEffect, useState, useMemo } from "react";
+import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
+import { useEffect, useState, useMemo, useCallback } from "react";
+import { useServerFn } from "@tanstack/react-start";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
-import { Plus, Search } from "lucide-react";
+import { Plus, Search, RotateCcw, Trash2 } from "lucide-react";
 import type { Tables } from "@/integrations/supabase/types";
-import { format } from "date-fns";
+import { format, formatDistanceToNow } from "date-fns";
+import { listDeletedReferrals, restoreReferral, RESTORE_WINDOW_DAYS } from "@/lib/referrals.functions";
+import { toast } from "sonner";
 
 type Referral = Tables<"referrals">;
+
 
 export const Route = createFileRoute("/_authenticated/")({
   head: () => ({
