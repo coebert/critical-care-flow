@@ -177,17 +177,26 @@ function ReferralsList() {
               <tr><td colSpan={7} className="px-3 py-8 text-center text-muted-foreground">No referrals match.</td></tr>
             )}
             {filtered.map((r) => (
-              <tr key={r.id} className="border-t hover:bg-accent/40 cursor-pointer">
+              <tr
+                key={r.id}
+                className="border-t hover:bg-accent/40 cursor-pointer"
+                onClick={() => navigate({ to: "/referrals/$id", params: { id: r.id } })}
+                tabIndex={0}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" || e.key === " ") {
+                    e.preventDefault();
+                    navigate({ to: "/referrals/$id", params: { id: r.id } });
+                  }
+                }}
+              >
                 <td className="px-3 py-2 whitespace-nowrap">
-                  <Link to="/referrals/$id" params={{ id: r.id }} className="block">
-                    {format(new Date(r.referral_received_at), "dd MMM HH:mm")}
-                  </Link>
+                  {format(new Date(r.referral_received_at), "dd MMM HH:mm")}
                 </td>
-                <td className="px-3 py-2"><Link to="/referrals/$id" params={{ id: r.id }}>{r.hospital_number ?? "—"}</Link></td>
-                <td className="px-3 py-2"><Link to="/referrals/$id" params={{ id: r.id }}>{r.age ?? "?"} / {r.sex ?? "?"}</Link></td>
-                <td className="px-3 py-2"><Link to="/referrals/$id" params={{ id: r.id }}>{r.current_ward ?? "—"} {r.current_bed ? `· ${r.current_bed}` : ""}</Link></td>
-                <td className="px-3 py-2"><Link to="/referrals/$id" params={{ id: r.id }}>{r.referring_specialty ?? "—"}</Link></td>
-                <td className="px-3 py-2 max-w-xs truncate"><Link to="/referrals/$id" params={{ id: r.id }}>{r.reason_for_referral ?? "—"}</Link></td>
+                <td className="px-3 py-2">{r.hospital_number ?? "—"}</td>
+                <td className="px-3 py-2">{r.age ?? "?"} / {r.sex ?? "?"}</td>
+                <td className="px-3 py-2">{r.current_ward ?? "—"} {r.current_bed ? `· ${r.current_bed}` : ""}</td>
+                <td className="px-3 py-2">{r.referring_specialty ?? "—"}</td>
+                <td className="px-3 py-2 max-w-xs truncate">{r.reason_for_referral ?? "—"}</td>
                 <td className="px-3 py-2">
                   <Badge variant="outline" className={`capitalize ${statusStyles[r.status]}`}>{r.status}</Badge>
                 </td>
