@@ -119,6 +119,7 @@ function ReferralsList() {
 
   const filtered = useMemo(() => {
     const needle = q.trim().toLowerCase();
+    const hospNeedle = hospSearch.trim().toLowerCase();
     const now = new Date();
     const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
     let fromTs: number | null = null;
@@ -135,12 +136,16 @@ function ReferralsList() {
         if (t < fromTs) return false;
         if (toTs !== null && t >= toTs) return false;
       }
+      if (hospNeedle) {
+        const hn = (r.hospital_number ?? "").toLowerCase();
+        if (!hn.includes(hospNeedle)) return false;
+      }
       if (!needle) return true;
       return [r.hospital_number, r.current_ward, r.current_bed, r.referring_specialty, r.reason_for_referral]
         .filter(Boolean)
         .some((v) => v!.toString().toLowerCase().includes(needle));
     });
-  }, [rows, q, statusFilter, dateFilter]);
+  }, [rows, q, hospSearch, statusFilter, dateFilter]);
 
   return (
     <div className="p-6 max-w-7xl mx-auto">
