@@ -37,6 +37,7 @@ function ReferralsList() {
     supabase
       .from("referrals")
       .select("*")
+      .is("deleted_at", null)
       .order("referral_received_at", { ascending: false })
       .limit(500)
       .then(({ data }) => {
@@ -45,6 +46,7 @@ function ReferralsList() {
           setLoading(false);
         }
       });
+
 
     const ch = supabase
       .channel("referrals-list")
