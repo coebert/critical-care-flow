@@ -122,7 +122,19 @@ function ReferralDetail() {
 
   const set = (k: keyof Referral, v: any) => setRef({ ...ref, [k]: v });
 
+  const timing = validateReferralTimings({
+    status: ref.status,
+    referral_received_at: ref.referral_received_at,
+    first_seen_at: ref.first_seen_at,
+    decision_at: ref.decision_at,
+    arrived_on_unit_at: ref.arrived_on_unit_at,
+  });
+
   const save = async () => {
+    if (!timing.isValid) {
+      toast.error("Please fix the highlighted timing issues before saving.");
+      return;
+    }
     setSaving(true);
     try {
       const patch: any = {
