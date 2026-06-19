@@ -2,7 +2,8 @@ import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { useServerFn } from "@tanstack/react-start";
 import { supabase } from "@/integrations/supabase/client";
-import { addNote, logReferralView, updateReferral } from "@/lib/referrals.functions";
+import { addNote, deleteReferral, logReferralView, updateReferral } from "@/lib/referrals.functions";
+import { useRole } from "@/hooks/use-auth";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -11,10 +12,15 @@ import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import {
+  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
+  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
 import type { Tables } from "@/integrations/supabase/types";
-import { ArrowLeft, Save } from "lucide-react";
+import { ArrowLeft, Save, Trash2 } from "lucide-react";
 import { format, formatDistanceToNow } from "date-fns";
 import { toast } from "sonner";
+
 
 type Referral = Tables<"referrals">;
 type Note = Tables<"referral_notes">;
@@ -37,6 +43,10 @@ function ReferralDetail() {
   const update = useServerFn(updateReferral);
   const addNoteFn = useServerFn(addNote);
   const logView = useServerFn(logReferralView);
+  const removeReferral = useServerFn(deleteReferral);
+  const { hasRole: isAdmin } = useRole("admin");
+  const [deleting, setDeleting] = useState(false);
+
 
   const [ref, setRef] = useState<Referral | null>(null);
   const [notes, setNotes] = useState<Note[]>([]);
@@ -114,6 +124,18 @@ function ReferralDetail() {
     }
   };
 
+  const onDelete = async () => {
+    setDeleting(true);
+    try {
+      await removeReferral({ data: { id } });
+      toast.success("Referral deleted");
+      navigate({ to: "/" });
+    } catch (err: any) {
+      toast.error(err.message ?? "Delete failed");
+      setDeleting(false);
+    }
+  };
+
   const statusStyles: Record<string, string> = {
     pending: "bg-warning/15 text-warning-foreground border-warning/30",
     admitted: "bg-success/15 text-success border-success/30",
@@ -124,7 +146,32 @@ function ReferralDetail() {
     <div className="p-6 max-w-5xl mx-auto">
       <div className="flex items-center justify-between mb-6">
         <Button variant="ghost" size="sm" onClick={() => navigate({ to: "/" })}><ArrowLeft className="w-4 h-4 mr-1" /> Back to list</Button>
-        <Badge variant="outline" className={`capitalize ${statusStyles[ref.status]}`}>{ref.status}</Badge>
+        <div className="flex items-center gap-2">
+          <Badge variant="outline" className={`capitalize ${statusStyles[ref.status]}`}>{ref.status}</Badge>
+          {isAdmin && (
+            <AlertDialog>
+              <AlertDialogTrigger asChild>
+                <Button variant="outline" size="sm" className="text-destructive hover:text-destructive">
+                  <Trash2 className="w-4 h-4 mr-1" /> Delete
+                </Button>
+              </AlertDialogTrigger>
+              <AlertDialogContent>
+                <AlertDialogHeader>
+                  <AlertDialogTitle>Delete this referral?</AlertDialogTitle>
+                  <AlertDialogDescription>
+                    This permanently removes the referral and its notes. The deletion is recorded in the audit log. This cannot be undone.
+                  </AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                  <AlertDialogCancel disabled={deleting}>Cancel</AlertDialogCancel>
+                  <AlertDialogAction onClick={onDelete} disabled={deleting} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
+                    {deleting ? "Deleting…" : "Delete referral"}
+                  </AlertDialogAction>
+                </AlertDialogFooter>
+              </AlertDialogContent>
+            </AlertDialog>
+          )}
+        </div>
       </div>
 
       <h1 className="text-2xl font-semibold mb-1">
