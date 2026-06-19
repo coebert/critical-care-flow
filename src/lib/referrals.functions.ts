@@ -379,3 +379,32 @@ export const restoreReferral = createServerFn({ method: "POST" })
   });
 
 
+export const findReferralsByHospitalNumber = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d: unknown) =>
+    z
+      .object({
+        hospital_number: z.string().trim().min(1).max(50),
+        exclude_id: z.string().uuid().optional(),
+      })
+      .parse(d),
+  )
+  .handler(async ({ data, context }) => {
+    const { supabase } = context;
+    let q = supabase
+      .from("referrals")
+      .select(
+        "id, hospital_number, referral_received_at, status, referring_specialty, current_ward, current_bed, reason_for_referral, age, sex",
+      )
+      .eq("hospital_number", data.hospital_number)
+      .is("deleted_at", null)
+      .order("referral_received_at", { ascending: false })
+      .limit(50);
+    if (data.exclude_id) q = q.neq("id", data.exclude_id);
+    const { data: rows, error } = await q;
+    if (error) throw new Error(error.message);
+    return rows ?? [];
+  });
+
+
+
