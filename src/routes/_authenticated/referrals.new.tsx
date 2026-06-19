@@ -34,6 +34,7 @@ function NewReferralPage() {
   const navigate = useNavigate();
   const create = useServerFn(createReferral);
   const [saving, setSaving] = useState(false);
+  const { specialties, wards } = useReferralOptions();
   const [f, setF] = useState({
     age: "",
     sex: "unknown" as "male" | "female" | "other" | "unknown",
