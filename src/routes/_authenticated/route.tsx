@@ -106,11 +106,6 @@ function AuthedShell() {
               id="mobile-sidebar"
               onInteractOutside={() => setMobileOpen(false)}
               onEscapeKeyDown={() => setMobileOpen(false)}
-              onOpenAutoFocus={(e) => {
-                e.preventDefault();
-                const firstLink = e.currentTarget.querySelector('nav a[href]') as HTMLElement | null;
-                firstLink?.focus();
-              }}
             >
               <SheetHeader>
                 <VisuallyHidden>
