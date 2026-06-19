@@ -37,8 +37,43 @@ function ReferralsList() {
   const [q, setQ] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [dateFilter, setDateFilter] = useState<"all" | "today" | "yesterday" | "7d" | "30d">("all");
+  const [showDeleted, setShowDeleted] = useState(false);
+  const [deletedRows, setDeletedRows] = useState<Referral[]>([]);
+  const [deletedLoading, setDeletedLoading] = useState(false);
+  const [restoringId, setRestoringId] = useState<string | null>(null);
+
+  const fetchDeleted = useServerFn(listDeletedReferrals);
+  const restoreFn = useServerFn(restoreReferral);
+
+  const loadDeleted = useCallback(async () => {
+    setDeletedLoading(true);
+    try {
+      const data = await fetchDeleted();
+      setDeletedRows((data ?? []) as Referral[]);
+    } catch (e: any) {
+      toast.error(e?.message ?? "Failed to load deleted referrals");
+    } finally {
+      setDeletedLoading(false);
+    }
+  }, [fetchDeleted]);
 
   useEffect(() => {
+    if (showDeleted) loadDeleted();
+  }, [showDeleted, loadDeleted]);
+
+  const onRestore = async (id: string) => {
+    setRestoringId(id);
+    try {
+      await restoreFn({ data: { id } });
+      toast.success("Referral restored");
+      setDeletedRows((cur) => cur.filter((r) => r.id !== id));
+    } catch (e: any) {
+      toast.error(e?.message ?? "Failed to restore referral");
+    } finally {
+      setRestoringId(null);
+    }
+  };
+
     let cancelled = false;
     supabase
       .from("referrals")
