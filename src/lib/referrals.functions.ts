@@ -293,7 +293,10 @@ export const deleteReferral = createServerFn({ method: "POST" })
       throw new Error("Only the creator or an admin can delete this referral");
     }
 
-    const { error } = await supabase
+    // Use admin client to bypass RLS, which restricts deleted_at writes to admins.
+    // Authorization is enforced above in application code.
+    const admin = await getAdmin();
+    const { error } = await admin
       .from("referrals")
       .update({ deleted_at: new Date().toISOString(), deleted_by: userId } as any)
       .eq("id", data.id)
