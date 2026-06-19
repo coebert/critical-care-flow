@@ -53,6 +53,7 @@ function ReferralDetail() {
   const { user } = useAuth();
   const { hasRole: isAdmin } = useRole("admin");
   const [deleting, setDeleting] = useState(false);
+  const [expandCmd, setExpandCmd] = useState<{ open: boolean; id: number } | null>(null);
   const { specialties, wards } = useReferralOptions();
 
 
