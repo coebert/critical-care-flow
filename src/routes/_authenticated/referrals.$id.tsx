@@ -17,6 +17,8 @@ import {
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 import type { Tables } from "@/integrations/supabase/types";
+import { ComboboxAdd } from "@/components/combobox-add";
+import { useReferralOptions } from "@/hooks/use-referral-options";
 import { ArrowLeft, Save, Trash2 } from "lucide-react";
 import { format, formatDistanceToNow } from "date-fns";
 import { toast } from "sonner";
@@ -46,6 +48,7 @@ function ReferralDetail() {
   const removeReferral = useServerFn(deleteReferral);
   const { hasRole: isAdmin } = useRole("admin");
   const [deleting, setDeleting] = useState(false);
+  const { specialties, wards } = useReferralOptions();
 
 
   const [ref, setRef] = useState<Referral | null>(null);
@@ -196,8 +199,8 @@ function ReferralDetail() {
                 </Select>
               </F>
               <F label="Hospital number"><Input value={ref.hospital_number ?? ""} onChange={(e) => set("hospital_number", e.target.value)} /></F>
-              <F label="Referring specialty"><Input value={ref.referring_specialty ?? ""} onChange={(e) => set("referring_specialty", e.target.value)} /></F>
-              <F label="Ward"><Input value={ref.current_ward ?? ""} onChange={(e) => set("current_ward", e.target.value)} /></F>
+              <F label="Referring specialty"><ComboboxAdd value={ref.referring_specialty ?? ""} onChange={(v) => set("referring_specialty", v)} options={specialties} /></F>
+              <F label="Ward"><ComboboxAdd value={ref.current_ward ?? ""} onChange={(v) => set("current_ward", v)} options={wards} /></F>
               <F label="Bed"><Input value={ref.current_bed ?? ""} onChange={(e) => set("current_bed", e.target.value)} /></F>
             </div>
             <F label="Past medical history"><Textarea rows={3} value={ref.past_medical_history ?? ""} onChange={(e) => set("past_medical_history", e.target.value)} /></F>

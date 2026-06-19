@@ -15,6 +15,8 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
+import { ComboboxAdd } from "@/components/combobox-add";
+import { useReferralOptions } from "@/hooks/use-referral-options";
 import { toast } from "sonner";
 
 export const Route = createFileRoute("/_authenticated/referrals/new")({
@@ -32,6 +34,7 @@ function NewReferralPage() {
   const navigate = useNavigate();
   const create = useServerFn(createReferral);
   const [saving, setSaving] = useState(false);
+  const { specialties, wards } = useReferralOptions();
   const [f, setF] = useState({
     age: "",
     sex: "unknown" as "male" | "female" | "other" | "unknown",
@@ -99,8 +102,8 @@ function NewReferralPage() {
               </Select>
             </Field>
             <Field label="Hospital number"><Input value={f.hospital_number} onChange={(e) => set("hospital_number", e.target.value)} /></Field>
-            <Field label="Referring specialty"><Input value={f.referring_specialty} onChange={(e) => set("referring_specialty", e.target.value)} placeholder="e.g. General Surgery" /></Field>
-            <Field label="Current ward"><Input value={f.current_ward} onChange={(e) => set("current_ward", e.target.value)} placeholder="e.g. ED Resus, Pembroke" /></Field>
+            <Field label="Referring specialty"><ComboboxAdd value={f.referring_specialty} onChange={(v) => set("referring_specialty", v)} options={specialties} placeholder="e.g. General Surgery" /></Field>
+            <Field label="Current ward"><ComboboxAdd value={f.current_ward} onChange={(v) => set("current_ward", v)} options={wards} placeholder="e.g. ED Resus, Pembroke" /></Field>
             <Field label="Bed"><Input value={f.current_bed} onChange={(e) => set("current_bed", e.target.value)} /></Field>
           </div>
         </Section>
