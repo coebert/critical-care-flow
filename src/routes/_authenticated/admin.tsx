@@ -159,7 +159,7 @@ function AuditPanel() {
     <Card className="p-5">
       <h2 className="font-semibold mb-3">Audit log (last 500 events)</h2>
       {loading ? <p className="text-sm text-muted-foreground">Loading…</p> : (
-        <table className="w-full text-sm">
+        <div className="overflow-x-auto"><table className="w-full text-sm min-w-[640px]">
           <thead className="text-xs uppercase text-muted-foreground">
             <tr><th className="text-left py-2">When</th><th className="text-left">Action</th><th className="text-left">Entity</th><th className="text-left">ID</th><th className="text-left">User</th></tr>
           </thead>
@@ -174,7 +174,7 @@ function AuditPanel() {
               </tr>
             ))}
           </tbody>
-        </table>
+        </table></div>
       )}
     </Card>
   );
