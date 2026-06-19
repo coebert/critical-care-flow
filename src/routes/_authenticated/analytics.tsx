@@ -1,0 +1,198 @@
+import { createFileRoute } from "@tanstack/react-router";
+import { useEffect, useMemo, useState } from "react";
+import { supabase } from "@/integrations/supabase/client";
+import { Card } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import type { Tables } from "@/integrations/supabase/types";
+import {
+  ResponsiveContainer, LineChart, Line, XAxis, YAxis, Tooltip, CartesianGrid,
+  BarChart, Bar, PieChart, Pie, Cell, Legend,
+} from "recharts";
+import { format, subDays, startOfDay, differenceInMinutes } from "date-fns";
+
+type Referral = Tables<"referrals">;
+
+export const Route = createFileRoute("/_authenticated/analytics")({
+  head: () => ({ meta: [{ title: "Analytics — SDH Critical Care" }] }),
+  component: AnalyticsPage,
+});
+
+const COLORS = ["var(--chart-1)", "var(--chart-2)", "var(--chart-3)", "var(--chart-4)", "var(--chart-5)"];
+
+function AnalyticsPage() {
+  const [rows, setRows] = useState<Referral[]>([]);
+  const [days, setDays] = useState<number>(30);
+
+  useEffect(() => {
+    supabase
+      .from("referrals")
+      .select("*")
+      .gte("referral_received_at", subDays(new Date(), Math.max(days, 365)).toISOString())
+      .limit(5000)
+      .then(({ data }) => setRows(data ?? []));
+  }, [days]);
+
+  const filtered = useMemo(() => {
+    const cutoff = subDays(new Date(), days);
+    return rows.filter((r) => new Date(r.referral_received_at) >= cutoff);
+  }, [rows, days]);
+
+  const perDay = useMemo(() => {
+    const map = new Map<string, number>();
+    for (let i = days - 1; i >= 0; i--) {
+      map.set(format(subDays(new Date(), i), "yyyy-MM-dd"), 0);
+    }
+    filtered.forEach((r) => {
+      const k = format(startOfDay(new Date(r.referral_received_at)), "yyyy-MM-dd");
+      map.set(k, (map.get(k) ?? 0) + 1);
+    });
+    return Array.from(map.entries()).map(([date, count]) => ({ date: format(new Date(date), "dd MMM"), count }));
+  }, [filtered, days]);
+
+  const meanPer24h = filtered.length / Math.max(days, 1);
+  const meanAge = (() => {
+    const ages = filtered.map((r) => r.age).filter((x): x is number => x != null);
+    return ages.length ? ages.reduce((a, b) => a + b, 0) / ages.length : 0;
+  })();
+
+  const bySpecialty = useMemo(() => {
+    const map = new Map<string, number>();
+    filtered.forEach((r) => {
+      const k = r.referring_specialty || "Unknown";
+      map.set(k, (map.get(k) ?? 0) + 1);
+    });
+    return Array.from(map.entries())
+      .map(([specialty, count]) => ({ specialty, count }))
+      .sort((a, b) => b.count - a.count)
+      .slice(0, 10);
+  }, [filtered]);
+
+  const byStatus = useMemo(() => {
+    const map = new Map<string, number>();
+    filtered.forEach((r) => map.set(r.status, (map.get(r.status) ?? 0) + 1));
+    return Array.from(map.entries()).map(([name, value]) => ({ name, value }));
+  }, [filtered]);
+
+  const bySex = useMemo(() => {
+    const map = new Map<string, number>();
+    filtered.forEach((r) => map.set(r.sex ?? "unknown", (map.get(r.sex ?? "unknown") ?? 0) + 1));
+    return Array.from(map.entries()).map(([name, value]) => ({ name, value }));
+  }, [filtered]);
+
+  const meanMinutes = (sel: (r: Referral) => [string | null, string | null]) => {
+    const ds = filtered
+      .map(sel)
+      .map(([a, b]) => (a && b ? differenceInMinutes(new Date(b), new Date(a)) : null))
+      .filter((x): x is number => x != null && x >= 0);
+    return ds.length ? ds.reduce((a, b) => a + b, 0) / ds.length : 0;
+  };
+  const meanTimeToSeen = meanMinutes((r) => [r.referral_received_at, r.first_seen_at]);
+  const meanDecisionToArrival = meanMinutes((r) => [r.decision_at, r.arrived_on_unit_at]);
+
+  return (
+    <div className="p-6 max-w-7xl mx-auto">
+      <div className="flex items-center justify-between mb-6">
+        <div>
+          <h1 className="text-2xl font-semibold tracking-tight">Analytics</h1>
+          <p className="text-sm text-muted-foreground">Last {days} days · {filtered.length} referrals</p>
+        </div>
+        <div className="flex gap-2">
+          {[7, 30, 90, 365].map((d) => (
+            <Button key={d} size="sm" variant={days === d ? "default" : "outline"} onClick={() => setDays(d)}>
+              {d}d
+            </Button>
+          ))}
+        </div>
+      </div>
+
+      <div className="grid md:grid-cols-4 gap-4 mb-6">
+        <Kpi label="Total referrals" value={filtered.length.toString()} />
+        <Kpi label="Mean / 24h" value={meanPer24h.toFixed(1)} />
+        <Kpi label="Mean age (yrs)" value={meanAge ? meanAge.toFixed(1) : "—"} />
+        <Kpi label="Mean time-to-first-seen" value={meanTimeToSeen ? `${Math.round(meanTimeToSeen)} min` : "—"} />
+      </div>
+
+      <div className="grid md:grid-cols-2 gap-6">
+        <Card className="p-5">
+          <h2 className="font-semibold mb-3">Referrals over time</h2>
+          <div className="h-64">
+            <ResponsiveContainer width="100%" height="100%">
+              <LineChart data={perDay}>
+                <CartesianGrid strokeDasharray="3 3" opacity={0.3} />
+                <XAxis dataKey="date" fontSize={11} />
+                <YAxis allowDecimals={false} fontSize={11} />
+                <Tooltip />
+                <Line type="monotone" dataKey="count" stroke="var(--chart-1)" strokeWidth={2} dot={false} />
+              </LineChart>
+            </ResponsiveContainer>
+          </div>
+        </Card>
+
+        <Card className="p-5">
+          <h2 className="font-semibold mb-3">Outcome breakdown</h2>
+          <div className="h-64">
+            <ResponsiveContainer width="100%" height="100%">
+              <PieChart>
+                <Pie data={byStatus} dataKey="value" nameKey="name" innerRadius={50} outerRadius={90} label>
+                  {byStatus.map((_, i) => <Cell key={i} fill={COLORS[i % COLORS.length]} />)}
+                </Pie>
+                <Legend />
+                <Tooltip />
+              </PieChart>
+            </ResponsiveContainer>
+          </div>
+        </Card>
+
+        <Card className="p-5 md:col-span-2">
+          <h2 className="font-semibold mb-3">Referrals by specialty (top 10)</h2>
+          <div className="h-72">
+            <ResponsiveContainer width="100%" height="100%">
+              <BarChart data={bySpecialty}>
+                <CartesianGrid strokeDasharray="3 3" opacity={0.3} />
+                <XAxis dataKey="specialty" fontSize={11} angle={-15} textAnchor="end" height={70} />
+                <YAxis allowDecimals={false} fontSize={11} />
+                <Tooltip />
+                <Bar dataKey="count" fill="var(--chart-2)" radius={[4, 4, 0, 0]} />
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
+        </Card>
+
+        <Card className="p-5">
+          <h2 className="font-semibold mb-3">Sex distribution</h2>
+          <div className="h-56">
+            <ResponsiveContainer width="100%" height="100%">
+              <PieChart>
+                <Pie data={bySex} dataKey="value" nameKey="name" outerRadius={80} label>
+                  {bySex.map((_, i) => <Cell key={i} fill={COLORS[(i + 1) % COLORS.length]} />)}
+                </Pie>
+                <Legend />
+                <Tooltip />
+              </PieChart>
+            </ResponsiveContainer>
+          </div>
+        </Card>
+
+        <Card className="p-5">
+          <h2 className="font-semibold mb-3">Process times</h2>
+          <ul className="space-y-3 text-sm">
+            <li className="flex justify-between"><span className="text-muted-foreground">Mean referral → first seen</span><span className="font-medium">{meanTimeToSeen ? `${Math.round(meanTimeToSeen)} min` : "—"}</span></li>
+            <li className="flex justify-between"><span className="text-muted-foreground">Mean decision → on unit</span><span className="font-medium">{meanDecisionToArrival ? `${Math.round(meanDecisionToArrival)} min` : "—"}</span></li>
+            <li className="flex justify-between"><span className="text-muted-foreground">Admitted</span><span className="font-medium">{byStatus.find((s) => s.name === "admitted")?.value ?? 0}</span></li>
+            <li className="flex justify-between"><span className="text-muted-foreground">Declined</span><span className="font-medium">{byStatus.find((s) => s.name === "declined")?.value ?? 0}</span></li>
+            <li className="flex justify-between"><span className="text-muted-foreground">Pending</span><span className="font-medium">{byStatus.find((s) => s.name === "pending")?.value ?? 0}</span></li>
+          </ul>
+        </Card>
+      </div>
+    </div>
+  );
+}
+
+function Kpi({ label, value }: { label: string; value: string }) {
+  return (
+    <Card className="p-5">
+      <div className="text-xs text-muted-foreground uppercase tracking-wide">{label}</div>
+      <div className="text-2xl font-semibold mt-1">{value}</div>
+    </Card>
+  );
+}

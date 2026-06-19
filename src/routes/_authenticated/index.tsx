@@ -1,0 +1,155 @@
+import { createFileRoute, Link, redirect } from "@tanstack/react-router";
+import { useEffect, useState, useMemo } from "react";
+import { supabase } from "@/integrations/supabase/client";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Badge } from "@/components/ui/badge";
+import { Plus, Search } from "lucide-react";
+import type { Tables } from "@/integrations/supabase/types";
+import { format } from "date-fns";
+
+type Referral = Tables<"referrals">;
+
+export const Route = createFileRoute("/_authenticated/")({
+  head: () => ({
+    meta: [
+      { title: "Referrals — SDH Critical Care" },
+      { name: "description", content: "Live list of critical care referrals at Salisbury District Hospital." },
+    ],
+  }),
+  component: ReferralsList,
+});
+
+const statusStyles: Record<string, string> = {
+  pending: "bg-warning/15 text-warning-foreground border-warning/30",
+  admitted: "bg-success/15 text-success border-success/30",
+  declined: "bg-destructive/10 text-destructive border-destructive/30",
+};
+
+function ReferralsList() {
+  const [rows, setRows] = useState<Referral[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [q, setQ] = useState("");
+  const [statusFilter, setStatusFilter] = useState<string>("all");
+
+  useEffect(() => {
+    let cancelled = false;
+    supabase
+      .from("referrals")
+      .select("*")
+      .order("referral_received_at", { ascending: false })
+      .limit(500)
+      .then(({ data }) => {
+        if (!cancelled) {
+          setRows(data ?? []);
+          setLoading(false);
+        }
+      });
+
+    const ch = supabase
+      .channel("referrals-list")
+      .on("postgres_changes", { event: "*", schema: "public", table: "referrals" }, (payload) => {
+        setRows((cur) => {
+          if (payload.eventType === "INSERT") return [payload.new as Referral, ...cur];
+          if (payload.eventType === "UPDATE")
+            return cur.map((r) => (r.id === (payload.new as Referral).id ? (payload.new as Referral) : r));
+          if (payload.eventType === "DELETE") return cur.filter((r) => r.id !== (payload.old as Referral).id);
+          return cur;
+        });
+      })
+      .subscribe();
+    return () => {
+      cancelled = true;
+      supabase.removeChannel(ch);
+    };
+  }, []);
+
+  const filtered = useMemo(() => {
+    const needle = q.trim().toLowerCase();
+    return rows.filter((r) => {
+      if (statusFilter !== "all" && r.status !== statusFilter) return false;
+      if (!needle) return true;
+      return [r.hospital_number, r.current_ward, r.current_bed, r.referring_specialty, r.reason_for_referral]
+        .filter(Boolean)
+        .some((v) => v!.toString().toLowerCase().includes(needle));
+    });
+  }, [rows, q, statusFilter]);
+
+  return (
+    <div className="p-6 max-w-7xl mx-auto">
+      <div className="flex items-center justify-between mb-6">
+        <div>
+          <h1 className="text-2xl font-semibold tracking-tight">Referrals</h1>
+          <p className="text-sm text-muted-foreground">{rows.length} total · live updating</p>
+        </div>
+        <Button asChild>
+          <Link to="/referrals/new"><Plus className="w-4 h-4 mr-1" /> New referral</Link>
+        </Button>
+      </div>
+
+      <div className="flex flex-wrap gap-2 mb-4">
+        <div className="relative flex-1 min-w-[240px]">
+          <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
+          <Input
+            placeholder="Search hospital number, ward, specialty…"
+            value={q}
+            onChange={(e) => setQ(e.target.value)}
+            className="pl-9"
+          />
+        </div>
+        {(["all", "pending", "admitted", "declined"] as const).map((s) => (
+          <Button
+            key={s}
+            size="sm"
+            variant={statusFilter === s ? "default" : "outline"}
+            onClick={() => setStatusFilter(s)}
+            className="capitalize"
+          >
+            {s}
+          </Button>
+        ))}
+      </div>
+
+      <div className="border rounded-md bg-card overflow-hidden">
+        <table className="w-full text-sm">
+          <thead className="bg-muted/50 text-xs uppercase text-muted-foreground">
+            <tr>
+              <th className="text-left px-3 py-2">Received</th>
+              <th className="text-left px-3 py-2">Hosp. no</th>
+              <th className="text-left px-3 py-2">Age/Sex</th>
+              <th className="text-left px-3 py-2">Location</th>
+              <th className="text-left px-3 py-2">Specialty</th>
+              <th className="text-left px-3 py-2">Reason</th>
+              <th className="text-left px-3 py-2">Status</th>
+            </tr>
+          </thead>
+          <tbody>
+            {loading && (
+              <tr><td colSpan={7} className="px-3 py-8 text-center text-muted-foreground">Loading…</td></tr>
+            )}
+            {!loading && filtered.length === 0 && (
+              <tr><td colSpan={7} className="px-3 py-8 text-center text-muted-foreground">No referrals match.</td></tr>
+            )}
+            {filtered.map((r) => (
+              <tr key={r.id} className="border-t hover:bg-accent/40 cursor-pointer">
+                <td className="px-3 py-2 whitespace-nowrap">
+                  <Link to="/referrals/$id" params={{ id: r.id }} className="block">
+                    {format(new Date(r.referral_received_at), "dd MMM HH:mm")}
+                  </Link>
+                </td>
+                <td className="px-3 py-2"><Link to="/referrals/$id" params={{ id: r.id }}>{r.hospital_number ?? "—"}</Link></td>
+                <td className="px-3 py-2"><Link to="/referrals/$id" params={{ id: r.id }}>{r.age ?? "?"} / {r.sex ?? "?"}</Link></td>
+                <td className="px-3 py-2"><Link to="/referrals/$id" params={{ id: r.id }}>{r.current_ward ?? "—"} {r.current_bed ? `· ${r.current_bed}` : ""}</Link></td>
+                <td className="px-3 py-2"><Link to="/referrals/$id" params={{ id: r.id }}>{r.referring_specialty ?? "—"}</Link></td>
+                <td className="px-3 py-2 max-w-xs truncate"><Link to="/referrals/$id" params={{ id: r.id }}>{r.reason_for_referral ?? "—"}</Link></td>
+                <td className="px-3 py-2">
+                  <Badge variant="outline" className={`capitalize ${statusStyles[r.status]}`}>{r.status}</Badge>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+}
