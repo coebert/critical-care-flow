@@ -134,6 +134,25 @@ function ReferralsList() {
         ))}
       </div>
 
+      <div className="flex flex-wrap gap-2 mb-4 items-center">
+        <span className="text-xs uppercase text-muted-foreground mr-1">Date</span>
+        {([
+          { k: "all", label: "All time" },
+          { k: "today", label: "Today" },
+          { k: "yesterday", label: "Yesterday" },
+          { k: "7d", label: "Last 7 days" },
+          { k: "30d", label: "Last 30 days" },
+        ] as const).map(({ k, label }) => (
+          <Button
+            key={k}
+            size="sm"
+            variant={dateFilter === k ? "default" : "outline"}
+            onClick={() => setDateFilter(k)}
+          >
+            {label}
+          </Button>
+        ))}
+
       <div className="border rounded-md bg-card overflow-hidden">
         <table className="w-full text-sm">
           <thead className="bg-muted/50 text-xs uppercase text-muted-foreground">
