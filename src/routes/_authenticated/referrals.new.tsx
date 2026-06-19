@@ -82,6 +82,37 @@ function NewReferralPage() {
 
   const set = (k: keyof typeof f, v: any) => setF((cur) => ({ ...cur, [k]: v }));
 
+  // Prior-referral lookup by hospital number
+  const findPrior = useServerFn(findReferralsByHospitalNumber);
+  const [priors, setPriors] = useState<PriorReferral[]>([]);
+  const [priorOpen, setPriorOpen] = useState(false);
+  const [dismissedFor, setDismissedFor] = useState<string | null>(null);
+
+  useEffect(() => {
+    const hn = f.hospital_number.trim();
+    if (!hn) {
+      setPriors([]);
+      return;
+    }
+    let cancelled = false;
+    const t = setTimeout(async () => {
+      try {
+        const res = await findPrior({ data: { hospital_number: hn } });
+        if (!cancelled) setPriors((res ?? []) as PriorReferral[]);
+      } catch {
+        if (!cancelled) setPriors([]);
+      }
+    }, 350);
+    return () => {
+      cancelled = true;
+      clearTimeout(t);
+    };
+  }, [f.hospital_number, findPrior]);
+
+  const showAlert =
+    priors.length > 0 && dismissedFor !== f.hospital_number.trim();
+
+
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
     setSaving(true);
