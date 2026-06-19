@@ -1,14 +1,18 @@
-import { createFileRoute, Link, useNavigate, redirect } from "@tanstack/react-router";
-import { useEffect, useState, useMemo } from "react";
+import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
+import { useEffect, useState, useMemo, useCallback } from "react";
+import { useServerFn } from "@tanstack/react-start";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
-import { Plus, Search } from "lucide-react";
+import { Plus, Search, RotateCcw, Trash2 } from "lucide-react";
 import type { Tables } from "@/integrations/supabase/types";
-import { format } from "date-fns";
+import { format, formatDistanceToNow } from "date-fns";
+import { listDeletedReferrals, restoreReferral, RESTORE_WINDOW_DAYS } from "@/lib/referrals.functions";
+import { toast } from "sonner";
 
 type Referral = Tables<"referrals">;
+
 
 export const Route = createFileRoute("/_authenticated/")({
   head: () => ({
@@ -33,9 +37,46 @@ function ReferralsList() {
   const [q, setQ] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [dateFilter, setDateFilter] = useState<"all" | "today" | "yesterday" | "7d" | "30d">("all");
+  const [showDeleted, setShowDeleted] = useState(false);
+  const [deletedRows, setDeletedRows] = useState<Referral[]>([]);
+  const [deletedLoading, setDeletedLoading] = useState(false);
+  const [restoringId, setRestoringId] = useState<string | null>(null);
+
+  const fetchDeleted = useServerFn(listDeletedReferrals);
+  const restoreFn = useServerFn(restoreReferral);
+
+  const loadDeleted = useCallback(async () => {
+    setDeletedLoading(true);
+    try {
+      const data = await fetchDeleted();
+      setDeletedRows((data ?? []) as Referral[]);
+    } catch (e: any) {
+      toast.error(e?.message ?? "Failed to load deleted referrals");
+    } finally {
+      setDeletedLoading(false);
+    }
+  }, [fetchDeleted]);
+
+  useEffect(() => {
+    if (showDeleted) loadDeleted();
+  }, [showDeleted, loadDeleted]);
+
+  const onRestore = async (id: string) => {
+    setRestoringId(id);
+    try {
+      await restoreFn({ data: { id } });
+      toast.success("Referral restored");
+      setDeletedRows((cur) => cur.filter((r) => r.id !== id));
+    } catch (e: any) {
+      toast.error(e?.message ?? "Failed to restore referral");
+    } finally {
+      setRestoringId(null);
+    }
+  };
 
   useEffect(() => {
     let cancelled = false;
+
     supabase
       .from("referrals")
       .select("*")
@@ -107,10 +148,74 @@ function ReferralsList() {
           <h1 className="text-2xl font-semibold tracking-tight">Referrals</h1>
           <p className="text-sm text-muted-foreground">{rows.length} total · live updating</p>
         </div>
-        <Button asChild>
-          <Link to="/referrals/new"><Plus className="w-4 h-4 mr-1" /> New referral</Link>
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button
+            variant={showDeleted ? "default" : "outline"}
+            size="sm"
+            onClick={() => setShowDeleted((v) => !v)}
+          >
+            <Trash2 className="w-4 h-4 mr-1" />
+            {showDeleted ? "Hide" : "Recently deleted"}
+          </Button>
+          <Button asChild>
+            <Link to="/referrals/new"><Plus className="w-4 h-4 mr-1" /> New referral</Link>
+          </Button>
+        </div>
       </div>
+
+      {showDeleted && (
+        <div className="border rounded-md bg-card overflow-hidden mb-6">
+          <div className="px-3 py-2 border-b bg-muted/40 text-sm flex items-center justify-between">
+            <span className="font-medium">Recently deleted</span>
+            <span className="text-xs text-muted-foreground">
+              Restorable within {RESTORE_WINDOW_DAYS} days of deletion
+            </span>
+          </div>
+          <table className="w-full text-sm">
+            <thead className="bg-muted/50 text-xs uppercase text-muted-foreground">
+              <tr>
+                <th className="text-left px-3 py-2">Deleted</th>
+                <th className="text-left px-3 py-2">Hosp. no</th>
+                <th className="text-left px-3 py-2">Location</th>
+                <th className="text-left px-3 py-2">Specialty</th>
+                <th className="text-left px-3 py-2">Reason</th>
+                <th className="px-3 py-2"></th>
+              </tr>
+            </thead>
+            <tbody>
+              {deletedLoading && (
+                <tr><td colSpan={6} className="px-3 py-6 text-center text-muted-foreground">Loading…</td></tr>
+              )}
+              {!deletedLoading && deletedRows.length === 0 && (
+                <tr><td colSpan={6} className="px-3 py-6 text-center text-muted-foreground">No restorable referrals.</td></tr>
+              )}
+              {deletedRows.map((r) => (
+                <tr key={r.id} className="border-t">
+                  <td className="px-3 py-2 whitespace-nowrap text-muted-foreground">
+                    {r.deleted_at ? `${formatDistanceToNow(new Date(r.deleted_at))} ago` : "—"}
+                  </td>
+                  <td className="px-3 py-2">{r.hospital_number ?? "—"}</td>
+                  <td className="px-3 py-2">{r.current_ward ?? "—"} {r.current_bed ? `· ${r.current_bed}` : ""}</td>
+                  <td className="px-3 py-2">{r.referring_specialty ?? "—"}</td>
+                  <td className="px-3 py-2 max-w-xs truncate">{r.reason_for_referral ?? "—"}</td>
+                  <td className="px-3 py-2 text-right">
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      disabled={restoringId === r.id}
+                      onClick={() => onRestore(r.id)}
+                    >
+                      <RotateCcw className="w-3.5 h-3.5 mr-1" />
+                      {restoringId === r.id ? "Restoring…" : "Restore"}
+                    </Button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+
 
       <div className="flex flex-wrap gap-2 mb-4">
         <div className="relative flex-1 min-w-[240px]">
