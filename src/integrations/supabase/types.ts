@@ -14,16 +14,241 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      audit_log: {
+        Row: {
+          action: Database["public"]["Enums"]["audit_action"]
+          created_at: string
+          diff: Json | null
+          entity: string
+          entity_id: string | null
+          id: string
+          user_id: string | null
+        }
+        Insert: {
+          action: Database["public"]["Enums"]["audit_action"]
+          created_at?: string
+          diff?: Json | null
+          entity: string
+          entity_id?: string | null
+          id?: string
+          user_id?: string | null
+        }
+        Update: {
+          action?: Database["public"]["Enums"]["audit_action"]
+          created_at?: string
+          diff?: Json | null
+          entity?: string
+          entity_id?: string | null
+          id?: string
+          user_id?: string | null
+        }
+        Relationships: []
+      }
+      notifications: {
+        Row: {
+          created_at: string
+          id: string
+          kind: string
+          message: string
+          read_at: string | null
+          referral_id: string | null
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          kind: string
+          message: string
+          read_at?: string | null
+          referral_id?: string | null
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          kind?: string
+          message?: string
+          read_at?: string | null
+          referral_id?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "notifications_referral_id_fkey"
+            columns: ["referral_id"]
+            isOneToOne: false
+            referencedRelation: "referrals"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      profiles: {
+        Row: {
+          created_at: string
+          full_name: string | null
+          id: string
+          job_title: string | null
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          full_name?: string | null
+          id: string
+          job_title?: string | null
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          full_name?: string | null
+          id?: string
+          job_title?: string | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      referral_notes: {
+        Row: {
+          author_id: string
+          body: string
+          created_at: string
+          id: string
+          referral_id: string
+        }
+        Insert: {
+          author_id: string
+          body: string
+          created_at?: string
+          id?: string
+          referral_id: string
+        }
+        Update: {
+          author_id?: string
+          body?: string
+          created_at?: string
+          id?: string
+          referral_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "referral_notes_referral_id_fkey"
+            columns: ["referral_id"]
+            isOneToOne: false
+            referencedRelation: "referrals"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      referrals: {
+        Row: {
+          age: number | null
+          arrived_on_unit_at: string | null
+          baseline_function: string | null
+          created_at: string
+          created_by: string | null
+          current_bed: string | null
+          current_ward: string | null
+          decision_at: string | null
+          decline_reason: string | null
+          dnacpr_respect: boolean
+          first_seen_at: string | null
+          hospital_number: string | null
+          id: string
+          past_medical_history: string | null
+          reason_for_referral: string | null
+          referral_received_at: string
+          referring_specialty: string | null
+          sex: Database["public"]["Enums"]["patient_sex"] | null
+          status: Database["public"]["Enums"]["referral_status"]
+          updated_at: string
+          updated_by: string | null
+        }
+        Insert: {
+          age?: number | null
+          arrived_on_unit_at?: string | null
+          baseline_function?: string | null
+          created_at?: string
+          created_by?: string | null
+          current_bed?: string | null
+          current_ward?: string | null
+          decision_at?: string | null
+          decline_reason?: string | null
+          dnacpr_respect?: boolean
+          first_seen_at?: string | null
+          hospital_number?: string | null
+          id?: string
+          past_medical_history?: string | null
+          reason_for_referral?: string | null
+          referral_received_at?: string
+          referring_specialty?: string | null
+          sex?: Database["public"]["Enums"]["patient_sex"] | null
+          status?: Database["public"]["Enums"]["referral_status"]
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Update: {
+          age?: number | null
+          arrived_on_unit_at?: string | null
+          baseline_function?: string | null
+          created_at?: string
+          created_by?: string | null
+          current_bed?: string | null
+          current_ward?: string | null
+          decision_at?: string | null
+          decline_reason?: string | null
+          dnacpr_respect?: boolean
+          first_seen_at?: string | null
+          hospital_number?: string | null
+          id?: string
+          past_medical_history?: string | null
+          reason_for_referral?: string | null
+          referral_received_at?: string
+          referring_specialty?: string | null
+          sex?: Database["public"]["Enums"]["patient_sex"] | null
+          status?: Database["public"]["Enums"]["referral_status"]
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Relationships: []
+      }
+      user_roles: {
+        Row: {
+          created_at: string
+          id: string
+          role: Database["public"]["Enums"]["app_role"]
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          role: Database["public"]["Enums"]["app_role"]
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          role?: Database["public"]["Enums"]["app_role"]
+          user_id?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      has_role: {
+        Args: {
+          _role: Database["public"]["Enums"]["app_role"]
+          _user_id: string
+        }
+        Returns: boolean
+      }
     }
     Enums: {
-      [_ in never]: never
+      app_role: "admin" | "clinician"
+      audit_action: "view" | "create" | "update" | "delete"
+      patient_sex: "male" | "female" | "other" | "unknown"
+      referral_status: "pending" | "declined" | "admitted"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -150,6 +375,11 @@ export type CompositeTypes<
 
 export const Constants = {
   public: {
-    Enums: {},
+    Enums: {
+      app_role: ["admin", "clinician"],
+      audit_action: ["view", "create", "update", "delete"],
+      patient_sex: ["male", "female", "other", "unknown"],
+      referral_status: ["pending", "declined", "admitted"],
+    },
   },
 } as const
