@@ -218,9 +218,27 @@ function ReferralDetail() {
       <h1 className="text-2xl font-semibold mb-1">
         {ref.hospital_number ?? "Referral"} · {ref.age ?? "?"}/{ref.sex ?? "?"}
       </h1>
-      <p className="text-sm text-muted-foreground mb-6">
+      <p className="text-sm text-muted-foreground mb-2">
         Received {format(new Date(ref.referral_received_at), "PPpp")}
       </p>
+      <div className="flex gap-2 mb-4 md:hidden">
+        <Button
+          size="sm"
+          variant="outline"
+          className="flex-1"
+          onClick={() => setExpandCmd({ open: true, id: Date.now() })}
+        >
+          Expand all
+        </Button>
+        <Button
+          size="sm"
+          variant="outline"
+          className="flex-1"
+          onClick={() => setExpandCmd({ open: false, id: Date.now() })}
+        >
+          Collapse all
+        </Button>
+      </div>
 
       <div className="space-y-4">
         <Card className="p-5 space-y-4">
