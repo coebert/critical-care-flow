@@ -152,6 +152,8 @@ function ReferralsList() {
             {label}
           </Button>
         ))}
+      </div>
+
 
       <div className="border rounded-md bg-card overflow-hidden">
         <table className="w-full text-sm">
