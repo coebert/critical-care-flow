@@ -368,8 +368,17 @@ function ReferralDetail() {
   );
 }
 
-function F({ label, children }: { label: string; children: React.ReactNode }) {
-  return <div className="space-y-1.5"><Label className="text-xs">{label}</Label>{children}</div>;
+function F({ label, children, required, error }: { label: string; children: React.ReactNode; required?: boolean; error?: string }) {
+  return (
+    <div className="space-y-1.5">
+      <Label className="text-xs">
+        {label}
+        {required && <span className="text-destructive ml-0.5">*</span>}
+      </Label>
+      {children}
+      {error && <p className="text-xs text-destructive">{error}</p>}
+    </div>
+  );
 }
 
 function ExpandableSection({ label, children, command }: { label: string; children: React.ReactNode; command?: { open: boolean; id: number } | null }) {
