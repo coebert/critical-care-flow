@@ -215,11 +215,12 @@ function ReferralDetail() {
           <Card className="p-5 space-y-4">
             <h2 className="font-semibold">Timeline (ICNARC)</h2>
             <div className="grid grid-cols-2 gap-4">
-              <F label="Received"><DTNow value={toLocal(ref.referral_received_at)} onChange={(v) => set("referral_received_at", new Date(v).toISOString())} /></F>
-              <F label="First seen"><DTNow value={toLocal(ref.first_seen_at)} onChange={(v) => set("first_seen_at", v ? new Date(v).toISOString() : null)} /></F>
-              <F label="Decision"><DTNow value={toLocal(ref.decision_at)} onChange={(v) => set("decision_at", v ? new Date(v).toISOString() : null)} /></F>
-              <F label="Arrived on unit"><DTNow value={toLocal(ref.arrived_on_unit_at)} onChange={(v) => set("arrived_on_unit_at", v ? new Date(v).toISOString() : null)} /></F>
+              <F label="Received"><DTNow value={toLocal(ref.referral_received_at)} onChange={(v) => saveTimestamp("referral_received_at", v ? new Date(v).toISOString() : null)} /></F>
+              <F label="First seen"><DTNow value={toLocal(ref.first_seen_at)} onChange={(v) => saveTimestamp("first_seen_at", v ? new Date(v).toISOString() : null)} /></F>
+              <F label="Decision"><DTNow value={toLocal(ref.decision_at)} onChange={(v) => saveTimestamp("decision_at", v ? new Date(v).toISOString() : null)} /></F>
+              <F label="Arrived on unit"><DTNow value={toLocal(ref.arrived_on_unit_at)} onChange={(v) => saveTimestamp("arrived_on_unit_at", v ? new Date(v).toISOString() : null)} /></F>
             </div>
+            <p className="text-xs text-muted-foreground">Timestamps save automatically.</p>
           </Card>
 
           <Card className="p-5 space-y-4">
