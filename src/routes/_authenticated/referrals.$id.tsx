@@ -194,91 +194,93 @@ function ReferralDetail() {
         Received {format(new Date(ref.referral_received_at), "PPpp")}
       </p>
 
-      <div className="grid md:grid-cols-3 gap-6">
-        <div className="md:col-span-2 space-y-4">
-          <Card className="p-5 space-y-4">
-            <h2 className="font-semibold">Details</h2>
-            <div className="grid grid-cols-2 gap-4">
-              <F label="Age"><Input type="number" value={ref.age ?? ""} onChange={(e) => set("age", e.target.value ? Number(e.target.value) : null)} /></F>
-              <F label="Sex">
-                <Select value={ref.sex ?? "unknown"} onValueChange={(v) => set("sex", v)}>
-                  <SelectTrigger><SelectValue /></SelectTrigger>
-                  <SelectContent>
-                    {["male","female","other","unknown"].map((s) => <SelectItem key={s} value={s}>{s}</SelectItem>)}
-                  </SelectContent>
-                </Select>
-              </F>
-              <F label="Hospital number"><Input value={ref.hospital_number ?? ""} onChange={(e) => set("hospital_number", e.target.value)} /></F>
-              <F label="Referring specialty"><ComboboxAdd value={ref.referring_specialty ?? ""} onChange={(v) => set("referring_specialty", v)} options={specialties} /></F>
-              <F label="Ward"><ComboboxAdd value={ref.current_ward ?? ""} onChange={(v) => set("current_ward", v)} options={wards} /></F>
-              <F label="Bed"><Input value={ref.current_bed ?? ""} onChange={(e) => set("current_bed", e.target.value)} /></F>
-            </div>
-            <F label="Past medical history"><Textarea rows={3} value={ref.past_medical_history ?? ""} onChange={(e) => set("past_medical_history", e.target.value)} /></F>
-            <F label="Baseline function"><Textarea rows={2} value={ref.baseline_function ?? ""} onChange={(e) => set("baseline_function", e.target.value)} /></F>
-            <F label="Reason for referral"><Textarea rows={3} value={ref.reason_for_referral ?? ""} onChange={(e) => set("reason_for_referral", e.target.value)} /></F>
-            <div className="flex items-center gap-3">
-              <Switch checked={ref.dnacpr_respect} onCheckedChange={(v) => set("dnacpr_respect", v)} id="dn" />
-              <Label htmlFor="dn">DNACPR / ReSPECT in place</Label>
-            </div>
-          </Card>
-
-          <Card className="p-5 space-y-4">
-            <h2 className="font-semibold">Timeline (ICNARC)</h2>
-            <div className="grid grid-cols-2 gap-4">
-              <F label="Received"><DTNow value={toLocal(ref.referral_received_at)} onChange={(v) => saveTimestamp("referral_received_at", v ? new Date(v).toISOString() : null)} /></F>
-              <F label="First seen"><DTNow value={toLocal(ref.first_seen_at)} onChange={(v) => saveTimestamp("first_seen_at", v ? new Date(v).toISOString() : null)} /></F>
-              <F label="Decision"><DTNow value={toLocal(ref.decision_at)} onChange={(v) => saveTimestamp("decision_at", v ? new Date(v).toISOString() : null)} /></F>
-              <F label="Arrived on unit"><DTNow value={toLocal(ref.arrived_on_unit_at)} onChange={(v) => saveTimestamp("arrived_on_unit_at", v ? new Date(v).toISOString() : null)} disabled={ref.status === "declined"} /></F>
-            </div>
-            <p className="text-xs text-muted-foreground">Timestamps save automatically.</p>
-          </Card>
-
-          <Card className="p-5 space-y-4">
-            <h2 className="font-semibold">Outcome</h2>
-            <div className="grid grid-cols-2 gap-4">
-              <F label="Status">
-                <Select value={ref.status} onValueChange={(v) => set("status", v)}>
-                  <SelectTrigger><SelectValue /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="pending">Pending</SelectItem>
-                    <SelectItem value="admitted">Admitted</SelectItem>
-                    <SelectItem value="declined">Declined</SelectItem>
-                  </SelectContent>
-                </Select>
-              </F>
-            </div>
-            {ref.status === "declined" && (
-              <F label="Reason for declining"><Textarea rows={3} value={ref.decline_reason ?? ""} onChange={(e) => set("decline_reason", e.target.value)} /></F>
-            )}
-          </Card>
-
-          <div className="flex justify-end">
-            <Button onClick={save} disabled={saving}><Save className="w-4 h-4 mr-1" />{saving ? "Saving…" : "Save changes"}</Button>
+      <div className="space-y-4">
+        <Card className="p-5 space-y-4">
+          <h2 className="font-semibold">Details</h2>
+          <div className="grid grid-cols-2 gap-4">
+            <F label="Age"><Input type="number" value={ref.age ?? ""} onChange={(e) => set("age", e.target.value ? Number(e.target.value) : null)} /></F>
+            <F label="Sex">
+              <Select value={ref.sex ?? "unknown"} onValueChange={(v) => set("sex", v)}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  {["male","female","other","unknown"].map((s) => <SelectItem key={s} value={s}>{s}</SelectItem>)}
+                </SelectContent>
+              </Select>
+            </F>
+            <F label="Hospital number"><Input value={ref.hospital_number ?? ""} onChange={(e) => set("hospital_number", e.target.value)} /></F>
+            <F label="Referring specialty"><ComboboxAdd value={ref.referring_specialty ?? ""} onChange={(v) => set("referring_specialty", v)} options={specialties} /></F>
+            <F label="Ward"><ComboboxAdd value={ref.current_ward ?? ""} onChange={(v) => set("current_ward", v)} options={wards} /></F>
+            <F label="Bed"><Input value={ref.current_bed ?? ""} onChange={(e) => set("current_bed", e.target.value)} /></F>
           </div>
+          <F label="Past medical history"><Textarea rows={3} value={ref.past_medical_history ?? ""} onChange={(e) => set("past_medical_history", e.target.value)} /></F>
+          <F label="Baseline function"><Textarea rows={2} value={ref.baseline_function ?? ""} onChange={(e) => set("baseline_function", e.target.value)} /></F>
+          <F label="Reason for referral"><Textarea rows={3} value={ref.reason_for_referral ?? ""} onChange={(e) => set("reason_for_referral", e.target.value)} /></F>
+          <div className="flex items-center gap-3">
+            <Switch checked={ref.dnacpr_respect} onCheckedChange={(v) => set("dnacpr_respect", v)} id="dn" />
+            <Label htmlFor="dn">DNACPR / ReSPECT in place</Label>
+          </div>
+        </Card>
+
+        <Card className="p-5 space-y-4">
+          <h2 className="font-semibold">Timeline (ICNARC)</h2>
+          <div className="grid grid-cols-2 gap-4">
+            <F label="Received"><DTNow value={toLocal(ref.referral_received_at)} onChange={(v) => saveTimestamp("referral_received_at", v ? new Date(v).toISOString() : null)} /></F>
+            <F label="First seen"><DTNow value={toLocal(ref.first_seen_at)} onChange={(v) => saveTimestamp("first_seen_at", v ? new Date(v).toISOString() : null)} /></F>
+            <F label="Decision"><DTNow value={toLocal(ref.decision_at)} onChange={(v) => saveTimestamp("decision_at", v ? new Date(v).toISOString() : null)} /></F>
+            <F label="Arrived on unit"><DTNow value={toLocal(ref.arrived_on_unit_at)} onChange={(v) => saveTimestamp("arrived_on_unit_at", v ? new Date(v).toISOString() : null)} disabled={ref.status === "declined"} /></F>
+          </div>
+          <p className="text-xs text-muted-foreground">Timestamps save automatically.</p>
+        </Card>
+
+        <Card className="p-5 space-y-4">
+          <h2 className="font-semibold">Outcome</h2>
+          <div className="grid grid-cols-2 gap-4">
+            <F label="Status">
+              <Select value={ref.status} onValueChange={(v) => set("status", v)}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="pending">Pending</SelectItem>
+                  <SelectItem value="admitted">Admitted</SelectItem>
+                  <SelectItem value="declined">Declined</SelectItem>
+                </SelectContent>
+              </Select>
+            </F>
+          </div>
+          {ref.status === "declined" && (
+            <F label="Reason for declining"><Textarea rows={3} value={ref.decline_reason ?? ""} onChange={(e) => set("decline_reason", e.target.value)} /></F>
+          )}
+        </Card>
+
+        <div className="flex justify-end">
+          <Button onClick={save} disabled={saving}><Save className="w-4 h-4 mr-1" />{saving ? "Saving…" : "Save changes"}</Button>
         </div>
 
-        <div className="space-y-4">
-          <Card className="p-5">
-            <h2 className="font-semibold mb-3">Notes</h2>
-            <div className="space-y-2 mb-3">
-              <Textarea rows={3} value={noteBody} onChange={(e) => setNoteBody(e.target.value)} placeholder="e.g. seen in ED resus, awaiting bloods, for re-review at 6pm" />
-              <Button size="sm" onClick={postNote} disabled={posting || !noteBody.trim()} className="w-full">
-                {posting ? "Posting…" : "Add note"}
+        <Card className="p-5">
+          <h2 className="font-semibold mb-1">Noteboard</h2>
+          <p className="text-xs text-muted-foreground mb-3">Messages for the team. Each note is tagged with the author and time.</p>
+          <div className="space-y-2 mb-4">
+            <Textarea rows={3} value={noteBody} onChange={(e) => setNoteBody(e.target.value)} placeholder="e.g. seen in ED resus, awaiting bloods, for re-review at 6pm" />
+            <div className="flex justify-end">
+              <Button size="sm" onClick={postNote} disabled={posting || !noteBody.trim()}>
+                {posting ? "Posting…" : "Post note"}
               </Button>
             </div>
-            <div className="space-y-3 max-h-[480px] overflow-auto">
-              {notes.length === 0 && <p className="text-xs text-muted-foreground">No notes yet.</p>}
-              {notes.map((n) => (
-                <div key={n.id} className="text-sm border-l-2 border-primary/40 pl-3">
-                  <div className="whitespace-pre-wrap">{n.body}</div>
-                  <div className="text-[11px] text-muted-foreground mt-1">
-                    {authors[n.author_id] ?? "Clinician"} · {formatDistanceToNow(new Date(n.created_at), { addSuffix: true })}
-                  </div>
+          </div>
+          <div className="space-y-3 max-h-[520px] overflow-auto">
+            {notes.length === 0 && <p className="text-xs text-muted-foreground">No notes yet.</p>}
+            {notes.map((n) => (
+              <div key={n.id} className="text-sm border-l-2 border-primary/40 pl-3 py-1">
+                <div className="flex items-baseline justify-between gap-3 mb-1">
+                  <span className="text-xs font-medium">{authors[n.author_id] ?? "Clinician"}</span>
+                  <span className="text-[11px] text-muted-foreground" title={format(new Date(n.created_at), "PPpp")}>
+                    {format(new Date(n.created_at), "d MMM yyyy, HH:mm")} · {formatDistanceToNow(new Date(n.created_at), { addSuffix: true })}
+                  </span>
                 </div>
-              ))}
-            </div>
-          </Card>
-        </div>
+                <div className="whitespace-pre-wrap">{n.body}</div>
+              </div>
+            ))}
+          </div>
+        </Card>
       </div>
     </div>
   );
