@@ -167,8 +167,13 @@ export const deleteReferral = createServerFn({ method: "POST" })
       .eq("id", data.id)
       .maybeSingle();
 
-    const { error } = await supabase.from("referrals").delete().eq("id", data.id);
+    const { error } = await supabase
+      .from("referrals")
+      .update({ deleted_at: new Date().toISOString(), deleted_by: userId } as any)
+      .eq("id", data.id)
+      .is("deleted_at", null);
     if (error) throw new Error(error.message);
+
 
     await supabase.from("audit_log").insert({
       user_id: userId,
