@@ -101,8 +101,8 @@ function NewReferralPage() {
               </Select>
             </Field>
             <Field label="Hospital number"><Input value={f.hospital_number} onChange={(e) => set("hospital_number", e.target.value)} /></Field>
-            <Field label="Referring specialty"><Input value={f.referring_specialty} onChange={(e) => set("referring_specialty", e.target.value)} placeholder="e.g. General Surgery" /></Field>
-            <Field label="Current ward"><Input value={f.current_ward} onChange={(e) => set("current_ward", e.target.value)} placeholder="e.g. ED Resus, Pembroke" /></Field>
+            <Field label="Referring specialty"><ComboboxAdd value={f.referring_specialty} onChange={(v) => set("referring_specialty", v)} options={specialties} placeholder="e.g. General Surgery" /></Field>
+            <Field label="Current ward"><ComboboxAdd value={f.current_ward} onChange={(v) => set("current_ward", v)} options={wards} placeholder="e.g. ED Resus, Pembroke" /></Field>
             <Field label="Bed"><Input value={f.current_bed} onChange={(e) => set("current_bed", e.target.value)} /></Field>
           </div>
         </Section>
