@@ -12,9 +12,12 @@ import { VisuallyHidden } from "@radix-ui/react-visually-hidden";
 export const Route = createFileRoute("/_authenticated")({
   ssr: false,
   beforeLoad: async () => {
-    const { data, error } = await supabase.auth.getUser();
-    if (error || !data.user) throw redirect({ to: "/auth" });
-    return { user: data.user };
+    // Use the locally persisted session so transient network failures
+    // against /auth/v1/user don't bounce signed-in users back to /auth.
+    // Server functions re-validate the bearer via requireSupabaseAuth.
+    const { data } = await supabase.auth.getSession();
+    if (!data.session?.user) throw redirect({ to: "/auth" });
+    return { user: data.session.user };
   },
   component: AuthedShell,
 });
