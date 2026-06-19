@@ -34,6 +34,7 @@ function ReferralsList() {
   const navigate = useNavigate();
   const [rows, setRows] = useState<Referral[]>([]);
   const [loading, setLoading] = useState(true);
+  const [hospSearch, setHospSearch] = useState("");
   const [q, setQ] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [dateFilter, setDateFilter] = useState<"all" | "today" | "yesterday" | "7d" | "30d">("all");
@@ -118,6 +119,7 @@ function ReferralsList() {
 
   const filtered = useMemo(() => {
     const needle = q.trim().toLowerCase();
+    const hospNeedle = hospSearch.trim().toLowerCase();
     const now = new Date();
     const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
     let fromTs: number | null = null;
@@ -134,12 +136,16 @@ function ReferralsList() {
         if (t < fromTs) return false;
         if (toTs !== null && t >= toTs) return false;
       }
+      if (hospNeedle) {
+        const hn = (r.hospital_number ?? "").toLowerCase();
+        if (!hn.includes(hospNeedle)) return false;
+      }
       if (!needle) return true;
       return [r.hospital_number, r.current_ward, r.current_bed, r.referring_specialty, r.reason_for_referral]
         .filter(Boolean)
         .some((v) => v!.toString().toLowerCase().includes(needle));
     });
-  }, [rows, q, statusFilter, dateFilter]);
+  }, [rows, q, hospSearch, statusFilter, dateFilter]);
 
   return (
     <div className="p-6 max-w-7xl mx-auto">
@@ -218,10 +224,19 @@ function ReferralsList() {
 
 
       <div className="flex flex-wrap gap-2 mb-4">
-        <div className="relative flex-1 min-w-[240px]">
+        <div className="relative flex-1 min-w-[200px]">
           <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
           <Input
-            placeholder="Search hospital number, ward, specialty…"
+            placeholder="Search by hospital number…"
+            value={hospSearch}
+            onChange={(e) => setHospSearch(e.target.value)}
+            className="pl-9"
+          />
+        </div>
+        <div className="relative flex-1 min-w-[200px]">
+          <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
+          <Input
+            placeholder="Search ward, bed, specialty, reason…"
             value={q}
             onChange={(e) => setQ(e.target.value)}
             className="pl-9"
