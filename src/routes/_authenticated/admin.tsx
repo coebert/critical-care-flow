@@ -120,7 +120,7 @@ function UsersPanel() {
     <Card className="p-5">
       <h2 className="font-semibold mb-3">Team members</h2>
       {loading ? <p className="text-sm text-muted-foreground">Loading…</p> : (
-        <table className="w-full text-sm">
+        <div className="overflow-x-auto"><table className="w-full text-sm min-w-[640px]">
           <thead className="text-xs uppercase text-muted-foreground">
             <tr><th className="text-left py-2">Name</th><th className="text-left">Email</th><th className="text-left">Roles</th><th className="text-left">Last sign-in</th><th></th></tr>
           </thead>
@@ -141,7 +141,7 @@ function UsersPanel() {
               </tr>
             ))}
           </tbody>
-        </table>
+        </table></div>
       )}
     </Card>
   );
