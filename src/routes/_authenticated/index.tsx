@@ -232,7 +232,7 @@ function ReferralsList() {
                 </tr>
               ))}
             </tbody>
-          </table>
+          </table></div>
         </div>
       )}
 
