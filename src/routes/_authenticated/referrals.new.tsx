@@ -108,6 +108,15 @@ function NewReferralPage() {
           </div>
         </Section>
 
+        <Section title="Timestamps">
+          <div className="grid grid-cols-2 gap-4">
+            <Field label="Referral received"><DateTimeNow value={f.referral_received_at} onChange={(v) => set("referral_received_at", v)} /></Field>
+            <Field label="First seen by CC"><DateTimeNow value={f.first_seen_at} onChange={(v) => set("first_seen_at", v)} /></Field>
+            <Field label="Decision to admit / decline"><DateTimeNow value={f.decision_at} onChange={(v) => set("decision_at", v)} /></Field>
+            <Field label="Arrived on unit"><DateTimeNow value={f.arrived_on_unit_at} onChange={(v) => set("arrived_on_unit_at", v)} /></Field>
+          </div>
+        </Section>
+
         <Section title="Clinical">
           <Field label="Past medical history"><Textarea rows={3} value={f.past_medical_history} onChange={(e) => set("past_medical_history", e.target.value)} /></Field>
           <Field label="Baseline level of function"><Textarea rows={2} value={f.baseline_function} onChange={(e) => set("baseline_function", e.target.value)} placeholder="e.g. independent, MRC dyspnoea 2, lives alone" /></Field>
@@ -115,15 +124,6 @@ function NewReferralPage() {
           <div className="flex items-center gap-3">
             <Switch id="dnacpr" checked={f.dnacpr_respect} onCheckedChange={(v) => set("dnacpr_respect", v)} />
             <Label htmlFor="dnacpr">DNACPR / ReSPECT form already in place</Label>
-          </div>
-        </Section>
-
-        <Section title="Timestamps">
-          <div className="grid grid-cols-2 gap-4">
-            <Field label="Referral received"><DateTimeNow value={f.referral_received_at} onChange={(v) => set("referral_received_at", v)} /></Field>
-            <Field label="First seen by CC"><DateTimeNow value={f.first_seen_at} onChange={(v) => set("first_seen_at", v)} /></Field>
-            <Field label="Decision to admit / decline"><DateTimeNow value={f.decision_at} onChange={(v) => set("decision_at", v)} /></Field>
-            <Field label="Arrived on unit"><DateTimeNow value={f.arrived_on_unit_at} onChange={(v) => set("arrived_on_unit_at", v)} /></Field>
           </div>
         </Section>
 
