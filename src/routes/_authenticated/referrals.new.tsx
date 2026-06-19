@@ -210,12 +210,34 @@ function NewReferralPage() {
 
 
         <Section title="Timestamps">
+          <p className="text-xs text-muted-foreground -mt-2">
+            ICNARC requires referral received for every record. First seen and decision are required once the patient has been reviewed; arrival is required for admitted patients.
+          </p>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <Field label="Referral received"><DateTimeNow value={f.referral_received_at} onChange={(v) => set("referral_received_at", v)} /></Field>
-            <Field label="First seen by CC"><DateTimeNow value={f.first_seen_at} onChange={(v) => set("first_seen_at", v)} /></Field>
-            <Field label="Decision to admit / decline"><DateTimeNow value={f.decision_at} onChange={(v) => set("decision_at", v)} /></Field>
-            <Field label="Arrived on unit"><DateTimeNow value={f.arrived_on_unit_at} onChange={(v) => set("arrived_on_unit_at", v)} /></Field>
+            <Field label="Referral received" required error={showErrors ? timing.fieldErrors.referral_received_at : undefined}>
+              <DateTimeNow value={f.referral_received_at} onChange={(v) => set("referral_received_at", v)} invalid={showErrors && !!timing.fieldErrors.referral_received_at} />
+            </Field>
+            <Field label="First seen by CC" required={f.status !== "pending"} error={showErrors ? timing.fieldErrors.first_seen_at : undefined}>
+              <DateTimeNow value={f.first_seen_at} onChange={(v) => set("first_seen_at", v)} invalid={showErrors && !!timing.fieldErrors.first_seen_at} />
+            </Field>
+            <Field label="Decision to admit / decline" required={f.status !== "pending"} error={showErrors ? timing.fieldErrors.decision_at : undefined}>
+              <DateTimeNow value={f.decision_at} onChange={(v) => set("decision_at", v)} invalid={showErrors && !!timing.fieldErrors.decision_at} />
+            </Field>
+            <Field label="Arrived on unit" required={f.status === "admitted"} error={showErrors ? timing.fieldErrors.arrived_on_unit_at : undefined}>
+              <DateTimeNow value={f.arrived_on_unit_at} onChange={(v) => set("arrived_on_unit_at", v)} invalid={showErrors && !!timing.fieldErrors.arrived_on_unit_at} />
+            </Field>
           </div>
+          {showErrors && timing.issues.length > 0 && (
+            <Alert variant="destructive" className="mt-2">
+              <AlertCircle className="h-4 w-4" />
+              <AlertTitle>Inconsistent timings</AlertTitle>
+              <AlertDescription>
+                <ul className="list-disc pl-4 space-y-1">
+                  {timing.issues.map((m) => <li key={m}>{m}</li>)}
+                </ul>
+              </AlertDescription>
+            </Alert>
+          )}
         </Section>
 
         <Section title="Clinical">
