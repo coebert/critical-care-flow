@@ -293,15 +293,22 @@ function ReferralDetail() {
           <div className="space-y-3 max-h-[520px] overflow-auto">
             {notes.length === 0 && <p className="text-xs text-muted-foreground">No notes yet.</p>}
             {notes.map((n) => (
-              <div key={n.id} className="text-sm border-l-2 border-primary/40 pl-3 py-1">
-                <div className="flex items-baseline justify-between gap-3 mb-1">
-                  <span className="text-xs font-medium">{authors[n.author_id] ?? "Clinician"}</span>
-                  <span className="text-[11px] text-muted-foreground" title={format(new Date(n.created_at), "PPpp")}>
-                    {format(new Date(n.created_at), "d MMM yyyy, HH:mm")} · {formatDistanceToNow(new Date(n.created_at), { addSuffix: true })}
-                  </span>
-                </div>
-                <div className="whitespace-pre-wrap">{n.body}</div>
-              </div>
+              <NoteItem
+                key={n.id}
+                note={n}
+                authorName={authors[n.author_id] ?? "Clinician"}
+                canEdit={!!user && (user.id === n.author_id || isAdmin)}
+                onSave={async (body) => {
+                  const updated = await updateNoteFn({ data: { id: n.id, body } });
+                  setNotes((cur) => cur.map((x) => (x.id === n.id ? (updated as Note) : x)));
+                  toast.success("Note updated");
+                }}
+                onDelete={async () => {
+                  await deleteNoteFn({ data: { id: n.id } });
+                  setNotes((cur) => cur.filter((x) => x.id !== n.id));
+                  toast.success("Note deleted");
+                }}
+              />
             ))}
           </div>
         </Card>
