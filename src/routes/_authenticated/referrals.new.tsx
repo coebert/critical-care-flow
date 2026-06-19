@@ -145,6 +145,12 @@ function NewReferralPage() {
           )}
         </Section>
 
+        <Section title="Noteboard">
+          <p className="text-sm text-muted-foreground">
+            The team noteboard becomes available after you save this referral. Save the referral, then post notes for other clinicians to see — each note is tagged with your name and the time it was written.
+          </p>
+        </Section>
+
         <div className="flex justify-end gap-2">
           <Button type="button" variant="outline" onClick={() => navigate({ to: "/" })}>Cancel</Button>
           <Button type="submit" disabled={saving}>{saving ? "Saving…" : "Save referral"}</Button>
