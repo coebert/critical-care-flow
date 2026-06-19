@@ -21,14 +21,30 @@ const refSchema = z.object({
   decline_reason: z.string().trim().max(2000).nullable().optional(),
 });
 
+async function getAdmin() {
+  const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+  return supabaseAdmin;
+}
+
+async function writeAudit(entry: {
+  user_id: string;
+  action: string;
+  entity: string;
+  entity_id: string;
+  diff?: any;
+}) {
+  const admin = await getAdmin();
+  await admin.from("audit_log").insert(entry as any);
+}
+
 async function fanOutNotifications(
-  supabase: any,
   userId: string,
   referralId: string,
   kind: "new" | "updated",
   message: string,
 ) {
-  const { data: others } = await supabase
+  const admin = await getAdmin();
+  const { data: others } = await admin
     .from("user_roles")
     .select("user_id")
     .neq("user_id", userId);
@@ -40,8 +56,9 @@ async function fanOutNotifications(
     kind,
     message,
   }));
-  await supabase.from("notifications").insert(rows);
+  await admin.from("notifications").insert(rows);
 }
+
 
 export const createReferral = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
