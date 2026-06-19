@@ -5,7 +5,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
-import { Plus, Search, RotateCcw, Trash2 } from "lucide-react";
+import { Plus, Search, RotateCcw, Trash2, MapPin } from "lucide-react";
 import type { Tables } from "@/integrations/supabase/types";
 import { format, formatDistanceToNow } from "date-fns";
 import { listDeletedReferrals, restoreReferral, RESTORE_WINDOW_DAYS } from "@/lib/referrals.functions";
@@ -37,6 +37,7 @@ function ReferralsList() {
   const [hospSearch, setHospSearch] = useState("");
   const [q, setQ] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("all");
+  const [locFilter, setLocFilter] = useState<string>("all");
   const [dateFilter, setDateFilter] = useState<"all" | "today" | "yesterday" | "7d" | "30d">("all");
   const [showDeleted, setShowDeleted] = useState(false);
   const [deletedRows, setDeletedRows] = useState<Referral[]>([]);
@@ -117,6 +118,18 @@ function ReferralsList() {
     };
   }, []);
 
+  const topWards = useMemo(() => {
+    const counts = new Map<string, number>();
+    for (const r of rows) {
+      if (!r.current_ward) continue;
+      counts.set(r.current_ward, (counts.get(r.current_ward) ?? 0) + 1);
+    }
+    return Array.from(counts.entries())
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 8)
+      .map(([ward]) => ward);
+  }, [rows]);
+
   const filtered = useMemo(() => {
     const needle = q.trim().toLowerCase();
     const hospNeedle = hospSearch.trim().toLowerCase();
@@ -131,6 +144,7 @@ function ReferralsList() {
 
     return rows.filter((r) => {
       if (statusFilter !== "all" && r.status !== statusFilter) return false;
+      if (locFilter !== "all" && r.current_ward !== locFilter) return false;
       if (fromTs !== null) {
         const t = new Date(r.referral_received_at).getTime();
         if (t < fromTs) return false;
@@ -145,7 +159,7 @@ function ReferralsList() {
         .filter(Boolean)
         .some((v) => v!.toString().toLowerCase().includes(needle));
     });
-  }, [rows, q, hospSearch, statusFilter, dateFilter]);
+  }, [rows, q, hospSearch, statusFilter, locFilter, dateFilter]);
 
   return (
     <div className="p-6 max-w-7xl mx-auto">
@@ -274,6 +288,30 @@ function ReferralsList() {
           </Button>
         ))}
       </div>
+
+      {topWards.length > 0 && (
+        <div className="flex flex-wrap gap-2 mb-4 items-center">
+          <span className="text-xs uppercase text-muted-foreground mr-1">Location</span>
+          <Button
+            size="sm"
+            variant={locFilter === "all" ? "default" : "outline"}
+            onClick={() => setLocFilter("all")}
+          >
+            All
+          </Button>
+          {topWards.map((ward) => (
+            <Button
+              key={ward}
+              size="sm"
+              variant={locFilter === ward ? "default" : "outline"}
+              onClick={() => setLocFilter(ward)}
+            >
+              <MapPin className="w-3 h-3 mr-1" />
+              {ward}
+            </Button>
+          ))}
+        </div>
+      )}
 
 
       <div className="border rounded-md bg-card overflow-hidden">
