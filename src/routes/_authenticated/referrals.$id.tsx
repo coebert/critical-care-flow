@@ -196,8 +196,8 @@ function ReferralDetail() {
                 </Select>
               </F>
               <F label="Hospital number"><Input value={ref.hospital_number ?? ""} onChange={(e) => set("hospital_number", e.target.value)} /></F>
-              <F label="Referring specialty"><Input value={ref.referring_specialty ?? ""} onChange={(e) => set("referring_specialty", e.target.value)} /></F>
-              <F label="Ward"><Input value={ref.current_ward ?? ""} onChange={(e) => set("current_ward", e.target.value)} /></F>
+              <F label="Referring specialty"><ComboboxAdd value={ref.referring_specialty ?? ""} onChange={(v) => set("referring_specialty", v)} options={specialties} /></F>
+              <F label="Ward"><ComboboxAdd value={ref.current_ward ?? ""} onChange={(v) => set("current_ward", v)} options={wards} /></F>
               <F label="Bed"><Input value={ref.current_bed ?? ""} onChange={(e) => set("current_bed", e.target.value)} /></F>
             </div>
             <F label="Past medical history"><Textarea rows={3} value={ref.past_medical_history ?? ""} onChange={(e) => set("past_medical_history", e.target.value)} /></F>
