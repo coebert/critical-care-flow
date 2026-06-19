@@ -92,13 +92,13 @@ function AnalyticsPage() {
   const meanDecisionToArrival = meanMinutes((r) => [r.decision_at, r.arrived_on_unit_at]);
 
   return (
-    <div className="p-6 max-w-7xl mx-auto">
-      <div className="flex items-center justify-between mb-6">
-        <div>
+    <div className="p-4 sm:p-6 max-w-7xl mx-auto">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-6">
+        <div className="min-w-0">
           <h1 className="text-2xl font-semibold tracking-tight">Analytics</h1>
           <p className="text-sm text-muted-foreground">Last {days} days · {filtered.length} referrals</p>
         </div>
-        <div className="flex gap-2">
+        <div className="flex gap-2 flex-wrap">
           {[7, 30, 90, 365].map((d) => (
             <Button key={d} size="sm" variant={days === d ? "default" : "outline"} onClick={() => setDays(d)}>
               {d}d

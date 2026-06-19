@@ -23,7 +23,7 @@ function AdminPage() {
   if (!hasRole) return <div className="p-6"><Card className="p-6 max-w-md"><h1 className="font-semibold mb-2">Admin only</h1><p className="text-sm text-muted-foreground">You don't have permission to view this page.</p></Card></div>;
 
   return (
-    <div className="p-6 max-w-6xl mx-auto">
+    <div className="p-4 sm:p-6 max-w-6xl mx-auto">
       <h1 className="text-2xl font-semibold tracking-tight mb-6">Admin</h1>
       <Tabs defaultValue="users">
         <TabsList>
@@ -120,7 +120,7 @@ function UsersPanel() {
     <Card className="p-5">
       <h2 className="font-semibold mb-3">Team members</h2>
       {loading ? <p className="text-sm text-muted-foreground">Loading…</p> : (
-        <table className="w-full text-sm">
+        <div className="overflow-x-auto"><table className="w-full text-sm min-w-[640px]">
           <thead className="text-xs uppercase text-muted-foreground">
             <tr><th className="text-left py-2">Name</th><th className="text-left">Email</th><th className="text-left">Roles</th><th className="text-left">Last sign-in</th><th></th></tr>
           </thead>
@@ -141,7 +141,7 @@ function UsersPanel() {
               </tr>
             ))}
           </tbody>
-        </table>
+        </table></div>
       )}
     </Card>
   );
@@ -159,7 +159,7 @@ function AuditPanel() {
     <Card className="p-5">
       <h2 className="font-semibold mb-3">Audit log (last 500 events)</h2>
       {loading ? <p className="text-sm text-muted-foreground">Loading…</p> : (
-        <table className="w-full text-sm">
+        <div className="overflow-x-auto"><table className="w-full text-sm min-w-[640px]">
           <thead className="text-xs uppercase text-muted-foreground">
             <tr><th className="text-left py-2">When</th><th className="text-left">Action</th><th className="text-left">Entity</th><th className="text-left">ID</th><th className="text-left">User</th></tr>
           </thead>
@@ -174,7 +174,7 @@ function AuditPanel() {
               </tr>
             ))}
           </tbody>
-        </table>
+        </table></div>
       )}
     </Card>
   );

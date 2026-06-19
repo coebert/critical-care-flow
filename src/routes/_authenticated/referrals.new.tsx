@@ -141,11 +141,11 @@ function NewReferralPage() {
   };
 
   return (
-    <div className="p-6 max-w-3xl mx-auto">
+    <div className="p-4 sm:p-6 max-w-3xl mx-auto">
       <h1 className="text-2xl font-semibold tracking-tight mb-6">New referral</h1>
       <form onSubmit={submit} className="space-y-6">
         <Section title="Patient">
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <Field label="Age"><Input type="number" min="0" max="130" value={f.age} onChange={(e) => set("age", e.target.value)} /></Field>
             <Field label="Sex">
               <Select value={f.sex} onValueChange={(v) => set("sex", v)}>
@@ -191,7 +191,7 @@ function NewReferralPage() {
 
 
         <Section title="Timestamps">
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <Field label="Referral received"><DateTimeNow value={f.referral_received_at} onChange={(v) => set("referral_received_at", v)} /></Field>
             <Field label="First seen by CC"><DateTimeNow value={f.first_seen_at} onChange={(v) => set("first_seen_at", v)} /></Field>
             <Field label="Decision to admit / decline"><DateTimeNow value={f.decision_at} onChange={(v) => set("decision_at", v)} /></Field>
@@ -210,7 +210,7 @@ function NewReferralPage() {
         </Section>
 
         <Section title="Outcome">
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <Field label="Status">
               <Select value={f.status} onValueChange={(v) => set("status", v)}>
                 <SelectTrigger><SelectValue /></SelectTrigger>

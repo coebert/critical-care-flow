@@ -162,13 +162,13 @@ function ReferralsList() {
   }, [rows, q, hospSearch, statusFilter, locFilter, dateFilter]);
 
   return (
-    <div className="p-6 max-w-7xl mx-auto">
-      <div className="flex items-center justify-between mb-6">
-        <div>
+    <div className="p-4 sm:p-6 max-w-7xl mx-auto">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-6">
+        <div className="min-w-0">
           <h1 className="text-2xl font-semibold tracking-tight">Referrals</h1>
           <p className="text-sm text-muted-foreground">{rows.length} total · live updating</p>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 flex-wrap">
           <Button
             variant={showDeleted ? "default" : "outline"}
             size="sm"
@@ -191,7 +191,7 @@ function ReferralsList() {
               Restorable within {RESTORE_WINDOW_DAYS} days of deletion
             </span>
           </div>
-          <table className="w-full text-sm">
+          <div className="overflow-x-auto"><table className="w-full text-sm min-w-[640px]">
             <thead className="bg-muted/50 text-xs uppercase text-muted-foreground">
               <tr>
                 <th className="text-left px-3 py-2">Deleted</th>
@@ -232,7 +232,7 @@ function ReferralsList() {
                 </tr>
               ))}
             </tbody>
-          </table>
+          </table></div>
         </div>
       )}
 
@@ -315,7 +315,7 @@ function ReferralsList() {
 
 
       <div className="border rounded-md bg-card overflow-hidden">
-        <table className="w-full text-sm">
+        <div className="overflow-x-auto"><table className="w-full text-sm min-w-[720px]">
           <thead className="bg-muted/50 text-xs uppercase text-muted-foreground">
             <tr>
               <th className="text-left px-3 py-2">Received</th>
@@ -361,7 +361,7 @@ function ReferralsList() {
               </tr>
             ))}
           </tbody>
-        </table>
+        </table></div>
       </div>
     </div>
   );
