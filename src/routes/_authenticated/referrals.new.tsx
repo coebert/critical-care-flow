@@ -1,7 +1,7 @@
-import { createFileRoute, useNavigate } from "@tanstack/react-router";
-import { useState } from "react";
+import { createFileRoute, useNavigate, Link } from "@tanstack/react-router";
+import { useState, useEffect } from "react";
 import { useServerFn } from "@tanstack/react-start";
-import { createReferral } from "@/lib/referrals.functions";
+import { createReferral, findReferralsByHospitalNumber } from "@/lib/referrals.functions";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -15,14 +15,40 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+  DialogFooter,
+} from "@/components/ui/dialog";
+import { Badge } from "@/components/ui/badge";
+import { AlertCircle } from "lucide-react";
 import { ComboboxAdd } from "@/components/combobox-add";
 import { useReferralOptions } from "@/hooks/use-referral-options";
 import { toast } from "sonner";
+import { format } from "date-fns";
+
+type PriorReferral = {
+  id: string;
+  hospital_number: string | null;
+  referral_received_at: string;
+  status: string;
+  referring_specialty: string | null;
+  current_ward: string | null;
+  current_bed: string | null;
+  reason_for_referral: string | null;
+  age: number | null;
+  sex: string | null;
+};
 
 export const Route = createFileRoute("/_authenticated/referrals/new")({
   head: () => ({ meta: [{ title: "New referral — SDH Critical Care" }] }),
   component: NewReferralPage,
 });
+
 
 function localISO() {
   const d = new Date();
@@ -55,6 +81,37 @@ function NewReferralPage() {
   });
 
   const set = (k: keyof typeof f, v: any) => setF((cur) => ({ ...cur, [k]: v }));
+
+  // Prior-referral lookup by hospital number
+  const findPrior = useServerFn(findReferralsByHospitalNumber);
+  const [priors, setPriors] = useState<PriorReferral[]>([]);
+  const [priorOpen, setPriorOpen] = useState(false);
+  const [dismissedFor, setDismissedFor] = useState<string | null>(null);
+
+  useEffect(() => {
+    const hn = f.hospital_number.trim();
+    if (!hn) {
+      setPriors([]);
+      return;
+    }
+    let cancelled = false;
+    const t = setTimeout(async () => {
+      try {
+        const res = await findPrior({ data: { hospital_number: hn } });
+        if (!cancelled) setPriors((res ?? []) as PriorReferral[]);
+      } catch {
+        if (!cancelled) setPriors([]);
+      }
+    }, 350);
+    return () => {
+      cancelled = true;
+      clearTimeout(t);
+    };
+  }, [f.hospital_number, findPrior]);
+
+  const showAlert =
+    priors.length > 0 && dismissedFor !== f.hospital_number.trim();
+
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -106,7 +163,32 @@ function NewReferralPage() {
             <Field label="Current ward"><ComboboxAdd value={f.current_ward} onChange={(v) => set("current_ward", v)} options={wards} placeholder="e.g. ED Resus, Pembroke" /></Field>
             <Field label="Bed"><Input value={f.current_bed} onChange={(e) => set("current_bed", e.target.value)} /></Field>
           </div>
+          {showAlert && (
+            <Alert variant="destructive" className="mt-2">
+              <AlertCircle className="h-4 w-4" />
+              <AlertTitle>Previous referral{priors.length > 1 ? "s" : ""} on record</AlertTitle>
+              <AlertDescription className="flex flex-col gap-2">
+                <span>
+                  This patient (hospital number <strong>{f.hospital_number}</strong>) has been referred to critical care {priors.length} time{priors.length > 1 ? "s" : ""} before.
+                </span>
+                <div className="flex gap-2">
+                  <Button type="button" size="sm" variant="outline" onClick={() => setPriorOpen(true)}>
+                    View previous referrals for this patient
+                  </Button>
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="ghost"
+                    onClick={() => setDismissedFor(f.hospital_number.trim())}
+                  >
+                    Dismiss
+                  </Button>
+                </div>
+              </AlertDescription>
+            </Alert>
+          )}
         </Section>
+
 
         <Section title="Timestamps">
           <div className="grid grid-cols-2 gap-4">
@@ -156,9 +238,54 @@ function NewReferralPage() {
           <Button type="submit" disabled={saving}>{saving ? "Saving…" : "Save referral"}</Button>
         </div>
       </form>
+
+      <Dialog open={priorOpen} onOpenChange={setPriorOpen}>
+        <DialogContent className="max-w-2xl">
+          <DialogHeader>
+            <DialogTitle>Previous referrals for {f.hospital_number || "this patient"}</DialogTitle>
+            <DialogDescription>
+              Click any referral to open the full form in a new tab.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="max-h-[60vh] overflow-y-auto space-y-2">
+            {priors.length === 0 && (
+              <p className="text-sm text-muted-foreground py-6 text-center">No previous referrals.</p>
+            )}
+            {priors.map((p) => (
+              <Link
+                key={p.id}
+                to="/referrals/$id"
+                params={{ id: p.id }}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="block border rounded-md p-3 hover:bg-accent/40 transition-colors"
+              >
+                <div className="flex items-center justify-between gap-2 mb-1">
+                  <div className="text-sm font-medium">
+                    {format(new Date(p.referral_received_at), "dd MMM yyyy HH:mm")}
+                  </div>
+                  <Badge variant="outline" className="capitalize">{p.status}</Badge>
+                </div>
+                <div className="text-xs text-muted-foreground">
+                  {p.referring_specialty ?? "Specialty unknown"}
+                  {p.current_ward ? ` · ${p.current_ward}` : ""}
+                  {p.current_bed ? ` ${p.current_bed}` : ""}
+                </div>
+                {p.reason_for_referral && (
+                  <div className="text-sm mt-1 line-clamp-2">{p.reason_for_referral}</div>
+                )}
+              </Link>
+            ))}
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setPriorOpen(false)}>Close</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
+
 
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
   return (
