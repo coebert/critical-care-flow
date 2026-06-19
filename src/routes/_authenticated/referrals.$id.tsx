@@ -47,6 +47,7 @@ function ReferralDetail() {
   const logView = useServerFn(logReferralView);
   const removeReferral = useServerFn(deleteReferral);
   const { hasRole: isAdmin } = useRole("admin");
+  const [deleting, setDeleting] = useState(false);
   const { specialties, wards } = useReferralOptions();
 
 
