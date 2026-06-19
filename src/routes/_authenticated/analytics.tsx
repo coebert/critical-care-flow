@@ -27,9 +27,11 @@ function AnalyticsPage() {
     supabase
       .from("referrals")
       .select("*")
+      .is("deleted_at", null)
       .gte("referral_received_at", subDays(new Date(), Math.max(days, 365)).toISOString())
       .limit(5000)
       .then(({ data }) => setRows(data ?? []));
+
   }, [days]);
 
   const filtered = useMemo(() => {
