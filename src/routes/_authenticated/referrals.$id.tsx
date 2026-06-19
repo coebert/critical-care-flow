@@ -53,6 +53,7 @@ function ReferralDetail() {
   const { user } = useAuth();
   const { hasRole: isAdmin } = useRole("admin");
   const [deleting, setDeleting] = useState(false);
+  const [expandCmd, setExpandCmd] = useState<{ open: boolean; id: number } | null>(null);
   const { specialties, wards } = useReferralOptions();
 
 
@@ -217,9 +218,27 @@ function ReferralDetail() {
       <h1 className="text-2xl font-semibold mb-1">
         {ref.hospital_number ?? "Referral"} · {ref.age ?? "?"}/{ref.sex ?? "?"}
       </h1>
-      <p className="text-sm text-muted-foreground mb-6">
+      <p className="text-sm text-muted-foreground mb-2">
         Received {format(new Date(ref.referral_received_at), "PPpp")}
       </p>
+      <div className="flex gap-2 mb-4 md:hidden">
+        <Button
+          size="sm"
+          variant="outline"
+          className="flex-1"
+          onClick={() => setExpandCmd({ open: true, id: Date.now() })}
+        >
+          Expand all
+        </Button>
+        <Button
+          size="sm"
+          variant="outline"
+          className="flex-1"
+          onClick={() => setExpandCmd({ open: false, id: Date.now() })}
+        >
+          Collapse all
+        </Button>
+      </div>
 
       <div className="space-y-4">
         <Card className="p-5 space-y-4">
@@ -239,9 +258,9 @@ function ReferralDetail() {
             <F label="Ward"><ComboboxAdd value={ref.current_ward ?? ""} onChange={(v) => set("current_ward", v)} options={wards} /></F>
             <F label="Bed"><Input value={ref.current_bed ?? ""} onChange={(e) => set("current_bed", e.target.value)} /></F>
           </div>
-          <ExpandableSection label="Past medical history"><Textarea rows={3} value={ref.past_medical_history ?? ""} onChange={(e) => set("past_medical_history", e.target.value)} /></ExpandableSection>
-          <ExpandableSection label="Baseline function"><Textarea rows={2} value={ref.baseline_function ?? ""} onChange={(e) => set("baseline_function", e.target.value)} /></ExpandableSection>
-          <ExpandableSection label="Reason for referral"><Textarea rows={3} value={ref.reason_for_referral ?? ""} onChange={(e) => set("reason_for_referral", e.target.value)} /></ExpandableSection>
+          <ExpandableSection label="Past medical history" command={expandCmd}><Textarea rows={3} value={ref.past_medical_history ?? ""} onChange={(e) => set("past_medical_history", e.target.value)} /></ExpandableSection>
+          <ExpandableSection label="Baseline function" command={expandCmd}><Textarea rows={2} value={ref.baseline_function ?? ""} onChange={(e) => set("baseline_function", e.target.value)} /></ExpandableSection>
+          <ExpandableSection label="Reason for referral" command={expandCmd}><Textarea rows={3} value={ref.reason_for_referral ?? ""} onChange={(e) => set("reason_for_referral", e.target.value)} /></ExpandableSection>
           <div className="flex items-center gap-3">
             <Switch checked={ref.dnacpr_respect} onCheckedChange={(v) => set("dnacpr_respect", v)} id="dn" />
             <Label htmlFor="dn">DNACPR / ReSPECT in place</Label>
@@ -274,7 +293,7 @@ function ReferralDetail() {
             </F>
           </div>
           {ref.status === "declined" && (
-            <ExpandableSection label="Reason for declining"><Textarea rows={3} value={ref.decline_reason ?? ""} onChange={(e) => set("decline_reason", e.target.value)} /></ExpandableSection>
+            <ExpandableSection label="Reason for declining" command={expandCmd}><Textarea rows={3} value={ref.decline_reason ?? ""} onChange={(e) => set("decline_reason", e.target.value)} /></ExpandableSection>
           )}
         </Card>
 
@@ -350,7 +369,7 @@ function F({ label, children }: { label: string; children: React.ReactNode }) {
   return <div className="space-y-1.5"><Label className="text-xs">{label}</Label>{children}</div>;
 }
 
-function ExpandableSection({ label, children }: { label: string; children: React.ReactNode }) {
+function ExpandableSection({ label, children, command }: { label: string; children: React.ReactNode; command?: { open: boolean; id: number } | null }) {
   const [open, setOpen] = useState(true);
   const [isMobile, setIsMobile] = useState(false);
 
@@ -364,6 +383,12 @@ function ExpandableSection({ label, children }: { label: string; children: React
     mq.addEventListener("change", update);
     return () => mq.removeEventListener("change", update);
   }, []);
+
+  useEffect(() => {
+    if (command) {
+      setOpen(command.open);
+    }
+  }, [command?.id]);
 
   if (!isMobile) {
     return <F label={label}>{children}</F>;
