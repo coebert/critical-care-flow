@@ -311,3 +311,71 @@ export const deleteReferral = createServerFn({ method: "POST" })
     return { ok: true };
   });
 
+
+// Window during which a soft-deleted referral can still be restored.
+export const RESTORE_WINDOW_DAYS = 7;
+
+export const listDeletedReferrals = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ context }) => {
+    const { supabase, userId } = context;
+    const cutoff = new Date(Date.now() - RESTORE_WINDOW_DAYS * 86400000).toISOString();
+    const { data: isAdmin } = await supabase.rpc("has_role", {
+      _user_id: userId,
+      _role: "admin",
+    });
+    let query = supabase
+      .from("referrals")
+      .select("*")
+      .not("deleted_at", "is", null)
+      .gte("deleted_at", cutoff)
+      .order("deleted_at", { ascending: false });
+    if (!isAdmin) query = query.eq("created_by", userId);
+    const { data, error } = await query;
+    if (error) throw new Error(error.message);
+    return data ?? [];
+  });
+
+export const restoreReferral = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d: unknown) => z.object({ id: z.string().uuid() }).parse(d))
+  .handler(async ({ data, context }) => {
+    const { supabase, userId } = context;
+    const { data: row } = await supabase
+      .from("referrals")
+      .select("*, created_by, deleted_at")
+      .eq("id", data.id)
+      .maybeSingle();
+    if (!row) throw new Error("Referral not found");
+    if (!row.deleted_at) throw new Error("Referral is not deleted");
+
+    const { data: isAdmin } = await supabase.rpc("has_role", {
+      _user_id: userId,
+      _role: "admin",
+    });
+    if (row.created_by !== userId && !isAdmin) {
+      throw new Error("Only the creator or an admin can restore this referral");
+    }
+
+    const cutoff = Date.now() - RESTORE_WINDOW_DAYS * 86400000;
+    if (new Date(row.deleted_at).getTime() < cutoff) {
+      throw new Error(`Restore window of ${RESTORE_WINDOW_DAYS} days has expired`);
+    }
+
+    const { error } = await supabase
+      .from("referrals")
+      .update({ deleted_at: null, deleted_by: null, updated_by: userId } as any)
+      .eq("id", data.id);
+    if (error) throw new Error(error.message);
+
+    await writeAudit({
+      user_id: userId,
+      action: "update",
+      entity: "referral",
+      entity_id: data.id,
+      diff: { restored: true },
+    });
+    return { ok: true };
+  });
+
+
