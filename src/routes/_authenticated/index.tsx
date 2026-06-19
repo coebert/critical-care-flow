@@ -289,6 +289,30 @@ function ReferralsList() {
         ))}
       </div>
 
+      {topWards.length > 0 && (
+        <div className="flex flex-wrap gap-2 mb-4 items-center">
+          <span className="text-xs uppercase text-muted-foreground mr-1">Location</span>
+          <Button
+            size="sm"
+            variant={locFilter === "all" ? "default" : "outline"}
+            onClick={() => setLocFilter("all")}
+          >
+            All
+          </Button>
+          {topWards.map((ward) => (
+            <Button
+              key={ward}
+              size="sm"
+              variant={locFilter === ward ? "default" : "outline"}
+              onClick={() => setLocFilter(ward)}
+            >
+              <MapPin className="w-3 h-3 mr-1" />
+              {ward}
+            </Button>
+          ))}
+        </div>
+      )}
+
 
       <div className="border rounded-md bg-card overflow-hidden">
         <table className="w-full text-sm">
