@@ -315,7 +315,7 @@ function ReferralsList() {
 
 
       <div className="border rounded-md bg-card overflow-hidden">
-        <table className="w-full text-sm">
+        <div className="overflow-x-auto"><table className="w-full text-sm min-w-[720px]">
           <thead className="bg-muted/50 text-xs uppercase text-muted-foreground">
             <tr>
               <th className="text-left px-3 py-2">Received</th>
