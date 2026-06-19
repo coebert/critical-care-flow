@@ -8,6 +8,7 @@ import { Card } from "@/components/ui/card";
 import { Activity } from "lucide-react";
 import { toast } from "sonner";
 import { Toaster } from "@/components/ui/sonner";
+import { retrySupabaseCall, retryWithBackoff } from "@/lib/retry";
 
 export const Route = createFileRoute("/auth")({
   ssr: false,
