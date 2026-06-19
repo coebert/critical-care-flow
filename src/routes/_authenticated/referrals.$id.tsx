@@ -239,9 +239,9 @@ function ReferralDetail() {
             <F label="Ward"><ComboboxAdd value={ref.current_ward ?? ""} onChange={(v) => set("current_ward", v)} options={wards} /></F>
             <F label="Bed"><Input value={ref.current_bed ?? ""} onChange={(e) => set("current_bed", e.target.value)} /></F>
           </div>
-          <F label="Past medical history"><Textarea rows={3} value={ref.past_medical_history ?? ""} onChange={(e) => set("past_medical_history", e.target.value)} /></F>
-          <F label="Baseline function"><Textarea rows={2} value={ref.baseline_function ?? ""} onChange={(e) => set("baseline_function", e.target.value)} /></F>
-          <F label="Reason for referral"><Textarea rows={3} value={ref.reason_for_referral ?? ""} onChange={(e) => set("reason_for_referral", e.target.value)} /></F>
+          <ExpandableSection label="Past medical history"><Textarea rows={3} value={ref.past_medical_history ?? ""} onChange={(e) => set("past_medical_history", e.target.value)} /></ExpandableSection>
+          <ExpandableSection label="Baseline function"><Textarea rows={2} value={ref.baseline_function ?? ""} onChange={(e) => set("baseline_function", e.target.value)} /></ExpandableSection>
+          <ExpandableSection label="Reason for referral"><Textarea rows={3} value={ref.reason_for_referral ?? ""} onChange={(e) => set("reason_for_referral", e.target.value)} /></ExpandableSection>
           <div className="flex items-center gap-3">
             <Switch checked={ref.dnacpr_respect} onCheckedChange={(v) => set("dnacpr_respect", v)} id="dn" />
             <Label htmlFor="dn">DNACPR / ReSPECT in place</Label>
@@ -274,7 +274,7 @@ function ReferralDetail() {
             </F>
           </div>
           {ref.status === "declined" && (
-            <F label="Reason for declining"><Textarea rows={3} value={ref.decline_reason ?? ""} onChange={(e) => set("decline_reason", e.target.value)} /></F>
+            <ExpandableSection label="Reason for declining"><Textarea rows={3} value={ref.decline_reason ?? ""} onChange={(e) => set("decline_reason", e.target.value)} /></ExpandableSection>
           )}
         </Card>
 
