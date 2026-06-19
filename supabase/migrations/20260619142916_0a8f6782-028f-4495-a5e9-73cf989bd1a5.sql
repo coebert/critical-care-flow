@@ -1,0 +1,2 @@
+DROP POLICY IF EXISTS "Referrals deletable by admins" ON public.referrals;
+CREATE POLICY "Referrals deletable by creator or admin" ON public.referrals FOR DELETE TO authenticated USING (auth.uid() = created_by OR has_role(auth.uid(), 'admin'::app_role));

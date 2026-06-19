@@ -277,17 +277,21 @@ export const deleteReferral = createServerFn({ method: "POST" })
   .inputValidator((d: unknown) => z.object({ id: z.string().uuid() }).parse(d))
   .handler(async ({ data, context }) => {
     const { supabase, userId } = context;
+    const { data: row } = await supabase
+      .from("referrals")
+      .select("*, created_by")
+      .eq("id", data.id)
+      .maybeSingle();
+
+    if (!row) throw new Error("Referral not found");
+
     const { data: isAdmin } = await supabase.rpc("has_role", {
       _user_id: userId,
       _role: "admin",
     });
-    if (!isAdmin) throw new Error("Only admins can delete referrals");
-
-    const { data: row } = await supabase
-      .from("referrals")
-      .select("*")
-      .eq("id", data.id)
-      .maybeSingle();
+    if (row.created_by !== userId && !isAdmin) {
+      throw new Error("Only the creator or an admin can delete this referral");
+    }
 
     const { error } = await supabase
       .from("referrals")
@@ -295,7 +299,6 @@ export const deleteReferral = createServerFn({ method: "POST" })
       .eq("id", data.id)
       .is("deleted_at", null);
     if (error) throw new Error(error.message);
-
 
     await writeAudit({
       user_id: userId,

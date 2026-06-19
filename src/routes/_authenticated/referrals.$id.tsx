@@ -113,6 +113,8 @@ function ReferralDetail() {
 
   if (!ref) return <div className="p-6 text-muted-foreground">Loading…</div>;
 
+  const canDelete = !!user && (user.id === ref.created_by || isAdmin);
+
   const set = (k: keyof Referral, v: any) => setRef({ ...ref, [k]: v });
 
   const save = async () => {
@@ -185,7 +187,7 @@ function ReferralDetail() {
         <Button variant="ghost" size="sm" onClick={() => navigate({ to: "/" })}><ArrowLeft className="w-4 h-4 mr-1" /> Back to list</Button>
         <div className="flex items-center gap-2">
           <Badge variant="outline" className={`capitalize ${statusStyles[ref.status]}`}>{ref.status}</Badge>
-          {isAdmin && (
+          {canDelete && (
             <AlertDialog>
               <AlertDialogTrigger asChild>
                 <Button variant="outline" size="sm" className="text-destructive hover:text-destructive">
@@ -312,6 +314,32 @@ function ReferralDetail() {
             ))}
           </div>
         </Card>
+
+        {canDelete && (
+          <div className="flex justify-end pt-2">
+            <AlertDialog>
+              <AlertDialogTrigger asChild>
+                <Button variant="destructive" size="sm">
+                  <Trash2 className="w-4 h-4 mr-1" /> Delete referral
+                </Button>
+              </AlertDialogTrigger>
+              <AlertDialogContent>
+                <AlertDialogHeader>
+                  <AlertDialogTitle>Are you sure?</AlertDialogTitle>
+                  <AlertDialogDescription>
+                    This will permanently delete the referral and all its notes. This action cannot be undone.
+                  </AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                  <AlertDialogCancel disabled={deleting}>No, cancel</AlertDialogCancel>
+                  <AlertDialogAction onClick={onDelete} disabled={deleting} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
+                    {deleting ? "Deleting…" : "Yes, delete referral"}
+                  </AlertDialogAction>
+                </AlertDialogFooter>
+              </AlertDialogContent>
+            </AlertDialog>
+          </div>
+        )}
       </div>
     </div>
   );
