@@ -47,13 +47,14 @@ export const inviteClinician = createServerFn({ method: "POST" })
         .upsert({ user_id: newUserId, role: "admin" }, { onConflict: "user_id,role" });
     }
 
-    await context.supabase.from("audit_log").insert({
+    await supabaseAdmin.from("audit_log").insert({
       user_id: context.userId,
       action: "create",
       entity: "user",
       entity_id: newUserId,
       diff: { email: data.email, role: data.role },
     });
+
 
     return { user_id: newUserId, temp_password: tempPassword };
   });
