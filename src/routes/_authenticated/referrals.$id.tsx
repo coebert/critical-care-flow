@@ -124,6 +124,18 @@ function ReferralDetail() {
     }
   };
 
+  const onDelete = async () => {
+    setDeleting(true);
+    try {
+      await removeReferral({ data: { id } });
+      toast.success("Referral deleted");
+      navigate({ to: "/" });
+    } catch (err: any) {
+      toast.error(err.message ?? "Delete failed");
+      setDeleting(false);
+    }
+  };
+
   const statusStyles: Record<string, string> = {
     pending: "bg-warning/15 text-warning-foreground border-warning/30",
     admitted: "bg-success/15 text-success border-success/30",
@@ -134,7 +146,32 @@ function ReferralDetail() {
     <div className="p-6 max-w-5xl mx-auto">
       <div className="flex items-center justify-between mb-6">
         <Button variant="ghost" size="sm" onClick={() => navigate({ to: "/" })}><ArrowLeft className="w-4 h-4 mr-1" /> Back to list</Button>
-        <Badge variant="outline" className={`capitalize ${statusStyles[ref.status]}`}>{ref.status}</Badge>
+        <div className="flex items-center gap-2">
+          <Badge variant="outline" className={`capitalize ${statusStyles[ref.status]}`}>{ref.status}</Badge>
+          {isAdmin && (
+            <AlertDialog>
+              <AlertDialogTrigger asChild>
+                <Button variant="outline" size="sm" className="text-destructive hover:text-destructive">
+                  <Trash2 className="w-4 h-4 mr-1" /> Delete
+                </Button>
+              </AlertDialogTrigger>
+              <AlertDialogContent>
+                <AlertDialogHeader>
+                  <AlertDialogTitle>Delete this referral?</AlertDialogTitle>
+                  <AlertDialogDescription>
+                    This permanently removes the referral and its notes. The deletion is recorded in the audit log. This cannot be undone.
+                  </AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                  <AlertDialogCancel disabled={deleting}>Cancel</AlertDialogCancel>
+                  <AlertDialogAction onClick={onDelete} disabled={deleting} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
+                    {deleting ? "Deleting…" : "Delete referral"}
+                  </AlertDialogAction>
+                </AlertDialogFooter>
+              </AlertDialogContent>
+            </AlertDialog>
+          )}
+        </div>
       </div>
 
       <h1 className="text-2xl font-semibold mb-1">
