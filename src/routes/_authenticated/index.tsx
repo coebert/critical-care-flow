@@ -314,7 +314,8 @@ function ReferralsList() {
       )}
 
 
-      <div className="border rounded-md bg-card overflow-hidden">
+      {/* Desktop table */}
+      <div className="hidden md:block border rounded-md bg-card overflow-hidden">
         <div className="overflow-x-auto"><table className="w-full text-sm min-w-[720px]">
           <thead className="bg-muted/50 text-xs uppercase text-muted-foreground">
             <tr>
@@ -362,6 +363,54 @@ function ReferralsList() {
             ))}
           </tbody>
         </table></div>
+      </div>
+
+      {/* Mobile cards */}
+      <div className="md:hidden flex flex-col gap-3">
+        {loading && (
+          <div className="text-center text-muted-foreground py-8">Loading…</div>
+        )}
+        {!loading && filtered.length === 0 && (
+          <div className="text-center text-muted-foreground py-8">No referrals match.</div>
+        )}
+        {filtered.map((r) => (
+          <div
+            key={r.id}
+            className="border rounded-lg bg-card p-4 cursor-pointer active:scale-[0.99] transition-transform"
+            onClick={() => navigate({ to: "/referrals/$id", params: { id: r.id } })}
+          >
+            <div className="flex items-center justify-between mb-2">
+              <span className="text-xs text-muted-foreground">
+                {format(new Date(r.referral_received_at), "dd MMM HH:mm")}
+              </span>
+              <Badge variant="outline" className={`capitalize text-xs ${statusStyles[r.status]}`}>
+                {r.status}
+              </Badge>
+            </div>
+            <div className="grid grid-cols-2 gap-x-4 gap-y-1.5 text-sm">
+              <div>
+                <span className="text-xs text-muted-foreground block">Hospital No</span>
+                <span className="font-medium">{r.hospital_number ?? "—"}</span>
+              </div>
+              <div>
+                <span className="text-xs text-muted-foreground block">Age / Sex</span>
+                <span className="font-medium">{r.age ?? "?"} / {r.sex ?? "?"}</span>
+              </div>
+              <div>
+                <span className="text-xs text-muted-foreground block">Location</span>
+                <span className="font-medium">{r.current_ward ?? "—"} {r.current_bed ? `· ${r.current_bed}` : ""}</span>
+              </div>
+              <div>
+                <span className="text-xs text-muted-foreground block">Specialty</span>
+                <span className="font-medium">{r.referring_specialty ?? "—"}</span>
+              </div>
+              <div className="col-span-2">
+                <span className="text-xs text-muted-foreground block">Reason</span>
+                <span className="font-medium line-clamp-2">{r.reason_for_referral ?? "—"}</span>
+              </div>
+            </div>
+          </div>
+        ))}
       </div>
     </div>
   );
