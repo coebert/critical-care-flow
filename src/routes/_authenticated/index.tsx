@@ -118,6 +118,18 @@ function ReferralsList() {
     };
   }, []);
 
+  const topWards = useMemo(() => {
+    const counts = new Map<string, number>();
+    for (const r of rows) {
+      if (!r.current_ward) continue;
+      counts.set(r.current_ward, (counts.get(r.current_ward) ?? 0) + 1);
+    }
+    return Array.from(counts.entries())
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 8)
+      .map(([ward]) => ward);
+  }, [rows]);
+
   const filtered = useMemo(() => {
     const needle = q.trim().toLowerCase();
     const hospNeedle = hospSearch.trim().toLowerCase();
@@ -132,6 +144,7 @@ function ReferralsList() {
 
     return rows.filter((r) => {
       if (statusFilter !== "all" && r.status !== statusFilter) return false;
+      if (locFilter !== "all" && r.current_ward !== locFilter) return false;
       if (fromTs !== null) {
         const t = new Date(r.referral_received_at).getTime();
         if (t < fromTs) return false;
@@ -146,7 +159,7 @@ function ReferralsList() {
         .filter(Boolean)
         .some((v) => v!.toString().toLowerCase().includes(needle));
     });
-  }, [rows, q, hospSearch, statusFilter, dateFilter]);
+  }, [rows, q, hospSearch, statusFilter, locFilter, dateFilter]);
 
   return (
     <div className="p-6 max-w-7xl mx-auto">
