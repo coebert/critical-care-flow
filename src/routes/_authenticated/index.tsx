@@ -34,6 +34,7 @@ function ReferralsList() {
   const navigate = useNavigate();
   const [rows, setRows] = useState<Referral[]>([]);
   const [loading, setLoading] = useState(true);
+  const [hospSearch, setHospSearch] = useState("");
   const [q, setQ] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [dateFilter, setDateFilter] = useState<"all" | "today" | "yesterday" | "7d" | "30d">("all");
