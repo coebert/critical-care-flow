@@ -113,6 +113,8 @@ function ReferralDetail() {
 
   if (!ref) return <div className="p-6 text-muted-foreground">Loading…</div>;
 
+  const canDelete = !!user && (user.id === ref.created_by || isAdmin);
+
   const set = (k: keyof Referral, v: any) => setRef({ ...ref, [k]: v });
 
   const save = async () => {
