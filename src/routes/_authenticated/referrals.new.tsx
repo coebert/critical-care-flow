@@ -238,9 +238,54 @@ function NewReferralPage() {
           <Button type="submit" disabled={saving}>{saving ? "Saving…" : "Save referral"}</Button>
         </div>
       </form>
+
+      <Dialog open={priorOpen} onOpenChange={setPriorOpen}>
+        <DialogContent className="max-w-2xl">
+          <DialogHeader>
+            <DialogTitle>Previous referrals for {f.hospital_number || "this patient"}</DialogTitle>
+            <DialogDescription>
+              Click any referral to open the full form in a new tab.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="max-h-[60vh] overflow-y-auto space-y-2">
+            {priors.length === 0 && (
+              <p className="text-sm text-muted-foreground py-6 text-center">No previous referrals.</p>
+            )}
+            {priors.map((p) => (
+              <Link
+                key={p.id}
+                to="/referrals/$id"
+                params={{ id: p.id }}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="block border rounded-md p-3 hover:bg-accent/40 transition-colors"
+              >
+                <div className="flex items-center justify-between gap-2 mb-1">
+                  <div className="text-sm font-medium">
+                    {format(new Date(p.referral_received_at), "dd MMM yyyy HH:mm")}
+                  </div>
+                  <Badge variant="outline" className="capitalize">{p.status}</Badge>
+                </div>
+                <div className="text-xs text-muted-foreground">
+                  {p.referring_specialty ?? "Specialty unknown"}
+                  {p.current_ward ? ` · ${p.current_ward}` : ""}
+                  {p.current_bed ? ` ${p.current_bed}` : ""}
+                </div>
+                {p.reason_for_referral && (
+                  <div className="text-sm mt-1 line-clamp-2">{p.reason_for_referral}</div>
+                )}
+              </Link>
+            ))}
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setPriorOpen(false)}>Close</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
+
 
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
   return (
