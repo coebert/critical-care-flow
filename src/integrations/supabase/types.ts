@@ -111,22 +111,28 @@ export type Database = {
           author_id: string
           body: string
           created_at: string
+          edited_at: string | null
           id: string
           referral_id: string
+          updated_at: string
         }
         Insert: {
           author_id: string
           body: string
           created_at?: string
+          edited_at?: string | null
           id?: string
           referral_id: string
+          updated_at?: string
         }
         Update: {
           author_id?: string
           body?: string
           created_at?: string
+          edited_at?: string | null
           id?: string
           referral_id?: string
+          updated_at?: string
         }
         Relationships: [
           {
