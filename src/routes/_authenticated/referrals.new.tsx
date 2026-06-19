@@ -163,7 +163,32 @@ function NewReferralPage() {
             <Field label="Current ward"><ComboboxAdd value={f.current_ward} onChange={(v) => set("current_ward", v)} options={wards} placeholder="e.g. ED Resus, Pembroke" /></Field>
             <Field label="Bed"><Input value={f.current_bed} onChange={(e) => set("current_bed", e.target.value)} /></Field>
           </div>
+          {showAlert && (
+            <Alert variant="destructive" className="mt-2">
+              <AlertCircle className="h-4 w-4" />
+              <AlertTitle>Previous referral{priors.length > 1 ? "s" : ""} on record</AlertTitle>
+              <AlertDescription className="flex flex-col gap-2">
+                <span>
+                  This patient (hospital number <strong>{f.hospital_number}</strong>) has been referred to critical care {priors.length} time{priors.length > 1 ? "s" : ""} before.
+                </span>
+                <div className="flex gap-2">
+                  <Button type="button" size="sm" variant="outline" onClick={() => setPriorOpen(true)}>
+                    View previous referrals for this patient
+                  </Button>
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="ghost"
+                    onClick={() => setDismissedFor(f.hospital_number.trim())}
+                  >
+                    Dismiss
+                  </Button>
+                </div>
+              </AlertDescription>
+            </Alert>
+          )}
         </Section>
+
 
         <Section title="Timestamps">
           <div className="grid grid-cols-2 gap-4">
