@@ -27,6 +27,7 @@ const statusStyles: Record<string, string> = {
 };
 
 function ReferralsList() {
+  const navigate = useNavigate();
   const [rows, setRows] = useState<Referral[]>([]);
   const [loading, setLoading] = useState(true);
   const [q, setQ] = useState("");
