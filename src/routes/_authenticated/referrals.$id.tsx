@@ -423,10 +423,20 @@ function nowLocal() {
   return d.toISOString().slice(0, 16);
 }
 
-function DTNow({ value, onChange, disabled }: { value: string; onChange: (v: string) => void; disabled?: boolean }) {
+function DTNow({ value, onChange, disabled, invalid }: { value: string; onChange: (v: string) => void; disabled?: boolean; invalid?: boolean }) {
   return (
     <div className={`flex gap-2 transition-opacity ${disabled ? "opacity-50" : ""}`}>
-      <Input type="datetime-local" value={value} onChange={(e) => onChange(e.target.value)} disabled={disabled} className={`${disabled ? "bg-muted border-muted-foreground/30" : ""} ${!value ? "text-muted-foreground" : ""}`} />
+      <Input
+        type="datetime-local"
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        disabled={disabled}
+        className={cn(
+          disabled && "bg-muted border-muted-foreground/30",
+          !value && "text-muted-foreground",
+          invalid && !disabled && "border-destructive focus-visible:ring-destructive",
+        )}
+      />
       <Button type="button" variant="outline" size="sm" onClick={() => onChange(nowLocal())} disabled={disabled}>Now</Button>
     </div>
   );
