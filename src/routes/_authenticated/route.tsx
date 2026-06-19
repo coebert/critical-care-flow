@@ -89,11 +89,29 @@ function AuthedShell() {
         <header className="h-14 border-b flex items-center justify-between md:justify-end px-4 md:px-6 gap-3 bg-card">
           <Sheet open={mobileOpen} onOpenChange={setMobileOpen}>
             <SheetTrigger asChild>
-              <Button variant="ghost" size="icon" className="md:hidden" aria-label="Open navigation menu">
+              <Button
+                variant="ghost"
+                size="icon"
+                className="md:hidden"
+                aria-label="Open navigation menu"
+                aria-expanded={mobileOpen}
+                aria-controls="mobile-sidebar"
+              >
                 <Menu className="w-5 h-5" />
               </Button>
             </SheetTrigger>
-            <SheetContent side="left" className="p-0 w-64 bg-sidebar">
+            <SheetContent
+              side="left"
+              className="p-0 w-64 bg-sidebar"
+              id="mobile-sidebar"
+              onInteractOutside={() => setMobileOpen(false)}
+              onEscapeKeyDown={() => setMobileOpen(false)}
+              onOpenAutoFocus={(e) => {
+                e.preventDefault();
+                const firstLink = e.currentTarget.querySelector('nav a[href]') as HTMLElement | null;
+                firstLink?.focus();
+              }}
+            >
               <SheetHeader>
                 <VisuallyHidden>
                   <SheetTitle>Navigation</SheetTitle>
