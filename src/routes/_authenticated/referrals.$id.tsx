@@ -139,6 +139,16 @@ function ReferralDetail() {
     }
   };
 
+  const saveTimestamp = async (key: keyof Referral, iso: string | null) => {
+    setRef({ ...ref, [key]: iso } as Referral);
+    try {
+      await update({ data: { id, patch: { [key]: iso } } });
+      toast.success("Saved", { duration: 1200 });
+    } catch (err: any) {
+      toast.error(err.message ?? "Auto-save failed");
+    }
+  };
+
   const statusStyles: Record<string, string> = {
     pending: "bg-warning/15 text-warning-foreground border-warning/30",
     admitted: "bg-success/15 text-success border-success/30",
