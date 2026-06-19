@@ -137,7 +137,7 @@ export const addNote = createServerFn({ method: "POST" })
       .single();
     if (error) throw new Error(error.message);
 
-    await supabase.from("audit_log").insert({
+    await writeAudit({
       user_id: userId,
       action: "create",
       entity: "referral_note",
@@ -146,7 +146,6 @@ export const addNote = createServerFn({ method: "POST" })
     });
 
     await fanOutNotifications(
-      supabase,
       userId,
       data.referral_id,
       "updated",
@@ -154,6 +153,7 @@ export const addNote = createServerFn({ method: "POST" })
     );
     return row;
   });
+
 
 export const logReferralView = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
