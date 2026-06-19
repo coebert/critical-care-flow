@@ -31,6 +31,7 @@ function ReferralsList() {
   const [loading, setLoading] = useState(true);
   const [q, setQ] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("all");
+  const [dateFilter, setDateFilter] = useState<"all" | "today" | "yesterday" | "7d" | "30d">("all");
 
   useEffect(() => {
     let cancelled = false;
@@ -75,14 +76,28 @@ function ReferralsList() {
 
   const filtered = useMemo(() => {
     const needle = q.trim().toLowerCase();
+    const now = new Date();
+    const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
+    let fromTs: number | null = null;
+    let toTs: number | null = null;
+    if (dateFilter === "today") fromTs = startOfToday;
+    else if (dateFilter === "yesterday") { fromTs = startOfToday - 86400000; toTs = startOfToday; }
+    else if (dateFilter === "7d") fromTs = now.getTime() - 7 * 86400000;
+    else if (dateFilter === "30d") fromTs = now.getTime() - 30 * 86400000;
+
     return rows.filter((r) => {
       if (statusFilter !== "all" && r.status !== statusFilter) return false;
+      if (fromTs !== null) {
+        const t = new Date(r.referral_received_at).getTime();
+        if (t < fromTs) return false;
+        if (toTs !== null && t >= toTs) return false;
+      }
       if (!needle) return true;
       return [r.hospital_number, r.current_ward, r.current_bed, r.referring_specialty, r.reason_for_referral]
         .filter(Boolean)
         .some((v) => v!.toString().toLowerCase().includes(needle));
     });
-  }, [rows, q, statusFilter]);
+  }, [rows, q, statusFilter, dateFilter]);
 
   return (
     <div className="p-6 max-w-7xl mx-auto">
@@ -118,6 +133,27 @@ function ReferralsList() {
           </Button>
         ))}
       </div>
+
+      <div className="flex flex-wrap gap-2 mb-4 items-center">
+        <span className="text-xs uppercase text-muted-foreground mr-1">Date</span>
+        {([
+          { k: "all", label: "All time" },
+          { k: "today", label: "Today" },
+          { k: "yesterday", label: "Yesterday" },
+          { k: "7d", label: "Last 7 days" },
+          { k: "30d", label: "Last 30 days" },
+        ] as const).map(({ k, label }) => (
+          <Button
+            key={k}
+            size="sm"
+            variant={dateFilter === k ? "default" : "outline"}
+            onClick={() => setDateFilter(k)}
+          >
+            {label}
+          </Button>
+        ))}
+      </div>
+
 
       <div className="border rounded-md bg-card overflow-hidden">
         <table className="w-full text-sm">
