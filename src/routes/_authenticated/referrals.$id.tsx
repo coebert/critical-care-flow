@@ -21,9 +21,12 @@ import { Collapsible, CollapsibleTrigger, CollapsibleContent } from "@/component
 import type { Tables } from "@/integrations/supabase/types";
 import { ComboboxAdd } from "@/components/combobox-add";
 import { useReferralOptions } from "@/hooks/use-referral-options";
-import { ArrowLeft, History, Pencil, Save, Trash2, X, ChevronDown } from "lucide-react";
+import { ArrowLeft, History, Pencil, Save, Trash2, X, ChevronDown, AlertCircle } from "lucide-react";
 import { format, formatDistanceToNow } from "date-fns";
 import { toast } from "sonner";
+import { validateReferralTimings } from "@/lib/referral-validation";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { cn } from "@/lib/utils";
 
 
 type Referral = Tables<"referrals">;
@@ -119,7 +122,19 @@ function ReferralDetail() {
 
   const set = (k: keyof Referral, v: any) => setRef({ ...ref, [k]: v });
 
+  const timing = validateReferralTimings({
+    status: ref.status,
+    referral_received_at: ref.referral_received_at,
+    first_seen_at: ref.first_seen_at,
+    decision_at: ref.decision_at,
+    arrived_on_unit_at: ref.arrived_on_unit_at,
+  });
+
   const save = async () => {
+    if (!timing.isValid) {
+      toast.error("Please fix the highlighted timing issues before saving.");
+      return;
+    }
     setSaving(true);
     try {
       const patch: any = {
@@ -270,12 +285,31 @@ function ReferralDetail() {
         <Card className="p-5 space-y-4">
           <h2 className="font-semibold">Timeline (ICNARC)</h2>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <F label="Received"><DTNow value={toLocal(ref.referral_received_at)} onChange={(v) => saveTimestamp("referral_received_at", v ? new Date(v).toISOString() : null)} /></F>
-            <F label="First seen"><DTNow value={toLocal(ref.first_seen_at)} onChange={(v) => saveTimestamp("first_seen_at", v ? new Date(v).toISOString() : null)} /></F>
-            <F label="Decision"><DTNow value={toLocal(ref.decision_at)} onChange={(v) => saveTimestamp("decision_at", v ? new Date(v).toISOString() : null)} /></F>
-            <F label="Arrived on unit"><DTNow value={toLocal(ref.arrived_on_unit_at)} onChange={(v) => saveTimestamp("arrived_on_unit_at", v ? new Date(v).toISOString() : null)} disabled={ref.status === "declined"} /></F>
+            <F label="Received" required error={timing.fieldErrors.referral_received_at}>
+              <DTNow value={toLocal(ref.referral_received_at)} onChange={(v) => saveTimestamp("referral_received_at", v ? new Date(v).toISOString() : null)} invalid={!!timing.fieldErrors.referral_received_at} />
+            </F>
+            <F label="First seen" required={ref.status !== "pending"} error={timing.fieldErrors.first_seen_at}>
+              <DTNow value={toLocal(ref.first_seen_at)} onChange={(v) => saveTimestamp("first_seen_at", v ? new Date(v).toISOString() : null)} invalid={!!timing.fieldErrors.first_seen_at} />
+            </F>
+            <F label="Decision" required={ref.status !== "pending"} error={timing.fieldErrors.decision_at}>
+              <DTNow value={toLocal(ref.decision_at)} onChange={(v) => saveTimestamp("decision_at", v ? new Date(v).toISOString() : null)} invalid={!!timing.fieldErrors.decision_at} />
+            </F>
+            <F label="Arrived on unit" required={ref.status === "admitted"} error={timing.fieldErrors.arrived_on_unit_at}>
+              <DTNow value={toLocal(ref.arrived_on_unit_at)} onChange={(v) => saveTimestamp("arrived_on_unit_at", v ? new Date(v).toISOString() : null)} disabled={ref.status === "declined"} invalid={!!timing.fieldErrors.arrived_on_unit_at} />
+            </F>
           </div>
-          <p className="text-xs text-muted-foreground">Timestamps save automatically.</p>
+          {timing.issues.length > 0 && (
+            <Alert variant="destructive">
+              <AlertCircle className="h-4 w-4" />
+              <AlertTitle>Inconsistent timings</AlertTitle>
+              <AlertDescription>
+                <ul className="list-disc pl-4 space-y-1">
+                  {timing.issues.map((m) => <li key={m}>{m}</li>)}
+                </ul>
+              </AlertDescription>
+            </Alert>
+          )}
+          <p className="text-xs text-muted-foreground">Timestamps save automatically. Fields marked <span className="text-destructive">*</span> are required for the ICNARC dataset.</p>
         </Card>
 
         <Card className="p-5 space-y-4">
@@ -365,8 +399,17 @@ function ReferralDetail() {
   );
 }
 
-function F({ label, children }: { label: string; children: React.ReactNode }) {
-  return <div className="space-y-1.5"><Label className="text-xs">{label}</Label>{children}</div>;
+function F({ label, children, required, error }: { label: string; children: React.ReactNode; required?: boolean; error?: string }) {
+  return (
+    <div className="space-y-1.5">
+      <Label className="text-xs">
+        {label}
+        {required && <span className="text-destructive ml-0.5">*</span>}
+      </Label>
+      {children}
+      {error && <p className="text-xs text-destructive">{error}</p>}
+    </div>
+  );
 }
 
 function ExpandableSection({ label, children, command }: { label: string; children: React.ReactNode; command?: { open: boolean; id: number } | null }) {
@@ -411,10 +454,20 @@ function nowLocal() {
   return d.toISOString().slice(0, 16);
 }
 
-function DTNow({ value, onChange, disabled }: { value: string; onChange: (v: string) => void; disabled?: boolean }) {
+function DTNow({ value, onChange, disabled, invalid }: { value: string; onChange: (v: string) => void; disabled?: boolean; invalid?: boolean }) {
   return (
     <div className={`flex gap-2 transition-opacity ${disabled ? "opacity-50" : ""}`}>
-      <Input type="datetime-local" value={value} onChange={(e) => onChange(e.target.value)} disabled={disabled} className={`${disabled ? "bg-muted border-muted-foreground/30" : ""} ${!value ? "text-muted-foreground" : ""}`} />
+      <Input
+        type="datetime-local"
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        disabled={disabled}
+        className={cn(
+          disabled && "bg-muted border-muted-foreground/30",
+          !value && "text-muted-foreground",
+          invalid && !disabled && "border-destructive focus-visible:ring-destructive",
+        )}
+      />
       <Button type="button" variant="outline" size="sm" onClick={() => onChange(nowLocal())} disabled={disabled}>Now</Button>
     </div>
   );

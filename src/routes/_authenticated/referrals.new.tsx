@@ -30,6 +30,8 @@ import { ComboboxAdd } from "@/components/combobox-add";
 import { useReferralOptions } from "@/hooks/use-referral-options";
 import { toast } from "sonner";
 import { format } from "date-fns";
+import { validateReferralTimings } from "@/lib/referral-validation";
+import { cn } from "@/lib/utils";
 
 type PriorReferral = {
   id: string;
@@ -112,9 +114,26 @@ function NewReferralPage() {
   const showAlert =
     priors.length > 0 && dismissedFor !== f.hospital_number.trim();
 
+  const timing = validateReferralTimings({
+    status: f.status,
+    referral_received_at: f.referral_received_at
+      ? new Date(f.referral_received_at).toISOString()
+      : null,
+    first_seen_at: f.first_seen_at ? new Date(f.first_seen_at).toISOString() : null,
+    decision_at: f.decision_at ? new Date(f.decision_at).toISOString() : null,
+    arrived_on_unit_at: f.arrived_on_unit_at
+      ? new Date(f.arrived_on_unit_at).toISOString()
+      : null,
+  });
+  const [showErrors, setShowErrors] = useState(false);
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!timing.isValid) {
+      setShowErrors(true);
+      toast.error("Please fix the highlighted timing fields before saving.");
+      return;
+    }
     setSaving(true);
     try {
       const payload: any = {
@@ -191,12 +210,34 @@ function NewReferralPage() {
 
 
         <Section title="Timestamps">
+          <p className="text-xs text-muted-foreground -mt-2">
+            ICNARC requires referral received for every record. First seen and decision are required once the patient has been reviewed; arrival is required for admitted patients.
+          </p>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <Field label="Referral received"><DateTimeNow value={f.referral_received_at} onChange={(v) => set("referral_received_at", v)} /></Field>
-            <Field label="First seen by CC"><DateTimeNow value={f.first_seen_at} onChange={(v) => set("first_seen_at", v)} /></Field>
-            <Field label="Decision to admit / decline"><DateTimeNow value={f.decision_at} onChange={(v) => set("decision_at", v)} /></Field>
-            <Field label="Arrived on unit"><DateTimeNow value={f.arrived_on_unit_at} onChange={(v) => set("arrived_on_unit_at", v)} /></Field>
+            <Field label="Referral received" required error={showErrors ? timing.fieldErrors.referral_received_at : undefined}>
+              <DateTimeNow value={f.referral_received_at} onChange={(v) => set("referral_received_at", v)} invalid={showErrors && !!timing.fieldErrors.referral_received_at} />
+            </Field>
+            <Field label="First seen by CC" required={f.status !== "pending"} error={showErrors ? timing.fieldErrors.first_seen_at : undefined}>
+              <DateTimeNow value={f.first_seen_at} onChange={(v) => set("first_seen_at", v)} invalid={showErrors && !!timing.fieldErrors.first_seen_at} />
+            </Field>
+            <Field label="Decision to admit / decline" required={f.status !== "pending"} error={showErrors ? timing.fieldErrors.decision_at : undefined}>
+              <DateTimeNow value={f.decision_at} onChange={(v) => set("decision_at", v)} invalid={showErrors && !!timing.fieldErrors.decision_at} />
+            </Field>
+            <Field label="Arrived on unit" required={f.status === "admitted"} error={showErrors ? timing.fieldErrors.arrived_on_unit_at : undefined}>
+              <DateTimeNow value={f.arrived_on_unit_at} onChange={(v) => set("arrived_on_unit_at", v)} invalid={showErrors && !!timing.fieldErrors.arrived_on_unit_at} />
+            </Field>
           </div>
+          {showErrors && timing.issues.length > 0 && (
+            <Alert variant="destructive" className="mt-2">
+              <AlertCircle className="h-4 w-4" />
+              <AlertTitle>Inconsistent timings</AlertTitle>
+              <AlertDescription>
+                <ul className="list-disc pl-4 space-y-1">
+                  {timing.issues.map((m) => <li key={m}>{m}</li>)}
+                </ul>
+              </AlertDescription>
+            </Alert>
+          )}
         </Section>
 
         <Section title="Clinical">
@@ -295,19 +336,28 @@ function Section({ title, children }: { title: string; children: React.ReactNode
     </Card>
   );
 }
-function Field({ label, children }: { label: string; children: React.ReactNode }) {
+function Field({ label, children, required, error }: { label: string; children: React.ReactNode; required?: boolean; error?: string }) {
   return (
     <div className="space-y-1.5">
-      <Label className="text-xs">{label}</Label>
+      <Label className="text-xs">
+        {label}
+        {required && <span className="text-destructive ml-0.5">*</span>}
+      </Label>
       {children}
+      {error && <p className="text-xs text-destructive">{error}</p>}
     </div>
   );
 }
 
-function DateTimeNow({ value, onChange }: { value: string; onChange: (v: string) => void }) {
+function DateTimeNow({ value, onChange, invalid }: { value: string; onChange: (v: string) => void; invalid?: boolean }) {
   return (
     <div className="flex gap-2">
-      <Input type="datetime-local" value={value} onChange={(e) => onChange(e.target.value)} className={!value ? "text-muted-foreground" : ""} />
+      <Input
+        type="datetime-local"
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        className={cn(!value && "text-muted-foreground", invalid && "border-destructive focus-visible:ring-destructive")}
+      />
       <Button type="button" variant="outline" size="sm" onClick={() => onChange(localISO())}>Now</Button>
     </div>
   );
