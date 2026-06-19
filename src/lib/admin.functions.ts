@@ -27,9 +27,15 @@ export const inviteClinician = createServerFn({ method: "POST" })
     await assertAdmin(context);
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
 
-    // Generate a strong temp password
-    const tempPassword =
-      "Tmp!" + Math.random().toString(36).slice(2, 10) + Math.random().toString(36).slice(2, 6).toUpperCase();
+    // Generate a strong temp password using CSPRNG
+    const bytes = new Uint8Array(18);
+    crypto.getRandomValues(bytes);
+    const b64 = Buffer.from(bytes)
+      .toString("base64")
+      .replace(/\+/g, "-")
+      .replace(/\//g, "_")
+      .replace(/=+$/, "");
+    const tempPassword = "Tmp!" + b64.slice(0, 20);
 
     const { data: created, error } = await supabaseAdmin.auth.admin.createUser({
       email: data.email,
