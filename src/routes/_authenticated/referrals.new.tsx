@@ -336,19 +336,28 @@ function Section({ title, children }: { title: string; children: React.ReactNode
     </Card>
   );
 }
-function Field({ label, children }: { label: string; children: React.ReactNode }) {
+function Field({ label, children, required, error }: { label: string; children: React.ReactNode; required?: boolean; error?: string }) {
   return (
     <div className="space-y-1.5">
-      <Label className="text-xs">{label}</Label>
+      <Label className="text-xs">
+        {label}
+        {required && <span className="text-destructive ml-0.5">*</span>}
+      </Label>
       {children}
+      {error && <p className="text-xs text-destructive">{error}</p>}
     </div>
   );
 }
 
-function DateTimeNow({ value, onChange }: { value: string; onChange: (v: string) => void }) {
+function DateTimeNow({ value, onChange, invalid }: { value: string; onChange: (v: string) => void; invalid?: boolean }) {
   return (
     <div className="flex gap-2">
-      <Input type="datetime-local" value={value} onChange={(e) => onChange(e.target.value)} className={!value ? "text-muted-foreground" : ""} />
+      <Input
+        type="datetime-local"
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        className={cn(!value && "text-muted-foreground", invalid && "border-destructive focus-visible:ring-destructive")}
+      />
       <Button type="button" variant="outline" size="sm" onClick={() => onChange(localISO())}>Now</Button>
     </div>
   );
