@@ -23,7 +23,7 @@ function AdminPage() {
   if (!hasRole) return <div className="p-6"><Card className="p-6 max-w-md"><h1 className="font-semibold mb-2">Admin only</h1><p className="text-sm text-muted-foreground">You don't have permission to view this page.</p></Card></div>;
 
   return (
-    <div className="p-6 max-w-6xl mx-auto">
+    <div className="p-4 sm:p-6 max-w-6xl mx-auto">
       <h1 className="text-2xl font-semibold tracking-tight mb-6">Admin</h1>
       <Tabs defaultValue="users">
         <TabsList>

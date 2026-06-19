@@ -92,7 +92,7 @@ function AnalyticsPage() {
   const meanDecisionToArrival = meanMinutes((r) => [r.decision_at, r.arrived_on_unit_at]);
 
   return (
-    <div className="p-6 max-w-7xl mx-auto">
+    <div className="p-4 sm:p-6 max-w-7xl mx-auto">
       <div className="flex items-center justify-between mb-6">
         <div>
           <h1 className="text-2xl font-semibold tracking-tight">Analytics</h1>

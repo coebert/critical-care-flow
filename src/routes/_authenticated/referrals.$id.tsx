@@ -182,7 +182,7 @@ function ReferralDetail() {
   };
 
   return (
-    <div className="p-6 max-w-5xl mx-auto">
+    <div className="p-4 sm:p-6 max-w-5xl mx-auto">
       <div className="flex items-center justify-between mb-6">
         <Button variant="ghost" size="sm" onClick={() => navigate({ to: "/" })}><ArrowLeft className="w-4 h-4 mr-1" /> Back to list</Button>
         <div className="flex items-center gap-2">
@@ -223,7 +223,7 @@ function ReferralDetail() {
       <div className="space-y-4">
         <Card className="p-5 space-y-4">
           <h2 className="font-semibold">Details</h2>
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <F label="Age"><Input type="number" value={ref.age ?? ""} onChange={(e) => set("age", e.target.value ? Number(e.target.value) : null)} /></F>
             <F label="Sex">
               <Select value={ref.sex ?? "unknown"} onValueChange={(v) => set("sex", v)}>
@@ -249,7 +249,7 @@ function ReferralDetail() {
 
         <Card className="p-5 space-y-4">
           <h2 className="font-semibold">Timeline (ICNARC)</h2>
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <F label="Received"><DTNow value={toLocal(ref.referral_received_at)} onChange={(v) => saveTimestamp("referral_received_at", v ? new Date(v).toISOString() : null)} /></F>
             <F label="First seen"><DTNow value={toLocal(ref.first_seen_at)} onChange={(v) => saveTimestamp("first_seen_at", v ? new Date(v).toISOString() : null)} /></F>
             <F label="Decision"><DTNow value={toLocal(ref.decision_at)} onChange={(v) => saveTimestamp("decision_at", v ? new Date(v).toISOString() : null)} /></F>
@@ -260,7 +260,7 @@ function ReferralDetail() {
 
         <Card className="p-5 space-y-4">
           <h2 className="font-semibold">Outcome</h2>
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <F label="Status">
               <Select value={ref.status} onValueChange={(v) => set("status", v)}>
                 <SelectTrigger><SelectValue /></SelectTrigger>
