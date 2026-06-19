@@ -43,6 +43,10 @@ function ReferralDetail() {
   const update = useServerFn(updateReferral);
   const addNoteFn = useServerFn(addNote);
   const logView = useServerFn(logReferralView);
+  const removeReferral = useServerFn(deleteReferral);
+  const { hasRole: isAdmin } = useRole("admin");
+  const [deleting, setDeleting] = useState(false);
+
 
   const [ref, setRef] = useState<Referral | null>(null);
   const [notes, setNotes] = useState<Note[]>([]);
