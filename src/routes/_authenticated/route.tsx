@@ -1,11 +1,13 @@
-import { createFileRoute, Outlet, redirect, Link, useRouter, useNavigate } from "@tanstack/react-router";
+import { createFileRoute, Outlet, redirect, Link, useRouter, useNavigate, useRouterState } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
-import { Activity, BarChart3, ListChecks, Shield, Bell, LogOut, Plus } from "lucide-react";
+import { Activity, BarChart3, ListChecks, Shield, Bell, LogOut, Plus, Menu } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useAuth, useRole } from "@/hooks/use-auth";
 import { NotificationBell } from "@/components/notification-bell";
 import { Toaster } from "@/components/ui/sonner";
+import { Sheet, SheetContent, SheetTrigger, SheetTitle, SheetHeader } from "@/components/ui/sheet";
+import { VisuallyHidden } from "@radix-ui/react-visually-hidden";
 
 export const Route = createFileRoute("/_authenticated")({
   ssr: false,
@@ -23,6 +25,13 @@ function AuthedShell() {
   const router = useRouter();
   const navigate = useNavigate();
   const [signingOut, setSigningOut] = useState(false);
+  const [mobileOpen, setMobileOpen] = useState(false);
+  const pathname = useRouterState({ select: (s) => s.location.pathname });
+
+  // Close the mobile drawer on route change
+  useEffect(() => {
+    setMobileOpen(false);
+  }, [pathname]);
 
   useEffect(() => {
     if (typeof window !== "undefined" && "Notification" in window) {
@@ -39,39 +48,60 @@ function AuthedShell() {
     navigate({ to: "/auth", replace: true });
   };
 
+  const sidebarContent = (
+    <div className="flex h-full flex-col">
+      <div className="px-5 py-5 border-b">
+        <div className="flex items-center gap-2">
+          <div className="w-9 h-9 rounded-md bg-primary flex items-center justify-center shrink-0">
+            <Activity className="w-5 h-5 text-primary-foreground" />
+          </div>
+          <div className="min-w-0">
+            <div className="font-semibold text-sm leading-tight truncate">SDH Critical Care</div>
+            <div className="text-xs text-muted-foreground">Referral tracker</div>
+          </div>
+        </div>
+      </div>
+      <nav className="flex-1 px-2 py-3 space-y-1 text-sm">
+        <NavItem to="/" icon={<ListChecks className="w-4 h-4" />}>Referrals</NavItem>
+        <NavItem to="/referrals/new" icon={<Plus className="w-4 h-4" />}>New referral</NavItem>
+        <NavItem to="/analytics" icon={<BarChart3 className="w-4 h-4" />}>Analytics</NavItem>
+        {isAdmin && (
+          <NavItem to="/admin" icon={<Shield className="w-4 h-4" />}>Admin</NavItem>
+        )}
+      </nav>
+      <div className="p-3 border-t text-xs space-y-2">
+        <div className="text-muted-foreground truncate" title={user?.email ?? ""}>
+          {user?.email}
+        </div>
+        <Button variant="ghost" size="sm" className="w-full justify-start" onClick={handleSignOut} disabled={signingOut}>
+          <LogOut className="w-4 h-4 mr-2" /> Sign out
+        </Button>
+      </div>
+    </div>
+  );
+
   return (
     <div className="min-h-screen flex bg-background">
-      <aside className="w-60 border-r bg-sidebar flex flex-col">
-        <div className="px-5 py-5 border-b">
-          <div className="flex items-center gap-2">
-            <div className="w-9 h-9 rounded-md bg-primary flex items-center justify-center">
-              <Activity className="w-5 h-5 text-primary-foreground" />
-            </div>
-            <div>
-              <div className="font-semibold text-sm leading-tight">SDH Critical Care</div>
-              <div className="text-xs text-muted-foreground">Referral tracker</div>
-            </div>
-          </div>
-        </div>
-        <nav className="flex-1 px-2 py-3 space-y-1 text-sm">
-          <NavItem to="/" icon={<ListChecks className="w-4 h-4" />}>Referrals</NavItem>
-          <NavItem to="/referrals/new" icon={<Plus className="w-4 h-4" />}>New referral</NavItem>
-          <NavItem to="/analytics" icon={<BarChart3 className="w-4 h-4" />}>Analytics</NavItem>
-          {isAdmin && (
-            <NavItem to="/admin" icon={<Shield className="w-4 h-4" />}>Admin</NavItem>
-          )}
-        </nav>
-        <div className="p-3 border-t text-xs space-y-2">
-          <div className="text-muted-foreground truncate" title={user?.email ?? ""}>
-            {user?.email}
-          </div>
-          <Button variant="ghost" size="sm" className="w-full justify-start" onClick={handleSignOut} disabled={signingOut}>
-            <LogOut className="w-4 h-4 mr-2" /> Sign out
-          </Button>
-        </div>
+      <aside className="hidden md:flex w-60 border-r bg-sidebar flex-col shrink-0">
+        {sidebarContent}
       </aside>
       <div className="flex-1 flex flex-col min-w-0">
-        <header className="h-14 border-b flex items-center justify-end px-6 gap-3 bg-card">
+        <header className="h-14 border-b flex items-center justify-between md:justify-end px-4 md:px-6 gap-3 bg-card">
+          <Sheet open={mobileOpen} onOpenChange={setMobileOpen}>
+            <SheetTrigger asChild>
+              <Button variant="ghost" size="icon" className="md:hidden" aria-label="Open navigation menu">
+                <Menu className="w-5 h-5" />
+              </Button>
+            </SheetTrigger>
+            <SheetContent side="left" className="p-0 w-64 bg-sidebar">
+              <SheetHeader>
+                <VisuallyHidden>
+                  <SheetTitle>Navigation</SheetTitle>
+                </VisuallyHidden>
+              </SheetHeader>
+              {sidebarContent}
+            </SheetContent>
+          </Sheet>
           <NotificationBell />
         </header>
         <main className="flex-1 overflow-auto">
