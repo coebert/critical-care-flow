@@ -224,10 +224,19 @@ function ReferralsList() {
 
 
       <div className="flex flex-wrap gap-2 mb-4">
-        <div className="relative flex-1 min-w-[240px]">
+        <div className="relative flex-1 min-w-[200px]">
           <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
           <Input
-            placeholder="Search hospital number, ward, specialty…"
+            placeholder="Search by hospital number…"
+            value={hospSearch}
+            onChange={(e) => setHospSearch(e.target.value)}
+            className="pl-9"
+          />
+        </div>
+        <div className="relative flex-1 min-w-[200px]">
+          <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
+          <Input
+            placeholder="Search ward, bed, specialty, reason…"
             value={q}
             onChange={(e) => setQ(e.target.value)}
             className="pl-9"
