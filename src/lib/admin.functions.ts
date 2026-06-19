@@ -103,13 +103,14 @@ export const setUserRole = createServerFn({ method: "POST" })
         .eq("user_id", data.user_id)
         .eq("role", data.role);
     }
-    await context.supabase.from("audit_log").insert({
+    await supabaseAdmin.from("audit_log").insert({
       user_id: context.userId,
       action: "update",
       entity: "user_role",
       entity_id: data.user_id,
       diff: { role: data.role, grant: data.grant },
     });
+
     return { ok: true };
   });
 
