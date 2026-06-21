@@ -84,11 +84,15 @@ function AuthPage() {
           },
         );
         if (error) {
-          await supabase.rpc("finalize_auth_attempt", { _attempt_id: attemptId, _success: false });
+          if (attemptId !== null) {
+            await supabase.rpc("finalize_auth_attempt", { _attempt_id: attemptId, _success: false });
+          }
           attemptId = null;
           throw error;
         }
-        await supabase.rpc("finalize_auth_attempt", { _attempt_id: attemptId, _success: true });
+        if (attemptId !== null) {
+          await supabase.rpc("finalize_auth_attempt", { _attempt_id: attemptId, _success: true });
+        }
         attemptId = null;
         toast.success("Signed in");
         navigate({ to: "/", replace: true });
@@ -98,7 +102,9 @@ function AuthPage() {
             redirectTo: window.location.origin + "/reset-password",
           }),
         );
-        await supabase.rpc("finalize_auth_attempt", { _attempt_id: attemptId, _success: !error });
+        if (attemptId !== null) {
+          await supabase.rpc("finalize_auth_attempt", { _attempt_id: attemptId, _success: !error });
+        }
         attemptId = null;
         if (error) throw error;
         toast.success("If that email exists, a password reset link has been sent.");
