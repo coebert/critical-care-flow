@@ -57,7 +57,7 @@ done
 echo "Granted: $GRANTED  Locked: $LOCKED  Errors: $ERRORS"
 
 # Cross-check the table: failure rows for this email should equal GRANTED.
-ROW_COUNT=$(psql -At -c "SELECT count(*) FROM public.auth_throttle WHERE email_norm='$EMAIL' AND attempt_type='signin' AND success=false")
+ROW_COUNT=$(psql -At -c "SELECT count(*) FROM public.auth_throttle WHERE email_norm='$EMAIL' AND attempt_type='$TYPE' AND success=false")
 echo "auth_throttle rows for test email: $ROW_COUNT"
 
 # No explicit cleanup: rows for this unique test email auto-expire via the
