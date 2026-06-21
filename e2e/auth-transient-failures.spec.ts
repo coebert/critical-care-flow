@@ -121,4 +121,37 @@ test.describe("transient supabase auth failures", () => {
 
     await context.close();
   });
+
+  test("retry toast appears on first retry and disappears after successful authenticated navigation", async ({
+    browser,
+  }) => {
+    const email = process.env.E2E_EMAIL;
+    const password = process.env.E2E_PASSWORD;
+    test.skip(!email || !password, "E2E_EMAIL / E2E_PASSWORD not set");
+
+    const context = await browser.newContext({ storageState: undefined });
+    const page = await context.newPage();
+
+    // One transient failure → exactly one retry → toast should appear once.
+    await page.route(AUTH_GLOB, flakyAuth(1, "abort"));
+
+    await page.goto("/auth");
+    await page.getByLabel(/email/i).fill(email!);
+    await page.getByLabel(/password/i).fill(password!);
+    await page.getByRole("button", { name: /sign in/i }).click();
+
+    // 1) Toast text appears on the first retry.
+    const toast = page.getByText(/retrying sign in/i);
+    await expect(toast).toBeVisible({ timeout: 10_000 });
+
+    // 2) Sign-in succeeds and we navigate to the authenticated route.
+    await expect(page).toHaveURL(/\/$/, { timeout: 20_000 });
+    await expect(page).not.toHaveURL(/\/auth/);
+
+    // 3) After successful navigation the toast is dismissed (sonner
+    //    auto-dismiss ~4s; allow generous margin).
+    await expect(toast).toHaveCount(0, { timeout: 15_000 });
+
+    await context.close();
+  });
 });
