@@ -44,6 +44,30 @@ export type Database = {
         }
         Relationships: []
       }
+      auth_throttle: {
+        Row: {
+          attempt_type: string
+          attempted_at: string
+          email_norm: string
+          id: number
+          success: boolean
+        }
+        Insert: {
+          attempt_type: string
+          attempted_at?: string
+          email_norm: string
+          id?: number
+          success: boolean
+        }
+        Update: {
+          attempt_type?: string
+          attempted_at?: string
+          email_norm?: string
+          id?: number
+          success?: boolean
+        }
+        Relationships: []
+      }
       notifications: {
         Row: {
           created_at: string
@@ -248,6 +272,10 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      check_auth_lockout: {
+        Args: { _attempt_type: string; _email: string }
+        Returns: Json
+      }
       has_clinical_access: { Args: { _user_id: string }; Returns: boolean }
       has_role: {
         Args: {
@@ -255,6 +283,10 @@ export type Database = {
           _user_id: string
         }
         Returns: boolean
+      }
+      record_auth_attempt: {
+        Args: { _attempt_type: string; _email: string; _success: boolean }
+        Returns: undefined
       }
     }
     Enums: {

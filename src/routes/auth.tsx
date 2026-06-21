@@ -49,8 +49,21 @@ function AuthPage() {
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
+    const attemptType: "signin" | "reset" = mode === "signin" ? "signin" : "reset";
     let notifiedRetry = false;
     try {
+      // Pre-check brute-force lockout
+      const { data: lockData, error: lockErr } = await supabase.rpc("check_auth_lockout", {
+        _email: email,
+        _attempt_type: attemptType,
+      });
+      if (!lockErr && lockData && (lockData as any).locked) {
+        const secs = (lockData as any).retry_after_seconds ?? 0;
+        const mins = Math.max(1, Math.ceil(secs / 60));
+        toast.error(`Too many failed attempts. Try again in ${mins} minute${mins === 1 ? "" : "s"}.`);
+        return;
+      }
+
       if (mode === "signin") {
         const { error } = await retrySupabaseCall(
           () => supabase.auth.signInWithPassword({ email, password }),
@@ -64,7 +77,11 @@ function AuthPage() {
             },
           },
         );
-        if (error) throw error;
+        if (error) {
+          await supabase.rpc("record_auth_attempt", { _email: email, _attempt_type: "signin", _success: false });
+          throw error;
+        }
+        await supabase.rpc("record_auth_attempt", { _email: email, _attempt_type: "signin", _success: true });
         toast.success("Signed in");
         navigate({ to: "/", replace: true });
       } else {
@@ -73,8 +90,13 @@ function AuthPage() {
             redirectTo: window.location.origin + "/reset-password",
           }),
         );
+        await supabase.rpc("record_auth_attempt", {
+          _email: email,
+          _attempt_type: "reset",
+          _success: !error,
+        });
         if (error) throw error;
-        toast.success("Password reset email sent");
+        toast.success("If that email exists, a password reset link has been sent.");
         setMode("signin");
       }
     } catch (err: any) {
