@@ -1,13 +1,14 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
+import { safeError } from "./safe-error";
 
 async function assertAdmin(context: any) {
   const { data, error } = await context.supabase.rpc("has_role", {
     _user_id: context.userId,
     _role: "admin",
   });
-  if (error) throw new Error(error.message);
+  if (error) throw safeError("admin.assertAdmin", error, "Permission check failed.");
   if (!data) throw new Error("Forbidden: admin role required");
 }
 
@@ -27,30 +28,24 @@ export const inviteClinician = createServerFn({ method: "POST" })
     await assertAdmin(context);
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
 
-    // Generate a strong temp password using CSPRNG
-    const bytes = new Uint8Array(18);
-    crypto.getRandomValues(bytes);
-    const b64 = Buffer.from(bytes)
-      .toString("base64")
-      .replace(/\+/g, "-")
-      .replace(/\//g, "_")
-      .replace(/=+$/, "");
-    const tempPassword = "Tmp!" + b64.slice(0, 20);
-
-    const { data: created, error } = await supabaseAdmin.auth.admin.createUser({
-      email: data.email,
-      password: tempPassword,
-      email_confirm: true,
-      user_metadata: { full_name: data.full_name, job_title: data.job_title ?? null },
-    });
-    if (error) throw new Error(error.message);
-    const newUserId = created.user!.id;
+    // Send a time-limited magic-link invite. The user clicks the link in their
+    // email and sets their own password — no plaintext temporary password is
+    // ever stored, displayed in the admin UI, or held in a browser DOM.
+    const { data: invited, error } = await supabaseAdmin.auth.admin.inviteUserByEmail(
+      data.email,
+      {
+        data: { full_name: data.full_name, job_title: data.job_title ?? null },
+      },
+    );
+    if (error) throw safeError("admin.inviteClinician", error, "Failed to invite user.");
+    const newUserId = invited.user!.id;
 
     if (data.role === "admin") {
       // Trigger inserted 'clinician'; upgrade to admin
-      await supabaseAdmin
+      const { error: roleErr } = await supabaseAdmin
         .from("user_roles")
         .upsert({ user_id: newUserId, role: "admin" }, { onConflict: "user_id,role" });
+      if (roleErr) throw safeError("admin.inviteClinician.role", roleErr, "Failed to set admin role.");
     }
 
     await supabaseAdmin.from("audit_log").insert({
@@ -58,11 +53,10 @@ export const inviteClinician = createServerFn({ method: "POST" })
       action: "create",
       entity: "user",
       entity_id: newUserId,
-      diff: { email: data.email, role: data.role },
+      diff: { email: data.email, role: data.role, method: "invite_email" },
     });
 
-
-    return { user_id: newUserId, temp_password: tempPassword };
+    return { user_id: newUserId };
   });
 
 export const listUsers = createServerFn({ method: "GET" })
@@ -71,7 +65,7 @@ export const listUsers = createServerFn({ method: "GET" })
     await assertAdmin(context);
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const { data: users, error } = await supabaseAdmin.auth.admin.listUsers({ perPage: 200 });
-    if (error) throw new Error(error.message);
+    if (error) throw safeError("admin.listUsers", error, "Failed to load users.");
     const { data: profiles } = await supabaseAdmin.from("profiles").select("*");
     const { data: roles } = await supabaseAdmin.from("user_roles").select("*");
     return users.users.map((u) => ({
@@ -99,15 +93,17 @@ export const setUserRole = createServerFn({ method: "POST" })
     await assertAdmin(context);
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     if (data.grant) {
-      await supabaseAdmin
+      const { error } = await supabaseAdmin
         .from("user_roles")
         .upsert({ user_id: data.user_id, role: data.role }, { onConflict: "user_id,role" });
+      if (error) throw safeError("admin.setUserRole.grant", error, "Failed to grant role.");
     } else {
-      await supabaseAdmin
+      const { error } = await supabaseAdmin
         .from("user_roles")
         .delete()
         .eq("user_id", data.user_id)
         .eq("role", data.role);
+      if (error) throw safeError("admin.setUserRole.revoke", error, "Failed to revoke role.");
     }
     await supabaseAdmin.from("audit_log").insert({
       user_id: context.userId,
@@ -129,6 +125,6 @@ export const getAuditLog = createServerFn({ method: "GET" })
       .select("*")
       .order("created_at", { ascending: false })
       .limit(500);
-    if (error) throw new Error(error.message);
+    if (error) throw safeError("admin.getAuditLog", error, "Failed to load audit log.");
     return data;
   });
