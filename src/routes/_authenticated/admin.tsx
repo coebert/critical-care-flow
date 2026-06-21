@@ -46,16 +46,16 @@ function InvitePanel() {
   const invite = useServerFn(inviteClinician);
   const [f, setF] = useState({ email: "", full_name: "", job_title: "", role: "clinician" as "clinician" | "admin" });
   const [busy, setBusy] = useState(false);
-  const [last, setLast] = useState<{ email: string; temp_password: string } | null>(null);
+  const [lastEmail, setLastEmail] = useState<string | null>(null);
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
     setBusy(true);
     try {
-      const res = await invite({ data: f });
-      setLast({ email: f.email, temp_password: (res as any).temp_password });
+      await invite({ data: f });
+      setLastEmail(f.email);
       setF({ email: "", full_name: "", job_title: "", role: "clinician" });
-      toast.success("User invited");
+      toast.success("Invitation email sent");
     } catch (err: any) {
       toast.error(err.message ?? "Failed to invite");
     } finally {
@@ -66,7 +66,7 @@ function InvitePanel() {
   return (
     <Card className="p-5">
       <h2 className="font-semibold mb-1">Invite a team member</h2>
-      <p className="text-sm text-muted-foreground mb-4">Creates an account with a temporary password. Share it with them securely and ask them to change it on first sign-in.</p>
+      <p className="text-sm text-muted-foreground mb-4">Sends a time-limited invitation email. The user clicks the link to set their own password — no temporary password is created or shared.</p>
       <form onSubmit={submit} className="grid md:grid-cols-2 gap-4">
         <div className="space-y-1.5"><Label>Email</Label><Input type="email" required value={f.email} onChange={(e) => setF({ ...f, email: e.target.value })} /></div>
         <div className="space-y-1.5"><Label>Full name</Label><Input required value={f.full_name} onChange={(e) => setF({ ...f, full_name: e.target.value })} /></div>
@@ -78,14 +78,13 @@ function InvitePanel() {
           </select>
         </div>
         <div className="md:col-span-2 flex justify-end">
-          <Button type="submit" disabled={busy}>{busy ? "Inviting…" : "Invite"}</Button>
+          <Button type="submit" disabled={busy}>{busy ? "Sending…" : "Send invitation"}</Button>
         </div>
       </form>
-      {last && (
+      {lastEmail && (
         <div className="mt-4 p-3 rounded-md border bg-accent/40 text-sm">
-          <div><span className="text-muted-foreground">Email:</span> <span className="font-mono">{last.email}</span></div>
-          <div><span className="text-muted-foreground">Temp password:</span> <span className="font-mono">{last.temp_password}</span></div>
-          <p className="text-xs text-muted-foreground mt-2">Share securely (e.g. in person or via NHS email). The user should reset their password after signing in.</p>
+          <div><span className="text-muted-foreground">Invitation sent to:</span> <span className="font-mono">{lastEmail}</span></div>
+          <p className="text-xs text-muted-foreground mt-2">The link in their email expires after a short window. If they don't sign in, send another invitation.</p>
         </div>
       )}
     </Card>
