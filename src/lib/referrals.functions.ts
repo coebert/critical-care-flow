@@ -77,7 +77,7 @@ export const createReferral = createServerFn({ method: "POST" })
       .insert(insert as any)
       .select()
       .single();
-    if (error) throw new Error(error.message);
+    if (error) throw safeError("referrals.create", error, "Failed to create referral.");
 
     await writeAudit({
       user_id: userId,
@@ -106,7 +106,7 @@ export const updateReferral = createServerFn({ method: "POST" })
       .eq("id", data.id)
       .select()
       .single();
-    if (error) throw new Error(error.message);
+    if (error) throw safeError("referrals.update", error, "Failed to update referral.");
 
     await writeAudit({
       user_id: userId,
@@ -136,7 +136,7 @@ export const addNote = createServerFn({ method: "POST" })
       .insert({ referral_id: data.referral_id, author_id: userId, body: data.body })
       .select()
       .single();
-    if (error) throw new Error(error.message);
+    if (error) throw safeError("referrals.addNote", error, "Failed to add note.");
 
     await writeAudit({
       user_id: userId,
@@ -178,7 +178,7 @@ export const updateNote = createServerFn({ method: "POST" })
       .eq("id", data.id)
       .select()
       .single();
-    if (error) throw new Error(error.message);
+    if (error) throw safeError("referrals.updateNote", error, "Failed to update note.");
 
     await writeAudit({
       user_id: userId,
@@ -208,7 +208,7 @@ export const deleteNote = createServerFn({ method: "POST" })
     if (!existing) throw new Error("Note not found");
 
     const { error } = await supabase.from("referral_notes").delete().eq("id", data.id);
-    if (error) throw new Error(error.message);
+    if (error) throw safeError("referrals.deleteNote", error, "Failed to delete note.");
 
     await writeAudit({
       user_id: userId,
@@ -236,7 +236,7 @@ export const getNoteHistory = createServerFn({ method: "POST" })
       .eq("entity", "referral_note")
       .eq("entity_id", data.note_id)
       .order("created_at", { ascending: false });
-    if (error) throw new Error(error.message);
+    if (error) throw safeError("referrals.getNoteHistory", error, "Failed to load note history.");
 
     const userIds = Array.from(new Set((rows ?? []).map((r: any) => r.user_id).filter(Boolean)));
     let names: Record<string, string> = {};
@@ -302,7 +302,7 @@ export const deleteReferral = createServerFn({ method: "POST" })
       .update({ deleted_at: new Date().toISOString(), deleted_by: userId } as any)
       .eq("id", data.id)
       .is("deleted_at", null);
-    if (error) throw new Error(error.message);
+    if (error) throw safeError("referrals.delete", error, "Failed to delete referral.");
 
     await writeAudit({
       user_id: userId,
@@ -336,7 +336,7 @@ export const listDeletedReferrals = createServerFn({ method: "GET" })
       .order("deleted_at", { ascending: false });
     if (!isAdmin) query = query.eq("created_by", userId);
     const { data, error } = await query;
-    if (error) throw new Error(error.message);
+    if (error) throw safeError("referrals.listDeleted", error, "Failed to load deleted referrals.");
     return data ?? [];
   });
 
@@ -370,7 +370,7 @@ export const restoreReferral = createServerFn({ method: "POST" })
       .from("referrals")
       .update({ deleted_at: null, deleted_by: null, updated_by: userId } as any)
       .eq("id", data.id);
-    if (error) throw new Error(error.message);
+    if (error) throw safeError("referrals.restore", error, "Failed to restore referral.");
 
     await writeAudit({
       user_id: userId,
@@ -406,7 +406,7 @@ export const findReferralsByHospitalNumber = createServerFn({ method: "POST" })
       .limit(50);
     if (data.exclude_id) q = q.neq("id", data.exclude_id);
     const { data: rows, error } = await q;
-    if (error) throw new Error(error.message);
+    if (error) throw safeError("referrals.findByHospitalNumber", error, "Failed to search referrals.");
     return rows ?? [];
   });
 
