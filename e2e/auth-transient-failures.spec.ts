@@ -154,4 +154,31 @@ test.describe("transient supabase auth failures", () => {
 
     await context.close();
   });
+
+  test("no retry toast appears when the first auth request succeeds", async ({
+    browser,
+  }) => {
+    const email = process.env.E2E_EMAIL;
+    const password = process.env.E2E_PASSWORD;
+    test.skip(!email || !password, "E2E_EMAIL / E2E_PASSWORD not set");
+
+    const context = await browser.newContext({ storageState: undefined });
+    const page = await context.newPage();
+
+    // No flakyAuth handler: every auth/v1 request succeeds on the first try.
+
+    await page.goto("/auth");
+    await page.getByLabel(/email/i).fill(email!);
+    await page.getByLabel(/password/i).fill(password!);
+    await page.getByRole("button", { name: /sign in/i }).click();
+
+    // User should land on the authenticated route without ever showing a retry toast.
+    await expect(page).toHaveURL(/\/$/, { timeout: 20_000 });
+    await expect(page).not.toHaveURL(/\/auth/);
+
+    const retryToast = page.getByText(/retrying sign in/i);
+    await expect(retryToast).toHaveCount(0);
+
+    await context.close();
+  });
 });
