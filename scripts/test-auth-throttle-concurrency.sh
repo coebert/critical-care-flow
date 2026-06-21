@@ -14,9 +14,15 @@ fi
 
 N=${N:-20}
 MAX=${MAX:-5}
+TYPE=${TYPE:-signin}   # 'signin' or 'reset'
 EMAIL="concurrency-test-$(date +%s%N)@example.test"
 
-echo "Test email: $EMAIL"
+if [ "$TYPE" != "signin" ] && [ "$TYPE" != "reset" ]; then
+  echo "TYPE must be 'signin' or 'reset' (got '$TYPE')" >&2
+  exit 2
+fi
+
+echo "Test email: $EMAIL  type: $TYPE"
 echo "Firing $N parallel begin_auth_attempt calls (max=$MAX)..."
 
 TMP=$(mktemp -d)
@@ -25,7 +31,7 @@ trap 'rm -rf "$TMP"' EXIT
 # Fire N parallel RPCs. Each writes its JSONB result to its own file.
 for i in $(seq 1 "$N"); do
   (
-    psql -At -c "SELECT public.begin_auth_attempt('$EMAIL','signin')::text" \
+    psql -At -c "SELECT public.begin_auth_attempt('$EMAIL','$TYPE')::text" \
       > "$TMP/r-$i.txt" 2>"$TMP/e-$i.txt"
   ) &
 done
@@ -51,7 +57,7 @@ done
 echo "Granted: $GRANTED  Locked: $LOCKED  Errors: $ERRORS"
 
 # Cross-check the table: failure rows for this email should equal GRANTED.
-ROW_COUNT=$(psql -At -c "SELECT count(*) FROM public.auth_throttle WHERE email_norm='$EMAIL' AND attempt_type='signin' AND success=false")
+ROW_COUNT=$(psql -At -c "SELECT count(*) FROM public.auth_throttle WHERE email_norm='$EMAIL' AND attempt_type='$TYPE' AND success=false")
 echo "auth_throttle rows for test email: $ROW_COUNT"
 
 # No explicit cleanup: rows for this unique test email auto-expire via the
