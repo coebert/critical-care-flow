@@ -51,18 +51,24 @@ function AuthPage() {
     setLoading(true);
     const attemptType: "signin" | "reset" = mode === "signin" ? "signin" : "reset";
     let notifiedRetry = false;
+    let attemptId: number | null = null;
     try {
-      // Pre-check brute-force lockout
-      const { data: lockData, error: lockErr } = await supabase.rpc("check_auth_lockout", {
+      // Atomic check + reserve. Concurrent submissions for the same email serialize
+      // server-side via pg_advisory_xact_lock; only attempts under the threshold get
+      // an attempt_id back, the rest are told they're locked out.
+      const { data: beginData, error: beginErr } = await supabase.rpc("begin_auth_attempt", {
         _email: email,
         _attempt_type: attemptType,
       });
-      if (!lockErr && lockData && (lockData as any).locked) {
-        const secs = (lockData as any).retry_after_seconds ?? 0;
+      if (beginErr) throw beginErr;
+      const begin = beginData as { locked: boolean; attempt_id: number | null; retry_after_seconds?: number };
+      if (begin?.locked) {
+        const secs = begin.retry_after_seconds ?? 0;
         const mins = Math.max(1, Math.ceil(secs / 60));
         toast.error(`Too many failed attempts. Try again in ${mins} minute${mins === 1 ? "" : "s"}.`);
         return;
       }
+      attemptId = begin?.attempt_id ?? null;
 
       if (mode === "signin") {
         const { error } = await retrySupabaseCall(
@@ -78,10 +84,16 @@ function AuthPage() {
           },
         );
         if (error) {
-          await supabase.rpc("record_auth_attempt", { _email: email, _attempt_type: "signin", _success: false });
+          if (attemptId !== null) {
+            await supabase.rpc("finalize_auth_attempt", { _attempt_id: attemptId, _success: false });
+          }
+          attemptId = null;
           throw error;
         }
-        await supabase.rpc("record_auth_attempt", { _email: email, _attempt_type: "signin", _success: true });
+        if (attemptId !== null) {
+          await supabase.rpc("finalize_auth_attempt", { _attempt_id: attemptId, _success: true });
+        }
+        attemptId = null;
         toast.success("Signed in");
         navigate({ to: "/", replace: true });
       } else {
@@ -90,16 +102,17 @@ function AuthPage() {
             redirectTo: window.location.origin + "/reset-password",
           }),
         );
-        await supabase.rpc("record_auth_attempt", {
-          _email: email,
-          _attempt_type: "reset",
-          _success: !error,
-        });
+        if (attemptId !== null) {
+          await supabase.rpc("finalize_auth_attempt", { _attempt_id: attemptId, _success: !error });
+        }
+        attemptId = null;
         if (error) throw error;
         toast.success("If that email exists, a password reset link has been sent.");
         setMode("signin");
       }
     } catch (err: any) {
+      // If we reserved a slot but never finalized (e.g. network error during auth),
+      // leave it as failed — better to over-count than under-count during a brute-force burst.
       toast.error(err?.message ?? "Something went wrong");
     } finally {
       setLoading(false);

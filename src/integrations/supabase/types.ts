@@ -272,9 +272,13 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
-      check_auth_lockout: {
+      begin_auth_attempt: {
         Args: { _attempt_type: string; _email: string }
         Returns: Json
+      }
+      finalize_auth_attempt: {
+        Args: { _attempt_id: number; _success: boolean }
+        Returns: undefined
       }
       has_clinical_access: { Args: { _user_id: string }; Returns: boolean }
       has_role: {
@@ -283,10 +287,6 @@ export type Database = {
           _user_id: string
         }
         Returns: boolean
-      }
-      record_auth_attempt: {
-        Args: { _attempt_type: string; _email: string; _success: boolean }
-        Returns: undefined
       }
     }
     Enums: {
