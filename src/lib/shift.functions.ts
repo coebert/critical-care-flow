@@ -46,9 +46,13 @@ export const subscribePush = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((d: unknown) => subSchema.parse(d))
   .handler(async ({ data, context }) => {
-    const { supabase, userId } = context;
-    // upsert by endpoint
-    const { error } = await supabase
+    const { userId } = context;
+    // Push endpoints are globally unique. If the same browser previously
+    // registered under a different user, take ownership for the current user.
+    // Caller is authenticated; we use the admin client to bypass the
+    // per-user RLS USING check on the prior owner's row.
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { error } = await supabaseAdmin
       .from("push_subscriptions")
       .upsert(
         {
