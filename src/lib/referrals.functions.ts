@@ -115,8 +115,34 @@ export const createReferral = createServerFn({ method: "POST" })
 
     const summary = `${row.referring_specialty ?? "Referral"} — ${row.current_ward ?? "ward unknown"}`;
     await fanOutNotifications(userId, row.id, "new", `New referral: ${summary}`);
+
+    // If this patient has a prior DECLINED referral on record, flag it loudly.
+    if (row.hospital_number) {
+      const admin = await getAdmin();
+      const { data: priorDeclined } = await admin
+        .from("referrals")
+        .select("id, decision_at, referral_received_at")
+        .eq("hospital_number", row.hospital_number)
+        .eq("status", "declined")
+        .is("deleted_at", null)
+        .neq("id", row.id)
+        .order("referral_received_at", { ascending: false })
+        .limit(1);
+      if (priorDeclined && priorDeclined.length > 0) {
+        const prev = priorDeclined[0];
+        const when = prev.decision_at ?? prev.referral_received_at;
+        const whenStr = when ? new Date(when).toLocaleDateString("en-GB") : "previously";
+        await fanOutNotifications(
+          userId,
+          row.id,
+          "updated",
+          `⚠️ Patient has a previously DECLINED critical care referral (${whenStr}) — ${summary}`,
+        );
+      }
+    }
     return row;
   });
+
 
 
 export const updateReferral = createServerFn({ method: "POST" })
