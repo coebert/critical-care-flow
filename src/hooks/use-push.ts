@@ -29,6 +29,28 @@ export function isPushSupported(): boolean {
   );
 }
 
+export function getPushPermissionContextError(): string | null {
+  if (typeof window === "undefined") return null;
+  if (!window.isSecureContext) {
+    return "Push notification permission can only be requested from a secure HTTPS page.";
+  }
+  try {
+    if (window.self !== window.top) {
+      return "Firefox and Safari block notification permission prompts inside embedded previews. Open the app in its own browser tab, then enable notifications there.";
+    }
+  } catch (_) {
+    return "Firefox and Safari block notification permission prompts inside embedded previews. Open the app in its own browser tab, then enable notifications there.";
+  }
+  return null;
+}
+
+export function openPushPermissionSetupWindow(): void {
+  if (typeof window === "undefined") return;
+  const url = new URL(window.location.href);
+  url.searchParams.set("pushSetup", "1");
+  window.open(url.toString(), "_blank", "noopener,noreferrer");
+}
+
 export function usePush() {
   const [permission, setPermission] = useState<NotificationPermission>("default");
   const [subscribed, setSubscribed] = useState(false);
@@ -56,19 +78,24 @@ export function usePush() {
         new Error("Push notifications are not supported on this device."),
       );
     }
+    const contextError = getPushPermissionContextError();
+    if (contextError) return Promise.reject(new Error(contextError));
     const current = Notification.permission;
     if (current !== "default") return Promise.resolve(current);
     // Call synchronously — do NOT await anything before this line in callers.
     let p: Promise<NotificationPermission>;
     try {
-      // Safari historically only supported the callback form; modern Safari
-      // returns a Promise. Cover both by wrapping.
-      const maybe = Notification.requestPermission((result) => {
-        setPermission(result);
-      });
+      // Firefox is stricter than Chromium about this API: pass no deprecated
+      // callback argument, and invoke it directly inside the click handler.
+      const maybe = Notification.requestPermission();
       p = maybe instanceof Promise ? maybe : new Promise((resolve) => {
-        // Fallback: poll once on next tick (legacy callback path).
-        setTimeout(() => resolve(Notification.permission), 0);
+        const started = Date.now();
+        const timer = window.setInterval(() => {
+          if (Notification.permission !== "default" || Date.now() - started > 60_000) {
+            window.clearInterval(timer);
+            resolve(Notification.permission);
+          }
+        }, 250);
       });
     } catch (e) {
       return Promise.reject(e);
@@ -83,16 +110,12 @@ export function usePush() {
     if (!isPushSupported()) {
       throw new Error("Push notifications are not supported on this device.");
     }
-    // If permission isn't yet granted, request it. Callers that need to
-    // preserve user-activation for Safari/Firefox should call
-    // requestPermission() synchronously themselves first.
-    let perm = Notification.permission;
-    if (perm === "default") {
-      perm = await requestPermission();
-    }
+    const contextError = getPushPermissionContextError();
+    if (contextError) throw new Error(contextError);
+    const perm = Notification.permission;
     setPermission(perm);
     if (perm !== "granted") {
-      throw new Error("Notification permission was not granted.");
+      throw new Error("Notification permission was not granted. Tap Enable again and choose Allow in your browser prompt.");
     }
     const reg =
       (await navigator.serviceWorker.getRegistration("/sw-push.js")) ||
@@ -115,7 +138,7 @@ export function usePush() {
       },
     });
     setSubscribed(true);
-  }, [subscribeFn, requestPermission]);
+  }, [subscribeFn]);
 
   const disable = useCallback(async () => {
     if (!isPushSupported()) return;
@@ -210,6 +233,8 @@ export function usePush() {
     enable,
     disable,
     requestPermission,
+    permissionContextError: getPushPermissionContextError(),
+    openPushPermissionSetupWindow,
     supported: isPushSupported(),
     autoRetrying,
   };
