@@ -129,6 +129,7 @@ function AuthedShell() {
             <NotificationBell />
           </div>
         </header>
+        <PushPermissionPrompt visible={supported && permission === "denied" && atWork === true} />
         <main className="flex-1 overflow-auto">
           <Outlet />
         </main>
