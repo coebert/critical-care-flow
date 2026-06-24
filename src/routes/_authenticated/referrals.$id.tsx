@@ -474,6 +474,39 @@ function ReferralDetail() {
           </div>
         </Card>
 
+        <Card className="p-5">
+          <Collapsible
+            open={historyOpen}
+            onOpenChange={(o) => {
+              setHistoryOpen(o);
+              if (o && history.length === 0 && !historyLoading) loadHistory();
+            }}
+          >
+            <CollapsibleTrigger asChild>
+              <button type="button" className="w-full flex items-center justify-between text-left">
+                <div>
+                  <h2 className="font-semibold">Audit trail</h2>
+                  <p className="text-xs text-muted-foreground">When key fields were created or changed, and by whom.</p>
+                </div>
+                <ChevronDown className={cn("w-4 h-4 transition-transform", historyOpen && "rotate-180")} />
+              </button>
+            </CollapsibleTrigger>
+            <CollapsibleContent className="mt-4">
+              {historyLoading && <p className="text-xs text-muted-foreground">Loading history…</p>}
+              {!historyLoading && history.length === 0 && (
+                <p className="text-xs text-muted-foreground">No audit entries.</p>
+              )}
+              <div className="space-y-3">
+                {history.map((h) => (
+                  <AuditEntry key={h.id} entry={h} />
+                ))}
+              </div>
+            </CollapsibleContent>
+          </Collapsible>
+        </Card>
+
+
+
         {canDelete && (
           <div className="flex justify-end pt-2">
             <AlertDialog>
