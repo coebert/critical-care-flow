@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { Alert, AlertTitle, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
+import { usePush } from "@/hooks/use-push";
 import { Bell, X } from "lucide-react";
 
 const DISMISS_KEY = "push-permission-prompt-dismissed";
