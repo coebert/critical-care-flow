@@ -83,7 +83,7 @@ async function fanOutNotifications(
         await admin.from("push_subscriptions").delete().in("endpoint", endpoints);
       },
     },
-    { actorId: userId, referralId, kind, message },
+    { actorId: userId, referralId, kind, message, url },
   );
 }
 
