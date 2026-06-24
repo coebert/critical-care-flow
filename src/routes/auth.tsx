@@ -8,7 +8,30 @@ import { Card } from "@/components/ui/card";
 import { Activity } from "lucide-react";
 import { toast } from "sonner";
 import { Toaster } from "@/components/ui/sonner";
+import { Checkbox } from "@/components/ui/checkbox";
 import { retrySupabaseCall, retryWithBackoff } from "@/lib/retry";
+
+// When "Keep me signed in" is unchecked, move the persisted Supabase auth token
+// from localStorage to sessionStorage so the session ends when the browser closes.
+function downgradeSessionToTabOnly() {
+  if (typeof window === "undefined") return;
+  try {
+    for (let i = 0; i < window.localStorage.length; i++) {
+      const key = window.localStorage.key(i);
+      if (!key) continue;
+      if (key.startsWith("sb-") && key.endsWith("-auth-token")) {
+        const value = window.localStorage.getItem(key);
+        if (value !== null) {
+          window.sessionStorage.setItem(key, value);
+          window.localStorage.removeItem(key);
+        }
+        break;
+      }
+    }
+  } catch {
+    // Storage access can fail in private modes — best-effort only.
+  }
+}
 
 export const Route = createFileRoute("/auth")({
   ssr: false,
@@ -36,6 +59,8 @@ function AuthPage() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
+  const [rememberMe, setRememberMe] = useState(true);
+
 
   useEffect(() => {
     let cancelled = false;
@@ -102,6 +127,7 @@ function AuthPage() {
           await supabase.rpc("finalize_auth_attempt", { _attempt_id: attemptId, _success: true });
         }
         attemptId = null;
+        if (!rememberMe) downgradeSessionToTabOnly();
         toast.success("Signed in");
         navigate({ to: postAuthTarget, replace: true });
       } else {
@@ -156,6 +182,23 @@ function AuthPage() {
             <div className="space-y-1.5">
               <Label htmlFor="password">Password</Label>
               <Input id="password" type="password" required value={password} onChange={(e) => setPassword(e.target.value)} autoComplete="current-password" />
+            </div>
+          )}
+          {mode === "signin" && (
+            <div className="flex items-start gap-2">
+              <Checkbox
+                id="remember-me"
+                checked={rememberMe}
+                onCheckedChange={(v) => setRememberMe(v === true)}
+              />
+              <div className="grid gap-0.5 leading-none">
+                <Label htmlFor="remember-me" className="text-sm font-normal cursor-pointer">
+                  Keep me signed in
+                </Label>
+                <p className="text-[11px] text-muted-foreground">
+                  Stay logged in on this device. Uncheck on shared computers — your session will end when you close the browser.
+                </p>
+              </div>
             </div>
           )}
           <Button type="submit" className="w-full" disabled={loading}>
