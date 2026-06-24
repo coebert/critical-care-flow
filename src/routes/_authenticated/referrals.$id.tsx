@@ -1,5 +1,5 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useServerFn } from "@tanstack/react-start";
 import { supabase } from "@/integrations/supabase/client";
 import { addNote, deleteNote, deleteReferral, getNoteHistory, logReferralView, updateNote, updateReferral } from "@/lib/referrals.functions";
