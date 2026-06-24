@@ -1,11 +1,14 @@
 import { createFileRoute, Outlet, redirect, Link, useRouter, useNavigate, useRouterState } from "@tanstack/react-router";
+import { usePush } from "@/hooks/use-push";
+import { useShiftStatus } from "@/hooks/use-shift-status";
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
-import { Activity, BarChart3, ListChecks, Shield, Bell, LogOut, Plus, Menu } from "lucide-react";
+import { Activity, BarChart3, ListChecks, Shield, LogOut, Plus, Menu } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useAuth, useRole } from "@/hooks/use-auth";
 import { NotificationBell } from "@/components/notification-bell";
 import { ShiftToggle } from "@/components/shift-toggle";
+import { PushPermissionPrompt } from "@/components/push-permission-prompt";
 import { Toaster } from "@/components/ui/sonner";
 import { Sheet, SheetContent, SheetTrigger, SheetTitle, SheetHeader } from "@/components/ui/sheet";
 import { VisuallyHidden } from "@radix-ui/react-visually-hidden";
@@ -31,6 +34,8 @@ function AuthedShell() {
   const [signingOut, setSigningOut] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
   const pathname = useRouterState({ select: (s) => s.location.pathname });
+  const { supported, permission } = usePush();
+  const { atWork } = useShiftStatus();
 
   // Close the mobile drawer on route change
   useEffect(() => {
@@ -124,6 +129,7 @@ function AuthedShell() {
             <NotificationBell />
           </div>
         </header>
+        <PushPermissionPrompt visible={supported && permission === "denied" && atWork === true} />
         <main className="flex-1 overflow-auto">
           <Outlet />
         </main>
