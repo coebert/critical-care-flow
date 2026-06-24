@@ -120,6 +120,7 @@ function AuthedShell() {
           </Sheet>
           <div className="ml-auto flex items-center gap-2">
             <ShiftToggle />
+            {supported && permission === "granted" && subscribed && <TestPushButton />}
             <NotificationBell />
           </div>
         </header>
