@@ -32,6 +32,7 @@ export function isPushSupported(): boolean {
 export function usePush() {
   const [permission, setPermission] = useState<NotificationPermission>("default");
   const [subscribed, setSubscribed] = useState(false);
+  const [autoRetrying, setAutoRetrying] = useState(false);
   const subscribeFn = useServerFn(subscribePush);
   const unsubscribeFn = useServerFn(unsubscribePush);
 
