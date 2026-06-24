@@ -769,3 +769,95 @@ function NoteHistoryButton({ noteId }: { noteId: string }) {
     </Dialog>
   );
 }
+
+const FIELD_LABELS: Record<string, string> = {
+  age: "Age",
+  sex: "Sex",
+  hospital_number: "Hospital number",
+  current_ward: "Current ward",
+  current_bed: "Bed",
+  past_medical_history: "Past medical history",
+  baseline_function: "Baseline function",
+  dnacpr_respect: "DNACPR / ReSPECT",
+  referring_specialty: "Referring specialty",
+  reason_for_referral: "Reason for referral",
+  referral_received_at: "Referral received",
+  first_seen_at: "First seen by CC",
+  decision_at: "Decision",
+  arrived_on_unit_at: "Arrived on unit",
+  status: "Status",
+  decline_reason: "Reason for declining",
+};
+
+const DATE_FIELDS = new Set([
+  "referral_received_at",
+  "first_seen_at",
+  "decision_at",
+  "arrived_on_unit_at",
+]);
+
+function formatAuditValue(field: string, value: string | number | boolean | null): string {
+  if (value === null || value === "") return "—";
+  if (typeof value === "boolean") return value ? "Yes" : "No";
+  if (DATE_FIELDS.has(field) && typeof value === "string") {
+    const d = new Date(value);
+    if (!isNaN(d.getTime())) return format(d, "dd MMM yyyy HH:mm");
+  }
+  return String(value);
+}
+
+function AuditEntry({ entry }: { entry: ReferralAuditEntry }) {
+  const when = new Date(entry.created_at);
+  const actionLabel =
+    entry.action === "create" ? "Created" :
+    entry.action === "delete" ? "Deleted" :
+    "Updated";
+  const actionTone =
+    entry.action === "create" ? "bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 border-emerald-500/40" :
+    entry.action === "delete" ? "bg-destructive/10 text-destructive border-destructive/40" :
+    "bg-muted text-foreground border-border";
+
+  return (
+    <div className="border rounded-md p-3 text-sm">
+      <div className="flex items-center justify-between gap-2 flex-wrap mb-2">
+        <div className="flex items-center gap-2">
+          <Badge variant="outline" className={cn("capitalize", actionTone)}>{actionLabel}</Badge>
+          <span className="font-medium">{entry.user_name}</span>
+        </div>
+        <span
+          className="text-xs text-muted-foreground"
+          title={format(when, "dd MMM yyyy HH:mm:ss")}
+        >
+          {format(when, "dd MMM yyyy HH:mm")} · {formatDistanceToNow(when, { addSuffix: true })}
+        </span>
+      </div>
+
+      {entry.action === "create" && entry.snapshot && (
+        <dl className="grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-1 text-xs">
+          {Object.entries(entry.snapshot)
+            .filter(([, v]) => v !== null && v !== "")
+            .map(([k, v]) => (
+              <div key={k} className="flex gap-1">
+                <dt className="text-muted-foreground">{FIELD_LABELS[k] ?? k}:</dt>
+                <dd className="break-words">{formatAuditValue(k, v)}</dd>
+              </div>
+            ))}
+        </dl>
+      )}
+
+      {entry.action === "update" && entry.changes.length > 0 && (
+        <ul className="space-y-1 text-xs">
+          {entry.changes.map((c) => (
+            <li key={c.field}>
+              <span className="text-muted-foreground">{FIELD_LABELS[c.field] ?? c.field}:</span>{" "}
+              <span className="line-through text-muted-foreground">{formatAuditValue(c.field, c.from)}</span>
+              {" → "}
+              <span className="font-medium">{formatAuditValue(c.field, c.to)}</span>
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
+  );
+}
+
