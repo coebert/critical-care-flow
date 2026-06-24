@@ -43,6 +43,7 @@ async function fanOutNotifications(
   referralId: string,
   kind: "new" | "updated",
   message: string,
+  url?: string,
 ) {
   const admin = await getAdmin();
   const { fanOutNotifications: runFanOut } = await import("./notification-fanout");
