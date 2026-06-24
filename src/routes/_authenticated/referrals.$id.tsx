@@ -118,6 +118,30 @@ function ReferralDetail() {
     return () => { supabase.removeChannel(ch); };
   }, [id, logView]);
 
+  // Fetch other declined referrals for the same patient (by hospital number).
+  useEffect(() => {
+    const hn = ref?.hospital_number?.trim();
+    if (!hn) {
+      setPriorDeclined([]);
+      return;
+    }
+    let cancelled = false;
+    supabase
+      .from("referrals")
+      .select("*")
+      .eq("hospital_number", hn)
+      .eq("status", "declined")
+      .is("deleted_at", null)
+      .neq("id", id)
+      .order("decision_at", { ascending: false, nullsFirst: false })
+      .order("referral_received_at", { ascending: false })
+      .then(({ data }) => {
+        if (!cancelled) setPriorDeclined((data ?? []) as Referral[]);
+      });
+    return () => { cancelled = true; };
+  }, [ref?.hospital_number, id]);
+
+
   if (!ref) return <div className="p-6 text-muted-foreground">Loading…</div>;
 
   const canDelete = !!user && (user.id === ref.created_by || isAdmin);
