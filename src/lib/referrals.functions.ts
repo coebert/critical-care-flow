@@ -121,7 +121,7 @@ export const createReferral = createServerFn({ method: "POST" })
       const admin = await getAdmin();
       const { data: priorDeclined } = await admin
         .from("referrals")
-        .select("id, decision_at, referral_received_at")
+        .select("id, decision_at, referral_received_at, decline_reason")
         .eq("hospital_number", row.hospital_number)
         .eq("status", "declined")
         .is("deleted_at", null)
@@ -132,13 +132,17 @@ export const createReferral = createServerFn({ method: "POST" })
         const prev = priorDeclined[0];
         const when = prev.decision_at ?? prev.referral_received_at;
         const whenStr = when ? new Date(when).toLocaleDateString("en-GB") : "previously";
+        const reasonRaw = (prev.decline_reason ?? "").trim();
+        const reason = reasonRaw.length > 200 ? `${reasonRaw.slice(0, 197)}…` : reasonRaw;
+        const reasonStr = reason ? ` Reason: ${reason}` : " Reason not recorded.";
         await fanOutNotifications(
           userId,
           row.id,
           "updated",
-          `⚠️ Patient has a previously DECLINED critical care referral (${whenStr}) — ${summary}`,
+          `⚠️ Patient has a previously DECLINED critical care referral (${whenStr}).${reasonStr} — ${summary}`,
         );
       }
+
     }
     return row;
   });
