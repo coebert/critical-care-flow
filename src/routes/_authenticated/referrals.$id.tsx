@@ -61,18 +61,29 @@ function ReferralDetail() {
   const [history, setHistory] = useState<ReferralAuditEntry[]>([]);
   const [historyLoading, setHistoryLoading] = useState(false);
   const [historyOpen, setHistoryOpen] = useState(false);
+  const [historyTotal, setHistoryTotal] = useState(0);
+  const [historyHasMore, setHistoryHasMore] = useState(false);
+  const HISTORY_PAGE_SIZE = 20;
 
-  const loadHistory = async () => {
+  const loadMoreHistory = async (reset = false) => {
+    if (historyLoading) return;
+    if (!reset && !historyHasMore) return;
     setHistoryLoading(true);
     try {
-      const rows = await fetchHistory({ data: { referral_id: id } });
-      setHistory(rows as ReferralAuditEntry[]);
+      const currentOffset = reset ? 0 : history.length;
+      const page = await fetchHistory({
+        data: { referral_id: id, offset: currentOffset, limit: HISTORY_PAGE_SIZE },
+      });
+      setHistory((cur) => (reset ? page.entries : [...cur, ...page.entries]));
+      setHistoryTotal(page.total);
+      setHistoryHasMore(page.hasMore);
     } catch (e: any) {
       toast.error(e?.message ?? "Failed to load history");
     } finally {
       setHistoryLoading(false);
     }
   };
+  const historySentinelRef = useRef<HTMLDivElement>(null);
   const { user } = useAuth();
   const { hasRole: isAdmin } = useRole("admin");
   const [deleting, setDeleting] = useState(false);
@@ -88,6 +99,23 @@ function ReferralDetail() {
   const [posting, setPosting] = useState(false);
   const [priorDeclined, setPriorDeclined] = useState<Referral[]>([]);
   const outcomeRef = useRef<HTMLDivElement>(null);
+
+  // Auto-load the next page of audit history when the sentinel scrolls into view.
+  useEffect(() => {
+    if (!historyOpen || !historyHasMore) return;
+    const node = historySentinelRef.current;
+    if (!node || typeof IntersectionObserver === "undefined") return;
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries.some((e) => e.isIntersecting)) loadMoreHistory(false);
+      },
+      { rootMargin: "200px" },
+    );
+    observer.observe(node);
+    return () => observer.disconnect();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [historyOpen, historyHasMore, history.length]);
+
 
   useEffect(() => {
     if (highlight === "declined" && ref?.status === "declined" && outcomeRef.current) {
@@ -479,20 +507,27 @@ function ReferralDetail() {
             open={historyOpen}
             onOpenChange={(o) => {
               setHistoryOpen(o);
-              if (o && history.length === 0 && !historyLoading) loadHistory();
+              if (o && history.length === 0 && !historyLoading) loadMoreHistory(true);
             }}
           >
             <CollapsibleTrigger asChild>
               <button type="button" className="w-full flex items-center justify-between text-left">
                 <div>
                   <h2 className="font-semibold">Audit trail</h2>
-                  <p className="text-xs text-muted-foreground">When key fields were created or changed, and by whom.</p>
+                  <p className="text-xs text-muted-foreground">
+                    When key fields were created or changed, and by whom.
+                    {historyOpen && historyTotal > 0 && (
+                      <span> · Showing {history.length} of {historyTotal}</span>
+                    )}
+                  </p>
                 </div>
                 <ChevronDown className={cn("w-4 h-4 transition-transform", historyOpen && "rotate-180")} />
               </button>
             </CollapsibleTrigger>
             <CollapsibleContent className="mt-4">
-              {historyLoading && <p className="text-xs text-muted-foreground">Loading history…</p>}
+              {history.length === 0 && historyLoading && (
+                <p className="text-xs text-muted-foreground">Loading history…</p>
+              )}
               {!historyLoading && history.length === 0 && (
                 <p className="text-xs text-muted-foreground">No audit entries.</p>
               )}
@@ -501,6 +536,24 @@ function ReferralDetail() {
                   <AuditEntry key={h.id} entry={h} />
                 ))}
               </div>
+              {history.length > 0 && historyHasMore && (
+                <div ref={historySentinelRef} className="pt-3 flex justify-center">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => loadMoreHistory(false)}
+                    disabled={historyLoading}
+                  >
+                    {historyLoading ? "Loading…" : "Load more"}
+                  </Button>
+                </div>
+              )}
+              {history.length > 0 && !historyHasMore && (
+                <p className="pt-3 text-center text-xs text-muted-foreground">
+                  End of history.
+                </p>
+              )}
             </CollapsibleContent>
           </Collapsible>
         </Card>

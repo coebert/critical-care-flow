@@ -355,13 +355,32 @@ export type ReferralAuditEntry = {
   snapshot?: Record<string, AuditValue>;
 };
 
+export type ReferralAuditPage = {
+  entries: ReferralAuditEntry[];
+  total: number;
+  offset: number;
+  limit: number;
+  hasMore: boolean;
+};
+
+const HISTORY_PAGE_MAX = 100;
+
 export const getReferralHistory = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((d: unknown) =>
-    z.object({ referral_id: z.string().uuid() }).parse(d),
+    z
+      .object({
+        referral_id: z.string().uuid(),
+        offset: z.number().int().min(0).optional(),
+        limit: z.number().int().min(1).max(HISTORY_PAGE_MAX).optional(),
+      })
+      .parse(d),
   )
-  .handler(async ({ data, context }): Promise<ReferralAuditEntry[]> => {
+  .handler(async ({ data, context }): Promise<ReferralAuditPage> => {
     const { supabase, userId } = context;
+    const offset = data.offset ?? 0;
+    const limit = data.limit ?? 20;
+
     const { data: access } = await supabase.rpc("has_clinical_access", { _user_id: userId });
     if (!access) throw new Error("Forbidden");
 
@@ -374,6 +393,9 @@ export const getReferralHistory = createServerFn({ method: "POST" })
     if (!ref) throw new Error("Referral not found");
 
     const admin = await getAdmin();
+    // We must walk all rows chronologically to reconstruct from->to diffs,
+    // then slice for pagination. The audit_log is indexed by entity/entity_id
+    // and rows are small, so this stays cheap per referral.
     const { data: rows, error } = await admin
       .from("audit_log")
       .select("id, user_id, action, diff, created_at")
@@ -382,18 +404,6 @@ export const getReferralHistory = createServerFn({ method: "POST" })
       .in("action", ["create", "update", "delete"])
       .order("created_at", { ascending: true });
     if (error) throw safeError("referrals.getReferralHistory", error, "Failed to load referral history.");
-
-    const userIds = Array.from(
-      new Set((rows ?? []).map((r: any) => r.user_id).filter(Boolean)),
-    );
-    const names: Record<string, string> = {};
-    if (userIds.length) {
-      const { data: profs } = await admin
-        .from("profiles")
-        .select("id, full_name")
-        .in("id", userIds as string[]);
-      profs?.forEach((p: any) => { names[p.id] = p.full_name ?? "Clinician"; });
-    }
 
     // Normalize a JSONB value to a simple scalar suitable for display.
     const norm = (v: unknown): AuditValue => {
@@ -405,7 +415,7 @@ export const getReferralHistory = createServerFn({ method: "POST" })
     // Track previous values so each update entry can be shown as
     // before -> after for the fields that actually changed.
     const prev: Record<string, AuditValue> = {};
-    const entries: ReferralAuditEntry[] = [];
+    const built: ReferralAuditEntry[] = [];
 
     for (const r of rows ?? []) {
       const diff = (r.diff ?? {}) as Record<string, unknown>;
@@ -414,7 +424,7 @@ export const getReferralHistory = createServerFn({ method: "POST" })
         action: r.action,
         created_at: r.created_at,
         user_id: r.user_id,
-        user_name: r.user_id ? (names[r.user_id] ?? "Clinician") : "System",
+        user_name: "Clinician", // filled in after slicing
         changes: [],
       };
 
@@ -442,11 +452,39 @@ export const getReferralHistory = createServerFn({ method: "POST" })
       }
       // "delete" actions are recorded as-is with no changes list.
 
-      entries.push(base);
+      built.push(base);
     }
 
-    // Show newest first in the UI.
-    return entries.reverse();
+    // Newest first for display, then slice the requested window.
+    built.reverse();
+    const total = built.length;
+    const page = built.slice(offset, offset + limit);
+
+    // Only resolve profile names for the users actually shown on this page.
+    const userIds = Array.from(new Set(page.map((e) => e.user_id).filter(Boolean) as string[]));
+    if (userIds.length) {
+      const { data: profs } = await admin
+        .from("profiles")
+        .select("id, full_name")
+        .in("id", userIds);
+      const names: Record<string, string> = {};
+      profs?.forEach((p: any) => { names[p.id] = p.full_name ?? "Clinician"; });
+      for (const e of page) {
+        e.user_name = e.user_id ? (names[e.user_id] ?? "Clinician") : "System";
+      }
+    } else {
+      for (const e of page) {
+        if (!e.user_id) e.user_name = "System";
+      }
+    }
+
+    return {
+      entries: page,
+      total,
+      offset,
+      limit,
+      hasMore: offset + page.length < total,
+    };
   });
 
 
