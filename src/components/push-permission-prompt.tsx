@@ -179,7 +179,7 @@ export function PushPermissionPrompt({ visible }: { visible: boolean }) {
 
   const isDenied = permission === "denied";
   const needsInstall = platform === "safari-ios-browser";
-  const showInstructions = isDenied || showHelp || needsInstall;
+  const showInstructions = isDenied || showHelp || needsInstall || !!permissionContextError;
 
   return (
     <div className="px-4 py-2">
@@ -202,6 +202,9 @@ export function PushPermissionPrompt({ visible }: { visible: boolean }) {
 
           {showInstructions && (
             <div className="rounded-md border border-current/20 bg-background/40 p-3">
+              {permissionContextError && (
+                <p className="mb-2 text-sm font-medium">{permissionContextError}</p>
+              )}
               <p className="mb-2 text-sm font-medium">
                 Browsers don't allow apps to open settings for you — here's how to do it:
               </p>
