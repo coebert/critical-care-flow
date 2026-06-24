@@ -342,6 +342,8 @@ const AUDITED_REFERRAL_FIELDS = [
   "status", "decline_reason",
 ] as const;
 
+export type AuditValue = string | number | boolean | null;
+
 export type ReferralAuditEntry = {
   id: string;
   action: string;
