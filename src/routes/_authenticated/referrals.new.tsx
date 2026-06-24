@@ -58,29 +58,121 @@ function localISO() {
   return d.toISOString().slice(0, 16);
 }
 
+const DRAFT_KEY = "referral-draft-v1";
+
+type DraftForm = {
+  age: string;
+  sex: "male" | "female" | "other" | "unknown";
+  hospital_number: string;
+  current_ward: string;
+  current_bed: string;
+  past_medical_history: string;
+  baseline_function: string;
+  dnacpr_respect: boolean;
+  referring_specialty: string;
+  reason_for_referral: string;
+  referral_received_at: string;
+  first_seen_at: string;
+  decision_at: string;
+  arrived_on_unit_at: string;
+  status: "pending" | "declined" | "admitted";
+  decline_reason: string;
+};
+
+const blankForm = (): DraftForm => ({
+  age: "",
+  sex: "unknown",
+  hospital_number: "",
+  current_ward: "",
+  current_bed: "",
+  past_medical_history: "",
+  baseline_function: "",
+  dnacpr_respect: false,
+  referring_specialty: "",
+  reason_for_referral: "",
+  referral_received_at: localISO(),
+  first_seen_at: "",
+  decision_at: "",
+  arrived_on_unit_at: "",
+  status: "pending",
+  decline_reason: "",
+});
+
+function isDraftDirty(d: DraftForm): boolean {
+  const b = blankForm();
+  // Ignore referral_received_at default (timestamp differs per render).
+  const keys = (Object.keys(b) as (keyof DraftForm)[]).filter(
+    (k) => k !== "referral_received_at",
+  );
+  return keys.some((k) => d[k] !== b[k]);
+}
+
 function NewReferralPage() {
   const navigate = useNavigate();
   const create = useServerFn(createReferral);
   const [saving, setSaving] = useState(false);
   const { specialties, wards } = useReferralOptions();
-  const [f, setF] = useState({
-    age: "",
-    sex: "unknown" as "male" | "female" | "other" | "unknown",
-    hospital_number: "",
-    current_ward: "",
-    current_bed: "",
-    past_medical_history: "",
-    baseline_function: "",
-    dnacpr_respect: false,
-    referring_specialty: "",
-    reason_for_referral: "",
-    referral_received_at: localISO(),
-    first_seen_at: "",
-    decision_at: "",
-    arrived_on_unit_at: "",
-    status: "pending" as "pending" | "declined" | "admitted",
-    decline_reason: "",
-  });
+  const [f, setF] = useState<DraftForm>(blankForm);
+  const [draftRestored, setDraftRestored] = useState(false);
+  const [draftSavedAt, setDraftSavedAt] = useState<Date | null>(null);
+
+  // Restore any in-progress draft from localStorage on mount.
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    try {
+      const raw = window.localStorage.getItem(DRAFT_KEY);
+      if (!raw) return;
+      const parsed = JSON.parse(raw) as Partial<DraftForm>;
+      const restored: DraftForm = { ...blankForm(), ...parsed };
+      if (isDraftDirty(restored)) {
+        setF(restored);
+        setDraftRestored(true);
+        toast.info("Restored your in-progress referral draft.");
+      }
+    } catch {
+      // ignore corrupt draft
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Auto-save the draft (debounced) whenever the form changes.
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const t = setTimeout(() => {
+      try {
+        if (isDraftDirty(f)) {
+          window.localStorage.setItem(DRAFT_KEY, JSON.stringify(f));
+          setDraftSavedAt(new Date());
+        } else {
+          window.localStorage.removeItem(DRAFT_KEY);
+        }
+      } catch {
+        // storage full / disabled — ignore
+      }
+    }, 400);
+    return () => clearTimeout(t);
+  }, [f]);
+
+  // Warn before leaving with an unsaved draft on the page.
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const handler = (e: BeforeUnloadEvent) => {
+      if (isDraftDirty(f)) {
+        e.preventDefault();
+        e.returnValue = "";
+      }
+    };
+    window.addEventListener("beforeunload", handler);
+    return () => window.removeEventListener("beforeunload", handler);
+  }, [f]);
+
+  const discardDraft = () => {
+    if (typeof window !== "undefined") window.localStorage.removeItem(DRAFT_KEY);
+    setF(blankForm());
+    setDraftRestored(false);
+    setDraftSavedAt(null);
+    toast.success("Draft discarded.");
+  };
 
   const set = (k: keyof typeof f, v: any) => setF((cur) => ({ ...cur, [k]: v }));
 
