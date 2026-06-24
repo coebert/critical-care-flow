@@ -32,6 +32,7 @@ export function isPushSupported(): boolean {
 export function usePush() {
   const [permission, setPermission] = useState<NotificationPermission>("default");
   const [subscribed, setSubscribed] = useState(false);
+  const [autoRetrying, setAutoRetrying] = useState(false);
   const subscribeFn = useServerFn(subscribePush);
   const unsubscribeFn = useServerFn(unsubscribePush);
 
@@ -133,5 +134,83 @@ export function usePush() {
     setSubscribed(false);
   }, [unsubscribeFn]);
 
-  return { permission, subscribed, enable, disable, requestPermission, supported: isPushSupported() };
+  // Auto-retry: when permission flips to "granted" but we don't yet have a
+  // subscription, finish the subscribe flow without requiring another click.
+  // Covers Safari/Firefox where the prompt may resolve after the original
+  // click handler's user-activation has lapsed, and cross-tab grants.
+  useEffect(() => {
+    if (!isPushSupported()) return;
+
+    let cancelled = false;
+    let permStatus: PermissionStatus | null = null;
+
+    const syncPermission = () => {
+      if (cancelled) return;
+      const current = Notification.permission;
+      setPermission((prev) => (prev === current ? prev : current));
+    };
+
+    const tryAutoSubscribe = async () => {
+      if (cancelled) return;
+      if (Notification.permission !== "granted") return;
+      if (subscribed) return;
+      if (autoRetrying) return;
+      setAutoRetrying(true);
+      try {
+        await enable();
+      } catch {
+        // swallow — surfaced by manual enable button on next click
+      } finally {
+        if (!cancelled) setAutoRetrying(false);
+      }
+    };
+
+    const onPermissionChange = () => {
+      syncPermission();
+      void tryAutoSubscribe();
+    };
+
+    const onVisibility = () => {
+      if (document.visibilityState === "visible") onPermissionChange();
+    };
+
+    // navigator.permissions is the reliable signal in Chrome/Firefox. Safari
+    // doesn't support querying "notifications", so we also fall back to
+    // focus/visibility events to re-check Notification.permission.
+    if (navigator.permissions?.query) {
+      navigator.permissions
+        .query({ name: "notifications" as PermissionName })
+        .then((status) => {
+          if (cancelled) return;
+          permStatus = status;
+          status.addEventListener("change", onPermissionChange);
+        })
+        .catch(() => {
+          /* unsupported — focus/visibility fallback covers it */
+        });
+    }
+    window.addEventListener("focus", onPermissionChange);
+    document.addEventListener("visibilitychange", onVisibility);
+
+    // Also trigger once on mount in case permission was granted previously
+    // (e.g. another tab) but this tab never finished subscribing.
+    void tryAutoSubscribe();
+
+    return () => {
+      cancelled = true;
+      if (permStatus) permStatus.removeEventListener("change", onPermissionChange);
+      window.removeEventListener("focus", onPermissionChange);
+      document.removeEventListener("visibilitychange", onVisibility);
+    };
+  }, [enable, subscribed, autoRetrying]);
+
+  return {
+    permission,
+    subscribed,
+    enable,
+    disable,
+    requestPermission,
+    supported: isPushSupported(),
+    autoRetrying,
+  };
 }
