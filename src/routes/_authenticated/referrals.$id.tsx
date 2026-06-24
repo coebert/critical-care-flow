@@ -57,6 +57,22 @@ function ReferralDetail() {
   const deleteNoteFn = useServerFn(deleteNote);
   const logView = useServerFn(logReferralView);
   const removeReferral = useServerFn(deleteReferral);
+  const fetchHistory = useServerFn(getReferralHistory);
+  const [history, setHistory] = useState<ReferralAuditEntry[]>([]);
+  const [historyLoading, setHistoryLoading] = useState(false);
+  const [historyOpen, setHistoryOpen] = useState(false);
+
+  const loadHistory = async () => {
+    setHistoryLoading(true);
+    try {
+      const rows = await fetchHistory({ data: { referral_id: id } });
+      setHistory(rows as ReferralAuditEntry[]);
+    } catch (e: any) {
+      toast.error(e?.message ?? "Failed to load history");
+    } finally {
+      setHistoryLoading(false);
+    }
+  };
   const { user } = useAuth();
   const { hasRole: isAdmin } = useRole("admin");
   const [deleting, setDeleting] = useState(false);
