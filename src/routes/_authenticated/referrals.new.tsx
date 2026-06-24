@@ -58,31 +58,124 @@ function localISO() {
   return d.toISOString().slice(0, 16);
 }
 
+const DRAFT_KEY = "referral-draft-v1";
+
+type DraftForm = {
+  age: string;
+  sex: "male" | "female" | "other" | "unknown";
+  hospital_number: string;
+  current_ward: string;
+  current_bed: string;
+  past_medical_history: string;
+  baseline_function: string;
+  dnacpr_respect: boolean;
+  referring_specialty: string;
+  reason_for_referral: string;
+  referral_received_at: string;
+  first_seen_at: string;
+  decision_at: string;
+  arrived_on_unit_at: string;
+  status: "pending" | "declined" | "admitted";
+  decline_reason: string;
+};
+
+const blankForm = (): DraftForm => ({
+  age: "",
+  sex: "unknown",
+  hospital_number: "",
+  current_ward: "",
+  current_bed: "",
+  past_medical_history: "",
+  baseline_function: "",
+  dnacpr_respect: false,
+  referring_specialty: "",
+  reason_for_referral: "",
+  referral_received_at: localISO(),
+  first_seen_at: "",
+  decision_at: "",
+  arrived_on_unit_at: "",
+  status: "pending",
+  decline_reason: "",
+});
+
+function isDraftDirty(d: DraftForm): boolean {
+  const b = blankForm();
+  // Ignore referral_received_at default (timestamp differs per render).
+  const keys = (Object.keys(b) as (keyof DraftForm)[]).filter(
+    (k) => k !== "referral_received_at",
+  );
+  return keys.some((k) => d[k] !== b[k]);
+}
+
 function NewReferralPage() {
   const navigate = useNavigate();
   const create = useServerFn(createReferral);
   const [saving, setSaving] = useState(false);
   const { specialties, wards } = useReferralOptions();
-  const [f, setF] = useState({
-    age: "",
-    sex: "unknown" as "male" | "female" | "other" | "unknown",
-    hospital_number: "",
-    current_ward: "",
-    current_bed: "",
-    past_medical_history: "",
-    baseline_function: "",
-    dnacpr_respect: false,
-    referring_specialty: "",
-    reason_for_referral: "",
-    referral_received_at: localISO(),
-    first_seen_at: "",
-    decision_at: "",
-    arrived_on_unit_at: "",
-    status: "pending" as "pending" | "declined" | "admitted",
-    decline_reason: "",
-  });
+  const [f, setF] = useState<DraftForm>(blankForm);
+  const [draftRestored, setDraftRestored] = useState(false);
+  const [draftSavedAt, setDraftSavedAt] = useState<Date | null>(null);
 
-  const set = (k: keyof typeof f, v: any) => setF((cur) => ({ ...cur, [k]: v }));
+  // Restore any in-progress draft from localStorage on mount.
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    try {
+      const raw = window.localStorage.getItem(DRAFT_KEY);
+      if (!raw) return;
+      const parsed = JSON.parse(raw) as Partial<DraftForm>;
+      const restored: DraftForm = { ...blankForm(), ...parsed };
+      if (isDraftDirty(restored)) {
+        setF(restored);
+        setDraftRestored(true);
+        toast.info("Restored your in-progress referral draft.");
+      }
+    } catch {
+      // ignore corrupt draft
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Auto-save the draft (debounced) whenever the form changes.
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const t = setTimeout(() => {
+      try {
+        if (isDraftDirty(f)) {
+          window.localStorage.setItem(DRAFT_KEY, JSON.stringify(f));
+          setDraftSavedAt(new Date());
+        } else {
+          window.localStorage.removeItem(DRAFT_KEY);
+        }
+      } catch {
+        // storage full / disabled — ignore
+      }
+    }, 400);
+    return () => clearTimeout(t);
+  }, [f]);
+
+  // Warn before leaving with an unsaved draft on the page.
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const handler = (e: BeforeUnloadEvent) => {
+      if (isDraftDirty(f)) {
+        e.preventDefault();
+        e.returnValue = "";
+      }
+    };
+    window.addEventListener("beforeunload", handler);
+    return () => window.removeEventListener("beforeunload", handler);
+  }, [f]);
+
+  const discardDraft = () => {
+    if (typeof window !== "undefined") window.localStorage.removeItem(DRAFT_KEY);
+    setF(blankForm());
+    setDraftRestored(false);
+    setDraftSavedAt(null);
+    toast.success("Draft discarded.");
+  };
+
+  const set = <K extends keyof DraftForm>(k: K, v: DraftForm[K]) =>
+    setF((cur) => ({ ...cur, [k]: v }));
 
   // Prior-referral lookup by hospital number
   const findPrior = useServerFn(findReferralsByHospitalNumber);
@@ -150,6 +243,7 @@ function NewReferralPage() {
       ]) if (!payload[k]) payload[k] = null;
 
       const res = await create({ data: payload });
+      if (typeof window !== "undefined") window.localStorage.removeItem(DRAFT_KEY);
       toast.success("Referral saved");
       navigate({ to: "/referrals/$id", params: { id: (res as any).id } });
     } catch (err: any) {
@@ -161,13 +255,26 @@ function NewReferralPage() {
 
   return (
     <div className="p-4 sm:p-6 max-w-3xl mx-auto">
-      <h1 className="text-2xl font-semibold tracking-tight mb-6">New referral</h1>
+      <div className="flex items-end justify-between mb-6 gap-4 flex-wrap">
+        <h1 className="text-2xl font-semibold tracking-tight">New referral</h1>
+        {(draftRestored || draftSavedAt) && isDraftDirty(f) && (
+          <div className="flex items-center gap-2 text-xs text-muted-foreground">
+            <span>
+              {draftRestored ? "Draft restored" : "Draft auto-saved"}
+              {draftSavedAt ? ` · ${format(draftSavedAt, "HH:mm:ss")}` : ""}
+            </span>
+            <Button type="button" variant="ghost" size="sm" onClick={discardDraft}>
+              Discard draft
+            </Button>
+          </div>
+        )}
+      </div>
       <form onSubmit={submit} className="space-y-6">
         <Section title="Patient">
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <Field label="Age"><Input type="number" min="0" max="130" value={f.age} onChange={(e) => set("age", e.target.value)} /></Field>
             <Field label="Sex">
-              <Select value={f.sex} onValueChange={(v) => set("sex", v)}>
+              <Select value={f.sex} onValueChange={(v) => set("sex", v as DraftForm["sex"])}>
                 <SelectTrigger><SelectValue /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="male">Male</SelectItem>
@@ -253,7 +360,7 @@ function NewReferralPage() {
         <Section title="Outcome">
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <Field label="Status">
-              <Select value={f.status} onValueChange={(v) => set("status", v)}>
+              <Select value={f.status} onValueChange={(v) => set("status", v as DraftForm["status"])}>
                 <SelectTrigger><SelectValue /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="pending">Pending</SelectItem>
