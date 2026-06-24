@@ -243,6 +243,7 @@ function NewReferralPage() {
       ]) if (!payload[k]) payload[k] = null;
 
       const res = await create({ data: payload });
+      if (typeof window !== "undefined") window.localStorage.removeItem(DRAFT_KEY);
       toast.success("Referral saved");
       navigate({ to: "/referrals/$id", params: { id: (res as any).id } });
     } catch (err: any) {
