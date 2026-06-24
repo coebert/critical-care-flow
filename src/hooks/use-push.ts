@@ -45,13 +45,49 @@ export function usePush() {
     });
   }, []);
 
+  // IMPORTANT: must be called SYNCHRONOUSLY from a user gesture (click/tap).
+  // Safari and Firefox drop user activation across any prior `await`, so
+  // calling Notification.requestPermission() after a network round-trip
+  // silently no-ops without ever showing the browser prompt.
+  const requestPermission = useCallback((): Promise<NotificationPermission> => {
+    if (!isPushSupported()) {
+      return Promise.reject(
+        new Error("Push notifications are not supported on this device."),
+      );
+    }
+    const current = Notification.permission;
+    if (current !== "default") return Promise.resolve(current);
+    // Call synchronously — do NOT await anything before this line in callers.
+    let p: Promise<NotificationPermission>;
+    try {
+      // Safari historically only supported the callback form; modern Safari
+      // returns a Promise. Cover both by wrapping.
+      const maybe = Notification.requestPermission((result) => {
+        setPermission(result);
+      });
+      p = maybe instanceof Promise ? maybe : new Promise((resolve) => {
+        // Fallback: poll once on next tick (legacy callback path).
+        setTimeout(() => resolve(Notification.permission), 0);
+      });
+    } catch (e) {
+      return Promise.reject(e);
+    }
+    return p.then((perm) => {
+      setPermission(perm);
+      return perm;
+    });
+  }, []);
+
   const enable = useCallback(async () => {
     if (!isPushSupported()) {
       throw new Error("Push notifications are not supported on this device.");
     }
+    // If permission isn't yet granted, request it. Callers that need to
+    // preserve user-activation for Safari/Firefox should call
+    // requestPermission() synchronously themselves first.
     let perm = Notification.permission;
     if (perm === "default") {
-      perm = await Notification.requestPermission();
+      perm = await requestPermission();
     }
     setPermission(perm);
     if (perm !== "granted") {
@@ -78,7 +114,7 @@ export function usePush() {
       },
     });
     setSubscribed(true);
-  }, [subscribeFn]);
+  }, [subscribeFn, requestPermission]);
 
   const disable = useCallback(async () => {
     if (!isPushSupported()) return;
