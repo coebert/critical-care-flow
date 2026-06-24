@@ -6,27 +6,116 @@ import { Bell, X } from "lucide-react";
 
 const DISMISS_KEY = "push-permission-prompt-dismissed";
 
-function getBrowserInstructions(): string {
-  const ua = navigator.userAgent.toLowerCase();
-  if (ua.includes("chrome") && !ua.includes("edg")) {
-    return "Click the lock icon (or the three dots → Settings) next to the address bar, then set Notifications to Allow.";
+type Platform =
+  | "safari-ios-standalone"
+  | "safari-ios-browser"
+  | "safari-macos"
+  | "chrome"
+  | "firefox"
+  | "edge"
+  | "other";
+
+function detectPlatform(): Platform {
+  if (typeof navigator === "undefined") return "other";
+  const ua = navigator.userAgent;
+  const isIOS =
+    /iPad|iPhone|iPod/.test(ua) ||
+    (navigator.platform === "MacIntel" && (navigator as Navigator & { maxTouchPoints?: number }).maxTouchPoints! > 1);
+  const isSafari = /^((?!chrome|android|crios|fxios|edgios).)*safari/i.test(ua);
+  const standalone =
+    (typeof window !== "undefined" &&
+      window.matchMedia?.("(display-mode: standalone)").matches) ||
+    (navigator as Navigator & { standalone?: boolean }).standalone === true;
+
+  if (isIOS) return standalone ? "safari-ios-standalone" : "safari-ios-browser";
+  if (isSafari) return "safari-macos";
+  if (/edg\//i.test(ua)) return "edge";
+  if (/firefox/i.test(ua)) return "firefox";
+  if (/chrome|crios/i.test(ua)) return "chrome";
+  return "other";
+}
+
+function PlatformInstructions({ platform }: { platform: Platform }) {
+  if (platform === "safari-ios-browser") {
+    return (
+      <div className="space-y-2">
+        <p className="font-medium">
+          iOS Safari only delivers push notifications to apps installed on your Home Screen.
+        </p>
+        <ol className="list-decimal pl-5 space-y-1 text-sm">
+          <li>Tap the Share icon at the bottom of Safari.</li>
+          <li>Scroll and tap <strong>Add to Home Screen</strong>, then tap <strong>Add</strong>.</li>
+          <li>Open the new app icon from your Home Screen.</li>
+          <li>Tap <strong>Enable push notifications</strong> here and choose <strong>Allow</strong>.</li>
+        </ol>
+      </div>
+    );
   }
-  if (ua.includes("firefox")) {
-    return "Click the lock icon next to the address bar, then clear the blocked permission for Notifications and choose Allow.";
+  if (platform === "safari-ios-standalone") {
+    return (
+      <ol className="list-decimal pl-5 space-y-1 text-sm">
+        <li>Open the iOS <strong>Settings</strong> app.</li>
+        <li>Scroll down and tap <strong>Notifications</strong>.</li>
+        <li>Find this app in the list and tap it.</li>
+        <li>Turn on <strong>Allow Notifications</strong>.</li>
+        <li>Return here and tap <strong>Enable push notifications</strong>.</li>
+      </ol>
+    );
   }
-  if (ua.includes("safari")) {
-    return "Open Safari Preferences → Websites → Notifications, find this site, and set it to Allow.";
+  if (platform === "safari-macos") {
+    return (
+      <ol className="list-decimal pl-5 space-y-1 text-sm">
+        <li>In the menu bar, open <strong>Safari → Settings…</strong> (or press <kbd>⌘</kbd>+<kbd>,</kbd>).</li>
+        <li>Click the <strong>Websites</strong> tab.</li>
+        <li>Select <strong>Notifications</strong> in the left sidebar.</li>
+        <li>Find this site and set it to <strong>Allow</strong>.</li>
+        <li>Return here and tap <strong>Enable push notifications</strong>.</li>
+      </ol>
+    );
   }
-  if (ua.includes("edg")) {
-    return "Click the lock icon next to the address bar, then set Notifications to Allow.";
+  if (platform === "chrome") {
+    return (
+      <ol className="list-decimal pl-5 space-y-1 text-sm">
+        <li>Click the lock / tune icon to the left of the address bar.</li>
+        <li>Choose <strong>Site settings</strong>.</li>
+        <li>Set <strong>Notifications</strong> to <strong>Allow</strong>.</li>
+        <li>Reload the page and tap <strong>Enable push notifications</strong>.</li>
+      </ol>
+    );
   }
-  return "Open your browser settings, find the Notifications section for this site, and set it to Allow.";
+  if (platform === "firefox") {
+    return (
+      <ol className="list-decimal pl-5 space-y-1 text-sm">
+        <li>Click the lock icon next to the address bar.</li>
+        <li>Next to <strong>Send Notifications</strong>, click the <strong>×</strong> to clear the block.</li>
+        <li>Reload the page and tap <strong>Enable push notifications</strong>, then choose <strong>Allow</strong>.</li>
+      </ol>
+    );
+  }
+  if (platform === "edge") {
+    return (
+      <ol className="list-decimal pl-5 space-y-1 text-sm">
+        <li>Click the lock icon next to the address bar.</li>
+        <li>Choose <strong>Permissions for this site</strong>.</li>
+        <li>Set <strong>Notifications</strong> to <strong>Allow</strong>.</li>
+        <li>Reload the page and tap <strong>Enable push notifications</strong>.</li>
+      </ol>
+    );
+  }
+  return (
+    <p className="text-sm">
+      Open your browser's site settings for this page and set <strong>Notifications</strong> to{" "}
+      <strong>Allow</strong>, then reload.
+    </p>
+  );
 }
 
 export function PushPermissionPrompt({ visible }: { visible: boolean }) {
   const [dismissed, setDismissed] = useState(false);
   const [enabling, setEnabling] = useState(false);
+  const [showHelp, setShowHelp] = useState(false);
   const { permission, enable } = usePush();
+  const platform = detectPlatform();
 
   useEffect(() => {
     try {
@@ -45,8 +134,10 @@ export function PushPermissionPrompt({ visible }: { visible: boolean }) {
   const handleDismiss = () => {
     setDismissed(true);
     try {
-      // Snooze for 24 hours so the prompt can re-appear if the user changes their mind
-      localStorage.setItem(DISMISS_KEY, JSON.stringify({ until: Date.now() + 24 * 60 * 60 * 1000 }));
+      localStorage.setItem(
+        DISMISS_KEY,
+        JSON.stringify({ until: Date.now() + 24 * 60 * 60 * 1000 }),
+      );
     } catch (_) {}
   };
 
@@ -55,7 +146,7 @@ export function PushPermissionPrompt({ visible }: { visible: boolean }) {
     try {
       await enable();
     } catch (_) {
-      // Permission denied or unsupported — banner will stay visible with instructions
+      setShowHelp(true);
     } finally {
       setEnabling(false);
     }
@@ -64,24 +155,49 @@ export function PushPermissionPrompt({ visible }: { visible: boolean }) {
   if (!visible || dismissed) return null;
 
   const isDenied = permission === "denied";
+  const needsInstall = platform === "safari-ios-browser";
+  const showInstructions = isDenied || showHelp || needsInstall;
 
   return (
     <div className="px-4 py-2">
       <Alert variant={isDenied ? "destructive" : "default"} className="relative pr-10">
         <Bell className="w-4 h-4" />
-        <AlertTitle>{isDenied ? "Push notifications are blocked" : "Enable push notifications"}</AlertTitle>
-        <AlertDescription className="mt-1">
-          <p className="mb-2">
-            {isDenied
-              ? getBrowserInstructions()
-              : "Get real-time alerts for new referrals, status changes, and notes while you're on shift."}
-          </p>
-          <Button size="sm" onClick={handleEnable} disabled={enabling} className="mb-2">
-            {enabling ? "Requesting…" : "Enable push notifications"}
-          </Button>
-          <p className="text-xs opacity-80">
-            Once enabled, you'll receive real-time alerts for new referrals, status changes, and notes while you're on shift.
-          </p>
+        <AlertTitle>
+          {isDenied
+            ? "Push notifications are blocked"
+            : needsInstall
+              ? "Install this app to receive push notifications"
+              : "Enable push notifications"}
+        </AlertTitle>
+        <AlertDescription className="mt-1 space-y-3">
+          {!showInstructions && (
+            <p>
+              Get real-time alerts for new referrals, status changes, and notes while you're on
+              shift.
+            </p>
+          )}
+
+          {showInstructions && (
+            <div className="rounded-md border border-current/20 bg-background/40 p-3">
+              <p className="mb-2 text-sm font-medium">
+                Browsers don't allow apps to open settings for you — here's how to do it:
+              </p>
+              <PlatformInstructions platform={platform} />
+            </div>
+          )}
+
+          <div className="flex flex-wrap gap-2">
+            {!needsInstall && (
+              <Button size="sm" onClick={handleEnable} disabled={enabling}>
+                {enabling ? "Requesting…" : "Enable push notifications"}
+              </Button>
+            )}
+            {!showInstructions && (
+              <Button size="sm" variant="outline" onClick={() => setShowHelp(true)}>
+                Show setup steps
+              </Button>
+            )}
+          </div>
         </AlertDescription>
         <Button
           variant="ghost"
