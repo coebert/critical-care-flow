@@ -2,10 +2,11 @@ import { useState } from "react";
 import { useServerFn } from "@tanstack/react-start";
 import { Button } from "@/components/ui/button";
 import { sendTestPushNotification } from "@/lib/push.functions";
+import { recordTestPushSuccess } from "@/lib/last-test-push";
 import { BellRing } from "lucide-react";
 import { toast } from "sonner";
 
-export function TestPushButton() {
+export function TestPushButton({ onSuccess }: { onSuccess?: () => void } = {}) {
   const [sending, setSending] = useState(false);
   const sendTest = useServerFn(sendTestPushNotification);
 
@@ -14,6 +15,8 @@ export function TestPushButton() {
     try {
       const result = await sendTest();
       if (result.ok) {
+        recordTestPushSuccess();
+        onSuccess?.();
         toast.success(`Test push sent (${result.sent} device${result.sent === 1 ? "" : "s"}).`);
       } else {
         toast.warning(result.error ?? "Could not send test push.");
@@ -24,6 +27,7 @@ export function TestPushButton() {
       setSending(false);
     }
   };
+
 
   return (
     <Button
