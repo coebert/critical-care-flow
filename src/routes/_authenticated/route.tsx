@@ -42,13 +42,6 @@ function AuthedShell() {
     setMobileOpen(false);
   }, [pathname]);
 
-  useEffect(() => {
-    if (typeof window !== "undefined" && "Notification" in window) {
-      if (Notification.permission === "default") {
-        Notification.requestPermission().catch(() => {});
-      }
-    }
-  }, []);
 
   const handleSignOut = async () => {
     setSigningOut(true);
