@@ -8,7 +8,30 @@ import { Card } from "@/components/ui/card";
 import { Activity } from "lucide-react";
 import { toast } from "sonner";
 import { Toaster } from "@/components/ui/sonner";
+import { Checkbox } from "@/components/ui/checkbox";
 import { retrySupabaseCall, retryWithBackoff } from "@/lib/retry";
+
+// When "Keep me signed in" is unchecked, move the persisted Supabase auth token
+// from localStorage to sessionStorage so the session ends when the browser closes.
+function downgradeSessionToTabOnly() {
+  if (typeof window === "undefined") return;
+  try {
+    for (let i = 0; i < window.localStorage.length; i++) {
+      const key = window.localStorage.key(i);
+      if (!key) continue;
+      if (key.startsWith("sb-") && key.endsWith("-auth-token")) {
+        const value = window.localStorage.getItem(key);
+        if (value !== null) {
+          window.sessionStorage.setItem(key, value);
+          window.localStorage.removeItem(key);
+        }
+        break;
+      }
+    }
+  } catch {
+    // Storage access can fail in private modes — best-effort only.
+  }
+}
 
 export const Route = createFileRoute("/auth")({
   ssr: false,
