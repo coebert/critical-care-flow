@@ -139,6 +139,13 @@ export const updateReferral = createServerFn({ method: "POST" })
   )
   .handler(async ({ data, context }) => {
     const { supabase, userId } = context;
+    // Read prior status to decide whether to notify on status change.
+    const { data: prior } = await supabase
+      .from("referrals")
+      .select("status")
+      .eq("id", data.id)
+      .maybeSingle();
+
     const { data: row, error } = await supabase
       .from("referrals")
       .update({ ...data.patch, updated_by: userId } as any)
@@ -155,8 +162,17 @@ export const updateReferral = createServerFn({ method: "POST" })
       diff: data.patch as any,
     });
 
-    const summary = `${row.referring_specialty ?? "Referral"} — ${row.current_ward ?? "ward unknown"}`;
-    await fanOutNotifications(userId, row.id, "updated", `Updated: ${summary}`);
+    const statusChanged =
+      data.patch.status !== undefined && prior?.status !== row.status;
+    if (statusChanged) {
+      const summary = `${row.referring_specialty ?? "Referral"} — ${row.current_ward ?? "ward unknown"}`;
+      await fanOutNotifications(
+        userId,
+        row.id,
+        "updated",
+        `Status changed to ${row.status}: ${summary}`,
+      );
+    }
     return row;
   });
 
