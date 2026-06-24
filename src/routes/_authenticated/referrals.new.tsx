@@ -346,7 +346,7 @@ function NewReferralPage() {
         <Section title="Outcome">
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <Field label="Status">
-              <Select value={f.status} onValueChange={(v) => set("status", v)}>
+              <Select value={f.status} onValueChange={(v) => set("status", v as DraftForm["status"])}>
                 <SelectTrigger><SelectValue /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="pending">Pending</SelectItem>
