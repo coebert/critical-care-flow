@@ -45,19 +45,58 @@ async function fanOutNotifications(
   message: string,
 ) {
   const admin = await getAdmin();
-  const { data: others } = await admin
+
+  // Recipients: all admins + clinicians except the actor, who are currently at work.
+  const { data: roleRows } = await admin
     .from("user_roles")
-    .select("user_id")
+    .select("user_id, role")
+    .in("role", ["admin", "clinician"])
     .neq("user_id", userId);
-  if (!others?.length) return;
-  const unique = Array.from(new Set(others.map((r: any) => r.user_id as string)));
-  const rows = unique.map((uid) => ({
+  if (!roleRows?.length) return;
+
+  const eligibleIds = Array.from(new Set(roleRows.map((r: any) => r.user_id as string)));
+
+  const { data: atWork } = await admin
+    .from("profiles")
+    .select("id")
+    .in("id", eligibleIds)
+    .eq("is_at_work", true);
+
+  const recipientIds = (atWork ?? []).map((p: any) => p.id as string);
+  if (!recipientIds.length) return;
+
+  const rows = recipientIds.map((uid) => ({
     user_id: uid,
     referral_id: referralId,
     kind,
     message,
   }));
   await admin.from("notifications").insert(rows);
+
+  // Send web push to subscriptions belonging to those users.
+  try {
+    const { data: subs } = await admin
+      .from("push_subscriptions")
+      .select("endpoint, p256dh, auth")
+      .in("user_id", recipientIds);
+    if (subs?.length) {
+      const { sendPushToMany } = await import("./push.server");
+      const { goneEndpoints } = await sendPushToMany(subs as any, {
+        title: "SDH Critical Care",
+        body: message,
+        url: `/referrals/${referralId}`,
+        tag: `referral-${referralId}`,
+      });
+      if (goneEndpoints.length) {
+        await admin
+          .from("push_subscriptions")
+          .delete()
+          .in("endpoint", goneEndpoints);
+      }
+    }
+  } catch (e) {
+    console.error("[fanOutNotifications] push error", e);
+  }
 }
 
 
@@ -100,6 +139,13 @@ export const updateReferral = createServerFn({ method: "POST" })
   )
   .handler(async ({ data, context }) => {
     const { supabase, userId } = context;
+    // Read prior status to decide whether to notify on status change.
+    const { data: prior } = await supabase
+      .from("referrals")
+      .select("status")
+      .eq("id", data.id)
+      .maybeSingle();
+
     const { data: row, error } = await supabase
       .from("referrals")
       .update({ ...data.patch, updated_by: userId } as any)
@@ -116,8 +162,17 @@ export const updateReferral = createServerFn({ method: "POST" })
       diff: data.patch as any,
     });
 
-    const summary = `${row.referring_specialty ?? "Referral"} — ${row.current_ward ?? "ward unknown"}`;
-    await fanOutNotifications(userId, row.id, "updated", `Updated: ${summary}`);
+    const statusChanged =
+      data.patch.status !== undefined && prior?.status !== row.status;
+    if (statusChanged) {
+      const summary = `${row.referring_specialty ?? "Referral"} — ${row.current_ward ?? "ward unknown"}`;
+      await fanOutNotifications(
+        userId,
+        row.id,
+        "updated",
+        `Status changed to ${row.status}: ${summary}`,
+      );
+    }
     return row;
   });
 

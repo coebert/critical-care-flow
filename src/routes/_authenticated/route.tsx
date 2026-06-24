@@ -5,6 +5,7 @@ import { Activity, BarChart3, ListChecks, Shield, Bell, LogOut, Plus, Menu } fro
 import { Button } from "@/components/ui/button";
 import { useAuth, useRole } from "@/hooks/use-auth";
 import { NotificationBell } from "@/components/notification-bell";
+import { ShiftToggle } from "@/components/shift-toggle";
 import { Toaster } from "@/components/ui/sonner";
 import { Sheet, SheetContent, SheetTrigger, SheetTitle, SheetHeader } from "@/components/ui/sheet";
 import { VisuallyHidden } from "@radix-ui/react-visually-hidden";
@@ -118,7 +119,10 @@ function AuthedShell() {
               {sidebarContent}
             </SheetContent>
           </Sheet>
-          <NotificationBell />
+          <div className="ml-auto flex items-center gap-2">
+            <ShiftToggle />
+            <NotificationBell />
+          </div>
         </header>
         <main className="flex-1 overflow-auto">
           <Outlet />
