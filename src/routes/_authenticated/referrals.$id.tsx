@@ -100,6 +100,23 @@ function ReferralDetail() {
   const [priorDeclined, setPriorDeclined] = useState<Referral[]>([]);
   const outcomeRef = useRef<HTMLDivElement>(null);
 
+  // Auto-load the next page of audit history when the sentinel scrolls into view.
+  useEffect(() => {
+    if (!historyOpen || !historyHasMore) return;
+    const node = historySentinelRef.current;
+    if (!node || typeof IntersectionObserver === "undefined") return;
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries.some((e) => e.isIntersecting)) loadMoreHistory(false);
+      },
+      { rootMargin: "200px" },
+    );
+    observer.observe(node);
+    return () => observer.disconnect();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [historyOpen, historyHasMore, history.length]);
+
+
   useEffect(() => {
     if (highlight === "declined" && ref?.status === "declined" && outcomeRef.current) {
       outcomeRef.current.scrollIntoView({ behavior: "smooth", block: "center" });
