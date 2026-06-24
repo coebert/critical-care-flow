@@ -9,6 +9,7 @@ import { useAuth, useRole } from "@/hooks/use-auth";
 import { NotificationBell } from "@/components/notification-bell";
 import { ShiftToggle } from "@/components/shift-toggle";
 import { PushPermissionPrompt } from "@/components/push-permission-prompt";
+import { TestPushButton } from "@/components/test-push-button";
 import { Toaster } from "@/components/ui/sonner";
 import { Sheet, SheetContent, SheetTrigger, SheetTitle, SheetHeader } from "@/components/ui/sheet";
 import { VisuallyHidden } from "@radix-ui/react-visually-hidden";
@@ -34,7 +35,7 @@ function AuthedShell() {
   const [signingOut, setSigningOut] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
   const pathname = useRouterState({ select: (s) => s.location.pathname });
-  const { supported, permission } = usePush();
+  const { supported, permission, subscribed } = usePush();
   const { atWork } = useShiftStatus();
 
   // Close the mobile drawer on route change
@@ -119,6 +120,7 @@ function AuthedShell() {
           </Sheet>
           <div className="ml-auto flex items-center gap-2">
             <ShiftToggle />
+            {supported && permission === "granted" && subscribed && <TestPushButton />}
             <NotificationBell />
           </div>
         </header>
