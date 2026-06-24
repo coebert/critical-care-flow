@@ -114,7 +114,7 @@ export function PushPermissionPrompt({ visible }: { visible: boolean }) {
   const [dismissed, setDismissed] = useState(false);
   const [enabling, setEnabling] = useState(false);
   const [showHelp, setShowHelp] = useState(false);
-  const { permission, enable } = usePush();
+  const { permission, enable, requestPermission } = usePush();
   const platform = detectPlatform();
 
   useEffect(() => {
@@ -141,15 +141,33 @@ export function PushPermissionPrompt({ visible }: { visible: boolean }) {
     } catch (_) {}
   };
 
-  const handleEnable = async () => {
+  // Synchronous click handler — kicks off Notification.requestPermission()
+  // before any await so Safari and Firefox preserve user activation and
+  // actually show their permission prompt.
+  const handleEnable = () => {
     setEnabling(true);
+    let permPromise: Promise<NotificationPermission>;
     try {
-      await enable();
-    } catch (_) {
-      setShowHelp(true);
-    } finally {
+      permPromise = requestPermission();
+    } catch (e) {
       setEnabling(false);
+      setShowHelp(true);
+      return;
     }
+    permPromise
+      .then(async (perm) => {
+        if (perm !== "granted") {
+          setShowHelp(true);
+          return;
+        }
+        await enable();
+      })
+      .catch(() => {
+        setShowHelp(true);
+      })
+      .finally(() => {
+        setEnabling(false);
+      });
   };
 
   if (!visible || dismissed) return null;
