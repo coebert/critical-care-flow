@@ -35,7 +35,7 @@ function AuthedShell() {
   const [signingOut, setSigningOut] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
   const pathname = useRouterState({ select: (s) => s.location.pathname });
-  const { supported, permission } = usePush();
+  const { supported, permission, subscribed } = usePush();
   const { atWork } = useShiftStatus();
 
   // Close the mobile drawer on route change
