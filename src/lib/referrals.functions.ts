@@ -348,9 +348,9 @@ export type ReferralAuditEntry = {
   created_at: string;
   user_id: string | null;
   user_name: string;
-  changes: { field: string; from: unknown; to: unknown }[];
+  changes: { field: string; from: AuditValue; to: AuditValue }[];
   // For "create": initial snapshot of the audited fields.
-  snapshot?: Record<string, unknown>;
+  snapshot?: Record<string, AuditValue>;
 };
 
 export const getReferralHistory = createServerFn({ method: "POST" })
