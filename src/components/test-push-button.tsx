@@ -12,7 +12,7 @@ export function TestPushButton() {
   const handleClick = async () => {
     setSending(true);
     try {
-      const result = await sendTest({ data: {} });
+      const result = await sendTest();
       if (result.ok) {
         toast.success(`Test push sent (${result.sent} device${result.sent === 1 ? "" : "s"}).`);
       } else {
