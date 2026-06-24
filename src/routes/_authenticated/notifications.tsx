@@ -61,7 +61,7 @@ function formatWhen(d: Date | null): string {
 }
 
 function NotificationSettingsPage() {
-  const { supported, permission, subscribed, enable, disable } = usePush();
+  const { supported, permission, subscribed, enable, disable, requestPermission } = usePush();
   const [lastTestAt, setLastTestAt] = useState<Date | null>(null);
   const [busy, setBusy] = useState<"enable" | "disable" | null>(null);
 
@@ -72,16 +72,31 @@ function NotificationSettingsPage() {
 
   const refreshLastTest = () => setLastTestAt(readLastTestPushAt());
 
-  const handleEnable = async () => {
+  // Synchronous handler — fire Notification.requestPermission() before any
+  // await so Safari/Firefox keep user-activation and show their prompt.
+  const handleEnable = () => {
     setBusy("enable");
+    let permPromise: Promise<NotificationPermission>;
     try {
-      await enable();
-      toast.success("Push notifications enabled on this device.");
+      permPromise = requestPermission();
     } catch (e: any) {
       toast.error(e?.message ?? "Could not enable push notifications.");
-    } finally {
       setBusy(null);
+      return;
     }
+    permPromise
+      .then(async (perm) => {
+        if (perm !== "granted") {
+          toast.error("Notification permission was not granted.");
+          return;
+        }
+        await enable();
+        toast.success("Push notifications enabled on this device.");
+      })
+      .catch((e: any) => {
+        toast.error(e?.message ?? "Could not enable push notifications.");
+      })
+      .finally(() => setBusy(null));
   };
 
   const handleDisable = async () => {
