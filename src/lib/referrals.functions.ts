@@ -379,6 +379,7 @@ export const getReferralHistory = createServerFn({ method: "POST" })
       .select("id, user_id, action, diff, created_at")
       .eq("entity", "referral")
       .eq("entity_id", data.referral_id)
+      .in("action", ["create", "update", "delete"])
       .order("created_at", { ascending: true });
     if (error) throw safeError("referrals.getReferralHistory", error, "Failed to load referral history.");
 
