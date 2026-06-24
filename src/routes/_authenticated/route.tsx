@@ -76,6 +76,7 @@ function AuthedShell() {
         <NavItem to="/" icon={<ListChecks className="w-4 h-4" />}>Referrals</NavItem>
         <NavItem to="/referrals/new" icon={<Plus className="w-4 h-4" />}>New referral</NavItem>
         <NavItem to="/analytics" icon={<BarChart3 className="w-4 h-4" />}>Analytics</NavItem>
+        <NavItem to="/notifications" icon={<Bell className="w-4 h-4" />}>Notifications</NavItem>
         {isAdmin && (
           <NavItem to="/admin" icon={<Shield className="w-4 h-4" />}>Admin</NavItem>
         )}
