@@ -174,7 +174,8 @@ function NewReferralPage() {
     toast.success("Draft discarded.");
   };
 
-  const set = (k: keyof typeof f, v: any) => setF((cur) => ({ ...cur, [k]: v }));
+  const set = <K extends keyof DraftForm>(k: K, v: DraftForm[K]) =>
+    setF((cur) => ({ ...cur, [k]: v }));
 
   // Prior-referral lookup by hospital number
   const findPrior = useServerFn(findReferralsByHospitalNumber);
