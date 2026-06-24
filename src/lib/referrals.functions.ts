@@ -304,7 +304,18 @@ export const logReferralView = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((d: unknown) => z.object({ referral_id: z.string().uuid() }).parse(d))
   .handler(async ({ data, context }) => {
-    const { userId } = context;
+    const { supabase, userId } = context;
+    const { data: access } = await supabase.rpc("has_clinical_access", { _user_id: userId });
+    if (!access) throw new Error("Forbidden");
+
+    // Verify the referral exists and is readable by the caller via RLS.
+    const { data: ref } = await supabase
+      .from("referrals")
+      .select("id")
+      .eq("id", data.referral_id)
+      .maybeSingle();
+    if (!ref) throw new Error("Referral not found");
+
     await writeAudit({
       user_id: userId,
       action: "view",
@@ -313,6 +324,7 @@ export const logReferralView = createServerFn({ method: "POST" })
     });
     return { ok: true };
   });
+
 
 
 export const deleteReferral = createServerFn({ method: "POST" })
