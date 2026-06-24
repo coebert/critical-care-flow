@@ -255,7 +255,20 @@ function NewReferralPage() {
 
   return (
     <div className="p-4 sm:p-6 max-w-3xl mx-auto">
-      <h1 className="text-2xl font-semibold tracking-tight mb-6">New referral</h1>
+      <div className="flex items-end justify-between mb-6 gap-4 flex-wrap">
+        <h1 className="text-2xl font-semibold tracking-tight">New referral</h1>
+        {(draftRestored || draftSavedAt) && isDraftDirty(f) && (
+          <div className="flex items-center gap-2 text-xs text-muted-foreground">
+            <span>
+              {draftRestored ? "Draft restored" : "Draft auto-saved"}
+              {draftSavedAt ? ` · ${format(draftSavedAt, "HH:mm:ss")}` : ""}
+            </span>
+            <Button type="button" variant="ghost" size="sm" onClick={discardDraft}>
+              Discard draft
+            </Button>
+          </div>
+        )}
+      </div>
       <form onSubmit={submit} className="space-y-6">
         <Section title="Patient">
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
