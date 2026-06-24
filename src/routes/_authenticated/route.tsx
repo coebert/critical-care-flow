@@ -1,4 +1,5 @@
 import { createFileRoute, Outlet, redirect, Link, useRouter, useNavigate, useRouterState } from "@tanstack/react-router";
+import { usePush } from "@/hooks/use-push";
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Activity, BarChart3, ListChecks, Shield, LogOut, Plus, Menu } from "lucide-react";
