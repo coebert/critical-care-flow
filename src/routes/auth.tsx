@@ -30,6 +30,8 @@ export const Route = createFileRoute("/auth")({
 
 function AuthPage() {
   const navigate = useNavigate();
+  const { redirect: redirectTo } = Route.useSearch();
+  const postAuthTarget = redirectTo || "/";
   const [mode, setMode] = useState<"signin" | "forgot">("signin");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -42,7 +44,7 @@ function AuthPage() {
       return r.data;
     }))
       .then((data) => {
-        if (!cancelled && data.session) navigate({ to: "/", replace: true });
+        if (!cancelled && data.session) navigate({ to: postAuthTarget, replace: true });
       })
       .catch(() => {
         // Transient failure restoring session — let the user sign in manually.
@@ -50,7 +52,7 @@ function AuthPage() {
     return () => {
       cancelled = true;
     };
-  }, [navigate]);
+  }, [navigate, postAuthTarget]);
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
