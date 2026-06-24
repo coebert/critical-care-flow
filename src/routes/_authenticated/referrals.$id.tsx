@@ -66,6 +66,8 @@ function ReferralDetail() {
   const [noteBody, setNoteBody] = useState("");
   const [saving, setSaving] = useState(false);
   const [posting, setPosting] = useState(false);
+  const [priorDeclined, setPriorDeclined] = useState<Referral[]>([]);
+
 
   const upsertAuthorName = async (uid: string) => {
     if (authors[uid]) return;
