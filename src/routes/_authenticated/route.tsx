@@ -1,11 +1,12 @@
 import { createFileRoute, Outlet, redirect, Link, useRouter, useNavigate, useRouterState } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
-import { Activity, BarChart3, ListChecks, Shield, Bell, LogOut, Plus, Menu } from "lucide-react";
+import { Activity, BarChart3, ListChecks, Shield, LogOut, Plus, Menu } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useAuth, useRole } from "@/hooks/use-auth";
 import { NotificationBell } from "@/components/notification-bell";
 import { ShiftToggle } from "@/components/shift-toggle";
+import { PushPermissionPrompt } from "@/components/push-permission-prompt";
 import { Toaster } from "@/components/ui/sonner";
 import { Sheet, SheetContent, SheetTrigger, SheetTitle, SheetHeader } from "@/components/ui/sheet";
 import { VisuallyHidden } from "@radix-ui/react-visually-hidden";
