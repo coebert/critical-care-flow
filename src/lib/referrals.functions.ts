@@ -394,9 +394,16 @@ export const getReferralHistory = createServerFn({ method: "POST" })
       profs?.forEach((p: any) => { names[p.id] = p.full_name ?? "Clinician"; });
     }
 
+    // Normalize a JSONB value to a simple scalar suitable for display.
+    const norm = (v: unknown): AuditValue => {
+      if (v === null || v === undefined) return null;
+      if (typeof v === "string" || typeof v === "number" || typeof v === "boolean") return v;
+      return JSON.stringify(v);
+    };
+
     // Track previous values so each update entry can be shown as
     // before -> after for the fields that actually changed.
-    const prev: Record<string, unknown> = {};
+    const prev: Record<string, AuditValue> = {};
     const entries: ReferralAuditEntry[] = [];
 
     for (const r of rows ?? []) {
@@ -411,18 +418,19 @@ export const getReferralHistory = createServerFn({ method: "POST" })
       };
 
       if (r.action === "create") {
-        const snap: Record<string, unknown> = {};
+        const snap: Record<string, AuditValue> = {};
         for (const k of AUDITED_REFERRAL_FIELDS) {
-          snap[k] = diff[k] ?? null;
-          prev[k] = diff[k] ?? null;
+          const v = norm(diff[k]);
+          snap[k] = v;
+          prev[k] = v;
         }
         base.snapshot = snap;
       } else if (r.action === "update") {
         for (const k of AUDITED_REFERRAL_FIELDS) {
           if (k in diff) {
-            const to = diff[k] ?? null;
+            const to = norm(diff[k]);
             const from = prev[k] ?? null;
-            if (JSON.stringify(from) !== JSON.stringify(to)) {
+            if (from !== to) {
               base.changes.push({ field: k, from, to });
               prev[k] = to;
             }
@@ -431,7 +439,7 @@ export const getReferralHistory = createServerFn({ method: "POST" })
         // Skip update rows that didn't touch any audited field.
         if (base.changes.length === 0) continue;
       }
-      // "delete" and "view" actions are recorded as-is with no changes list.
+      // "delete" actions are recorded as-is with no changes list.
 
       entries.push(base);
     }
