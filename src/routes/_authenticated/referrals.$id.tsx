@@ -490,20 +490,27 @@ function ReferralDetail() {
             open={historyOpen}
             onOpenChange={(o) => {
               setHistoryOpen(o);
-              if (o && history.length === 0 && !historyLoading) loadHistory();
+              if (o && history.length === 0 && !historyLoading) loadMoreHistory(true);
             }}
           >
             <CollapsibleTrigger asChild>
               <button type="button" className="w-full flex items-center justify-between text-left">
                 <div>
                   <h2 className="font-semibold">Audit trail</h2>
-                  <p className="text-xs text-muted-foreground">When key fields were created or changed, and by whom.</p>
+                  <p className="text-xs text-muted-foreground">
+                    When key fields were created or changed, and by whom.
+                    {historyOpen && historyTotal > 0 && (
+                      <span> · Showing {history.length} of {historyTotal}</span>
+                    )}
+                  </p>
                 </div>
                 <ChevronDown className={cn("w-4 h-4 transition-transform", historyOpen && "rotate-180")} />
               </button>
             </CollapsibleTrigger>
             <CollapsibleContent className="mt-4">
-              {historyLoading && <p className="text-xs text-muted-foreground">Loading history…</p>}
+              {history.length === 0 && historyLoading && (
+                <p className="text-xs text-muted-foreground">Loading history…</p>
+              )}
               {!historyLoading && history.length === 0 && (
                 <p className="text-xs text-muted-foreground">No audit entries.</p>
               )}
@@ -512,6 +519,24 @@ function ReferralDetail() {
                   <AuditEntry key={h.id} entry={h} />
                 ))}
               </div>
+              {history.length > 0 && historyHasMore && (
+                <div ref={historySentinelRef} className="pt-3 flex justify-center">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => loadMoreHistory(false)}
+                    disabled={historyLoading}
+                  >
+                    {historyLoading ? "Loading…" : "Load more"}
+                  </Button>
+                </div>
+              )}
+              {history.length > 0 && !historyHasMore && (
+                <p className="pt-3 text-center text-xs text-muted-foreground">
+                  End of history.
+                </p>
+              )}
             </CollapsibleContent>
           </Collapsible>
         </Card>
