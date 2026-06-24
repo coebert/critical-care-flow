@@ -141,6 +141,7 @@ export const createReferral = createServerFn({ method: "POST" })
           row.id,
           "updated",
           `⚠️ Patient has a previously DECLINED critical care referral (${whenStr}).${reasonStr} — ${summary}`,
+          `/referrals/${prev.id}?highlight=declined`,
         );
       }
 
