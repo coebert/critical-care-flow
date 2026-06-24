@@ -133,5 +133,5 @@ export function usePush() {
     setSubscribed(false);
   }, [unsubscribeFn]);
 
-  return { permission, subscribed, enable, disable, supported: isPushSupported() };
+  return { permission, subscribed, enable, disable, requestPermission, supported: isPushSupported() };
 }
