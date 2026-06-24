@@ -127,6 +127,7 @@ function AuthPage() {
           await supabase.rpc("finalize_auth_attempt", { _attempt_id: attemptId, _success: true });
         }
         attemptId = null;
+        if (!rememberMe) downgradeSessionToTabOnly();
         toast.success("Signed in");
         navigate({ to: postAuthTarget, replace: true });
       } else {
