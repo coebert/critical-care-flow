@@ -12,6 +12,12 @@ import { retrySupabaseCall, retryWithBackoff } from "@/lib/retry";
 
 export const Route = createFileRoute("/auth")({
   ssr: false,
+  validateSearch: (search: Record<string, unknown>) => {
+    const raw = typeof search.redirect === "string" ? search.redirect : "";
+    // Only accept same-origin relative paths to prevent open redirects.
+    const safe = raw.startsWith("/") && !raw.startsWith("//") ? raw : "";
+    return { redirect: safe };
+  },
   head: () => ({
     meta: [
       { title: "Sign in — SDH Critical Care" },
