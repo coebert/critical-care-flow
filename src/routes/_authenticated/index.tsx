@@ -390,7 +390,7 @@ function ReferralsList() {
             {filtered.map((r) => (
               <tr
                 key={r.id}
-                className="border-t hover:bg-accent/40 cursor-pointer"
+                className={`border-t hover:bg-accent/40 cursor-pointer ${rowBgStyles[r.status] ?? ""}`}
                 onClick={() => navigate({ to: "/referrals/$id", params: { id: r.id } })}
                 tabIndex={0}
                 onKeyDown={(e) => {
