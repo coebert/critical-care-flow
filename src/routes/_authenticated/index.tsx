@@ -428,7 +428,7 @@ function ReferralsList() {
         {filtered.map((r) => (
           <div
             key={r.id}
-            className="border rounded-lg bg-card p-4 cursor-pointer active:scale-[0.99] transition-transform"
+            className={`border rounded-lg p-4 cursor-pointer active:scale-[0.99] transition-transform ${rowBgStyles[r.status] ?? "bg-card"}`}
             onClick={() => navigate({ to: "/referrals/$id", params: { id: r.id } })}
           >
             <div className="flex items-center justify-between mb-2">
