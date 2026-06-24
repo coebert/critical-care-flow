@@ -30,6 +30,12 @@ const statusStyles: Record<string, string> = {
   declined: "bg-destructive/10 text-destructive border-destructive/30",
 };
 
+const rowBgStyles: Record<string, string> = {
+  pending: "bg-warning/[0.08]",
+  admitted: "bg-success/[0.08]",
+  declined: "bg-destructive/[0.06]",
+};
+
 function ReferralsList() {
   const navigate = useNavigate();
   const [rows, setRows] = useState<Referral[]>([]);
