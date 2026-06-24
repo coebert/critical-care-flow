@@ -13,7 +13,7 @@ export function ShiftToggle() {
   const [atWork, setAtWork] = useState(false);
   const [busy, setBusy] = useState(false);
   const setFn = useServerFn(setShiftStatus);
-  const { supported, permission, subscribed, enable, disable } = usePush();
+  const { supported, permission, subscribed, enable, disable, requestPermission } = usePush();
 
   useEffect(() => {
     if (serverAtWork !== null) {
@@ -21,41 +21,57 @@ export function ShiftToggle() {
     }
   }, [serverAtWork]);
 
-  const handleToggle = async (next: boolean) => {
+  const handleToggle = (next: boolean) => {
     if (busy) return;
+    // Kick off the permission request SYNCHRONOUSLY (no awaits before it)
+    // so Safari and Firefox preserve the user-activation token and actually
+    // show their permission prompt.
+    let permPromise: Promise<NotificationPermission> | null = null;
+    if (next && supported && permission === "default") {
+      try {
+        permPromise = requestPermission();
+      } catch (_) {
+        permPromise = null;
+      }
+    }
+
     setBusy(true);
     const previous = atWork;
     setAtWork(next);
-    try {
-      await setFn({ data: { is_at_work: next } });
-      if (next) {
-        if (supported) {
-          try {
-            await enable();
-            toast.success("You're on shift — push notifications enabled.");
-          } catch (e: any) {
-            toast.warning(
-              e?.message ||
-                "On shift, but push notifications could not be enabled. You'll still see in-app alerts.",
-            );
+    (async () => {
+      try {
+        await setFn({ data: { is_at_work: next } });
+        if (next) {
+          if (supported) {
+            try {
+              // Wait for any in-flight permission prompt before subscribing.
+              if (permPromise) await permPromise;
+              await enable();
+              toast.success("You're on shift — push notifications enabled.");
+            } catch (e: any) {
+              toast.warning(
+                e?.message ||
+                  "On shift, but push notifications could not be enabled. You'll still see in-app alerts.",
+              );
+            }
+          } else {
+            toast.success("You're on shift. In-app alerts will appear here.");
           }
         } else {
-          toast.success("You're on shift. In-app alerts will appear here.");
+          if (subscribed) {
+            try {
+              await disable();
+            } catch (_) {}
+          }
+          toast.success("You're off shift — notifications paused.");
         }
-      } else {
-        if (subscribed) {
-          try {
-            await disable();
-          } catch (_) {}
-        }
-        toast.success("You're off shift — notifications paused.");
+      } catch (e: any) {
+        setAtWork(previous);
+        toast.error(e?.message || "Failed to update shift status.");
+      } finally {
+        setBusy(false);
       }
-    } catch (e: any) {
-      setAtWork(previous);
-      toast.error(e?.message || "Failed to update shift status.");
-    } finally {
-      setBusy(false);
-    }
+    })();
   };
 
   if (loading) {
