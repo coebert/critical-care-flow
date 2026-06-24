@@ -103,7 +103,7 @@ function AuthPage() {
         }
         attemptId = null;
         toast.success("Signed in");
-        navigate({ to: "/", replace: true });
+        navigate({ to: postAuthTarget, replace: true });
       } else {
         const { error } = await retrySupabaseCall(() =>
           supabase.auth.resetPasswordForEmail(email, {
