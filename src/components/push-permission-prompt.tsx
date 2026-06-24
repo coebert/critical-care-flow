@@ -114,7 +114,7 @@ export function PushPermissionPrompt({ visible }: { visible: boolean }) {
   const [dismissed, setDismissed] = useState(false);
   const [enabling, setEnabling] = useState(false);
   const [showHelp, setShowHelp] = useState(false);
-  const { permission, enable, requestPermission } = usePush();
+  const { permission, enable, requestPermission, permissionContextError, openPushPermissionSetupWindow } = usePush();
   const platform = detectPlatform();
 
   useEffect(() => {
@@ -145,6 +145,11 @@ export function PushPermissionPrompt({ visible }: { visible: boolean }) {
   // before any await so Safari and Firefox preserve user activation and
   // actually show their permission prompt.
   const handleEnable = () => {
+    if (permissionContextError) {
+      openPushPermissionSetupWindow();
+      setShowHelp(true);
+      return;
+    }
     setEnabling(true);
     let permPromise: Promise<NotificationPermission>;
     try {
@@ -174,7 +179,7 @@ export function PushPermissionPrompt({ visible }: { visible: boolean }) {
 
   const isDenied = permission === "denied";
   const needsInstall = platform === "safari-ios-browser";
-  const showInstructions = isDenied || showHelp || needsInstall;
+  const showInstructions = isDenied || showHelp || needsInstall || !!permissionContextError;
 
   return (
     <div className="px-4 py-2">
@@ -197,6 +202,9 @@ export function PushPermissionPrompt({ visible }: { visible: boolean }) {
 
           {showInstructions && (
             <div className="rounded-md border border-current/20 bg-background/40 p-3">
+              {permissionContextError && (
+                <p className="mb-2 text-sm font-medium">{permissionContextError}</p>
+              )}
               <p className="mb-2 text-sm font-medium">
                 Browsers don't allow apps to open settings for you — here's how to do it:
               </p>
@@ -207,7 +215,11 @@ export function PushPermissionPrompt({ visible }: { visible: boolean }) {
           <div className="flex flex-wrap gap-2">
             {!needsInstall && (
               <Button size="sm" onClick={handleEnable} disabled={enabling}>
-                {enabling ? "Requesting…" : "Enable push notifications"}
+                {permissionContextError
+                  ? "Open setup tab"
+                  : enabling
+                    ? "Requesting…"
+                    : "Enable push notifications"}
               </Button>
             )}
             {!showInstructions && (

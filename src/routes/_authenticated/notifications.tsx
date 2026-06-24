@@ -61,7 +61,7 @@ function formatWhen(d: Date | null): string {
 }
 
 function NotificationSettingsPage() {
-  const { supported, permission, subscribed, enable, disable, requestPermission } = usePush();
+  const { supported, permission, subscribed, enable, disable, requestPermission, permissionContextError, openPushPermissionSetupWindow } = usePush();
   const [lastTestAt, setLastTestAt] = useState<Date | null>(null);
   const [busy, setBusy] = useState<"enable" | "disable" | null>(null);
 
@@ -75,6 +75,11 @@ function NotificationSettingsPage() {
   // Synchronous handler — fire Notification.requestPermission() before any
   // await so Safari/Firefox keep user-activation and show their prompt.
   const handleEnable = () => {
+    if (permissionContextError) {
+      openPushPermissionSetupWindow();
+      toast.message("Opened a separate setup tab for browser notification permission.");
+      return;
+    }
     setBusy("enable");
     let permPromise: Promise<NotificationPermission>;
     try {
