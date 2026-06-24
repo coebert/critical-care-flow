@@ -3,7 +3,7 @@ import { usePush } from "@/hooks/use-push";
 import { useShiftStatus } from "@/hooks/use-shift-status";
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
-import { Activity, BarChart3, ListChecks, Shield, LogOut, Plus, Menu } from "lucide-react";
+import { Activity, BarChart3, ListChecks, Shield, LogOut, Plus, Menu, Bell } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useAuth, useRole } from "@/hooks/use-auth";
 import { NotificationBell } from "@/components/notification-bell";
@@ -76,6 +76,7 @@ function AuthedShell() {
         <NavItem to="/" icon={<ListChecks className="w-4 h-4" />}>Referrals</NavItem>
         <NavItem to="/referrals/new" icon={<Plus className="w-4 h-4" />}>New referral</NavItem>
         <NavItem to="/analytics" icon={<BarChart3 className="w-4 h-4" />}>Analytics</NavItem>
+        <NavItem to="/notifications" icon={<Bell className="w-4 h-4" />}>Notifications</NavItem>
         {isAdmin && (
           <NavItem to="/admin" icon={<Shield className="w-4 h-4" />}>Admin</NavItem>
         )}
