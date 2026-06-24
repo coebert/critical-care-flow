@@ -184,6 +184,23 @@ function AuthPage() {
               <Input id="password" type="password" required value={password} onChange={(e) => setPassword(e.target.value)} autoComplete="current-password" />
             </div>
           )}
+          {mode === "signin" && (
+            <div className="flex items-start gap-2">
+              <Checkbox
+                id="remember-me"
+                checked={rememberMe}
+                onCheckedChange={(v) => setRememberMe(v === true)}
+              />
+              <div className="grid gap-0.5 leading-none">
+                <Label htmlFor="remember-me" className="text-sm font-normal cursor-pointer">
+                  Keep me signed in
+                </Label>
+                <p className="text-[11px] text-muted-foreground">
+                  Stay logged in on this device. Uncheck on shared computers — your session will end when you close the browser.
+                </p>
+              </div>
+            </div>
+          )}
           <Button type="submit" className="w-full" disabled={loading}>
             {loading ? "Please wait…" : mode === "signin" ? "Sign in" : "Send reset link"}
           </Button>
