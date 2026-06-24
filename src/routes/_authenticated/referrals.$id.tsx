@@ -71,7 +71,18 @@ function ReferralDetail() {
   const [saving, setSaving] = useState(false);
   const [posting, setPosting] = useState(false);
   const [priorDeclined, setPriorDeclined] = useState<Referral[]>([]);
+  const outcomeRef = useRef<HTMLDivElement>(null);
 
+  useEffect(() => {
+    if (highlight === "declined" && ref?.status === "declined" && outcomeRef.current) {
+      outcomeRef.current.scrollIntoView({ behavior: "smooth", block: "center" });
+      outcomeRef.current.classList.add("ring-2", "ring-destructive", "ring-offset-2", "rounded-xl");
+      const timer = setTimeout(() => {
+        outcomeRef.current?.classList.remove("ring-2", "ring-destructive", "ring-offset-2", "rounded-xl");
+      }, 4000);
+      return () => clearTimeout(timer);
+    }
+  }, [highlight, ref?.status]);
 
   const upsertAuthorName = async (uid: string) => {
     if (authors[uid]) return;
