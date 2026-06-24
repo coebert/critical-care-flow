@@ -30,6 +30,12 @@ const statusStyles: Record<string, string> = {
   declined: "bg-destructive/10 text-destructive border-destructive/30",
 };
 
+const rowBgStyles: Record<string, string> = {
+  pending: "bg-warning/[0.08]",
+  admitted: "bg-success/[0.08]",
+  declined: "bg-destructive/[0.06]",
+};
+
 function ReferralsList() {
   const navigate = useNavigate();
   const [rows, setRows] = useState<Referral[]>([]);
@@ -384,7 +390,7 @@ function ReferralsList() {
             {filtered.map((r) => (
               <tr
                 key={r.id}
-                className="border-t hover:bg-accent/40 cursor-pointer"
+                className={`border-t hover:bg-accent/40 cursor-pointer ${rowBgStyles[r.status] ?? ""}`}
                 onClick={() => navigate({ to: "/referrals/$id", params: { id: r.id } })}
                 tabIndex={0}
                 onKeyDown={(e) => {
@@ -422,7 +428,7 @@ function ReferralsList() {
         {filtered.map((r) => (
           <div
             key={r.id}
-            className="border rounded-lg bg-card p-4 cursor-pointer active:scale-[0.99] transition-transform"
+            className={`border rounded-lg p-4 cursor-pointer active:scale-[0.99] transition-transform ${rowBgStyles[r.status] ?? "bg-card"}`}
             onClick={() => navigate({ to: "/referrals/$id", params: { id: r.id } })}
           >
             <div className="flex items-center justify-between mb-2">
