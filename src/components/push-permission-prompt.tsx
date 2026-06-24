@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { Alert, AlertTitle, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
+import { usePush } from "@/hooks/use-push";
 import { Bell, X } from "lucide-react";
 
 const DISMISS_KEY = "push-permission-prompt-dismissed";
@@ -24,6 +25,8 @@ function getBrowserInstructions(): string {
 
 export function PushPermissionPrompt({ visible }: { visible: boolean }) {
   const [dismissed, setDismissed] = useState(false);
+  const [enabling, setEnabling] = useState(false);
+  const { permission, enable } = usePush();
 
   useEffect(() => {
     try {
@@ -47,17 +50,37 @@ export function PushPermissionPrompt({ visible }: { visible: boolean }) {
     } catch (_) {}
   };
 
+  const handleEnable = async () => {
+    setEnabling(true);
+    try {
+      await enable();
+    } catch (_) {
+      // Permission denied or unsupported — banner will stay visible with instructions
+    } finally {
+      setEnabling(false);
+    }
+  };
+
   if (!visible || dismissed) return null;
+
+  const isDenied = permission === "denied";
 
   return (
     <div className="px-4 py-2">
-      <Alert variant="destructive" className="relative pr-10">
+      <Alert variant={isDenied ? "destructive" : "default"} className="relative pr-10">
         <Bell className="w-4 h-4" />
-        <AlertTitle>Push notifications are blocked</AlertTitle>
+        <AlertTitle>{isDenied ? "Push notifications are blocked" : "Enable push notifications"}</AlertTitle>
         <AlertDescription className="mt-1">
-          <p className="mb-2">{getBrowserInstructions()}</p>
+          <p className="mb-2">
+            {isDenied
+              ? getBrowserInstructions()
+              : "Get real-time alerts for new referrals, status changes, and notes while you're on shift."}
+          </p>
+          <Button size="sm" onClick={handleEnable} disabled={enabling} className="mb-2">
+            {enabling ? "Requesting…" : "Enable push notifications"}
+          </Button>
           <p className="text-xs opacity-80">
-            Once enabled, you’ll receive real-time alerts for new referrals, status changes, and notes while you’re on shift.
+            Once enabled, you'll receive real-time alerts for new referrals, status changes, and notes while you're on shift.
           </p>
         </AlertDescription>
         <Button

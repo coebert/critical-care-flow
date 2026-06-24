@@ -42,13 +42,6 @@ function AuthedShell() {
     setMobileOpen(false);
   }, [pathname]);
 
-  useEffect(() => {
-    if (typeof window !== "undefined" && "Notification" in window) {
-      if (Notification.permission === "default") {
-        Notification.requestPermission().catch(() => {});
-      }
-    }
-  }, []);
 
   const handleSignOut = async () => {
     setSigningOut(true);
@@ -129,7 +122,7 @@ function AuthedShell() {
             <NotificationBell />
           </div>
         </header>
-        <PushPermissionPrompt visible={supported && permission === "denied" && atWork === true} />
+        <PushPermissionPrompt visible={supported && permission !== "granted" && atWork === true} />
         <main className="flex-1 overflow-auto">
           <Outlet />
         </main>
