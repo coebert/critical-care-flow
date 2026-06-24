@@ -260,7 +260,7 @@ function NewReferralPage() {
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <Field label="Age"><Input type="number" min="0" max="130" value={f.age} onChange={(e) => set("age", e.target.value)} /></Field>
             <Field label="Sex">
-              <Select value={f.sex} onValueChange={(v) => set("sex", v)}>
+              <Select value={f.sex} onValueChange={(v) => set("sex", v as DraftForm["sex"])}>
                 <SelectTrigger><SelectValue /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="male">Male</SelectItem>
