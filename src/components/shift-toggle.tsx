@@ -13,7 +13,7 @@ export function ShiftToggle() {
   const [atWork, setAtWork] = useState(false);
   const [busy, setBusy] = useState(false);
   const setFn = useServerFn(setShiftStatus);
-  const { supported, permission, subscribed, enable, disable, requestPermission } = usePush();
+  const { supported, permission, subscribed, enable, disable, requestPermission, permissionContextError, openPushPermissionSetupWindow } = usePush();
 
   useEffect(() => {
     if (serverAtWork !== null) {
@@ -28,10 +28,14 @@ export function ShiftToggle() {
     // show their permission prompt.
     let permPromise: Promise<NotificationPermission> | null = null;
     if (next && supported && permission === "default") {
-      try {
-        permPromise = requestPermission();
-      } catch (_) {
-        permPromise = null;
+      if (permissionContextError) {
+        openPushPermissionSetupWindow();
+      } else {
+        try {
+          permPromise = requestPermission();
+        } catch (_) {
+          permPromise = null;
+        }
       }
     }
 
