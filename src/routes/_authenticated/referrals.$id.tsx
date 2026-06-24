@@ -1,5 +1,5 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useServerFn } from "@tanstack/react-start";
 import { supabase } from "@/integrations/supabase/client";
 import { addNote, deleteNote, deleteReferral, getNoteHistory, logReferralView, updateNote, updateReferral } from "@/lib/referrals.functions";
@@ -33,6 +33,9 @@ type Referral = Tables<"referrals">;
 type Note = Tables<"referral_notes">;
 
 export const Route = createFileRoute("/_authenticated/referrals/$id")({
+  validateSearch: (search: Record<string, unknown>) => ({
+    highlight: typeof search.highlight === "string" ? search.highlight : undefined,
+  }),
   head: () => ({ meta: [{ title: "Referral — SDH Critical Care" }, { name: "robots", content: "noindex" }] }),
   component: ReferralDetail,
 });
@@ -46,6 +49,7 @@ function toLocal(iso: string | null) {
 
 function ReferralDetail() {
   const { id } = Route.useParams();
+  const { highlight } = Route.useSearch();
   const navigate = useNavigate();
   const update = useServerFn(updateReferral);
   const addNoteFn = useServerFn(addNote);
@@ -67,7 +71,18 @@ function ReferralDetail() {
   const [saving, setSaving] = useState(false);
   const [posting, setPosting] = useState(false);
   const [priorDeclined, setPriorDeclined] = useState<Referral[]>([]);
+  const outcomeRef = useRef<HTMLDivElement>(null);
 
+  useEffect(() => {
+    if (highlight === "declined" && ref?.status === "declined" && outcomeRef.current) {
+      outcomeRef.current.scrollIntoView({ behavior: "smooth", block: "center" });
+      outcomeRef.current.classList.add("ring-2", "ring-destructive", "ring-offset-2", "rounded-xl");
+      const timer = setTimeout(() => {
+        outcomeRef.current?.classList.remove("ring-2", "ring-destructive", "ring-offset-2", "rounded-xl");
+      }, 4000);
+      return () => clearTimeout(timer);
+    }
+  }, [highlight, ref?.status]);
 
   const upsertAuthorName = async (uid: string) => {
     if (authors[uid]) return;
@@ -386,7 +401,7 @@ function ReferralDetail() {
           <p className="text-xs text-muted-foreground">Timestamps save automatically. Fields marked <span className="text-destructive">*</span> are required for the ICNARC dataset.</p>
         </Card>
 
-        <Card className="p-5 space-y-4">
+        <Card ref={outcomeRef} className="p-5 space-y-4">
           <h2 className="font-semibold">Outcome</h2>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <F label="Status">

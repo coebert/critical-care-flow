@@ -43,6 +43,7 @@ async function fanOutNotifications(
   referralId: string,
   kind: "new" | "updated",
   message: string,
+  url?: string,
 ) {
   const admin = await getAdmin();
   const { fanOutNotifications: runFanOut } = await import("./notification-fanout");
@@ -82,7 +83,7 @@ async function fanOutNotifications(
         await admin.from("push_subscriptions").delete().in("endpoint", endpoints);
       },
     },
-    { actorId: userId, referralId, kind, message },
+    { actorId: userId, referralId, kind, message, url },
   );
 }
 
@@ -140,6 +141,7 @@ export const createReferral = createServerFn({ method: "POST" })
           row.id,
           "updated",
           `⚠️ Patient has a previously DECLINED critical care referral (${whenStr}).${reasonStr} — ${summary}`,
+          `/referrals/${prev.id}?highlight=declined`,
         );
       }
 

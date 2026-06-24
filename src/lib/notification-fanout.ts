@@ -50,6 +50,7 @@ export interface FanOutArgs {
   referralId: string;
   kind: "new" | "updated";
   message: string;
+  url?: string;
 }
 
 export interface FanOutResult {
@@ -122,7 +123,7 @@ export async function fanOutNotifications(
       const { goneEndpoints } = await deps.sendPush(safeSubs, {
         title: "SDH Critical Care",
         body: args.message,
-        url: `/referrals/${args.referralId}`,
+        url: args.url ?? `/referrals/${args.referralId}`,
         tag: `referral-${args.referralId}`,
       });
       pushSent = safeSubs.length - goneEndpoints.length;
