@@ -33,6 +33,9 @@ type Referral = Tables<"referrals">;
 type Note = Tables<"referral_notes">;
 
 export const Route = createFileRoute("/_authenticated/referrals/$id")({
+  validateSearch: (search: Record<string, unknown>) => ({
+    highlight: typeof search.highlight === "string" ? search.highlight : undefined,
+  }),
   head: () => ({ meta: [{ title: "Referral — SDH Critical Care" }, { name: "robots", content: "noindex" }] }),
   component: ReferralDetail,
 });
