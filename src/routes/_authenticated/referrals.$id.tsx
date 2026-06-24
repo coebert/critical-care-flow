@@ -308,6 +308,54 @@ function ReferralDetail() {
           </div>
         </Card>
 
+        {priorDeclined.length > 0 && (
+          <Card className="p-5 space-y-3 border-destructive/40">
+            <div className="flex items-center gap-2">
+              <AlertCircle className="w-4 h-4 text-destructive" />
+              <h2 className="font-semibold text-destructive">
+                Previously declined critical care referral{priorDeclined.length > 1 ? "s" : ""} for this patient
+              </h2>
+            </div>
+            <p className="text-xs text-muted-foreground">
+              Same hospital number ({ref.hospital_number}). Full decline reasons shown below.
+            </p>
+            <div className="space-y-3">
+              {priorDeclined.map((p) => {
+                const when = p.decision_at ?? p.referral_received_at;
+                return (
+                  <div key={p.id} className="border rounded-md p-3 bg-destructive/5">
+                    <div className="flex items-center justify-between gap-2 mb-2 flex-wrap">
+                      <div className="text-sm font-medium">
+                        Declined {when ? format(new Date(when), "PPp") : "date unknown"}
+                        {p.referring_specialty ? ` · ${p.referring_specialty}` : ""}
+                      </div>
+                      <Link
+                        to="/referrals/$id"
+                        params={{ id: p.id }}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-xs underline text-muted-foreground hover:text-foreground"
+                      >
+                        Open full referral
+                      </Link>
+                    </div>
+                    <div className="text-xs uppercase tracking-wide text-muted-foreground mb-1">
+                      Reason for declining
+                    </div>
+                    {p.decline_reason ? (
+                      <p className="text-sm whitespace-pre-wrap">{p.decline_reason}</p>
+                    ) : (
+                      <p className="text-sm italic text-muted-foreground">No reason recorded.</p>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          </Card>
+        )}
+
+
+
         <Card className="p-5 space-y-4">
           <h2 className="font-semibold">Timeline (ICNARC)</h2>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
