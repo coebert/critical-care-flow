@@ -332,6 +332,126 @@ export const getNoteHistory = createServerFn({ method: "POST" })
   });
 
 
+// Fields shown in the referral audit trail. Other columns (created_by,
+// updated_by, deleted_*) are bookkeeping and excluded from the diff view.
+const AUDITED_REFERRAL_FIELDS = [
+  "age", "sex", "hospital_number", "current_ward", "current_bed",
+  "past_medical_history", "baseline_function", "dnacpr_respect",
+  "referring_specialty", "reason_for_referral",
+  "referral_received_at", "first_seen_at", "decision_at", "arrived_on_unit_at",
+  "status", "decline_reason",
+] as const;
+
+export type AuditValue = string | number | boolean | null;
+
+export type ReferralAuditEntry = {
+  id: string;
+  action: string;
+  created_at: string;
+  user_id: string | null;
+  user_name: string;
+  changes: { field: string; from: AuditValue; to: AuditValue }[];
+  // For "create": initial snapshot of the audited fields.
+  snapshot?: Record<string, AuditValue>;
+};
+
+export const getReferralHistory = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d: unknown) =>
+    z.object({ referral_id: z.string().uuid() }).parse(d),
+  )
+  .handler(async ({ data, context }): Promise<ReferralAuditEntry[]> => {
+    const { supabase, userId } = context;
+    const { data: access } = await supabase.rpc("has_clinical_access", { _user_id: userId });
+    if (!access) throw new Error("Forbidden");
+
+    // Confirm the caller can see the referral via RLS before exposing history.
+    const { data: ref } = await supabase
+      .from("referrals")
+      .select("id")
+      .eq("id", data.referral_id)
+      .maybeSingle();
+    if (!ref) throw new Error("Referral not found");
+
+    const admin = await getAdmin();
+    const { data: rows, error } = await admin
+      .from("audit_log")
+      .select("id, user_id, action, diff, created_at")
+      .eq("entity", "referral")
+      .eq("entity_id", data.referral_id)
+      .in("action", ["create", "update", "delete"])
+      .order("created_at", { ascending: true });
+    if (error) throw safeError("referrals.getReferralHistory", error, "Failed to load referral history.");
+
+    const userIds = Array.from(
+      new Set((rows ?? []).map((r: any) => r.user_id).filter(Boolean)),
+    );
+    const names: Record<string, string> = {};
+    if (userIds.length) {
+      const { data: profs } = await admin
+        .from("profiles")
+        .select("id, full_name")
+        .in("id", userIds as string[]);
+      profs?.forEach((p: any) => { names[p.id] = p.full_name ?? "Clinician"; });
+    }
+
+    // Normalize a JSONB value to a simple scalar suitable for display.
+    const norm = (v: unknown): AuditValue => {
+      if (v === null || v === undefined) return null;
+      if (typeof v === "string" || typeof v === "number" || typeof v === "boolean") return v;
+      return JSON.stringify(v);
+    };
+
+    // Track previous values so each update entry can be shown as
+    // before -> after for the fields that actually changed.
+    const prev: Record<string, AuditValue> = {};
+    const entries: ReferralAuditEntry[] = [];
+
+    for (const r of rows ?? []) {
+      const diff = (r.diff ?? {}) as Record<string, unknown>;
+      const base: ReferralAuditEntry = {
+        id: r.id,
+        action: r.action,
+        created_at: r.created_at,
+        user_id: r.user_id,
+        user_name: r.user_id ? (names[r.user_id] ?? "Clinician") : "System",
+        changes: [],
+      };
+
+      if (r.action === "create") {
+        const snap: Record<string, AuditValue> = {};
+        for (const k of AUDITED_REFERRAL_FIELDS) {
+          const v = norm(diff[k]);
+          snap[k] = v;
+          prev[k] = v;
+        }
+        base.snapshot = snap;
+      } else if (r.action === "update") {
+        for (const k of AUDITED_REFERRAL_FIELDS) {
+          if (k in diff) {
+            const to = norm(diff[k]);
+            const from = prev[k] ?? null;
+            if (from !== to) {
+              base.changes.push({ field: k, from, to });
+              prev[k] = to;
+            }
+          }
+        }
+        // Skip update rows that didn't touch any audited field.
+        if (base.changes.length === 0) continue;
+      }
+      // "delete" actions are recorded as-is with no changes list.
+
+      entries.push(base);
+    }
+
+    // Show newest first in the UI.
+    return entries.reverse();
+  });
+
+
+
+
 export const logReferralView = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((d: unknown) => z.object({ referral_id: z.string().uuid() }).parse(d))
