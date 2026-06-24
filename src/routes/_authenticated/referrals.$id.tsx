@@ -401,7 +401,7 @@ function ReferralDetail() {
           <p className="text-xs text-muted-foreground">Timestamps save automatically. Fields marked <span className="text-destructive">*</span> are required for the ICNARC dataset.</p>
         </Card>
 
-        <Card className="p-5 space-y-4">
+        <Card ref={outcomeRef} className="p-5 space-y-4">
           <h2 className="font-semibold">Outcome</h2>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <F label="Status">
