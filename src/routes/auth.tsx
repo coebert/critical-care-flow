@@ -12,6 +12,12 @@ import { retrySupabaseCall, retryWithBackoff } from "@/lib/retry";
 
 export const Route = createFileRoute("/auth")({
   ssr: false,
+  validateSearch: (search: Record<string, unknown>) => {
+    const raw = typeof search.redirect === "string" ? search.redirect : "";
+    // Only accept same-origin relative paths to prevent open redirects.
+    const safe = raw.startsWith("/") && !raw.startsWith("//") ? raw : "";
+    return { redirect: safe };
+  },
   head: () => ({
     meta: [
       { title: "Sign in — SDH Critical Care" },
@@ -24,6 +30,8 @@ export const Route = createFileRoute("/auth")({
 
 function AuthPage() {
   const navigate = useNavigate();
+  const { redirect: redirectTo } = Route.useSearch();
+  const postAuthTarget = redirectTo || "/";
   const [mode, setMode] = useState<"signin" | "forgot">("signin");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -36,7 +44,7 @@ function AuthPage() {
       return r.data;
     }))
       .then((data) => {
-        if (!cancelled && data.session) navigate({ to: "/", replace: true });
+        if (!cancelled && data.session) navigate({ to: postAuthTarget, replace: true });
       })
       .catch(() => {
         // Transient failure restoring session — let the user sign in manually.
@@ -44,7 +52,7 @@ function AuthPage() {
     return () => {
       cancelled = true;
     };
-  }, [navigate]);
+  }, [navigate, postAuthTarget]);
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -95,7 +103,7 @@ function AuthPage() {
         }
         attemptId = null;
         toast.success("Signed in");
-        navigate({ to: "/", replace: true });
+        navigate({ to: postAuthTarget, replace: true });
       } else {
         const { error } = await retrySupabaseCall(() =>
           supabase.auth.resetPasswordForEmail(email, {
