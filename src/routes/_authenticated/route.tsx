@@ -42,6 +42,15 @@ function AuthedShell() {
   const navigate = useNavigate();
   const [signingOut, setSigningOut] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
+  const [desktopCollapsed, setDesktopCollapsed] = useState<boolean>(() => {
+    if (typeof window === "undefined") return false;
+    return window.localStorage.getItem("sidebar:collapsed") === "1";
+  });
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      window.localStorage.setItem("sidebar:collapsed", desktopCollapsed ? "1" : "0");
+    }
+  }, [desktopCollapsed]);
   const pathname = useRouterState({ select: (s) => s.location.pathname });
   const { supported, permission, subscribed } = usePush();
   const { atWork } = useShiftStatus();
