@@ -178,15 +178,17 @@ function AuthedShell() {
   );
 }
 
-function NavItem({ to, icon, children }: { to: string; icon: React.ReactNode; children: React.ReactNode }) {
+function NavItem({ to, icon, children, collapsed }: { to: string; icon: React.ReactNode; children: React.ReactNode; collapsed?: boolean }) {
   return (
     <Link
       to={to}
-      className="flex items-center gap-2 px-3 py-2 rounded-md hover:bg-sidebar-accent text-sidebar-foreground [&.active]:bg-sidebar-accent [&.active]:text-sidebar-accent-foreground [&.active]:font-medium"
+      className={`flex items-center gap-2 ${collapsed ? "justify-center px-2" : "px-3"} py-2 rounded-md hover:bg-sidebar-accent text-sidebar-foreground [&.active]:bg-sidebar-accent [&.active]:text-sidebar-accent-foreground [&.active]:font-medium`}
       activeOptions={{ exact: to === "/" }}
+      title={collapsed ? String(children) : undefined}
+      aria-label={collapsed ? String(children) : undefined}
     >
       {icon}
-      {children}
+      {!collapsed && <span className="truncate">{children}</span>}
     </Link>
   );
 }
