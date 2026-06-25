@@ -478,9 +478,9 @@ function ReferralsList() {
             {loading && (
               <tr><td colSpan={8} className="px-3 py-8 text-center text-muted-foreground">Loading…</td></tr>
             )}
-            {!loading && filtered.length === 0 && (
+            {!loading && displayed.length === 0 && (
               <tr><td colSpan={8} className="px-3 py-8 text-center text-muted-foreground">No referrals match.</td></tr>)}
-            {filtered.map((r) => (
+            {displayed.map((r) => (
               <tr
                 key={r.id}
                 className={`border-t hover:bg-accent/40 cursor-pointer ${rowBgStyles[r.status] ?? ""}`}
@@ -516,10 +516,10 @@ function ReferralsList() {
         {loading && (
           <div className="text-center text-muted-foreground py-8">Loading…</div>
         )}
-        {!loading && filtered.length === 0 && (
+        {!loading && displayed.length === 0 && (
           <div className="text-center text-muted-foreground py-8">No referrals match.</div>
         )}
-        {filtered.map((r) => (
+        {displayed.map((r) => (
           <div
             key={r.id}
             className={`border rounded-lg p-4 cursor-pointer active:scale-[0.99] transition-transform ${rowBgStyles[r.status] ?? "bg-card"}`}
