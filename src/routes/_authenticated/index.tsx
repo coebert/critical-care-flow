@@ -229,6 +229,23 @@ function ReferralsList() {
     });
   }, [rows, q, hospSearch, statusFilter, locFilter, dateFilter]);
 
+  const displayed = useMemo(() => {
+    if (timerSort === "none") return filtered;
+    const now = Date.now();
+    const dir = timerSort === "desc" ? -1 : 1;
+    return [...filtered].sort((a, b) => {
+      const ea = getTimerElapsedMs(a, now);
+      const eb = getTimerElapsedMs(b, now);
+      // Rows without an active timer always sort to the bottom.
+      if (ea === null && eb === null) return 0;
+      if (ea === null) return 1;
+      if (eb === null) return -1;
+      return (ea - eb) * dir;
+    });
+    // sortTick triggers re-sort as time advances
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [filtered, timerSort, sortTick]);
+
   return (
     <div className="p-4 sm:p-6 max-w-7xl mx-auto">
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-6">
