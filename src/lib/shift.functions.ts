@@ -46,25 +46,18 @@ export const subscribePush = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((d: unknown) => subSchema.parse(d))
   .handler(async ({ data, context }) => {
-    const { userId } = context;
-    // Push endpoints are globally unique. If the same browser previously
-    // registered under a different user, take ownership for the current user.
-    // Caller is authenticated; we use the admin client to bypass the
-    // per-user RLS USING check on the prior owner's row.
-    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-    const { error } = await supabaseAdmin
-      .from("push_subscriptions")
-      .upsert(
-        {
-          user_id: userId,
-          endpoint: data.endpoint,
-          p256dh: data.p256dh,
-          auth: data.auth,
-          user_agent: data.user_agent ?? null,
-          last_used_at: new Date().toISOString(),
-        } as any,
-        { onConflict: "endpoint" },
-      );
+    const { supabase } = context;
+    // Push endpoints are globally unique. Registration goes through a
+    // SECURITY DEFINER RPC so the database can atomically claim/refresh the
+    // endpoint for the authenticated user, even when the same browser endpoint
+    // was previously registered by another account. This avoids depending on
+    // service-role environment configuration from the app runtime.
+    const { error } = await supabase.rpc("claim_push_subscription", {
+      p_endpoint: data.endpoint,
+      p_p256dh: data.p256dh,
+      p_auth: data.auth,
+      p_user_agent: data.user_agent ?? null,
+    });
     if (error) throw safeError("push.subscribe", error, "Failed to register for push notifications.");
     return { ok: true };
   });
