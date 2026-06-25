@@ -275,3 +275,121 @@ describe("analytics date-range filter updates urgency surfaces together", () => 
   });
 });
 
+/**
+ * Integration test for sparse / empty datasets within a selected date range.
+ *
+ * Verifies the analytics page pipeline still produces consistent,
+ * canonically-ordered output for the urgency bar chart axis, counts list,
+ * and stacked-area legend when the data is empty, all-null, or only
+ * partially populated.
+ */
+describe("analytics urgency surfaces with empty / partial data", () => {
+  const now = new Date("2026-06-25T12:00:00Z");
+
+  function buildRange(days: number, rows: UrgencyRow[]) {
+    const to = endOfDay(now);
+    const from = startOfDay(subDays(to, days - 1));
+    const filtered = rows.filter((r) => {
+      const t = new Date(r.referral_received_at).getTime();
+      return t >= from.getTime() && t <= to.getTime();
+    });
+    const dayKeys = eachDayOfInterval({ start: from, end: to }).map((d) =>
+      format(d, "yyyy-MM-dd")
+    );
+    return {
+      filtered,
+      dayKeys,
+      byUrgency: aggregateUrgencyCounts(filtered),
+      perDayByUrgency: aggregateUrgencyPerDay(filtered, dayKeys),
+    };
+  }
+
+  it("empty dataset: counts/axis are empty but stacked-area still has one bucket per day with all legend keys", () => {
+    const r = buildRange(7, []);
+    expect(r.byUrgency).toEqual([]);
+    expect(r.perDayByUrgency.length).toBe(7);
+    for (const row of r.perDayByUrgency) {
+      const keys = Object.keys(row).filter((k) => k !== "date");
+      expect(keys.sort()).toEqual([...URGENCY_LEGEND_KEYS].sort());
+      for (const k of URGENCY_LEGEND_KEYS) expect(row[k]).toBe(0);
+    }
+  });
+
+  it("all-null dataset: only 'Not set' appears, and it is last in display order", () => {
+    const rows: UrgencyRow[] = Array.from({ length: 3 }, (_, i) => ({
+      admission_urgency: null,
+      referral_received_at: new Date(now.getTime() - i * 86_400_000).toISOString(),
+    }));
+    const r = buildRange(7, rows);
+    const axis = r.byUrgency.map((b) => b.urgency);
+    expect(axis).toEqual([URGENCY_NOT_SET_LABEL]);
+    // Stacked legend still carries every key, with totals only on Not set.
+    for (const k of URGENCY_LEGEND_KEYS) {
+      const total = r.perDayByUrgency.reduce(
+        (s, row) => s + ((row[k] as number) ?? 0),
+        0
+      );
+      if (k === URGENCY_NOT_SET_LABEL) expect(total).toBe(3);
+      else expect(total).toBe(0);
+    }
+  });
+
+  it("partial dataset: axis/counts preserve canonical order even when input order is scrambled", () => {
+    // Intentionally insert rows out of urgency order; aggregator must
+    // still emit them in URGENCY_DISPLAY_ORDER.
+    const rows: UrgencyRow[] = [
+      { admission_urgency: "not_admitting", referral_received_at: new Date(now.getTime() - 1 * 86_400_000).toISOString() },
+      { admission_urgency: "within_15_min", referral_received_at: new Date(now.getTime() - 2 * 86_400_000).toISOString() },
+      { admission_urgency: null,            referral_received_at: new Date(now.getTime() - 3 * 86_400_000).toISOString() },
+      { admission_urgency: "within_1_hour", referral_received_at: new Date(now.getTime() - 4 * 86_400_000).toISOString() },
+    ];
+    const r = buildRange(7, rows);
+    const axis = r.byUrgency.map((b) => b.urgency);
+    const counts = r.byUrgency.map((b) => b.urgency);
+
+    expect(axis).toEqual(counts);
+    // Order must be a subsequence of the canonical display order.
+    const indexed = axis.map((l) => URGENCY_DISPLAY_ORDER.indexOf(l));
+    expect(indexed).toEqual([...indexed].sort((a, b) => a - b));
+    expect(indexed.every((i) => i >= 0)).toBe(true);
+
+    // The exact expected subsequence:
+    expect(axis).toEqual([
+      "Within 15 minutes",
+      "Within 1 hour",
+      "N/A (decision not to admit)",
+      URGENCY_NOT_SET_LABEL,
+    ]);
+  });
+
+  it("dataset outside the selected range: filtered surfaces are empty, stacked legend still consistent", () => {
+    const rows: UrgencyRow[] = [
+      // 60 days ago — outside a 7-day window
+      { admission_urgency: "within_15_min", referral_received_at: new Date(now.getTime() - 60 * 86_400_000).toISOString() },
+      { admission_urgency: "within_30_min", referral_received_at: new Date(now.getTime() - 65 * 86_400_000).toISOString() },
+    ];
+    const r = buildRange(7, rows);
+    expect(r.filtered).toEqual([]);
+    expect(r.byUrgency).toEqual([]);
+    expect(r.perDayByUrgency.length).toBe(7);
+    for (const row of r.perDayByUrgency) {
+      for (const k of URGENCY_LEGEND_KEYS) expect(row[k]).toBe(0);
+    }
+  });
+
+  it("single-day range with one referral: surfaces still align and order is canonical", () => {
+    const rows: UrgencyRow[] = [
+      { admission_urgency: "within_30_min", referral_received_at: now.toISOString() },
+    ];
+    const r = buildRange(1, rows);
+    expect(r.perDayByUrgency.length).toBe(1);
+    expect(r.byUrgency).toEqual([{ urgency: "Within 30 minutes", count: 1 }]);
+    const row = r.perDayByUrgency[0];
+    expect(row["Within 30 minutes"]).toBe(1);
+    for (const k of URGENCY_LEGEND_KEYS) {
+      if (k !== "Within 30 minutes") expect(row[k]).toBe(0);
+    }
+  });
+});
+
+
