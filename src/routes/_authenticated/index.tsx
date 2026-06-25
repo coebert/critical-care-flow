@@ -421,8 +421,16 @@ function ReferralsList() {
               <th className="text-left px-3 py-2">Location</th>
               <th className="text-left px-3 py-2">Specialty</th>
               <th className="text-left px-3 py-2">Reason</th>
+              <th className="text-left px-3 py-2">Timer</th>
               <th className="text-left px-3 py-2">Status</th>
             </tr>
+          </thead>
+          <tbody>
+            {loading && (
+              <tr><td colSpan={8} className="px-3 py-8 text-center text-muted-foreground">Loading…</td></tr>
+            )}
+            {!loading && filtered.length === 0 && (
+              <tr><td colSpan={8} className="px-3 py-8 text-center text-muted-foreground">No referrals match.</td></tr>)}
           </thead>
           <tbody>
             {loading && (
