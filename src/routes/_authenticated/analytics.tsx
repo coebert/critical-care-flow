@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import type { Tables } from "@/integrations/supabase/types";
 import {
   ResponsiveContainer, LineChart, Line, XAxis, YAxis, Tooltip, CartesianGrid,
-  BarChart, Bar, PieChart, Pie, Cell, Legend,
+  BarChart, Bar, PieChart, Pie, Cell, Legend, AreaChart, Area,
 } from "recharts";
 import { format, subDays, startOfDay, differenceInMinutes } from "date-fns";
 import { ADMISSION_URGENCY_LABELS } from "@/lib/admission-urgency";
