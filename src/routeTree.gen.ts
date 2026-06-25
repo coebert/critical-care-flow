@@ -14,6 +14,7 @@ import { Route as ResetPasswordRouteImport } from './routes/reset-password'
 import { Route as AuthRouteImport } from './routes/auth'
 import { Route as AuthenticatedRouteRouteImport } from './routes/_authenticated/route'
 import { Route as AuthenticatedIndexRouteImport } from './routes/_authenticated/index'
+import { Route as AuthenticatedPushTestRouteImport } from './routes/_authenticated/push-test'
 import { Route as AuthenticatedNotificationsRouteImport } from './routes/_authenticated/notifications'
 import { Route as AuthenticatedAnalyticsRouteImport } from './routes/_authenticated/analytics'
 import { Route as AuthenticatedAdminRouteImport } from './routes/_authenticated/admin'
@@ -42,6 +43,11 @@ const AuthenticatedRouteRoute = AuthenticatedRouteRouteImport.update({
 const AuthenticatedIndexRoute = AuthenticatedIndexRouteImport.update({
   id: '/',
   path: '/',
+  getParentRoute: () => AuthenticatedRouteRoute,
+} as any)
+const AuthenticatedPushTestRoute = AuthenticatedPushTestRouteImport.update({
+  id: '/push-test',
+  path: '/push-test',
   getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
 const AuthenticatedNotificationsRoute =
@@ -81,6 +87,7 @@ export interface FileRoutesByFullPath {
   '/admin': typeof AuthenticatedAdminRoute
   '/analytics': typeof AuthenticatedAnalyticsRoute
   '/notifications': typeof AuthenticatedNotificationsRoute
+  '/push-test': typeof AuthenticatedPushTestRoute
   '/referrals/$id': typeof AuthenticatedReferralsIdRoute
   '/referrals/new': typeof AuthenticatedReferralsNewRoute
 }
@@ -91,6 +98,7 @@ export interface FileRoutesByTo {
   '/admin': typeof AuthenticatedAdminRoute
   '/analytics': typeof AuthenticatedAnalyticsRoute
   '/notifications': typeof AuthenticatedNotificationsRoute
+  '/push-test': typeof AuthenticatedPushTestRoute
   '/': typeof AuthenticatedIndexRoute
   '/referrals/$id': typeof AuthenticatedReferralsIdRoute
   '/referrals/new': typeof AuthenticatedReferralsNewRoute
@@ -104,6 +112,7 @@ export interface FileRoutesById {
   '/_authenticated/admin': typeof AuthenticatedAdminRoute
   '/_authenticated/analytics': typeof AuthenticatedAnalyticsRoute
   '/_authenticated/notifications': typeof AuthenticatedNotificationsRoute
+  '/_authenticated/push-test': typeof AuthenticatedPushTestRoute
   '/_authenticated/': typeof AuthenticatedIndexRoute
   '/_authenticated/referrals/$id': typeof AuthenticatedReferralsIdRoute
   '/_authenticated/referrals/new': typeof AuthenticatedReferralsNewRoute
@@ -118,6 +127,7 @@ export interface FileRouteTypes {
     | '/admin'
     | '/analytics'
     | '/notifications'
+    | '/push-test'
     | '/referrals/$id'
     | '/referrals/new'
   fileRoutesByTo: FileRoutesByTo
@@ -128,6 +138,7 @@ export interface FileRouteTypes {
     | '/admin'
     | '/analytics'
     | '/notifications'
+    | '/push-test'
     | '/'
     | '/referrals/$id'
     | '/referrals/new'
@@ -140,6 +151,7 @@ export interface FileRouteTypes {
     | '/_authenticated/admin'
     | '/_authenticated/analytics'
     | '/_authenticated/notifications'
+    | '/_authenticated/push-test'
     | '/_authenticated/'
     | '/_authenticated/referrals/$id'
     | '/_authenticated/referrals/new'
@@ -189,6 +201,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedIndexRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
+    '/_authenticated/push-test': {
+      id: '/_authenticated/push-test'
+      path: '/push-test'
+      fullPath: '/push-test'
+      preLoaderRoute: typeof AuthenticatedPushTestRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
     '/_authenticated/notifications': {
       id: '/_authenticated/notifications'
       path: '/notifications'
@@ -231,6 +250,7 @@ interface AuthenticatedRouteRouteChildren {
   AuthenticatedAdminRoute: typeof AuthenticatedAdminRoute
   AuthenticatedAnalyticsRoute: typeof AuthenticatedAnalyticsRoute
   AuthenticatedNotificationsRoute: typeof AuthenticatedNotificationsRoute
+  AuthenticatedPushTestRoute: typeof AuthenticatedPushTestRoute
   AuthenticatedIndexRoute: typeof AuthenticatedIndexRoute
   AuthenticatedReferralsIdRoute: typeof AuthenticatedReferralsIdRoute
   AuthenticatedReferralsNewRoute: typeof AuthenticatedReferralsNewRoute
@@ -240,6 +260,7 @@ const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedAdminRoute: AuthenticatedAdminRoute,
   AuthenticatedAnalyticsRoute: AuthenticatedAnalyticsRoute,
   AuthenticatedNotificationsRoute: AuthenticatedNotificationsRoute,
+  AuthenticatedPushTestRoute: AuthenticatedPushTestRoute,
   AuthenticatedIndexRoute: AuthenticatedIndexRoute,
   AuthenticatedReferralsIdRoute: AuthenticatedReferralsIdRoute,
   AuthenticatedReferralsNewRoute: AuthenticatedReferralsNewRoute,
