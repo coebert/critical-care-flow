@@ -17,7 +17,12 @@ import {
   format, subDays, startOfDay, endOfDay, differenceInMinutes,
   differenceInCalendarDays, eachDayOfInterval,
 } from "date-fns";
-import { urgencyLabel, URGENCY_DISPLAY_ORDER } from "@/lib/admission-urgency";
+import { URGENCY_DISPLAY_ORDER } from "@/lib/admission-urgency";
+import {
+  aggregateUrgencyCounts,
+  aggregateUrgencyPerDay,
+  URGENCY_LEGEND_KEYS,
+} from "@/lib/analytics-urgency";
 
 type Referral = Tables<"referrals">;
 
