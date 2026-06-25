@@ -27,3 +27,17 @@ export const ADMISSION_URGENCY_BADGE: Record<AdmissionUrgency, string> = {
   within_1_2_hours: "bg-yellow-100 text-yellow-900 border-yellow-300 dark:bg-yellow-950 dark:text-yellow-200",
   not_admitting: "bg-muted text-muted-foreground border-muted-foreground/20",
 };
+
+/** Label used in analytics for referrals with no admission_urgency set. */
+export const URGENCY_NOT_SET_LABEL = "Not set";
+
+/** Resolve a urgency value (possibly null) to its analytics display label. */
+export function urgencyLabel(value: AdmissionUrgency | null | undefined): string {
+  return value ? ADMISSION_URGENCY_LABELS[value] : URGENCY_NOT_SET_LABEL;
+}
+
+/** Stable display order for analytics counts/legend/axis. */
+export const URGENCY_DISPLAY_ORDER: readonly string[] = [
+  ...ADMISSION_URGENCY_OPTIONS.map((o) => o.label),
+  URGENCY_NOT_SET_LABEL,
+];
