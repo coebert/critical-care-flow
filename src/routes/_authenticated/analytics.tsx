@@ -120,13 +120,13 @@ function AnalyticsPage() {
   );
 
   const perDayByUrgency = useMemo(() => {
-    const buckets = new Map<string, Record<string, number>>();
-    for (let i = days - 1; i >= 0; i--) {
-      const key = format(subDays(new Date(), i), "yyyy-MM-dd");
-      const row: Record<string, number> = {};
-      urgencyKeys.forEach((k) => (row[k] = 0));
-      buckets.set(key, row);
-    }
+    const buckets = new Map<string, Record<string, number>>(
+      dayKeys.map((k) => {
+        const row: Record<string, number> = {};
+        urgencyKeys.forEach((u) => (row[u] = 0));
+        return [k, row];
+      })
+    );
     filtered.forEach((r) => {
       const k = format(startOfDay(new Date(r.referral_received_at)), "yyyy-MM-dd");
       const label = r.admission_urgency ? ADMISSION_URGENCY_LABELS[r.admission_urgency] : "Not set";
@@ -137,7 +137,7 @@ function AnalyticsPage() {
       date: format(new Date(date), "dd MMM"),
       ...vals,
     }));
-  }, [filtered, days, urgencyKeys]);
+  }, [filtered, dayKeys, urgencyKeys]);
 
   const meanMinutes = (sel: (r: Referral) => [string | null, string | null]) => {
     const ds = filtered
