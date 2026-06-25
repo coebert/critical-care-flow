@@ -13,6 +13,50 @@ import { toast } from "sonner";
 
 type Referral = Tables<"referrals">;
 
+function formatElapsed(ms: number): string {
+  if (ms < 0) ms = 0;
+  const totalMinutes = Math.floor(ms / 60000);
+  const hours = Math.floor(totalMinutes / 60);
+  const minutes = totalMinutes % 60;
+  if (hours === 0) return `${minutes}m`;
+  return `${hours}h ${minutes}m`;
+}
+
+function getTimerInfo(r: Referral, now: number): { label: string; value: string; tone: string } | null {
+  if (r.status === "pending") {
+    const start = new Date(r.referral_received_at).getTime();
+    return { label: "Waiting", value: formatElapsed(now - start), tone: "text-warning-foreground" };
+  }
+  if (r.status === "admitted") {
+    const startSrc = r.decision_at ?? r.updated_at;
+    if (!startSrc) return null;
+    const start = new Date(startSrc).getTime();
+    const end = r.arrived_on_unit_at ? new Date(r.arrived_on_unit_at).getTime() : now;
+    return {
+      label: r.arrived_on_unit_at ? "Time to admission" : "Time waiting for admission",
+      value: formatElapsed(end - start),
+      tone: "text-success",
+    };
+  }
+  return null;
+}
+
+function ReferralTimer({ r }: { r: Referral }) {
+  const [now, setNow] = useState(() => Date.now());
+  useEffect(() => {
+    const id = setInterval(() => setNow(Date.now()), 30000);
+    return () => clearInterval(id);
+  }, []);
+  const info = getTimerInfo(r, now);
+  if (!info) return <span className="text-xs text-muted-foreground">—</span>;
+  return (
+    <div className="flex flex-col leading-tight">
+      <span className={`font-mono text-sm tabular-nums ${info.tone}`}>{info.value}</span>
+      <span className="text-[10px] uppercase tracking-wide text-muted-foreground">{info.label}</span>
+    </div>
+  );
+}
+
 
 export const Route = createFileRoute("/_authenticated/")({
   head: () => ({
@@ -377,16 +421,16 @@ function ReferralsList() {
               <th className="text-left px-3 py-2">Location</th>
               <th className="text-left px-3 py-2">Specialty</th>
               <th className="text-left px-3 py-2">Reason</th>
+              <th className="text-left px-3 py-2">Timer</th>
               <th className="text-left px-3 py-2">Status</th>
             </tr>
           </thead>
           <tbody>
             {loading && (
-              <tr><td colSpan={7} className="px-3 py-8 text-center text-muted-foreground">Loading…</td></tr>
+              <tr><td colSpan={8} className="px-3 py-8 text-center text-muted-foreground">Loading…</td></tr>
             )}
             {!loading && filtered.length === 0 && (
-              <tr><td colSpan={7} className="px-3 py-8 text-center text-muted-foreground">No referrals match.</td></tr>
-            )}
+              <tr><td colSpan={8} className="px-3 py-8 text-center text-muted-foreground">No referrals match.</td></tr>)}
             {filtered.map((r) => (
               <tr
                 key={r.id}
@@ -408,6 +452,7 @@ function ReferralsList() {
                 <td className="px-3 py-2">{r.current_ward ?? "—"} {r.current_bed ? `· ${r.current_bed}` : ""}</td>
                 <td className="px-3 py-2">{r.referring_specialty ?? "—"}</td>
                 <td className="px-3 py-2 max-w-xs truncate">{r.reason_for_referral ?? "—"}</td>
+                <td className="px-3 py-2"><ReferralTimer r={r} /></td>
                 <td className="px-3 py-2">
                   <Badge variant="outline" className={`capitalize ${statusStyles[r.status]}`}>{r.status}</Badge>
                 </td>
@@ -435,9 +480,12 @@ function ReferralsList() {
               <span className="text-xs text-muted-foreground">
                 {format(new Date(r.referral_received_at), "dd MMM HH:mm")}
               </span>
-              <Badge variant="outline" className={`capitalize text-xs ${statusStyles[r.status]}`}>
-                {r.status}
-              </Badge>
+              <div className="flex items-center gap-2">
+                <ReferralTimer r={r} />
+                <Badge variant="outline" className={`capitalize text-xs ${statusStyles[r.status]}`}>
+                  {r.status}
+                </Badge>
+              </div>
             </div>
             <div className="grid grid-cols-2 gap-x-4 gap-y-1.5 text-sm">
               <div>
