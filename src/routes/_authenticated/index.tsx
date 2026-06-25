@@ -480,9 +480,12 @@ function ReferralsList() {
               <span className="text-xs text-muted-foreground">
                 {format(new Date(r.referral_received_at), "dd MMM HH:mm")}
               </span>
-              <Badge variant="outline" className={`capitalize text-xs ${statusStyles[r.status]}`}>
-                {r.status}
-              </Badge>
+              <div className="flex items-center gap-2">
+                <ReferralTimer r={r} />
+                <Badge variant="outline" className={`capitalize text-xs ${statusStyles[r.status]}`}>
+                  {r.status}
+                </Badge>
+              </div>
             </div>
             <div className="grid grid-cols-2 gap-x-4 gap-y-1.5 text-sm">
               <div>
