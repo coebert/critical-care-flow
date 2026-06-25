@@ -26,6 +26,7 @@ import { format, formatDistanceToNow } from "date-fns";
 import { toast } from "sonner";
 import { validateReferralTimings } from "@/lib/referral-validation";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { ADMISSION_URGENCY_OPTIONS, type AdmissionUrgency } from "@/lib/admission-urgency";
 import { cn } from "@/lib/utils";
 
 
@@ -229,6 +230,7 @@ function ReferralDetail() {
         dnacpr_respect: ref.dnacpr_respect, referring_specialty: ref.referring_specialty,
         reason_for_referral: ref.reason_for_referral, status: ref.status,
         decline_reason: ref.decline_reason,
+        admission_urgency: ref.admission_urgency ?? null,
         referral_received_at: ref.referral_received_at,
         first_seen_at: ref.first_seen_at, decision_at: ref.decision_at,
         arrived_on_unit_at: ref.arrived_on_unit_at,
