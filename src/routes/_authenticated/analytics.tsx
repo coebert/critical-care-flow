@@ -30,35 +30,46 @@ const COLORS = ["var(--chart-1)", "var(--chart-2)", "var(--chart-3)", "var(--cha
 
 function AnalyticsPage() {
   const [rows, setRows] = useState<Referral[]>([]);
-  const [days, setDays] = useState<number>(30);
+  const [range, setRange] = useState<DateRange>(() => ({
+    from: startOfDay(subDays(new Date(), 29)),
+    to: endOfDay(new Date()),
+  }));
+
+  const from = range.from ? startOfDay(range.from) : startOfDay(subDays(new Date(), 29));
+  const to = range.to ? endOfDay(range.to) : endOfDay(range.from ?? new Date());
+  const days = Math.max(1, differenceInCalendarDays(to, from) + 1);
 
   useEffect(() => {
     supabase
       .from("referrals")
       .select("*")
       .is("deleted_at", null)
-      .gte("referral_received_at", subDays(new Date(), Math.max(days, 365)).toISOString())
+      .gte("referral_received_at", from.toISOString())
+      .lte("referral_received_at", to.toISOString())
       .limit(5000)
       .then(({ data }) => setRows(data ?? []));
-
-  }, [days]);
+  }, [from.getTime(), to.getTime()]);
 
   const filtered = useMemo(() => {
-    const cutoff = subDays(new Date(), days);
-    return rows.filter((r) => new Date(r.referral_received_at) >= cutoff);
-  }, [rows, days]);
+    return rows.filter((r) => {
+      const t = new Date(r.referral_received_at).getTime();
+      return t >= from.getTime() && t <= to.getTime();
+    });
+  }, [rows, from, to]);
+
+  const dayKeys = useMemo(
+    () => eachDayOfInterval({ start: from, end: to }).map((d) => format(d, "yyyy-MM-dd")),
+    [from, to]
+  );
 
   const perDay = useMemo(() => {
-    const map = new Map<string, number>();
-    for (let i = days - 1; i >= 0; i--) {
-      map.set(format(subDays(new Date(), i), "yyyy-MM-dd"), 0);
-    }
+    const map = new Map<string, number>(dayKeys.map((k) => [k, 0]));
     filtered.forEach((r) => {
       const k = format(startOfDay(new Date(r.referral_received_at)), "yyyy-MM-dd");
-      map.set(k, (map.get(k) ?? 0) + 1);
+      if (map.has(k)) map.set(k, (map.get(k) ?? 0) + 1);
     });
     return Array.from(map.entries()).map(([date, count]) => ({ date: format(new Date(date), "dd MMM"), count }));
-  }, [filtered, days]);
+  }, [filtered, dayKeys]);
 
   const meanPer24h = filtered.length / Math.max(days, 1);
   const meanAge = (() => {
