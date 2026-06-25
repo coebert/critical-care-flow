@@ -9,6 +9,7 @@ import { Plus, Search, RotateCcw, Trash2, MapPin } from "lucide-react";
 import type { Tables } from "@/integrations/supabase/types";
 import { format, formatDistanceToNow } from "date-fns";
 import { listDeletedReferrals, restoreReferral, RESTORE_WINDOW_DAYS } from "@/lib/referrals.functions";
+import { ADMISSION_URGENCY_LABELS, ADMISSION_URGENCY_BADGE } from "@/lib/admission-urgency";
 import { toast } from "sonner";
 
 type Referral = Tables<"referrals">;
@@ -471,15 +472,16 @@ function ReferralsList() {
                   </span>
                 </button>
               </th>
+              <th className="text-left px-3 py-2">Urgency</th>
               <th className="text-left px-3 py-2">Status</th>
             </tr>
           </thead>
           <tbody>
             {loading && (
-              <tr><td colSpan={8} className="px-3 py-8 text-center text-muted-foreground">Loading…</td></tr>
+              <tr><td colSpan={9} className="px-3 py-8 text-center text-muted-foreground">Loading…</td></tr>
             )}
             {!loading && displayed.length === 0 && (
-              <tr><td colSpan={8} className="px-3 py-8 text-center text-muted-foreground">No referrals match.</td></tr>)}
+              <tr><td colSpan={9} className="px-3 py-8 text-center text-muted-foreground">No referrals match.</td></tr>)}
             {displayed.map((r) => (
               <tr
                 key={r.id}
@@ -502,6 +504,15 @@ function ReferralsList() {
                 <td className="px-3 py-2">{r.referring_specialty ?? "—"}</td>
                 <td className="px-3 py-2 max-w-xs truncate">{r.reason_for_referral ?? "—"}</td>
                 <td className="px-3 py-2"><ReferralTimer r={r} /></td>
+                <td className="px-3 py-2">
+                  {r.admission_urgency ? (
+                    <Badge variant="outline" className={`whitespace-nowrap ${ADMISSION_URGENCY_BADGE[r.admission_urgency]}`}>
+                      {ADMISSION_URGENCY_LABELS[r.admission_urgency]}
+                    </Badge>
+                  ) : (
+                    <span className="text-xs text-muted-foreground">—</span>
+                  )}
+                </td>
                 <td className="px-3 py-2">
                   <Badge variant="outline" className={`capitalize ${statusStyles[r.status]}`}>{r.status}</Badge>
                 </td>
@@ -529,7 +540,12 @@ function ReferralsList() {
               <span className="text-xs text-muted-foreground">
                 {format(new Date(r.referral_received_at), "dd MMM HH:mm")}
               </span>
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-2 flex-wrap justify-end">
+                {r.admission_urgency && (
+                  <Badge variant="outline" className={`text-xs whitespace-nowrap ${ADMISSION_URGENCY_BADGE[r.admission_urgency]}`}>
+                    {ADMISSION_URGENCY_LABELS[r.admission_urgency]}
+                  </Badge>
+                )}
                 <ReferralTimer r={r} />
                 <Badge variant="outline" className={`capitalize text-xs ${statusStyles[r.status]}`}>
                   {r.status}

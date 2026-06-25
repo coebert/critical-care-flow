@@ -209,6 +209,9 @@ export type Database = {
       }
       referrals: {
         Row: {
+          admission_urgency:
+            | Database["public"]["Enums"]["admission_urgency"]
+            | null
           age: number | null
           arrived_on_unit_at: string | null
           baseline_function: string | null
@@ -234,6 +237,9 @@ export type Database = {
           updated_by: string | null
         }
         Insert: {
+          admission_urgency?:
+            | Database["public"]["Enums"]["admission_urgency"]
+            | null
           age?: number | null
           arrived_on_unit_at?: string | null
           baseline_function?: string | null
@@ -259,6 +265,9 @@ export type Database = {
           updated_by?: string | null
         }
         Update: {
+          admission_urgency?:
+            | Database["public"]["Enums"]["admission_urgency"]
+            | null
           age?: number | null
           arrived_on_unit_at?: string | null
           baseline_function?: string | null
@@ -338,6 +347,11 @@ export type Database = {
       }
     }
     Enums: {
+      admission_urgency:
+        | "within_15_min"
+        | "within_30_min"
+        | "within_1_hour"
+        | "within_1_2_hours"
       app_role: "admin" | "clinician"
       audit_action: "view" | "create" | "update" | "delete"
       patient_sex: "male" | "female" | "other" | "unknown"
@@ -469,6 +483,12 @@ export type CompositeTypes<
 export const Constants = {
   public: {
     Enums: {
+      admission_urgency: [
+        "within_15_min",
+        "within_30_min",
+        "within_1_hour",
+        "within_1_2_hours",
+      ],
       app_role: ["admin", "clinician"],
       audit_action: ["view", "create", "update", "delete"],
       patient_sex: ["male", "female", "other", "unknown"],

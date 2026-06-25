@@ -26,6 +26,7 @@ import { format, formatDistanceToNow } from "date-fns";
 import { toast } from "sonner";
 import { validateReferralTimings } from "@/lib/referral-validation";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { ADMISSION_URGENCY_OPTIONS, type AdmissionUrgency } from "@/lib/admission-urgency";
 import { cn } from "@/lib/utils";
 
 
@@ -229,6 +230,7 @@ function ReferralDetail() {
         dnacpr_respect: ref.dnacpr_respect, referring_specialty: ref.referring_specialty,
         reason_for_referral: ref.reason_for_referral, status: ref.status,
         decline_reason: ref.decline_reason,
+        admission_urgency: ref.admission_urgency ?? null,
         referral_received_at: ref.referral_received_at,
         first_seen_at: ref.first_seen_at, decision_at: ref.decision_at,
         arrived_on_unit_at: ref.arrived_on_unit_at,
@@ -455,6 +457,22 @@ function ReferralDetail() {
                   <SelectItem value="pending">Pending</SelectItem>
                   <SelectItem value="admitted">Admitted</SelectItem>
                   <SelectItem value="declined">Declined</SelectItem>
+                </SelectContent>
+              </Select>
+            </F>
+            <F label="Admission urgency">
+              <Select
+                value={ref.admission_urgency ?? "none"}
+                onValueChange={(v) =>
+                  set("admission_urgency", v === "none" ? null : (v as AdmissionUrgency))
+                }
+              >
+                <SelectTrigger><SelectValue placeholder="Not specified" /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="none">Not specified</SelectItem>
+                  {ADMISSION_URGENCY_OPTIONS.map((o) => (
+                    <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
             </F>
@@ -840,6 +858,7 @@ const FIELD_LABELS: Record<string, string> = {
   arrived_on_unit_at: "Arrived on unit",
   status: "Status",
   decline_reason: "Reason for declining",
+  admission_urgency: "Admission urgency",
 };
 
 const DATE_FIELDS = new Set([
