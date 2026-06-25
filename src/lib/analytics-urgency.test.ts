@@ -126,3 +126,152 @@ describe("analytics urgency surfaces alignment", () => {
     }
   });
 });
+
+/**
+ * Integration test for the analytics page date-range filter.
+ *
+ * Simulates the user changing the date-range Popover/quick-preset on the
+ * analytics page by recomputing `filtered`, `dayKeys`, `byUrgency`, and
+ * `perDayByUrgency` exactly the way <AnalyticsPage> does. Asserts that the
+ * urgency legend, bar-chart axis labels, and counts list update together
+ * and stay aligned for each selected period.
+ */
+describe("analytics date-range filter updates urgency surfaces together", () => {
+  const now = new Date("2026-06-25T12:00:00Z");
+
+  // A 90-day pool spanning many urgencies, including a cluster of
+  // "within_15_min" only in the most recent 7 days and a "not_admitting"
+  // cluster only 60+ days ago. Lets us prove range changes shift which
+  // labels appear in axis/counts/legend together.
+  const pool: UrgencyRow[] = [
+    // Last 7 days — only within_15_min + nulls
+    ...Array.from({ length: 4 }, (_, i) => ({
+      admission_urgency: "within_15_min" as const,
+      referral_received_at: new Date(now.getTime() - i * 86_400_000).toISOString(),
+    })),
+    { admission_urgency: null, referral_received_at: new Date(now.getTime() - 2 * 86_400_000).toISOString() },
+
+    // 20-40 days ago — within_30_min + within_1_hour
+    { admission_urgency: "within_30_min", referral_received_at: new Date(now.getTime() - 15 * 86_400_000).toISOString() },
+    { admission_urgency: "within_30_min", referral_received_at: new Date(now.getTime() - 20 * 86_400_000).toISOString() },
+    { admission_urgency: "within_1_hour", referral_received_at: new Date(now.getTime() - 25 * 86_400_000).toISOString() },
+
+    // 60-80 days ago — not_admitting + within_1_2_hours
+    { admission_urgency: "not_admitting", referral_received_at: new Date(now.getTime() - 65 * 86_400_000).toISOString() },
+    { admission_urgency: "not_admitting", referral_received_at: new Date(now.getTime() - 70 * 86_400_000).toISOString() },
+    { admission_urgency: "within_1_2_hours", referral_received_at: new Date(now.getTime() - 75 * 86_400_000).toISOString() },
+  ];
+
+  /** Mirrors the page's pipeline for a chosen quick-preset (in days). */
+  function selectRange(days: number) {
+    const to = endOfDay(now);
+    const from = startOfDay(subDays(to, days - 1));
+    const filtered = pool.filter((r) => {
+      const t = new Date(r.referral_received_at).getTime();
+      return t >= from.getTime() && t <= to.getTime();
+    });
+    const dayKeys = eachDayOfInterval({ start: from, end: to }).map((d) =>
+      format(d, "yyyy-MM-dd")
+    );
+    return {
+      from,
+      to,
+      filtered,
+      dayKeys,
+      byUrgency: aggregateUrgencyCounts(filtered),
+      perDayByUrgency: aggregateUrgencyPerDay(filtered, dayKeys),
+    };
+  }
+
+  function legendKeysWithData(perDay: ReturnType<typeof selectRange>["perDayByUrgency"]) {
+    const totals: Record<string, number> = {};
+    for (const k of URGENCY_LEGEND_KEYS) totals[k] = 0;
+    for (const row of perDay) {
+      for (const k of URGENCY_LEGEND_KEYS) totals[k] += (row[k] as number) ?? 0;
+    }
+    // Mirror display order, only labels with non-zero stack totals.
+    return URGENCY_LEGEND_KEYS.filter((k) => totals[k] > 0);
+  }
+
+  it("7-day range only surfaces labels present in the last week", () => {
+    const r = selectRange(7);
+    const expected = ["Within 15 minutes", URGENCY_NOT_SET_LABEL];
+    const axis = r.byUrgency.map((b) => b.urgency);
+    const counts = r.byUrgency.map((b) => b.urgency);
+    const legend = legendKeysWithData(r.perDayByUrgency);
+
+    expect(axis).toEqual(expected);
+    expect(counts).toEqual(expected);
+    expect(legend).toEqual(expected);
+    expect(r.perDayByUrgency.length).toBe(7);
+  });
+
+  it("30-day range expands to include 30-min / 1-hour clusters across all surfaces", () => {
+    const r = selectRange(30);
+    const axis = r.byUrgency.map((b) => b.urgency);
+    const legend = legendKeysWithData(r.perDayByUrgency);
+
+    expect(axis).toEqual(legend);
+    expect(axis).toContain("Within 15 minutes");
+    expect(axis).toContain("Within 30 minutes");
+    expect(axis).toContain("Within 1 hour");
+    expect(axis).not.toContain("N/A (decision not to admit)");
+    expect(axis).not.toContain("Within 1–2 hours");
+    expect(r.perDayByUrgency.length).toBe(30);
+  });
+
+  it("90-day range adds the older not_admitting / 1–2h clusters to every surface", () => {
+    const r = selectRange(90);
+    const axis = r.byUrgency.map((b) => b.urgency);
+    const legend = legendKeysWithData(r.perDayByUrgency);
+
+    expect(axis).toEqual(legend);
+    for (const label of [
+      "Within 15 minutes",
+      "Within 30 minutes",
+      "Within 1 hour",
+      "Within 1–2 hours",
+      "N/A (decision not to admit)",
+      URGENCY_NOT_SET_LABEL,
+    ]) {
+      expect(axis).toContain(label);
+    }
+    expect(r.perDayByUrgency.length).toBe(90);
+  });
+
+  it("shrinking the range removes labels from axis, counts, AND legend together", () => {
+    const wide = selectRange(90);
+    const narrow = selectRange(7);
+
+    const wideLabels = new Set(wide.byUrgency.map((b) => b.urgency));
+    const narrowLabels = new Set(narrow.byUrgency.map((b) => b.urgency));
+    const dropped = [...wideLabels].filter((l) => !narrowLabels.has(l));
+
+    expect(dropped.length).toBeGreaterThan(0);
+    for (const label of dropped) {
+      // Bar/counts axis dropped it.
+      expect(narrow.byUrgency.find((b) => b.urgency === label)).toBeUndefined();
+      // Stacked area legend dropped it (no data in any bucket).
+      const stackTotal = narrow.perDayByUrgency.reduce(
+        (s, row) => s + ((row[label] as number) ?? 0),
+        0
+      );
+      expect(stackTotal).toBe(0);
+    }
+  });
+
+  it("counts and stacked-area totals stay equal to filtered row count for every range", () => {
+    for (const days of [7, 30, 90]) {
+      const r = selectRange(days);
+      const countsTotal = r.byUrgency.reduce((a, b) => a + b.count, 0);
+      const stackTotal = r.perDayByUrgency.reduce(
+        (sum, row) =>
+          sum + URGENCY_LEGEND_KEYS.reduce((s, k) => s + ((row[k] as number) ?? 0), 0),
+        0
+      );
+      expect(countsTotal).toBe(r.filtered.length);
+      expect(stackTotal).toBe(r.filtered.length);
+    }
+  });
+});
+
