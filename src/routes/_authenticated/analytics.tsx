@@ -3,12 +3,20 @@ import { useEffect, useMemo, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { Calendar } from "@/components/ui/calendar";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { CalendarIcon } from "lucide-react";
+import { cn } from "@/lib/utils";
+import type { DateRange } from "react-day-picker";
 import type { Tables } from "@/integrations/supabase/types";
 import {
   ResponsiveContainer, LineChart, Line, XAxis, YAxis, Tooltip, CartesianGrid,
   BarChart, Bar, PieChart, Pie, Cell, Legend, AreaChart, Area,
 } from "recharts";
-import { format, subDays, startOfDay, differenceInMinutes } from "date-fns";
+import {
+  format, subDays, startOfDay, endOfDay, differenceInMinutes,
+  differenceInCalendarDays, eachDayOfInterval,
+} from "date-fns";
 import { ADMISSION_URGENCY_LABELS } from "@/lib/admission-urgency";
 
 type Referral = Tables<"referrals">;
