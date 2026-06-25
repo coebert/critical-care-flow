@@ -13,6 +13,50 @@ import { toast } from "sonner";
 
 type Referral = Tables<"referrals">;
 
+function formatElapsed(ms: number): string {
+  if (ms < 0) ms = 0;
+  const totalMinutes = Math.floor(ms / 60000);
+  const hours = Math.floor(totalMinutes / 60);
+  const minutes = totalMinutes % 60;
+  if (hours === 0) return `${minutes}m`;
+  return `${hours}h ${minutes}m`;
+}
+
+function getTimerInfo(r: Referral, now: number): { label: string; value: string; tone: string } | null {
+  if (r.status === "pending") {
+    const start = new Date(r.referral_received_at).getTime();
+    return { label: "Waiting", value: formatElapsed(now - start), tone: "text-warning-foreground" };
+  }
+  if (r.status === "admitted") {
+    const startSrc = r.decision_at ?? r.updated_at;
+    if (!startSrc) return null;
+    const start = new Date(startSrc).getTime();
+    const end = r.arrived_on_unit_at ? new Date(r.arrived_on_unit_at).getTime() : now;
+    return {
+      label: r.arrived_on_unit_at ? "Time to admission" : "Time waiting for admission",
+      value: formatElapsed(end - start),
+      tone: "text-success",
+    };
+  }
+  return null;
+}
+
+function ReferralTimer({ r }: { r: Referral }) {
+  const [now, setNow] = useState(() => Date.now());
+  useEffect(() => {
+    const id = setInterval(() => setNow(Date.now()), 30000);
+    return () => clearInterval(id);
+  }, []);
+  const info = getTimerInfo(r, now);
+  if (!info) return <span className="text-xs text-muted-foreground">—</span>;
+  return (
+    <div className="flex flex-col leading-tight">
+      <span className={`font-mono text-sm tabular-nums ${info.tone}`}>{info.value}</span>
+      <span className="text-[10px] uppercase tracking-wide text-muted-foreground">{info.label}</span>
+    </div>
+  );
+}
+
 
 export const Route = createFileRoute("/_authenticated/")({
   head: () => ({
