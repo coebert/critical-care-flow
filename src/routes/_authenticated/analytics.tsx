@@ -199,6 +199,32 @@ function AnalyticsPage() {
           </div>
         </Card>
 
+        <Card className="p-5 md:col-span-2">
+          <h2 className="font-semibold mb-3">Referrals over time by urgency</h2>
+          <div className="h-72">
+            <ResponsiveContainer width="100%" height="100%">
+              <AreaChart data={perDayByUrgency}>
+                <CartesianGrid strokeDasharray="3 3" opacity={0.3} />
+                <XAxis dataKey="date" fontSize={11} />
+                <YAxis allowDecimals={false} fontSize={11} />
+                <Tooltip />
+                <Legend wrapperStyle={{ fontSize: 11 }} />
+                {urgencyKeys.map((k, i) => (
+                  <Area
+                    key={k}
+                    type="monotone"
+                    dataKey={k}
+                    stackId="1"
+                    stroke={COLORS[i % COLORS.length]}
+                    fill={COLORS[i % COLORS.length]}
+                    fillOpacity={0.7}
+                  />
+                ))}
+              </AreaChart>
+            </ResponsiveContainer>
+          </div>
+        </Card>
+
         <Card className="p-5">
           <h2 className="font-semibold mb-3">Urgency counts</h2>
           <ul className="space-y-2 text-sm">
