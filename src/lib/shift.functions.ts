@@ -56,7 +56,7 @@ export const subscribePush = createServerFn({ method: "POST" })
       p_endpoint: data.endpoint,
       p_p256dh: data.p256dh,
       p_auth: data.auth,
-      p_user_agent: data.user_agent ?? null,
+      p_user_agent: data.user_agent,
     });
     if (error) throw safeError("push.subscribe", error, "Failed to register for push notifications.");
     return { ok: true };
