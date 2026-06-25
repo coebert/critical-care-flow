@@ -37,8 +37,8 @@ export function TestPushButton({ onSuccess }: { onSuccess?: () => void } = {}) {
       disabled={sending}
       aria-label="Send test push notification"
     >
-      <BellRing className="w-4 h-4 mr-1" />
-      {sending ? "Sending…" : "Test push"}
+      <BellRing className="w-4 h-4 sm:mr-1" />
+      <span className="hidden sm:inline">{sending ? "Sending…" : "Test push"}</span>
     </Button>
   );
 }

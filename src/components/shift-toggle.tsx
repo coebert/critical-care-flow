@@ -90,13 +90,13 @@ export function ShiftToggle() {
   return (
     <div className="flex items-center gap-2 px-2 py-1 rounded-md border bg-card">
       {atWork ? (
-        <Briefcase className="w-4 h-4 text-primary" />
+        <Briefcase className="w-4 h-4 text-primary shrink-0" />
       ) : (
-        <BellOff className="w-4 h-4 text-muted-foreground" />
+        <BellOff className="w-4 h-4 text-muted-foreground shrink-0" />
       )}
       <Label
         htmlFor="shift-toggle"
-        className="text-xs font-medium cursor-pointer select-none"
+        className="hidden sm:inline text-xs font-medium cursor-pointer select-none"
       >
         {atWork ? "At work" : "Off shift"}
       </Label>
@@ -105,6 +105,7 @@ export function ShiftToggle() {
         checked={atWork}
         disabled={busy}
         onCheckedChange={handleToggle}
+        aria-label={atWork ? "At work — toggle off shift" : "Off shift — toggle at work"}
       />
       {atWork && supported && permission === "denied" && (
         <span
