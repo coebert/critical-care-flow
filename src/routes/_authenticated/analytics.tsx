@@ -196,8 +196,6 @@ function AnalyticsPage() {
                 className={cn("p-3 pointer-events-auto")}
               />
             </PopoverContent>
-          </Calendar>
-            </PopoverContent>
           </Popover>
         </div>
       </div>
