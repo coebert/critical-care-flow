@@ -9,7 +9,7 @@ import { Plus, Search, RotateCcw, Trash2, MapPin } from "lucide-react";
 import type { Tables } from "@/integrations/supabase/types";
 import { format, formatDistanceToNow } from "date-fns";
 import { listDeletedReferrals, restoreReferral, RESTORE_WINDOW_DAYS } from "@/lib/referrals.functions";
-import { ADMISSION_URGENCY_LABELS, ADMISSION_URGENCY_BADGE } from "@/lib/admission-urgency";
+import { ADMISSION_URGENCY_LABELS, ADMISSION_URGENCY_BADGE, ADMISSION_URGENCY_OPTIONS, type AdmissionUrgency } from "@/lib/admission-urgency";
 import { toast } from "sonner";
 
 type Referral = Tables<"referrals">;
@@ -99,6 +99,7 @@ function ReferralsList() {
   const [hospSearch, setHospSearch] = useState("");
   const [q, setQ] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("all");
+  const [urgencyFilter, setUrgencyFilter] = useState<"all" | AdmissionUrgency>("all");
   const [locFilter, setLocFilter] = useState<string>("all");
   const [dateFilter, setDateFilter] = useState<"all" | "today" | "yesterday" | "7d" | "30d">("all");
   const [showDeleted, setShowDeleted] = useState(false);
@@ -213,6 +214,7 @@ function ReferralsList() {
 
     return rows.filter((r) => {
       if (statusFilter !== "all" && r.status !== statusFilter) return false;
+      if (urgencyFilter !== "all" && r.admission_urgency !== urgencyFilter) return false;
       if (locFilter !== "all" && r.current_ward !== locFilter) return false;
       if (fromTs !== null) {
         const t = new Date(r.referral_received_at).getTime();
@@ -228,7 +230,7 @@ function ReferralsList() {
         .filter(Boolean)
         .some((v) => v!.toString().toLowerCase().includes(needle));
     });
-  }, [rows, q, hospSearch, statusFilter, locFilter, dateFilter]);
+  }, [rows, q, hospSearch, statusFilter, urgencyFilter, locFilter, dateFilter]);
 
   const displayed = useMemo(() => {
     if (timerSort === "none") return filtered;
@@ -417,6 +419,27 @@ function ReferralsList() {
             onClick={() => setDateFilter(k)}
           >
             {label}
+          </Button>
+        ))}
+      </div>
+
+      <div className="flex flex-wrap gap-2 mb-4 items-center">
+        <span className="text-xs uppercase text-muted-foreground mr-1">Urgency</span>
+        <Button
+          size="sm"
+          variant={urgencyFilter === "all" ? "default" : "outline"}
+          onClick={() => setUrgencyFilter("all")}
+        >
+          All
+        </Button>
+        {ADMISSION_URGENCY_OPTIONS.map((o) => (
+          <Button
+            key={o.value}
+            size="sm"
+            variant={urgencyFilter === o.value ? "default" : "outline"}
+            onClick={() => setUrgencyFilter(o.value)}
+          >
+            {o.label}
           </Button>
         ))}
       </div>
