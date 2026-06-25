@@ -22,6 +22,17 @@ function formatElapsed(ms: number): string {
   return `${hours}h ${minutes}m`;
 }
 
+function getTimerElapsedMs(r: Referral, now: number): number | null {
+  if (r.status === "pending") return now - new Date(r.referral_received_at).getTime();
+  if (r.status === "admitted") {
+    const startSrc = r.decision_at ?? r.updated_at;
+    if (!startSrc) return null;
+    const end = r.arrived_on_unit_at ? new Date(r.arrived_on_unit_at).getTime() : now;
+    return end - new Date(startSrc).getTime();
+  }
+  return null;
+}
+
 function getTimerInfo(r: Referral, now: number): { label: string; value: string; tone: string } | null {
   if (r.status === "pending") {
     const start = new Date(r.referral_received_at).getTime();
