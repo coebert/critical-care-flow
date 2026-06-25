@@ -68,35 +68,48 @@ function AuthedShell() {
     navigate({ to: "/auth", replace: true });
   };
 
-  const sidebarContent = (
+  const renderSidebar = (collapsed: boolean) => (
     <div className="flex h-full flex-col">
-      <div className="px-5 py-5 border-b">
-        <div className="flex items-center gap-2">
+      <div className={`${collapsed ? "px-2" : "px-5"} py-5 border-b`}>
+        <div className={`flex items-center gap-2 ${collapsed ? "justify-center" : ""}`}>
           <div className="w-9 h-9 rounded-md bg-primary flex items-center justify-center shrink-0">
             <Activity className="w-5 h-5 text-primary-foreground" />
           </div>
-          <div className="min-w-0">
-            <div className="font-semibold text-sm leading-tight truncate">SDH Critical Care</div>
-            <div className="text-xs text-muted-foreground">Referral tracker</div>
-          </div>
+          {!collapsed && (
+            <div className="min-w-0">
+              <div className="font-semibold text-sm leading-tight truncate">SDH Critical Care</div>
+              <div className="text-xs text-muted-foreground">Referral tracker</div>
+            </div>
+          )}
         </div>
       </div>
       <nav className="flex-1 px-2 py-3 space-y-1 text-sm">
-        <NavItem to="/" icon={<ListChecks className="w-4 h-4" />}>Referrals</NavItem>
-        <NavItem to="/referrals/new" icon={<Plus className="w-4 h-4" />}>New referral</NavItem>
-        <NavItem to="/analytics" icon={<BarChart3 className="w-4 h-4" />}>Analytics</NavItem>
-        <NavItem to="/notifications" icon={<Bell className="w-4 h-4" />}>Notifications</NavItem>
-        <NavItem to="/push-test" icon={<BellRing className="w-4 h-4" />}>Push test</NavItem>
+        <NavItem to="/" icon={<ListChecks className="w-4 h-4" />} collapsed={collapsed}>Referrals</NavItem>
+        <NavItem to="/referrals/new" icon={<Plus className="w-4 h-4" />} collapsed={collapsed}>New referral</NavItem>
+        <NavItem to="/analytics" icon={<BarChart3 className="w-4 h-4" />} collapsed={collapsed}>Analytics</NavItem>
+        <NavItem to="/notifications" icon={<Bell className="w-4 h-4" />} collapsed={collapsed}>Notifications</NavItem>
+        <NavItem to="/push-test" icon={<BellRing className="w-4 h-4" />} collapsed={collapsed}>Push test</NavItem>
         {isAdmin && (
-          <NavItem to="/admin" icon={<Shield className="w-4 h-4" />}>Admin</NavItem>
+          <NavItem to="/admin" icon={<Shield className="w-4 h-4" />} collapsed={collapsed}>Admin</NavItem>
         )}
       </nav>
       <div className="p-3 border-t text-xs space-y-2">
-        <div className="text-muted-foreground truncate" title={user?.email ?? ""}>
-          {user?.email}
-        </div>
-        <Button variant="ghost" size="sm" className="w-full justify-start" onClick={handleSignOut} disabled={signingOut}>
-          <LogOut className="w-4 h-4 mr-2" /> Sign out
+        {!collapsed && (
+          <div className="text-muted-foreground truncate" title={user?.email ?? ""}>
+            {user?.email}
+          </div>
+        )}
+        <Button
+          variant="ghost"
+          size="sm"
+          className={collapsed ? "w-full justify-center px-0" : "w-full justify-start"}
+          onClick={handleSignOut}
+          disabled={signingOut}
+          aria-label="Sign out"
+          title={collapsed ? "Sign out" : undefined}
+        >
+          <LogOut className={`w-4 h-4 ${collapsed ? "" : "mr-2"}`} />
+          {!collapsed && "Sign out"}
         </Button>
       </div>
     </div>
