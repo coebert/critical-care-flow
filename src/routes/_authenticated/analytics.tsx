@@ -9,6 +9,7 @@ import {
   BarChart, Bar, PieChart, Pie, Cell, Legend,
 } from "recharts";
 import { format, subDays, startOfDay, differenceInMinutes } from "date-fns";
+import { ADMISSION_URGENCY_LABELS } from "@/lib/admission-urgency";
 
 type Referral = Tables<"referrals">;
 
