@@ -456,7 +456,21 @@ function ReferralsList() {
               <th className="text-left px-3 py-2">Location</th>
               <th className="text-left px-3 py-2">Specialty</th>
               <th className="text-left px-3 py-2">Reason</th>
-              <th className="text-left px-3 py-2">Timer</th>
+              <th className="text-left px-3 py-2">
+                <button
+                  type="button"
+                  className="inline-flex items-center gap-1 uppercase hover:text-foreground"
+                  onClick={() =>
+                    setTimerSort((s) => (s === "none" ? "desc" : s === "desc" ? "asc" : "none"))
+                  }
+                  aria-label="Sort by timer"
+                >
+                  Timer
+                  <span className="text-[10px]">
+                    {timerSort === "desc" ? "↓" : timerSort === "asc" ? "↑" : "↕"}
+                  </span>
+                </button>
+              </th>
               <th className="text-left px-3 py-2">Status</th>
             </tr>
           </thead>
