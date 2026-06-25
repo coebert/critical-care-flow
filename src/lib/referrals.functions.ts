@@ -21,7 +21,7 @@ const refSchema = z.object({
   status: z.enum(["pending", "declined", "admitted"]).optional(),
   decline_reason: z.string().trim().max(2000).nullable().optional(),
   admission_urgency: z
-    .enum(["within_15_min", "within_30_min", "within_1_hour", "within_1_2_hours"])
+    .enum(["within_15_min", "within_30_min", "within_1_hour", "within_1_2_hours", "not_admitting"])
     .nullable()
     .optional(),
 });

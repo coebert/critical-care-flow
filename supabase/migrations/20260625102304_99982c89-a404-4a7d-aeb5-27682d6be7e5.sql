@@ -1,0 +1,1 @@
+ALTER TYPE public.admission_urgency ADD VALUE IF NOT EXISTS 'not_admitting';
