@@ -431,14 +431,6 @@ function ReferralsList() {
             )}
             {!loading && filtered.length === 0 && (
               <tr><td colSpan={8} className="px-3 py-8 text-center text-muted-foreground">No referrals match.</td></tr>)}
-          </thead>
-          <tbody>
-            {loading && (
-              <tr><td colSpan={7} className="px-3 py-8 text-center text-muted-foreground">Loading…</td></tr>
-            )}
-            {!loading && filtered.length === 0 && (
-              <tr><td colSpan={7} className="px-3 py-8 text-center text-muted-foreground">No referrals match.</td></tr>
-            )}
             {filtered.map((r) => (
               <tr
                 key={r.id}
