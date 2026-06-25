@@ -17,7 +17,7 @@ import {
   format, subDays, startOfDay, endOfDay, differenceInMinutes,
   differenceInCalendarDays, eachDayOfInterval,
 } from "date-fns";
-import { ADMISSION_URGENCY_LABELS } from "@/lib/admission-urgency";
+import { urgencyLabel, URGENCY_DISPLAY_ORDER } from "@/lib/admission-urgency";
 
 type Referral = Tables<"referrals">;
 
