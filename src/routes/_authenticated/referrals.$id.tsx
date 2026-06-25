@@ -858,6 +858,7 @@ const FIELD_LABELS: Record<string, string> = {
   arrived_on_unit_at: "Arrived on unit",
   status: "Status",
   decline_reason: "Reason for declining",
+  admission_urgency: "Admission urgency",
 };
 
 const DATE_FIELDS = new Set([
