@@ -159,6 +159,36 @@ function AnalyticsPage() {
           </div>
         </Card>
 
+        <Card className="p-5">
+          <h2 className="font-semibold mb-3">Admission urgency</h2>
+          <div className="h-64">
+            <ResponsiveContainer width="100%" height="100%">
+              <BarChart data={byUrgency}>
+                <CartesianGrid strokeDasharray="3 3" opacity={0.3} />
+                <XAxis dataKey="urgency" fontSize={10} angle={-20} textAnchor="end" height={80} interval={0} />
+                <YAxis allowDecimals={false} fontSize={11} />
+                <Tooltip />
+                <Bar dataKey="count" fill="var(--chart-3)" radius={[4, 4, 0, 0]} />
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
+        </Card>
+
+        <Card className="p-5">
+          <h2 className="font-semibold mb-3">Urgency counts</h2>
+          <ul className="space-y-2 text-sm">
+            {byUrgency.map((u) => (
+              <li key={u.urgency} className="flex justify-between">
+                <span className="text-muted-foreground truncate mr-2" title={u.urgency}>{u.urgency}</span>
+                <span className="font-medium shrink-0">{u.count}</span>
+              </li>
+            ))}
+            {byUrgency.length === 0 && (
+              <li className="text-muted-foreground">No urgency data for this period.</li>
+            )}
+          </ul>
+        </Card>
+
         <Card className="p-5 md:col-span-2">
           <h2 className="font-semibold mb-3">Referrals by specialty (top 10)</h2>
           <div className="h-72">
