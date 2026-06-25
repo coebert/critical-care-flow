@@ -242,6 +242,7 @@ function NewReferralPage() {
         first_seen_at: f.first_seen_at ? new Date(f.first_seen_at).toISOString() : null,
         decision_at: f.decision_at ? new Date(f.decision_at).toISOString() : null,
         arrived_on_unit_at: f.arrived_on_unit_at ? new Date(f.arrived_on_unit_at).toISOString() : null,
+        admission_urgency: f.admission_urgency || null,
       };
       for (const k of [
         "hospital_number","current_ward","current_bed","past_medical_history",
@@ -372,6 +373,22 @@ function NewReferralPage() {
                   <SelectItem value="pending">Pending</SelectItem>
                   <SelectItem value="admitted">Admitted</SelectItem>
                   <SelectItem value="declined">Declined</SelectItem>
+                </SelectContent>
+              </Select>
+            </Field>
+            <Field label="Admission urgency">
+              <Select
+                value={f.admission_urgency || "none"}
+                onValueChange={(v) =>
+                  set("admission_urgency", v === "none" ? "" : (v as AdmissionUrgency))
+                }
+              >
+                <SelectTrigger><SelectValue placeholder="Not specified" /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="none">Not specified</SelectItem>
+                  {ADMISSION_URGENCY_OPTIONS.map((o) => (
+                    <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
             </Field>
