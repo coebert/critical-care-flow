@@ -31,6 +31,10 @@ import { useReferralOptions } from "@/hooks/use-referral-options";
 import { toast } from "sonner";
 import { format } from "date-fns";
 import { validateReferralTimings } from "@/lib/referral-validation";
+import {
+  ADMISSION_URGENCY_OPTIONS,
+  type AdmissionUrgency,
+} from "@/lib/admission-urgency";
 import { cn } from "@/lib/utils";
 
 type PriorReferral = {
@@ -77,6 +81,7 @@ type DraftForm = {
   arrived_on_unit_at: string;
   status: "pending" | "declined" | "admitted";
   decline_reason: string;
+  admission_urgency: AdmissionUrgency | "";
 };
 
 const blankForm = (): DraftForm => ({
@@ -96,6 +101,7 @@ const blankForm = (): DraftForm => ({
   arrived_on_unit_at: "",
   status: "pending",
   decline_reason: "",
+  admission_urgency: "",
 });
 
 function isDraftDirty(d: DraftForm): boolean {
