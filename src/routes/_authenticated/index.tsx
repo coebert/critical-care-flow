@@ -214,6 +214,7 @@ function ReferralsList() {
 
     return rows.filter((r) => {
       if (statusFilter !== "all" && r.status !== statusFilter) return false;
+      if (urgencyFilter !== "all" && r.admission_urgency !== urgencyFilter) return false;
       if (locFilter !== "all" && r.current_ward !== locFilter) return false;
       if (fromTs !== null) {
         const t = new Date(r.referral_received_at).getTime();
@@ -229,7 +230,7 @@ function ReferralsList() {
         .filter(Boolean)
         .some((v) => v!.toString().toLowerCase().includes(needle));
     });
-  }, [rows, q, hospSearch, statusFilter, locFilter, dateFilter]);
+  }, [rows, q, hospSearch, statusFilter, urgencyFilter, locFilter, dateFilter]);
 
   const displayed = useMemo(() => {
     if (timerSort === "none") return filtered;
