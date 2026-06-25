@@ -3,12 +3,20 @@ import { useEffect, useMemo, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { Calendar } from "@/components/ui/calendar";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { CalendarIcon } from "lucide-react";
+import { cn } from "@/lib/utils";
+import type { DateRange } from "react-day-picker";
 import type { Tables } from "@/integrations/supabase/types";
 import {
   ResponsiveContainer, LineChart, Line, XAxis, YAxis, Tooltip, CartesianGrid,
   BarChart, Bar, PieChart, Pie, Cell, Legend, AreaChart, Area,
 } from "recharts";
-import { format, subDays, startOfDay, differenceInMinutes } from "date-fns";
+import {
+  format, subDays, startOfDay, endOfDay, differenceInMinutes,
+  differenceInCalendarDays, eachDayOfInterval,
+} from "date-fns";
 import { ADMISSION_URGENCY_LABELS } from "@/lib/admission-urgency";
 
 type Referral = Tables<"referrals">;
@@ -22,35 +30,46 @@ const COLORS = ["var(--chart-1)", "var(--chart-2)", "var(--chart-3)", "var(--cha
 
 function AnalyticsPage() {
   const [rows, setRows] = useState<Referral[]>([]);
-  const [days, setDays] = useState<number>(30);
+  const [range, setRange] = useState<DateRange>(() => ({
+    from: startOfDay(subDays(new Date(), 29)),
+    to: endOfDay(new Date()),
+  }));
+
+  const from = range.from ? startOfDay(range.from) : startOfDay(subDays(new Date(), 29));
+  const to = range.to ? endOfDay(range.to) : endOfDay(range.from ?? new Date());
+  const days = Math.max(1, differenceInCalendarDays(to, from) + 1);
 
   useEffect(() => {
     supabase
       .from("referrals")
       .select("*")
       .is("deleted_at", null)
-      .gte("referral_received_at", subDays(new Date(), Math.max(days, 365)).toISOString())
+      .gte("referral_received_at", from.toISOString())
+      .lte("referral_received_at", to.toISOString())
       .limit(5000)
       .then(({ data }) => setRows(data ?? []));
-
-  }, [days]);
+  }, [from.getTime(), to.getTime()]);
 
   const filtered = useMemo(() => {
-    const cutoff = subDays(new Date(), days);
-    return rows.filter((r) => new Date(r.referral_received_at) >= cutoff);
-  }, [rows, days]);
+    return rows.filter((r) => {
+      const t = new Date(r.referral_received_at).getTime();
+      return t >= from.getTime() && t <= to.getTime();
+    });
+  }, [rows, from, to]);
+
+  const dayKeys = useMemo(
+    () => eachDayOfInterval({ start: from, end: to }).map((d) => format(d, "yyyy-MM-dd")),
+    [from, to]
+  );
 
   const perDay = useMemo(() => {
-    const map = new Map<string, number>();
-    for (let i = days - 1; i >= 0; i--) {
-      map.set(format(subDays(new Date(), i), "yyyy-MM-dd"), 0);
-    }
+    const map = new Map<string, number>(dayKeys.map((k) => [k, 0]));
     filtered.forEach((r) => {
       const k = format(startOfDay(new Date(r.referral_received_at)), "yyyy-MM-dd");
-      map.set(k, (map.get(k) ?? 0) + 1);
+      if (map.has(k)) map.set(k, (map.get(k) ?? 0) + 1);
     });
     return Array.from(map.entries()).map(([date, count]) => ({ date: format(new Date(date), "dd MMM"), count }));
-  }, [filtered, days]);
+  }, [filtered, dayKeys]);
 
   const meanPer24h = filtered.length / Math.max(days, 1);
   const meanAge = (() => {
@@ -101,13 +120,13 @@ function AnalyticsPage() {
   );
 
   const perDayByUrgency = useMemo(() => {
-    const buckets = new Map<string, Record<string, number>>();
-    for (let i = days - 1; i >= 0; i--) {
-      const key = format(subDays(new Date(), i), "yyyy-MM-dd");
-      const row: Record<string, number> = {};
-      urgencyKeys.forEach((k) => (row[k] = 0));
-      buckets.set(key, row);
-    }
+    const buckets = new Map<string, Record<string, number>>(
+      dayKeys.map((k) => {
+        const row: Record<string, number> = {};
+        urgencyKeys.forEach((u) => (row[u] = 0));
+        return [k, row];
+      })
+    );
     filtered.forEach((r) => {
       const k = format(startOfDay(new Date(r.referral_received_at)), "yyyy-MM-dd");
       const label = r.admission_urgency ? ADMISSION_URGENCY_LABELS[r.admission_urgency] : "Not set";
@@ -118,7 +137,7 @@ function AnalyticsPage() {
       date: format(new Date(date), "dd MMM"),
       ...vals,
     }));
-  }, [filtered, days, urgencyKeys]);
+  }, [filtered, dayKeys, urgencyKeys]);
 
   const meanMinutes = (sel: (r: Referral) => [string | null, string | null]) => {
     const ds = filtered
@@ -135,14 +154,49 @@ function AnalyticsPage() {
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-6">
         <div className="min-w-0">
           <h1 className="text-2xl font-semibold tracking-tight">Analytics</h1>
-          <p className="text-sm text-muted-foreground">Last {days} days · {filtered.length} referrals</p>
+          <p className="text-sm text-muted-foreground">
+            {format(from, "dd MMM yyyy")} – {format(to, "dd MMM yyyy")} · {days} day{days === 1 ? "" : "s"} · {filtered.length} referrals
+          </p>
         </div>
-        <div className="flex gap-2 flex-wrap">
+        <div className="flex gap-2 flex-wrap items-center">
           {[7, 30, 90, 365].map((d) => (
-            <Button key={d} size="sm" variant={days === d ? "default" : "outline"} onClick={() => setDays(d)}>
+            <Button
+              key={d}
+              size="sm"
+              variant={days === d ? "default" : "outline"}
+              onClick={() =>
+                setRange({ from: startOfDay(subDays(new Date(), d - 1)), to: endOfDay(new Date()) })
+              }
+            >
               {d}d
             </Button>
           ))}
+          <Popover>
+            <PopoverTrigger asChild>
+              <Button
+                variant="outline"
+                size="sm"
+                className={cn("justify-start text-left font-normal", !range.from && "text-muted-foreground")}
+              >
+                <CalendarIcon className="mr-2 h-4 w-4" />
+                {range.from
+                  ? range.to
+                    ? `${format(range.from, "dd MMM yy")} – ${format(range.to, "dd MMM yy")}`
+                    : format(range.from, "dd MMM yy")
+                  : "Pick a date range"}
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent className="w-auto p-0" align="end">
+              <Calendar
+                mode="range"
+                selected={range}
+                onSelect={(r) => r && setRange(r)}
+                numberOfMonths={2}
+                initialFocus
+                className={cn("p-3 pointer-events-auto")}
+              />
+            </PopoverContent>
+          </Popover>
         </div>
       </div>
 
