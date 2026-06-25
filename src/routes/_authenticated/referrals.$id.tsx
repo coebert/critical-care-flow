@@ -460,6 +460,22 @@ function ReferralDetail() {
                 </SelectContent>
               </Select>
             </F>
+            <F label="Admission urgency">
+              <Select
+                value={ref.admission_urgency ?? "none"}
+                onValueChange={(v) =>
+                  set("admission_urgency", v === "none" ? null : (v as AdmissionUrgency))
+                }
+              >
+                <SelectTrigger><SelectValue placeholder="Not specified" /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="none">Not specified</SelectItem>
+                  {ADMISSION_URGENCY_OPTIONS.map((o) => (
+                    <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </F>
           </div>
           {ref.status === "declined" && (
             <ExpandableSection label="Reason for declining" command={expandCmd}><Textarea rows={3} value={ref.decline_reason ?? ""} onChange={(e) => set("decline_reason", e.target.value)} /></ExpandableSection>
