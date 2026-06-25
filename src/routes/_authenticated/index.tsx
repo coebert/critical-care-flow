@@ -540,7 +540,12 @@ function ReferralsList() {
               <span className="text-xs text-muted-foreground">
                 {format(new Date(r.referral_received_at), "dd MMM HH:mm")}
               </span>
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-2 flex-wrap justify-end">
+                {r.admission_urgency && (
+                  <Badge variant="outline" className={`text-xs whitespace-nowrap ${ADMISSION_URGENCY_BADGE[r.admission_urgency]}`}>
+                    {ADMISSION_URGENCY_LABELS[r.admission_urgency]}
+                  </Badge>
+                )}
                 <ReferralTimer r={r} />
                 <Badge variant="outline" className={`capitalize text-xs ${statusStyles[r.status]}`}>
                   {r.status}
