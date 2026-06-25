@@ -82,6 +82,19 @@ function AnalyticsPage() {
     return Array.from(map.entries()).map(([name, value]) => ({ name, value }));
   }, [filtered]);
 
+  const byUrgency = useMemo(() => {
+    const map = new Map<string, number>();
+    filtered.forEach((r) => {
+      const k = r.admission_urgency ? ADMISSION_URGENCY_LABELS[r.admission_urgency] : "Not set";
+      map.set(k, (map.get(k) ?? 0) + 1);
+    });
+    // Preserve defined order then append "Not set" last
+    const order = [...Object.values(ADMISSION_URGENCY_LABELS), "Not set"];
+    return order
+      .filter((label) => map.has(label))
+      .map((label) => ({ urgency: label, count: map.get(label)! }));
+  }, [filtered]);
+
   const meanMinutes = (sel: (r: Referral) => [string | null, string | null]) => {
     const ds = filtered
       .map(sel)
