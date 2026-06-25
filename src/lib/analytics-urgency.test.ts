@@ -152,9 +152,9 @@ describe("analytics date-range filter updates urgency surfaces together", () => 
     { admission_urgency: null, referral_received_at: new Date(now.getTime() - 2 * 86_400_000).toISOString() },
 
     // 20-40 days ago — within_30_min + within_1_hour
-    { admission_urgency: "within_30_min", referral_received_at: new Date(now.getTime() - 25 * 86_400_000).toISOString() },
-    { admission_urgency: "within_30_min", referral_received_at: new Date(now.getTime() - 30 * 86_400_000).toISOString() },
-    { admission_urgency: "within_1_hour", referral_received_at: new Date(now.getTime() - 35 * 86_400_000).toISOString() },
+    { admission_urgency: "within_30_min", referral_received_at: new Date(now.getTime() - 15 * 86_400_000).toISOString() },
+    { admission_urgency: "within_30_min", referral_received_at: new Date(now.getTime() - 20 * 86_400_000).toISOString() },
+    { admission_urgency: "within_1_hour", referral_received_at: new Date(now.getTime() - 25 * 86_400_000).toISOString() },
 
     // 60-80 days ago — not_admitting + within_1_2_hours
     { admission_urgency: "not_admitting", referral_received_at: new Date(now.getTime() - 65 * 86_400_000).toISOString() },
