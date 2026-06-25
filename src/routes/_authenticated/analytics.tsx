@@ -17,7 +17,6 @@ import {
   format, subDays, startOfDay, endOfDay, differenceInMinutes,
   differenceInCalendarDays, eachDayOfInterval,
 } from "date-fns";
-import { URGENCY_DISPLAY_ORDER } from "@/lib/admission-urgency";
 import {
   aggregateUrgencyCounts,
   aggregateUrgencyPerDay,
