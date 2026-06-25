@@ -559,20 +559,22 @@ function ReferralsList() {
             className={`border rounded-lg p-4 cursor-pointer active:scale-[0.99] transition-transform ${rowBgStyles[r.status] ?? "bg-card"}`}
             onClick={() => navigate({ to: "/referrals/$id", params: { id: r.id } })}
           >
-            <div className="flex items-center justify-between mb-2">
-              <span className="text-xs text-muted-foreground">
-                {format(new Date(r.referral_received_at), "dd MMM HH:mm")}
-              </span>
-              <div className="flex items-center gap-2 flex-wrap justify-end">
+            <div className="flex flex-col gap-2 mb-2">
+              <div className="flex items-center justify-between gap-2">
+                <span className="text-xs text-muted-foreground shrink-0">
+                  {format(new Date(r.referral_received_at), "dd MMM HH:mm")}
+                </span>
+                <Badge variant="outline" className={`capitalize text-xs shrink-0 ${statusStyles[r.status]}`}>
+                  {r.status}
+                </Badge>
+              </div>
+              <div className="flex items-center justify-between gap-2 flex-wrap">
+                <ReferralTimer r={r} />
                 {r.admission_urgency && (
                   <Badge variant="outline" className={`text-xs whitespace-nowrap ${ADMISSION_URGENCY_BADGE[r.admission_urgency]}`}>
                     {ADMISSION_URGENCY_LABELS[r.admission_urgency]}
                   </Badge>
                 )}
-                <ReferralTimer r={r} />
-                <Badge variant="outline" className={`capitalize text-xs ${statusStyles[r.status]}`}>
-                  {r.status}
-                </Badge>
               </div>
             </div>
             <div className="grid grid-cols-2 gap-x-4 gap-y-1.5 text-sm">
