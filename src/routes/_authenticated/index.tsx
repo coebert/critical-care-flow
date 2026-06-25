@@ -104,6 +104,13 @@ function ReferralsList() {
   const [deletedRows, setDeletedRows] = useState<Referral[]>([]);
   const [deletedLoading, setDeletedLoading] = useState(false);
   const [restoringId, setRestoringId] = useState<string | null>(null);
+  const [timerSort, setTimerSort] = useState<"none" | "desc" | "asc">("none");
+  const [sortTick, setSortTick] = useState(0);
+  useEffect(() => {
+    if (timerSort === "none") return;
+    const id = setInterval(() => setSortTick((t) => t + 1), 30000);
+    return () => clearInterval(id);
+  }, [timerSort]);
 
   const fetchDeleted = useServerFn(listDeletedReferrals);
   const restoreFn = useServerFn(restoreReferral);
