@@ -423,6 +423,27 @@ function ReferralsList() {
         ))}
       </div>
 
+      <div className="flex flex-wrap gap-2 mb-4 items-center">
+        <span className="text-xs uppercase text-muted-foreground mr-1">Urgency</span>
+        <Button
+          size="sm"
+          variant={urgencyFilter === "all" ? "default" : "outline"}
+          onClick={() => setUrgencyFilter("all")}
+        >
+          All
+        </Button>
+        {ADMISSION_URGENCY_OPTIONS.map((o) => (
+          <Button
+            key={o.value}
+            size="sm"
+            variant={urgencyFilter === o.value ? "default" : "outline"}
+            onClick={() => setUrgencyFilter(o.value)}
+          >
+            {o.label}
+          </Button>
+        ))}
+      </div>
+
       {topWards.length > 0 && (
         <div className="flex flex-wrap gap-2 mb-4 items-center">
           <span className="text-xs uppercase text-muted-foreground mr-1">Location</span>
