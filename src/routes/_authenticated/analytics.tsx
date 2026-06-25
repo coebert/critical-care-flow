@@ -9,6 +9,7 @@ import {
   BarChart, Bar, PieChart, Pie, Cell, Legend,
 } from "recharts";
 import { format, subDays, startOfDay, differenceInMinutes } from "date-fns";
+import { ADMISSION_URGENCY_LABELS } from "@/lib/admission-urgency";
 
 type Referral = Tables<"referrals">;
 
@@ -81,6 +82,19 @@ function AnalyticsPage() {
     return Array.from(map.entries()).map(([name, value]) => ({ name, value }));
   }, [filtered]);
 
+  const byUrgency = useMemo(() => {
+    const map = new Map<string, number>();
+    filtered.forEach((r) => {
+      const k = r.admission_urgency ? ADMISSION_URGENCY_LABELS[r.admission_urgency] : "Not set";
+      map.set(k, (map.get(k) ?? 0) + 1);
+    });
+    // Preserve defined order then append "Not set" last
+    const order = [...Object.values(ADMISSION_URGENCY_LABELS), "Not set"];
+    return order
+      .filter((label) => map.has(label))
+      .map((label) => ({ urgency: label, count: map.get(label)! }));
+  }, [filtered]);
+
   const meanMinutes = (sel: (r: Referral) => [string | null, string | null]) => {
     const ds = filtered
       .map(sel)
@@ -143,6 +157,36 @@ function AnalyticsPage() {
               </PieChart>
             </ResponsiveContainer>
           </div>
+        </Card>
+
+        <Card className="p-5">
+          <h2 className="font-semibold mb-3">Admission urgency</h2>
+          <div className="h-64">
+            <ResponsiveContainer width="100%" height="100%">
+              <BarChart data={byUrgency}>
+                <CartesianGrid strokeDasharray="3 3" opacity={0.3} />
+                <XAxis dataKey="urgency" fontSize={10} angle={-20} textAnchor="end" height={80} interval={0} />
+                <YAxis allowDecimals={false} fontSize={11} />
+                <Tooltip />
+                <Bar dataKey="count" fill="var(--chart-3)" radius={[4, 4, 0, 0]} />
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
+        </Card>
+
+        <Card className="p-5">
+          <h2 className="font-semibold mb-3">Urgency counts</h2>
+          <ul className="space-y-2 text-sm">
+            {byUrgency.map((u) => (
+              <li key={u.urgency} className="flex justify-between">
+                <span className="text-muted-foreground truncate mr-2" title={u.urgency}>{u.urgency}</span>
+                <span className="font-medium shrink-0">{u.count}</span>
+              </li>
+            ))}
+            {byUrgency.length === 0 && (
+              <li className="text-muted-foreground">No urgency data for this period.</li>
+            )}
+          </ul>
         </Card>
 
         <Card className="p-5 md:col-span-2">
