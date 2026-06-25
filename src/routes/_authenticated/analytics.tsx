@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import type { Tables } from "@/integrations/supabase/types";
 import {
   ResponsiveContainer, LineChart, Line, XAxis, YAxis, Tooltip, CartesianGrid,
-  BarChart, Bar, PieChart, Pie, Cell, Legend,
+  BarChart, Bar, PieChart, Pie, Cell, Legend, AreaChart, Area,
 } from "recharts";
 import { format, subDays, startOfDay, differenceInMinutes } from "date-fns";
 import { ADMISSION_URGENCY_LABELS } from "@/lib/admission-urgency";
@@ -95,6 +95,31 @@ function AnalyticsPage() {
       .map((label) => ({ urgency: label, count: map.get(label)! }));
   }, [filtered]);
 
+  const urgencyKeys = useMemo(
+    () => [...Object.values(ADMISSION_URGENCY_LABELS), "Not set"],
+    []
+  );
+
+  const perDayByUrgency = useMemo(() => {
+    const buckets = new Map<string, Record<string, number>>();
+    for (let i = days - 1; i >= 0; i--) {
+      const key = format(subDays(new Date(), i), "yyyy-MM-dd");
+      const row: Record<string, number> = {};
+      urgencyKeys.forEach((k) => (row[k] = 0));
+      buckets.set(key, row);
+    }
+    filtered.forEach((r) => {
+      const k = format(startOfDay(new Date(r.referral_received_at)), "yyyy-MM-dd");
+      const label = r.admission_urgency ? ADMISSION_URGENCY_LABELS[r.admission_urgency] : "Not set";
+      const row = buckets.get(k);
+      if (row) row[label] = (row[label] ?? 0) + 1;
+    });
+    return Array.from(buckets.entries()).map(([date, vals]) => ({
+      date: format(new Date(date), "dd MMM"),
+      ...vals,
+    }));
+  }, [filtered, days, urgencyKeys]);
+
   const meanMinutes = (sel: (r: Referral) => [string | null, string | null]) => {
     const ds = filtered
       .map(sel)
@@ -170,6 +195,32 @@ function AnalyticsPage() {
                 <Tooltip />
                 <Bar dataKey="count" fill="var(--chart-3)" radius={[4, 4, 0, 0]} />
               </BarChart>
+            </ResponsiveContainer>
+          </div>
+        </Card>
+
+        <Card className="p-5 md:col-span-2">
+          <h2 className="font-semibold mb-3">Referrals over time by urgency</h2>
+          <div className="h-72">
+            <ResponsiveContainer width="100%" height="100%">
+              <AreaChart data={perDayByUrgency}>
+                <CartesianGrid strokeDasharray="3 3" opacity={0.3} />
+                <XAxis dataKey="date" fontSize={11} />
+                <YAxis allowDecimals={false} fontSize={11} />
+                <Tooltip />
+                <Legend wrapperStyle={{ fontSize: 11 }} />
+                {urgencyKeys.map((k, i) => (
+                  <Area
+                    key={k}
+                    type="monotone"
+                    dataKey={k}
+                    stackId="1"
+                    stroke={COLORS[i % COLORS.length]}
+                    fill={COLORS[i % COLORS.length]}
+                    fillOpacity={0.7}
+                  />
+                ))}
+              </AreaChart>
             </ResponsiveContainer>
           </div>
         </Card>
