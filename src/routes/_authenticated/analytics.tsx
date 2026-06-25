@@ -106,38 +106,14 @@ function AnalyticsPage() {
     return Array.from(map.entries()).map(([name, value]) => ({ name, value }));
   }, [filtered]);
 
-  const byUrgency = useMemo(() => {
-    const map = new Map<string, number>();
-    filtered.forEach((r) => {
-      const k = urgencyLabel(r.admission_urgency);
-      map.set(k, (map.get(k) ?? 0) + 1);
-    });
-    return URGENCY_DISPLAY_ORDER
-      .filter((label) => map.has(label))
-      .map((label) => ({ urgency: label, count: map.get(label)! }));
-  }, [filtered]);
+  const byUrgency = useMemo(() => aggregateUrgencyCounts(filtered), [filtered]);
 
-  const urgencyKeys = URGENCY_DISPLAY_ORDER;
+  const urgencyKeys = URGENCY_LEGEND_KEYS;
 
-  const perDayByUrgency = useMemo(() => {
-    const buckets = new Map<string, Record<string, number>>(
-      dayKeys.map((k) => {
-        const row: Record<string, number> = {};
-        urgencyKeys.forEach((u) => (row[u] = 0));
-        return [k, row];
-      })
-    );
-    filtered.forEach((r) => {
-      const k = format(startOfDay(new Date(r.referral_received_at)), "yyyy-MM-dd");
-      const label = urgencyLabel(r.admission_urgency);
-      const row = buckets.get(k);
-      if (row) row[label] = (row[label] ?? 0) + 1;
-    });
-    return Array.from(buckets.entries()).map(([date, vals]) => ({
-      date: format(new Date(date), "dd MMM"),
-      ...vals,
-    }));
-  }, [filtered, dayKeys, urgencyKeys]);
+  const perDayByUrgency = useMemo(
+    () => aggregateUrgencyPerDay(filtered, dayKeys),
+    [filtered, dayKeys]
+  );
 
   const meanMinutes = (sel: (r: Referral) => [string | null, string | null]) => {
     const ds = filtered
