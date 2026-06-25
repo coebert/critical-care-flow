@@ -9,6 +9,7 @@ import { Plus, Search, RotateCcw, Trash2, MapPin } from "lucide-react";
 import type { Tables } from "@/integrations/supabase/types";
 import { format, formatDistanceToNow } from "date-fns";
 import { listDeletedReferrals, restoreReferral, RESTORE_WINDOW_DAYS } from "@/lib/referrals.functions";
+import { ADMISSION_URGENCY_LABELS, ADMISSION_URGENCY_BADGE } from "@/lib/admission-urgency";
 import { toast } from "sonner";
 
 type Referral = Tables<"referrals">;
@@ -471,6 +472,7 @@ function ReferralsList() {
                   </span>
                 </button>
               </th>
+              <th className="text-left px-3 py-2">Urgency</th>
               <th className="text-left px-3 py-2">Status</th>
             </tr>
           </thead>
