@@ -22,6 +22,17 @@ function formatElapsed(ms: number): string {
   return `${hours}h ${minutes}m`;
 }
 
+function getTimerElapsedMs(r: Referral, now: number): number | null {
+  if (r.status === "pending") return now - new Date(r.referral_received_at).getTime();
+  if (r.status === "admitted") {
+    const startSrc = r.decision_at ?? r.updated_at;
+    if (!startSrc) return null;
+    const end = r.arrived_on_unit_at ? new Date(r.arrived_on_unit_at).getTime() : now;
+    return end - new Date(startSrc).getTime();
+  }
+  return null;
+}
+
 function getTimerInfo(r: Referral, now: number): { label: string; value: string; tone: string } | null {
   if (r.status === "pending") {
     const start = new Date(r.referral_received_at).getTime();
@@ -93,6 +104,13 @@ function ReferralsList() {
   const [deletedRows, setDeletedRows] = useState<Referral[]>([]);
   const [deletedLoading, setDeletedLoading] = useState(false);
   const [restoringId, setRestoringId] = useState<string | null>(null);
+  const [timerSort, setTimerSort] = useState<"none" | "desc" | "asc">("none");
+  const [sortTick, setSortTick] = useState(0);
+  useEffect(() => {
+    if (timerSort === "none") return;
+    const id = setInterval(() => setSortTick((t) => t + 1), 30000);
+    return () => clearInterval(id);
+  }, [timerSort]);
 
   const fetchDeleted = useServerFn(listDeletedReferrals);
   const restoreFn = useServerFn(restoreReferral);
@@ -210,6 +228,23 @@ function ReferralsList() {
         .some((v) => v!.toString().toLowerCase().includes(needle));
     });
   }, [rows, q, hospSearch, statusFilter, locFilter, dateFilter]);
+
+  const displayed = useMemo(() => {
+    if (timerSort === "none") return filtered;
+    const now = Date.now();
+    const dir = timerSort === "desc" ? -1 : 1;
+    return [...filtered].sort((a, b) => {
+      const ea = getTimerElapsedMs(a, now);
+      const eb = getTimerElapsedMs(b, now);
+      // Rows without an active timer always sort to the bottom.
+      if (ea === null && eb === null) return 0;
+      if (ea === null) return 1;
+      if (eb === null) return -1;
+      return (ea - eb) * dir;
+    });
+    // sortTick triggers re-sort as time advances
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [filtered, timerSort, sortTick]);
 
   return (
     <div className="p-4 sm:p-6 max-w-7xl mx-auto">
@@ -421,7 +456,21 @@ function ReferralsList() {
               <th className="text-left px-3 py-2">Location</th>
               <th className="text-left px-3 py-2">Specialty</th>
               <th className="text-left px-3 py-2">Reason</th>
-              <th className="text-left px-3 py-2">Timer</th>
+              <th className="text-left px-3 py-2">
+                <button
+                  type="button"
+                  className="inline-flex items-center gap-1 uppercase hover:text-foreground"
+                  onClick={() =>
+                    setTimerSort((s) => (s === "none" ? "desc" : s === "desc" ? "asc" : "none"))
+                  }
+                  aria-label="Sort by timer"
+                >
+                  Timer
+                  <span className="text-[10px]">
+                    {timerSort === "desc" ? "↓" : timerSort === "asc" ? "↑" : "↕"}
+                  </span>
+                </button>
+              </th>
               <th className="text-left px-3 py-2">Status</th>
             </tr>
           </thead>
@@ -429,9 +478,9 @@ function ReferralsList() {
             {loading && (
               <tr><td colSpan={8} className="px-3 py-8 text-center text-muted-foreground">Loading…</td></tr>
             )}
-            {!loading && filtered.length === 0 && (
+            {!loading && displayed.length === 0 && (
               <tr><td colSpan={8} className="px-3 py-8 text-center text-muted-foreground">No referrals match.</td></tr>)}
-            {filtered.map((r) => (
+            {displayed.map((r) => (
               <tr
                 key={r.id}
                 className={`border-t hover:bg-accent/40 cursor-pointer ${rowBgStyles[r.status] ?? ""}`}
@@ -467,10 +516,10 @@ function ReferralsList() {
         {loading && (
           <div className="text-center text-muted-foreground py-8">Loading…</div>
         )}
-        {!loading && filtered.length === 0 && (
+        {!loading && displayed.length === 0 && (
           <div className="text-center text-muted-foreground py-8">No referrals match.</div>
         )}
-        {filtered.map((r) => (
+        {displayed.map((r) => (
           <div
             key={r.id}
             className={`border rounded-lg p-4 cursor-pointer active:scale-[0.99] transition-transform ${rowBgStyles[r.status] ?? "bg-card"}`}
