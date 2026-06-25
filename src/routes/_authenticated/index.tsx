@@ -452,6 +452,7 @@ function ReferralsList() {
                 <td className="px-3 py-2">{r.current_ward ?? "—"} {r.current_bed ? `· ${r.current_bed}` : ""}</td>
                 <td className="px-3 py-2">{r.referring_specialty ?? "—"}</td>
                 <td className="px-3 py-2 max-w-xs truncate">{r.reason_for_referral ?? "—"}</td>
+                <td className="px-3 py-2"><ReferralTimer r={r} /></td>
                 <td className="px-3 py-2">
                   <Badge variant="outline" className={`capitalize ${statusStyles[r.status]}`}>{r.status}</Badge>
                 </td>
