@@ -117,17 +117,19 @@ function AuthedShell() {
 
   return (
     <div className="min-h-screen flex bg-background">
-      <aside className="hidden md:flex w-60 border-r bg-sidebar flex-col shrink-0">
-        {sidebarContent}
+      <aside
+        className={`hidden md:flex ${desktopCollapsed ? "w-16" : "w-60"} border-r bg-sidebar flex-col shrink-0 transition-[width] duration-200`}
+      >
+        {renderSidebar(desktopCollapsed)}
       </aside>
       <div className="flex-1 flex flex-col min-w-0">
-        <header className="h-14 border-b flex items-center justify-between md:justify-end px-4 md:px-6 gap-3 bg-card">
+        <header className="h-14 border-b flex items-center px-2 sm:px-4 md:px-6 gap-2 sm:gap-3 bg-card">
           <Sheet open={mobileOpen} onOpenChange={setMobileOpen}>
             <SheetTrigger asChild>
               <Button
                 variant="ghost"
                 size="icon"
-                className="md:hidden"
+                className="md:hidden shrink-0"
                 aria-label="Open navigation menu"
                 aria-expanded={mobileOpen}
                 aria-controls="mobile-sidebar"
@@ -147,10 +149,20 @@ function AuthedShell() {
                   <SheetTitle>Navigation</SheetTitle>
                 </VisuallyHidden>
               </SheetHeader>
-              {sidebarContent}
+              {renderSidebar(false)}
             </SheetContent>
           </Sheet>
-          <div className="ml-auto flex items-center gap-2">
+          <Button
+            variant="ghost"
+            size="icon"
+            className="hidden md:inline-flex shrink-0"
+            onClick={() => setDesktopCollapsed((v) => !v)}
+            aria-label={desktopCollapsed ? "Expand sidebar" : "Collapse sidebar"}
+            title={desktopCollapsed ? "Expand sidebar" : "Collapse sidebar"}
+          >
+            {desktopCollapsed ? <PanelLeftOpen className="w-5 h-5" /> : <PanelLeftClose className="w-5 h-5" />}
+          </Button>
+          <div className="ml-auto flex items-center gap-2 min-w-0 flex-wrap justify-end">
             <ShiftToggle />
             {supported && permission === "granted" && subscribed && <TestPushButton />}
             <NotificationBell />
