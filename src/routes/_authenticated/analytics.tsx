@@ -104,20 +104,15 @@ function AnalyticsPage() {
   const byUrgency = useMemo(() => {
     const map = new Map<string, number>();
     filtered.forEach((r) => {
-      const k = r.admission_urgency ? ADMISSION_URGENCY_LABELS[r.admission_urgency] : "Not set";
+      const k = urgencyLabel(r.admission_urgency);
       map.set(k, (map.get(k) ?? 0) + 1);
     });
-    // Preserve defined order then append "Not set" last
-    const order = [...Object.values(ADMISSION_URGENCY_LABELS), "Not set"];
-    return order
+    return URGENCY_DISPLAY_ORDER
       .filter((label) => map.has(label))
       .map((label) => ({ urgency: label, count: map.get(label)! }));
   }, [filtered]);
 
-  const urgencyKeys = useMemo(
-    () => [...Object.values(ADMISSION_URGENCY_LABELS), "Not set"],
-    []
-  );
+  const urgencyKeys = URGENCY_DISPLAY_ORDER;
 
   const perDayByUrgency = useMemo(() => {
     const buckets = new Map<string, Record<string, number>>(
@@ -129,7 +124,7 @@ function AnalyticsPage() {
     );
     filtered.forEach((r) => {
       const k = format(startOfDay(new Date(r.referral_received_at)), "yyyy-MM-dd");
-      const label = r.admission_urgency ? ADMISSION_URGENCY_LABELS[r.admission_urgency] : "Not set";
+      const label = urgencyLabel(r.admission_urgency);
       const row = buckets.get(k);
       if (row) row[label] = (row[label] ?? 0) + 1;
     });
