@@ -867,6 +867,7 @@ const FIELD_LABELS: Record<string, string> = {
   past_medical_history: "Past medical history",
   baseline_function: "Baseline function",
   dnacpr_respect: "DNACPR / ReSPECT",
+  consultant_to_consultant_only: "Consultant-to-consultant only",
   referring_specialty: "Referring specialty",
   reason_for_referral: "Reason for referral",
   referral_received_at: "Referral received",
