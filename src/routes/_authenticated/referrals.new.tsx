@@ -95,6 +95,7 @@ const blankForm = (): DraftForm => ({
   past_medical_history: "",
   baseline_function: "",
   dnacpr_respect: false,
+  consultant_to_consultant_only: false,
   referring_specialty: "",
   reason_for_referral: "",
   referral_received_at: localISO(),
