@@ -514,13 +514,16 @@ function ReferralDetail() {
             </ExpandableSection>
           )}
           {ref.status === "admitted" && (
-            <F label="Accepting critical care consultant">
+            <F label="Accepting critical care consultant" required>
               <ComboboxAdd
                 value={ref.accepting_consultant ?? ""}
                 onChange={(v) => set("accepting_consultant", v || null)}
                 options={consultants}
                 placeholder="Select or add consultant…"
               />
+              {acceptingConsultantMissing && (
+                <p className="text-xs text-destructive mt-1">Required when admitting a referral.</p>
+              )}
             </F>
           )}
         </Card>
