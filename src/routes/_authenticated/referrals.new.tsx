@@ -339,6 +339,18 @@ function NewReferralPage() {
                 </div>
               </AlertDescription>
             </Alert>
+          {priorC2C && (
+            <Alert variant="destructive" className="mt-2">
+              <AlertCircle className="h-4 w-4" />
+              <AlertTitle>Consultant-to-consultant referral only</AlertTitle>
+              <AlertDescription>
+                A previous referral for this patient (hospital number{" "}
+                <strong>{f.hospital_number}</strong>) was flagged as{" "}
+                <strong>consultant-to-consultant only</strong>. This referral must
+                be made consultant-to-consultant. The flag has been applied
+                automatically below.
+              </AlertDescription>
+            </Alert>
           )}
         </Section>
 
