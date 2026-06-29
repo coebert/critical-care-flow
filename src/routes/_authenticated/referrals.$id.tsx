@@ -216,9 +216,16 @@ function ReferralDetail() {
     arrived_on_unit_at: ref.arrived_on_unit_at,
   });
 
+  const declineReasonMissing =
+    ref.status === "declined" && !(ref.decline_reason ?? "").trim();
+
   const save = async () => {
     if (!timing.isValid) {
       toast.error("Please fix the highlighted timing issues before saving.");
+      return;
+    }
+    if (declineReasonMissing) {
+      toast.error("A reason is required when declining a referral.");
       return;
     }
     setSaving(true);
