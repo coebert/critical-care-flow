@@ -102,6 +102,9 @@ export const createReferral = createServerFn({ method: "POST" })
     if (data.status === "declined" && !(data.decline_reason ?? "").trim()) {
       throw new Error("A reason is required when declining a referral.");
     }
+    if (data.status === "admitted" && !(data.accepting_consultant ?? "").trim()) {
+      throw new Error("An accepting consultant is required when admitting a referral.");
+    }
     const insert = {
       ...data,
       created_by: userId,
@@ -172,7 +175,7 @@ export const updateReferral = createServerFn({ method: "POST" })
     // only touches one of the two fields.
     const { data: prior } = await supabase
       .from("referrals")
-      .select("status, decline_reason")
+      .select("status, decline_reason, accepting_consultant")
       .eq("id", data.id)
       .maybeSingle();
 
@@ -184,6 +187,14 @@ export const updateReferral = createServerFn({ method: "POST" })
     if (finalStatus === "declined" && !(finalReason ?? "").trim()) {
       throw new Error("A reason is required when declining a referral.");
     }
+    const finalConsultant =
+      data.patch.accepting_consultant !== undefined
+        ? data.patch.accepting_consultant
+        : (prior as any)?.accepting_consultant;
+    if (finalStatus === "admitted" && !(finalConsultant ?? "").trim()) {
+      throw new Error("An accepting consultant is required when admitting a referral.");
+    }
+
 
     const { data: row, error } = await supabase
       .from("referrals")

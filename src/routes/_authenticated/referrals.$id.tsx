@@ -218,6 +218,8 @@ function ReferralDetail() {
 
   const declineReasonMissing =
     ref.status === "declined" && !(ref.decline_reason ?? "").trim();
+  const acceptingConsultantMissing =
+    ref.status === "admitted" && !((ref as any).accepting_consultant ?? "").trim();
 
   const save = async () => {
     if (!timing.isValid) {
@@ -226,6 +228,10 @@ function ReferralDetail() {
     }
     if (declineReasonMissing) {
       toast.error("A reason is required when declining a referral.");
+      return;
+    }
+    if (acceptingConsultantMissing) {
+      toast.error("An accepting consultant is required when admitting a referral.");
       return;
     }
     setSaving(true);
@@ -508,13 +514,16 @@ function ReferralDetail() {
             </ExpandableSection>
           )}
           {ref.status === "admitted" && (
-            <F label="Accepting critical care consultant">
+            <F label="Accepting critical care consultant" required>
               <ComboboxAdd
                 value={ref.accepting_consultant ?? ""}
                 onChange={(v) => set("accepting_consultant", v || null)}
                 options={consultants}
                 placeholder="Select or add consultant…"
               />
+              {acceptingConsultantMissing && (
+                <p className="text-xs text-destructive mt-1">Required when admitting a referral.</p>
+              )}
             </F>
           )}
         </Card>
