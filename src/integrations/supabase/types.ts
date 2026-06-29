@@ -215,6 +215,7 @@ export type Database = {
           age: number | null
           arrived_on_unit_at: string | null
           baseline_function: string | null
+          consultant_to_consultant_only: boolean
           created_at: string
           created_by: string | null
           current_bed: string | null
@@ -243,6 +244,7 @@ export type Database = {
           age?: number | null
           arrived_on_unit_at?: string | null
           baseline_function?: string | null
+          consultant_to_consultant_only?: boolean
           created_at?: string
           created_by?: string | null
           current_bed?: string | null
@@ -271,6 +273,7 @@ export type Database = {
           age?: number | null
           arrived_on_unit_at?: string | null
           baseline_function?: string | null
+          consultant_to_consultant_only?: boolean
           created_at?: string
           created_by?: string | null
           current_bed?: string | null
