@@ -83,6 +83,7 @@ type DraftForm = {
   arrived_on_unit_at: string;
   status: "pending" | "declined" | "admitted";
   decline_reason: string;
+  accepting_consultant: string;
   admission_urgency: AdmissionUrgency | "";
 };
 
@@ -104,6 +105,7 @@ const blankForm = (): DraftForm => ({
   arrived_on_unit_at: "",
   status: "pending",
   decline_reason: "",
+  accepting_consultant: "",
   admission_urgency: "",
 });
 
@@ -120,7 +122,7 @@ function NewReferralPage() {
   const navigate = useNavigate();
   const create = useServerFn(createReferral);
   const [saving, setSaving] = useState(false);
-  const { specialties, wards } = useReferralOptions();
+  const { specialties, wards, consultants } = useReferralOptions();
   const [f, setF] = useState<DraftForm>(blankForm);
   const [draftRestored, setDraftRestored] = useState(false);
   const [draftSavedAt, setDraftSavedAt] = useState<Date | null>(null);
@@ -266,7 +268,7 @@ function NewReferralPage() {
       };
       for (const k of [
         "hospital_number","current_ward","current_bed","past_medical_history",
-        "baseline_function","referring_specialty","reason_for_referral","decline_reason",
+        "baseline_function","referring_specialty","reason_for_referral","decline_reason","accepting_consultant",
       ]) if (!payload[k]) payload[k] = null;
 
       const res = await create({ data: payload });
@@ -445,6 +447,16 @@ function NewReferralPage() {
                 value={f.decline_reason}
                 onChange={(e) => set("decline_reason", e.target.value)}
                 className={cn(showErrors && declineReasonMissing && "border-destructive focus-visible:ring-destructive")}
+              />
+            </Field>
+          )}
+          {f.status === "admitted" && (
+            <Field label="Accepting critical care consultant">
+              <ComboboxAdd
+                value={f.accepting_consultant}
+                onChange={(v) => set("accepting_consultant", v)}
+                options={consultants}
+                placeholder="Select or add consultant…"
               />
             </Field>
           )}

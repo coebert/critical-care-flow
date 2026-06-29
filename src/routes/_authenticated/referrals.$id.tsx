@@ -89,7 +89,7 @@ function ReferralDetail() {
   const { hasRole: isAdmin } = useRole("admin");
   const [deleting, setDeleting] = useState(false);
   const [expandCmd, setExpandCmd] = useState<{ open: boolean; id: number } | null>(null);
-  const { specialties, wards } = useReferralOptions();
+  const { specialties, wards, consultants } = useReferralOptions();
 
 
   const [ref, setRef] = useState<Referral | null>(null);
@@ -239,6 +239,7 @@ function ReferralDetail() {
         reason_for_referral: ref.reason_for_referral, status: ref.status,
         decline_reason: ref.decline_reason,
         admission_urgency: ref.admission_urgency ?? null,
+        accepting_consultant: (ref as any).accepting_consultant ?? null,
         referral_received_at: ref.referral_received_at,
         first_seen_at: ref.first_seen_at, decision_at: ref.decision_at,
         arrived_on_unit_at: ref.arrived_on_unit_at,
@@ -505,6 +506,16 @@ function ReferralDetail() {
                 <p className="text-xs text-destructive mt-1">Required when declining a referral.</p>
               )}
             </ExpandableSection>
+          )}
+          {ref.status === "admitted" && (
+            <F label="Accepting critical care consultant">
+              <ComboboxAdd
+                value={ref.accepting_consultant ?? ""}
+                onChange={(v) => set("accepting_consultant", v || null)}
+                options={consultants}
+                placeholder="Select or add consultant…"
+              />
+            </F>
           )}
         </Card>
 
@@ -886,6 +897,7 @@ const FIELD_LABELS: Record<string, string> = {
   status: "Status",
   decline_reason: "Reason for declining",
   admission_urgency: "Admission urgency",
+  accepting_consultant: "Accepting consultant",
 };
 
 const DATE_FIELDS = new Set([
