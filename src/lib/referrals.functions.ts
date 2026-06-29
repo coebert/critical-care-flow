@@ -102,6 +102,9 @@ export const createReferral = createServerFn({ method: "POST" })
     if (data.status === "declined" && !(data.decline_reason ?? "").trim()) {
       throw new Error("A reason is required when declining a referral.");
     }
+    if (data.status === "admitted" && !(data.accepting_consultant ?? "").trim()) {
+      throw new Error("An accepting consultant is required when admitting a referral.");
+    }
     const insert = {
       ...data,
       created_by: userId,
