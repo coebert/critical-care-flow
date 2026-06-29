@@ -506,6 +506,16 @@ function ReferralDetail() {
               )}
             </ExpandableSection>
           )}
+          {ref.status === "admitted" && (
+            <F label="Accepting critical care consultant">
+              <ComboboxAdd
+                value={ref.accepting_consultant ?? ""}
+                onChange={(v) => set("accepting_consultant", v || null)}
+                options={consultants}
+                placeholder="Select or add consultant…"
+              />
+            </F>
+          )}
         </Card>
 
         <div className="flex justify-end">
