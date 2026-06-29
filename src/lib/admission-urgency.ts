@@ -31,9 +31,19 @@ export const ADMISSION_URGENCY_BADGE: Record<AdmissionUrgency, string> = {
 /** Label used in analytics for referrals with no admission_urgency set. */
 export const URGENCY_NOT_SET_LABEL = "Not set";
 
-/** Resolve a urgency value (possibly null) to its analytics display label. */
-export function urgencyLabel(value: AdmissionUrgency | null | undefined): string {
-  return value ? ADMISSION_URGENCY_LABELS[value] : URGENCY_NOT_SET_LABEL;
+/**
+ * Resolve a urgency value to its analytics display label.
+ *
+ * Accepts `unknown` so that partially populated rows from the database
+ * (e.g. legacy enum values, typos, or `undefined` after a schema change)
+ * are guaranteed to map to a label that exists in URGENCY_DISPLAY_ORDER
+ * rather than leaking a raw value into the axis/legend/counts.
+ */
+export function urgencyLabel(value: unknown): string {
+  if (typeof value === "string" && value in ADMISSION_URGENCY_LABELS) {
+    return ADMISSION_URGENCY_LABELS[value as AdmissionUrgency];
+  }
+  return URGENCY_NOT_SET_LABEL;
 }
 
 /** Stable display order for analytics counts/legend/axis. */
