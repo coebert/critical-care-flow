@@ -114,6 +114,52 @@ function AnalyticsPage() {
     [filtered, dayKeys]
   );
 
+  const admittedConsultants = useMemo(() => {
+    const counts = new Map<string, number>();
+    filtered.forEach((r) => {
+      if (r.status !== "admitted") return;
+      const name = (r.accepting_consultant ?? "").trim() || "Unspecified";
+      counts.set(name, (counts.get(name) ?? 0) + 1);
+    });
+    return Array.from(counts.entries())
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 8)
+      .map(([name]) => name);
+  }, [filtered]);
+
+  const perDayByConsultant = useMemo(() => {
+    const map = new Map<string, Record<string, number | string>>(
+      dayKeys.map((k) => [
+        k,
+        { date: format(new Date(k), "dd MMM"), ...Object.fromEntries(admittedConsultants.map((c) => [c, 0])) },
+      ])
+    );
+    filtered.forEach((r) => {
+      if (r.status !== "admitted") return;
+      const name = (r.accepting_consultant ?? "").trim() || "Unspecified";
+      if (!admittedConsultants.includes(name)) return;
+      const k = format(startOfDay(new Date(r.referral_received_at)), "yyyy-MM-dd");
+      const row = map.get(k);
+      if (row) row[name] = ((row[name] as number) ?? 0) + 1;
+    });
+    return Array.from(map.values());
+  }, [filtered, dayKeys, admittedConsultants]);
+
+  const consultantTotals = useMemo(
+    () =>
+      admittedConsultants
+        .map((name) => ({
+          name,
+          count: filtered.filter(
+            (r) =>
+              r.status === "admitted" &&
+              ((r.accepting_consultant ?? "").trim() || "Unspecified") === name
+          ).length,
+        }))
+        .sort((a, b) => b.count - a.count),
+    [filtered, admittedConsultants]
+  );
+
   const meanMinutes = (sel: (r: Referral) => [string | null, string | null]) => {
     const ds = filtered
       .map(sel)
