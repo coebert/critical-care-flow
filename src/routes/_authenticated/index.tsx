@@ -108,6 +108,7 @@ function ReferralsList() {
   const [restoringId, setRestoringId] = useState<string | null>(null);
   const [timerSort, setTimerSort] = useState<"none" | "desc" | "asc">("none");
   const [sortTick, setSortTick] = useState(0);
+  const [clinicianNames, setClinicianNames] = useState<Record<string, string>>({});
   useEffect(() => {
     if (timerSort === "none") return;
     const id = setInterval(() => setSortTick((t) => t + 1), 30000);
