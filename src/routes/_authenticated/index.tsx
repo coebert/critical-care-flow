@@ -108,6 +108,7 @@ function ReferralsList() {
   const [restoringId, setRestoringId] = useState<string | null>(null);
   const [timerSort, setTimerSort] = useState<"none" | "desc" | "asc">("none");
   const [sortTick, setSortTick] = useState(0);
+  const [clinicianNames, setClinicianNames] = useState<Record<string, string>>({});
   useEffect(() => {
     if (timerSort === "none") return;
     const id = setInterval(() => setSortTick((t) => t + 1), 30000);
@@ -187,6 +188,34 @@ function ReferralsList() {
       supabase.removeChannel(ch);
     };
   }, []);
+
+  // Resolve clinician names for the "Taken by" column.
+  useEffect(() => {
+    const missing = Array.from(
+      new Set(
+        rows
+          .map((r) => r.created_by)
+          .filter((id): id is string => !!id && !(id in clinicianNames)),
+      ),
+    );
+    if (missing.length === 0) return;
+    let cancelled = false;
+    supabase
+      .from("profiles")
+      .select("id, full_name")
+      .in("id", missing)
+      .then(({ data }) => {
+        if (cancelled || !data) return;
+        setClinicianNames((cur) => {
+          const next = { ...cur };
+          for (const p of data) next[p.id] = p.full_name ?? "";
+          return next;
+        });
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [rows, clinicianNames]);
 
   const topWards = useMemo(() => {
     const counts = new Map<string, number>();
@@ -497,14 +526,15 @@ function ReferralsList() {
               </th>
               <th className="text-left px-3 py-2">Urgency</th>
               <th className="text-left px-3 py-2">Status</th>
+              <th className="text-left px-3 py-2">Taken by</th>
             </tr>
           </thead>
           <tbody>
             {loading && (
-              <tr><td colSpan={9} className="px-3 py-8 text-center text-muted-foreground">Loading…</td></tr>
+              <tr><td colSpan={10} className="px-3 py-8 text-center text-muted-foreground">Loading…</td></tr>
             )}
             {!loading && displayed.length === 0 && (
-              <tr><td colSpan={9} className="px-3 py-8 text-center text-muted-foreground">No referrals match.</td></tr>)}
+              <tr><td colSpan={10} className="px-3 py-8 text-center text-muted-foreground">No referrals match.</td></tr>)}
             {displayed.map((r) => (
               <tr
                 key={r.id}
@@ -538,6 +568,11 @@ function ReferralsList() {
                 </td>
                 <td className="px-3 py-2">
                   <Badge variant="outline" className={`capitalize ${statusStyles[r.status]}`}>{r.status}</Badge>
+                </td>
+                <td className="px-3 py-2 whitespace-nowrap">
+                  {r.created_by && clinicianNames[r.created_by]
+                    ? clinicianNames[r.created_by]
+                    : <span className="text-xs text-muted-foreground">—</span>}
                 </td>
               </tr>
             ))}
@@ -597,6 +632,14 @@ function ReferralsList() {
               <div className="col-span-2">
                 <span className="text-xs text-muted-foreground block">Reason</span>
                 <span className="font-medium line-clamp-2">{r.reason_for_referral ?? "—"}</span>
+              </div>
+              <div className="col-span-2">
+                <span className="text-xs text-muted-foreground block">Taken by</span>
+                <span className="font-medium">
+                  {r.created_by && clinicianNames[r.created_by]
+                    ? clinicianNames[r.created_by]
+                    : "—"}
+                </span>
               </div>
             </div>
           </div>
