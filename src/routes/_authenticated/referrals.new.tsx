@@ -48,6 +48,7 @@ type PriorReferral = {
   reason_for_referral: string | null;
   age: number | null;
   sex: string | null;
+  consultant_to_consultant_only: boolean | null;
 };
 
 export const Route = createFileRoute("/_authenticated/referrals/new")({
