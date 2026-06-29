@@ -514,22 +514,21 @@ function ReferralDetail() {
             </ExpandableSection>
           )}
           {ref.status === "admitted" && (
-            <F label="Accepting critical care consultant" required>
-              <ComboboxAdd
-                value={ref.accepting_consultant ?? ""}
-                onChange={(v) => set("accepting_consultant", v || null)}
-                options={consultants}
-                placeholder="Select or add consultant…"
-              />
-              {acceptingConsultantMissing && (
-                <p className="text-xs text-destructive mt-1">Required when admitting a referral.</p>
-              )}
+            <F label="Accepting critical care consultant" required error={acceptingConsultantMissing ? "Required when admitting a referral." : undefined}>
+              <div className={cn(acceptingConsultantMissing && "rounded-md ring-1 ring-destructive")}>
+                <ComboboxAdd
+                  value={ref.accepting_consultant ?? ""}
+                  onChange={(v) => set("accepting_consultant", v || null)}
+                  options={consultants}
+                  placeholder="Select or add consultant…"
+                />
+              </div>
             </F>
           )}
         </Card>
 
         <div className="flex justify-end">
-          <Button onClick={save} disabled={saving}><Save className="w-4 h-4 mr-1" />{saving ? "Saving…" : "Save changes"}</Button>
+          <Button onClick={save} disabled={saving || acceptingConsultantMissing}><Save className="w-4 h-4 mr-1" />{saving ? "Saving…" : "Save changes"}</Button>
         </div>
 
         <Card className="p-5">
