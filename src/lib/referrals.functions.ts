@@ -165,12 +165,23 @@ export const updateReferral = createServerFn({ method: "POST" })
   )
   .handler(async ({ data, context }) => {
     const { supabase, userId } = context;
-    // Read prior status to decide whether to notify on status change.
+    // Read prior status & decline reason to decide notifications and enforce
+    // the "decline_reason required when declined" rule even when the patch
+    // only touches one of the two fields.
     const { data: prior } = await supabase
       .from("referrals")
-      .select("status")
+      .select("status, decline_reason")
       .eq("id", data.id)
       .maybeSingle();
+
+    const finalStatus = data.patch.status ?? prior?.status;
+    const finalReason =
+      data.patch.decline_reason !== undefined
+        ? data.patch.decline_reason
+        : prior?.decline_reason;
+    if (finalStatus === "declined" && !(finalReason ?? "").trim()) {
+      throw new Error("A reason is required when declining a referral.");
+    }
 
     const { data: row, error } = await supabase
       .from("referrals")
