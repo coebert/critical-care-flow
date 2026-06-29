@@ -339,6 +339,7 @@ function NewReferralPage() {
                 </div>
               </AlertDescription>
             </Alert>
+          )}
           {priorC2C && (
             <Alert variant="destructive" className="mt-2">
               <AlertCircle className="h-4 w-4" />
