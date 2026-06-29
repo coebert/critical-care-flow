@@ -401,7 +401,18 @@ function NewReferralPage() {
             </Field>
           </div>
           {f.status === "declined" && (
-            <Field label="Reason for declining"><Textarea rows={3} value={f.decline_reason} onChange={(e) => set("decline_reason", e.target.value)} /></Field>
+            <Field
+              label="Reason for declining"
+              required
+              error={showErrors && declineReasonMissing ? "Required when declining a referral." : undefined}
+            >
+              <Textarea
+                rows={3}
+                value={f.decline_reason}
+                onChange={(e) => set("decline_reason", e.target.value)}
+                className={cn(showErrors && declineReasonMissing && "border-destructive focus-visible:ring-destructive")}
+              />
+            </Field>
           )}
         </Section>
 
