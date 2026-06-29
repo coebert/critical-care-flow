@@ -662,7 +662,7 @@ export const findReferralsByHospitalNumber = createServerFn({ method: "POST" })
     let q = supabase
       .from("referrals")
       .select(
-        "id, hospital_number, referral_received_at, status, referring_specialty, current_ward, current_bed, reason_for_referral, age, sex",
+        "id, hospital_number, referral_received_at, status, referring_specialty, current_ward, current_bed, reason_for_referral, age, sex, consultant_to_consultant_only",
       )
       .eq("hospital_number", data.hospital_number)
       .is("deleted_at", null)
