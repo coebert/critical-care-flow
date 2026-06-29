@@ -122,7 +122,7 @@ function NewReferralPage() {
   const navigate = useNavigate();
   const create = useServerFn(createReferral);
   const [saving, setSaving] = useState(false);
-  const { specialties, wards } = useReferralOptions();
+  const { specialties, wards, consultants } = useReferralOptions();
   const [f, setF] = useState<DraftForm>(blankForm);
   const [draftRestored, setDraftRestored] = useState(false);
   const [draftSavedAt, setDraftSavedAt] = useState<Date | null>(null);
