@@ -356,6 +356,7 @@ export const getNoteHistory = createServerFn({ method: "POST" })
 const AUDITED_REFERRAL_FIELDS = [
   "age", "sex", "hospital_number", "current_ward", "current_bed",
   "past_medical_history", "baseline_function", "dnacpr_respect",
+  "consultant_to_consultant_only",
   "referring_specialty", "reason_for_referral",
   "referral_received_at", "first_seen_at", "decision_at", "arrived_on_unit_at",
   "status", "decline_reason",
