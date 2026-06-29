@@ -89,7 +89,7 @@ function ReferralDetail() {
   const { hasRole: isAdmin } = useRole("admin");
   const [deleting, setDeleting] = useState(false);
   const [expandCmd, setExpandCmd] = useState<{ open: boolean; id: number } | null>(null);
-  const { specialties, wards } = useReferralOptions();
+  const { specialties, wards, consultants } = useReferralOptions();
 
 
   const [ref, setRef] = useState<Referral | null>(null);
