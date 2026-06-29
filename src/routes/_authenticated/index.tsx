@@ -646,6 +646,12 @@ function ReferralsList() {
                     : "—"}
                 </span>
               </div>
+              {r.status === "admitted" && (r as any).accepting_consultant && (
+                <div className="col-span-2">
+                  <span className="text-xs text-muted-foreground block">Accepted by</span>
+                  <span className="font-medium">{(r as any).accepting_consultant}</span>
+                </div>
+              )}
             </div>
           </div>
         ))}
