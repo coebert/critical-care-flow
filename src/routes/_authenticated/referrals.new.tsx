@@ -74,6 +74,7 @@ type DraftForm = {
   past_medical_history: string;
   baseline_function: string;
   dnacpr_respect: boolean;
+  consultant_to_consultant_only: boolean;
   referring_specialty: string;
   reason_for_referral: string;
   referral_received_at: string;
