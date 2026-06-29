@@ -97,6 +97,9 @@ export const createReferral = createServerFn({ method: "POST" })
   .inputValidator((d: unknown) => refSchema.parse(d))
   .handler(async ({ data, context }) => {
     const { supabase, userId } = context;
+    if (data.status === "declined" && !(data.decline_reason ?? "").trim()) {
+      throw new Error("A reason is required when declining a referral.");
+    }
     const insert = {
       ...data,
       created_by: userId,
