@@ -375,6 +375,14 @@ function ReferralDetail() {
             <Switch checked={ref.dnacpr_respect} onCheckedChange={(v) => set("dnacpr_respect", v)} id="dn" />
             <Label htmlFor="dn">DNACPR / ReSPECT in place</Label>
           </div>
+          <div className="flex items-center gap-3">
+            <Switch
+              checked={(ref as any).consultant_to_consultant_only ?? false}
+              onCheckedChange={(v) => set("consultant_to_consultant_only" as any, v as any)}
+              id="c2c"
+            />
+            <Label htmlFor="c2c">Consultant-to-consultant referral only</Label>
+          </div>
         </Card>
 
         {priorDeclined.length > 0 && (
