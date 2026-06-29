@@ -218,6 +218,8 @@ function ReferralDetail() {
 
   const declineReasonMissing =
     ref.status === "declined" && !(ref.decline_reason ?? "").trim();
+  const acceptingConsultantMissing =
+    ref.status === "admitted" && !((ref as any).accepting_consultant ?? "").trim();
 
   const save = async () => {
     if (!timing.isValid) {
@@ -226,6 +228,10 @@ function ReferralDetail() {
     }
     if (declineReasonMissing) {
       toast.error("A reason is required when declining a referral.");
+      return;
+    }
+    if (acceptingConsultantMissing) {
+      toast.error("An accepting consultant is required when admitting a referral.");
       return;
     }
     setSaving(true);
