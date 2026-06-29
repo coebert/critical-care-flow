@@ -355,6 +355,51 @@ function AnalyticsPage() {
             <li className="flex justify-between"><span className="text-muted-foreground">Pending</span><span className="font-medium">{byStatus.find((s) => s.name === "pending")?.value ?? 0}</span></li>
           </ul>
         </Card>
+
+        <Card className="p-5 md:col-span-2">
+          <h2 className="font-semibold mb-1">Admitted referrals by accepting consultant</h2>
+          <p className="text-xs text-muted-foreground mb-3">
+            Daily admissions broken down by accepting consultant (top {admittedConsultants.length || 0}).
+          </p>
+          <div className="h-72">
+            {admittedConsultants.length === 0 ? (
+              <div className="h-full flex items-center justify-center text-sm text-muted-foreground">
+                No admitted referrals in this period.
+              </div>
+            ) : (
+              <ResponsiveContainer width="100%" height="100%">
+                <AreaChart data={perDayByConsultant}>
+                  <CartesianGrid strokeDasharray="3 3" opacity={0.3} />
+                  <XAxis dataKey="date" fontSize={11} />
+                  <YAxis allowDecimals={false} fontSize={11} />
+                  <Tooltip />
+                  <Legend wrapperStyle={{ fontSize: 11 }} />
+                  {admittedConsultants.map((name, i) => (
+                    <Area
+                      key={name}
+                      type="monotone"
+                      dataKey={name}
+                      stackId="consultant"
+                      stroke={COLORS[i % COLORS.length]}
+                      fill={COLORS[i % COLORS.length]}
+                      fillOpacity={0.7}
+                    />
+                  ))}
+                </AreaChart>
+              </ResponsiveContainer>
+            )}
+          </div>
+          {consultantTotals.length > 0 && (
+            <ul className="mt-4 grid grid-cols-2 sm:grid-cols-3 gap-x-4 gap-y-1 text-sm">
+              {consultantTotals.map((c) => (
+                <li key={c.name} className="flex justify-between">
+                  <span className="text-muted-foreground truncate mr-2" title={c.name}>{c.name}</span>
+                  <span className="font-medium shrink-0">{c.count}</span>
+                </li>
+              ))}
+            </ul>
+          )}
+        </Card>
       </div>
     </div>
   );
