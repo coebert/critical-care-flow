@@ -485,7 +485,17 @@ function ReferralDetail() {
             </F>
           </div>
           {ref.status === "declined" && (
-            <ExpandableSection label="Reason for declining" command={expandCmd}><Textarea rows={3} value={ref.decline_reason ?? ""} onChange={(e) => set("decline_reason", e.target.value)} /></ExpandableSection>
+            <ExpandableSection label="Reason for declining" command={expandCmd}>
+              <Textarea
+                rows={3}
+                value={ref.decline_reason ?? ""}
+                onChange={(e) => set("decline_reason", e.target.value)}
+                className={declineReasonMissing ? "border-destructive focus-visible:ring-destructive" : undefined}
+              />
+              {declineReasonMissing && (
+                <p className="text-xs text-destructive mt-1">Required when declining a referral.</p>
+              )}
+            </ExpandableSection>
           )}
         </Card>
 
