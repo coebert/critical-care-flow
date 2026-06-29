@@ -235,6 +235,7 @@ function ReferralDetail() {
         current_ward: ref.current_ward, current_bed: ref.current_bed,
         past_medical_history: ref.past_medical_history, baseline_function: ref.baseline_function,
         dnacpr_respect: ref.dnacpr_respect, referring_specialty: ref.referring_specialty,
+        consultant_to_consultant_only: (ref as any).consultant_to_consultant_only ?? false,
         reason_for_referral: ref.reason_for_referral, status: ref.status,
         decline_reason: ref.decline_reason,
         admission_urgency: ref.admission_urgency ?? null,
