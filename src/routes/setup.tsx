@@ -43,7 +43,7 @@ const bootstrapFirstAdmin = createServerFn({ method: "POST" })
 const hasAnyUser = createServerFn({ method: "GET" }).handler(async () => {
   const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
   const { data, error } = await supabaseAdmin.auth.admin.listUsers({ perPage: 1 });
-  if (error) throw new Error(error.message);
+  if (error) throw safeError("setup.hasAnyUser", error, "Setup check failed.");
   return { hasUsers: data.users.length > 0 };
 });
 
