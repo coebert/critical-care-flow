@@ -458,9 +458,9 @@ function NewReferralPage() {
             <Field
               label="Accepting critical care consultant"
               required
-              error={showErrors && acceptingConsultantMissing ? "Required when admitting a referral." : undefined}
+              error={acceptingConsultantMissing ? "Required when admitting a referral." : undefined}
             >
-              <div className={cn(showErrors && acceptingConsultantMissing && "rounded-md ring-1 ring-destructive")}>
+              <div className={cn(acceptingConsultantMissing && "rounded-md ring-1 ring-destructive")}>
                 <ComboboxAdd
                   value={f.accepting_consultant}
                   onChange={(v) => set("accepting_consultant", v)}
