@@ -216,9 +216,16 @@ function ReferralDetail() {
     arrived_on_unit_at: ref.arrived_on_unit_at,
   });
 
+  const declineReasonMissing =
+    ref.status === "declined" && !(ref.decline_reason ?? "").trim();
+
   const save = async () => {
     if (!timing.isValid) {
       toast.error("Please fix the highlighted timing issues before saving.");
+      return;
+    }
+    if (declineReasonMissing) {
+      toast.error("A reason is required when declining a referral.");
       return;
     }
     setSaving(true);
@@ -478,7 +485,17 @@ function ReferralDetail() {
             </F>
           </div>
           {ref.status === "declined" && (
-            <ExpandableSection label="Reason for declining" command={expandCmd}><Textarea rows={3} value={ref.decline_reason ?? ""} onChange={(e) => set("decline_reason", e.target.value)} /></ExpandableSection>
+            <ExpandableSection label="Reason for declining" command={expandCmd}>
+              <Textarea
+                rows={3}
+                value={ref.decline_reason ?? ""}
+                onChange={(e) => set("decline_reason", e.target.value)}
+                className={declineReasonMissing ? "border-destructive focus-visible:ring-destructive" : undefined}
+              />
+              {declineReasonMissing && (
+                <p className="text-xs text-destructive mt-1">Required when declining a referral.</p>
+              )}
+            </ExpandableSection>
           )}
         </Card>
 
