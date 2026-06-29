@@ -450,6 +450,16 @@ function NewReferralPage() {
               />
             </Field>
           )}
+          {f.status === "admitted" && (
+            <Field label="Accepting critical care consultant">
+              <ComboboxAdd
+                value={f.accepting_consultant}
+                onChange={(v) => set("accepting_consultant", v)}
+                options={consultants}
+                placeholder="Select or add consultant…"
+              />
+            </Field>
+          )}
         </Section>
 
         <Section title="Noteboard">
