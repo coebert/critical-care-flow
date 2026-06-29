@@ -531,10 +531,10 @@ function ReferralsList() {
           </thead>
           <tbody>
             {loading && (
-              <tr><td colSpan={9} className="px-3 py-8 text-center text-muted-foreground">Loading…</td></tr>
+              <tr><td colSpan={10} className="px-3 py-8 text-center text-muted-foreground">Loading…</td></tr>
             )}
             {!loading && displayed.length === 0 && (
-              <tr><td colSpan={9} className="px-3 py-8 text-center text-muted-foreground">No referrals match.</td></tr>)}
+              <tr><td colSpan={10} className="px-3 py-8 text-center text-muted-foreground">No referrals match.</td></tr>)}
             {displayed.map((r) => (
               <tr
                 key={r.id}
@@ -568,6 +568,11 @@ function ReferralsList() {
                 </td>
                 <td className="px-3 py-2">
                   <Badge variant="outline" className={`capitalize ${statusStyles[r.status]}`}>{r.status}</Badge>
+                </td>
+                <td className="px-3 py-2 whitespace-nowrap">
+                  {r.created_by && clinicianNames[r.created_by]
+                    ? clinicianNames[r.created_by]
+                    : <span className="text-xs text-muted-foreground">—</span>}
                 </td>
               </tr>
             ))}
