@@ -455,15 +455,22 @@ function NewReferralPage() {
             </Field>
           )}
           {f.status === "admitted" && (
-            <Field label="Accepting critical care consultant">
-              <ComboboxAdd
-                value={f.accepting_consultant}
-                onChange={(v) => set("accepting_consultant", v)}
-                options={consultants}
-                placeholder="Select or add consultant…"
-              />
+            <Field
+              label="Accepting critical care consultant"
+              required
+              error={showErrors && acceptingConsultantMissing ? "Required when admitting a referral." : undefined}
+            >
+              <div className={cn(showErrors && acceptingConsultantMissing && "rounded-md ring-1 ring-destructive")}>
+                <ComboboxAdd
+                  value={f.accepting_consultant}
+                  onChange={(v) => set("accepting_consultant", v)}
+                  options={consultants}
+                  placeholder="Select or add consultant…"
+                />
+              </div>
             </Field>
           )}
+
         </Section>
 
         <Section title="Noteboard">
