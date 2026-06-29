@@ -633,6 +633,14 @@ function ReferralsList() {
                 <span className="text-xs text-muted-foreground block">Reason</span>
                 <span className="font-medium line-clamp-2">{r.reason_for_referral ?? "—"}</span>
               </div>
+              <div className="col-span-2">
+                <span className="text-xs text-muted-foreground block">Taken by</span>
+                <span className="font-medium">
+                  {r.created_by && clinicianNames[r.created_by]
+                    ? clinicianNames[r.created_by]
+                    : "—"}
+                </span>
+              </div>
             </div>
           </div>
         ))}
