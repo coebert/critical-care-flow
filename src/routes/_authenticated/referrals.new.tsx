@@ -243,18 +243,22 @@ function NewReferralPage() {
 
   const declineReasonMissing =
     f.status === "declined" && !f.decline_reason.trim();
+  const acceptingConsultantMissing =
+    f.status === "admitted" && !f.accepting_consultant.trim();
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!timing.isValid || declineReasonMissing) {
+    if (!timing.isValid || declineReasonMissing || acceptingConsultantMissing) {
       setShowErrors(true);
-      toast.error(
-        declineReasonMissing && timing.isValid
-          ? "A reason is required when declining a referral."
-          : "Please fix the highlighted fields before saving.",
-      );
+      const msg = acceptingConsultantMissing && timing.isValid && !declineReasonMissing
+        ? "An accepting consultant is required when admitting a referral."
+        : declineReasonMissing && timing.isValid && !acceptingConsultantMissing
+        ? "A reason is required when declining a referral."
+        : "Please fix the highlighted fields before saving.";
+      toast.error(msg);
       return;
     }
+
     setSaving(true);
     try {
       const payload: any = {
