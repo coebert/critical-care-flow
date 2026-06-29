@@ -209,6 +209,7 @@ export type Database = {
       }
       referrals: {
         Row: {
+          accepting_consultant: string | null
           admission_urgency:
             | Database["public"]["Enums"]["admission_urgency"]
             | null
@@ -238,6 +239,7 @@ export type Database = {
           updated_by: string | null
         }
         Insert: {
+          accepting_consultant?: string | null
           admission_urgency?:
             | Database["public"]["Enums"]["admission_urgency"]
             | null
@@ -267,6 +269,7 @@ export type Database = {
           updated_by?: string | null
         }
         Update: {
+          accepting_consultant?: string | null
           admission_urgency?:
             | Database["public"]["Enums"]["admission_urgency"]
             | null
