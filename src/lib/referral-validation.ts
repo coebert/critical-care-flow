@@ -27,12 +27,16 @@ const toDate = (v: string | null | undefined): Date | null => {
   return Number.isNaN(d.getTime()) ? null : d;
 };
 
+/** Maximum age (in days) allowed for `referral_received_at`. */
+export const MAX_REFERRAL_AGE_DAYS = 30;
+
 export function validateReferralTimings(input: ReferralTimingInput): TimingValidation {
   const fieldErrors: Partial<Record<TimingField, string>> = {};
   const issues: string[] = [];
   const now = new Date();
   // Allow up to 2 minutes of clock skew when comparing to "now".
   const futureCap = new Date(now.getTime() + 2 * 60 * 1000);
+  const pastCap = new Date(now.getTime() - MAX_REFERRAL_AGE_DAYS * 24 * 60 * 60 * 1000);
 
   const received = toDate(input.referral_received_at);
   const firstSeen = toDate(input.first_seen_at);
@@ -41,6 +45,9 @@ export function validateReferralTimings(input: ReferralTimingInput): TimingValid
 
   // Required fields per ICNARC dataset
   if (!received) fieldErrors.referral_received_at = "Required — when the referral was received.";
+  else if (received < pastCap) {
+    fieldErrors.referral_received_at = `Received time is more than ${MAX_REFERRAL_AGE_DAYS} days ago — please check the date.`;
+  }
   if (input.status !== "pending") {
     if (!firstSeen) fieldErrors.first_seen_at = "Required once the patient has been reviewed.";
     if (!decision) fieldErrors.decision_at = "Required once a decision has been made.";
