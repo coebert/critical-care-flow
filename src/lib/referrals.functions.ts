@@ -12,6 +12,7 @@ const refSchema = z.object({
   past_medical_history: z.string().trim().max(5000).nullable().optional(),
   baseline_function: z.string().trim().max(2000).nullable().optional(),
   dnacpr_respect: z.boolean().optional(),
+  consultant_to_consultant_only: z.boolean().optional(),
   referring_specialty: z.string().trim().max(100).nullable().optional(),
   reason_for_referral: z.string().trim().max(5000).nullable().optional(),
   referral_received_at: z.string().optional(),
