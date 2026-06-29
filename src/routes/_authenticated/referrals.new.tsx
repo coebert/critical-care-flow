@@ -226,11 +226,18 @@ function NewReferralPage() {
   });
   const [showErrors, setShowErrors] = useState(false);
 
+  const declineReasonMissing =
+    f.status === "declined" && !f.decline_reason.trim();
+
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!timing.isValid) {
+    if (!timing.isValid || declineReasonMissing) {
       setShowErrors(true);
-      toast.error("Please fix the highlighted timing fields before saving.");
+      toast.error(
+        declineReasonMissing && timing.isValid
+          ? "A reason is required when declining a referral."
+          : "Please fix the highlighted fields before saving.",
+      );
       return;
     }
     setSaving(true);
