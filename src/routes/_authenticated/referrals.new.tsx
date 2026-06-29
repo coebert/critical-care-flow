@@ -481,7 +481,7 @@ function NewReferralPage() {
 
         <div className="flex justify-end gap-2">
           <Button type="button" variant="outline" onClick={() => navigate({ to: "/" })}>Cancel</Button>
-          <Button type="submit" disabled={saving}>{saving ? "Saving…" : "Save referral"}</Button>
+          <Button type="submit" disabled={saving || acceptingConsultantMissing}>{saving ? "Saving…" : "Save referral"}</Button>
         </div>
       </form>
 
