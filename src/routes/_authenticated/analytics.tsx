@@ -236,6 +236,25 @@ function AnalyticsPage() {
         <Kpi label="Mean time-to-first-seen" value={meanTimeToSeen ? `${Math.round(meanTimeToSeen)} min` : "—"} />
       </div>
 
+      {admittedMissingConsultant > 0 && (
+        <Card className="mb-6 p-4 border-amber-200 bg-amber-50 dark:bg-amber-950 dark:border-amber-800">
+          <div className="flex items-center gap-3">
+            <TriangleAlert className="h-5 w-5 text-amber-700 dark:text-amber-300 shrink-0" />
+            <div>
+              <p className="text-sm font-medium text-amber-900 dark:text-amber-100">
+                Data quality issue
+              </p>
+              <p className="text-sm text-amber-800 dark:text-amber-200">
+                {admittedMissingConsultant} admitted referral{admittedMissingConsultant === 1 ? "" : "s"} missing an accepting consultant. These {admittedMissingConsultant === 1 ? "record is" : "records are"} excluded from the consultant chart below.
+              </p>
+            </div>
+            <Badge variant="destructive" className="ml-auto shrink-0">
+              {admittedMissingConsultant}
+            </Badge>
+          </div>
+        </Card>
+      )}
+
       <div className="grid md:grid-cols-2 gap-6">
         <Card className="p-5">
           <h2 className="font-semibold mb-3">Referrals over time</h2>
