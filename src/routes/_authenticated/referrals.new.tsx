@@ -395,6 +395,14 @@ function NewReferralPage() {
             <Switch id="dnacpr" checked={f.dnacpr_respect} onCheckedChange={(v) => set("dnacpr_respect", v)} />
             <Label htmlFor="dnacpr">DNACPR / ReSPECT form already in place</Label>
           </div>
+          <div className="flex items-center gap-3">
+            <Switch
+              id="c2c"
+              checked={f.consultant_to_consultant_only}
+              onCheckedChange={(v) => set("consultant_to_consultant_only", v)}
+            />
+            <Label htmlFor="c2c">Consultant-to-consultant referral only</Label>
+          </div>
         </Section>
 
         <Section title="Outcome">
