@@ -213,6 +213,16 @@ function NewReferralPage() {
     };
   }, [f.hospital_number, findPrior]);
 
+  const priorC2C = priors.some((p) => p.consultant_to_consultant_only === true);
+
+  // Auto-persist the C2C flag from any prior referral for this patient.
+  useEffect(() => {
+    if (priorC2C && !f.consultant_to_consultant_only) {
+      setF((cur) => ({ ...cur, consultant_to_consultant_only: true }));
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [priorC2C]);
+
   const showAlert =
     priors.length > 0 && dismissedFor !== f.hospital_number.trim();
 
