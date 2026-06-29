@@ -526,6 +526,7 @@ function ReferralsList() {
               </th>
               <th className="text-left px-3 py-2">Urgency</th>
               <th className="text-left px-3 py-2">Status</th>
+              <th className="text-left px-3 py-2">Taken by</th>
             </tr>
           </thead>
           <tbody>
