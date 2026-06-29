@@ -26,7 +26,7 @@ const bootstrapFirstAdmin = createServerFn({ method: "POST" })
   .handler(async ({ data }) => {
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const { data: users, error: listErr } = await supabaseAdmin.auth.admin.listUsers({ perPage: 1 });
-    if (listErr) throw new Error(listErr.message);
+    if (listErr) throw safeError("setup.listUsers", listErr, "Setup check failed.");
     if (users.users.length > 0) throw new Error("Setup already complete. Sign in instead.");
 
     const { data: created, error } = await supabaseAdmin.auth.admin.createUser({
@@ -35,7 +35,7 @@ const bootstrapFirstAdmin = createServerFn({ method: "POST" })
       email_confirm: true,
       user_metadata: { full_name: data.full_name },
     });
-    if (error) throw new Error(error.message);
+    if (error) throw safeError("setup.createAdmin", error, "Failed to create admin account.");
     // Trigger already creates 'admin' for the first user
     return { ok: true };
   });
