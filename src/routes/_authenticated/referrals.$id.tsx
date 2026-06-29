@@ -528,7 +528,7 @@ function ReferralDetail() {
         </Card>
 
         <div className="flex justify-end">
-          <Button onClick={save} disabled={saving}><Save className="w-4 h-4 mr-1" />{saving ? "Saving…" : "Save changes"}</Button>
+          <Button onClick={save} disabled={saving || acceptingConsultantMissing}><Save className="w-4 h-4 mr-1" />{saving ? "Saving…" : "Save changes"}</Button>
         </div>
 
         <Card className="p-5">
