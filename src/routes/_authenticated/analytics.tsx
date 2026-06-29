@@ -2,6 +2,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Card } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
@@ -13,6 +14,7 @@ import {
   ResponsiveContainer, LineChart, Line, XAxis, YAxis, Tooltip, CartesianGrid,
   BarChart, Bar, PieChart, Pie, Cell, Legend, AreaChart, Area,
 } from "recharts";
+import { TriangleAlert } from "lucide-react";
 import {
   format, subDays, startOfDay, endOfDay, differenceInMinutes,
   differenceInCalendarDays, eachDayOfInterval,
@@ -114,18 +116,27 @@ function AnalyticsPage() {
     [filtered, dayKeys]
   );
 
+  const admittedWithConsultant = useMemo(
+    () => filtered.filter((r) => r.status === "admitted" && (r.accepting_consultant ?? "").trim()),
+    [filtered]
+  );
+
+  const admittedMissingConsultant = useMemo(
+    () => filtered.filter((r) => r.status === "admitted" && !(r.accepting_consultant ?? "").trim()).length,
+    [filtered]
+  );
+
   const admittedConsultants = useMemo(() => {
     const counts = new Map<string, number>();
-    filtered.forEach((r) => {
-      if (r.status !== "admitted") return;
-      const name = (r.accepting_consultant ?? "").trim() || "Unspecified";
+    admittedWithConsultant.forEach((r) => {
+      const name = r.accepting_consultant!.trim();
       counts.set(name, (counts.get(name) ?? 0) + 1);
     });
     return Array.from(counts.entries())
       .sort((a, b) => b[1] - a[1])
       .slice(0, 8)
       .map(([name]) => name);
-  }, [filtered]);
+  }, [admittedWithConsultant]);
 
   const perDayByConsultant = useMemo(() => {
     const map = new Map<string, Record<string, number | string>>(
@@ -134,30 +145,27 @@ function AnalyticsPage() {
         { date: format(new Date(k), "dd MMM"), ...Object.fromEntries(admittedConsultants.map((c) => [c, 0])) },
       ])
     );
-    filtered.forEach((r) => {
-      if (r.status !== "admitted") return;
-      const name = (r.accepting_consultant ?? "").trim() || "Unspecified";
+    admittedWithConsultant.forEach((r) => {
+      const name = r.accepting_consultant!.trim();
       if (!admittedConsultants.includes(name)) return;
       const k = format(startOfDay(new Date(r.referral_received_at)), "yyyy-MM-dd");
       const row = map.get(k);
       if (row) row[name] = ((row[name] as number) ?? 0) + 1;
     });
     return Array.from(map.values());
-  }, [filtered, dayKeys, admittedConsultants]);
+  }, [admittedWithConsultant, dayKeys, admittedConsultants]);
 
   const consultantTotals = useMemo(
     () =>
       admittedConsultants
         .map((name) => ({
           name,
-          count: filtered.filter(
-            (r) =>
-              r.status === "admitted" &&
-              ((r.accepting_consultant ?? "").trim() || "Unspecified") === name
+          count: admittedWithConsultant.filter(
+            (r) => r.accepting_consultant!.trim() === name
           ).length,
         }))
         .sort((a, b) => b.count - a.count),
-    [filtered, admittedConsultants]
+    [admittedConsultants, admittedWithConsultant]
   );
 
   const meanMinutes = (sel: (r: Referral) => [string | null, string | null]) => {
@@ -227,6 +235,25 @@ function AnalyticsPage() {
         <Kpi label="Mean age (yrs)" value={meanAge ? meanAge.toFixed(1) : "—"} />
         <Kpi label="Mean time-to-first-seen" value={meanTimeToSeen ? `${Math.round(meanTimeToSeen)} min` : "—"} />
       </div>
+
+      {admittedMissingConsultant > 0 && (
+        <Card className="mb-6 p-4 border-amber-200 bg-amber-50 dark:bg-amber-950 dark:border-amber-800">
+          <div className="flex items-center gap-3">
+            <TriangleAlert className="h-5 w-5 text-amber-700 dark:text-amber-300 shrink-0" />
+            <div>
+              <p className="text-sm font-medium text-amber-900 dark:text-amber-100">
+                Data quality issue
+              </p>
+              <p className="text-sm text-amber-800 dark:text-amber-200">
+                {admittedMissingConsultant} admitted referral{admittedMissingConsultant === 1 ? "" : "s"} missing an accepting consultant. These {admittedMissingConsultant === 1 ? "record is" : "records are"} excluded from the consultant chart below.
+              </p>
+            </div>
+            <Badge variant="destructive" className="ml-auto shrink-0">
+              {admittedMissingConsultant}
+            </Badge>
+          </div>
+        </Card>
+      )}
 
       <div className="grid md:grid-cols-2 gap-6">
         <Card className="p-5">
