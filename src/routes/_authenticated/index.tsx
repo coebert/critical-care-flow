@@ -568,6 +568,11 @@ function ReferralsList() {
                 </td>
                 <td className="px-3 py-2">
                   <Badge variant="outline" className={`capitalize ${statusStyles[r.status]}`}>{r.status}</Badge>
+                  {r.status === "admitted" && (r as any).accepting_consultant && (
+                    <div className="text-xs text-muted-foreground mt-1 whitespace-nowrap">
+                      Accepted by {(r as any).accepting_consultant}
+                    </div>
+                  )}
                 </td>
                 <td className="px-3 py-2 whitespace-nowrap">
                   {r.created_by && clinicianNames[r.created_by]
