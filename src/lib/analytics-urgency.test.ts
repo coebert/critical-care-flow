@@ -392,4 +392,113 @@ describe("analytics urgency surfaces with empty / partial data", () => {
   });
 });
 
+/**
+ * Fallback tests — guarantees that missing / unknown urgency values and
+ * missing / invalid `referral_received_at` values still map onto
+ * URGENCY_DISPLAY_ORDER and stay consistent across axis, counts, and the
+ * stacked-area legend.
+ */
+describe("analytics urgency surfaces fallbacks for missing/invalid fields", () => {
+  const now = new Date("2026-06-25T12:00:00Z");
+  const to = endOfDay(now);
+  const from = startOfDay(subDays(to, 6));
+  const dayKeys = eachDayOfInterval({ start: from, end: to }).map((d) =>
+    format(d, "yyyy-MM-dd")
+  );
+
+  it("unknown urgency strings are routed to 'Not set', never leaked into axis/legend", () => {
+    const rows = [
+      { admission_urgency: "legacy_value", referral_received_at: `${dayKeys[0]}T08:00:00Z` },
+      { admission_urgency: "WITHIN_15_MIN", referral_received_at: `${dayKeys[1]}T08:00:00Z` },
+      { admission_urgency: "within_15_min", referral_received_at: `${dayKeys[2]}T08:00:00Z` },
+    ] as unknown as UrgencyRow[];
+
+    const counts = aggregateUrgencyCounts(rows);
+    const perDay = aggregateUrgencyPerDay(rows, dayKeys);
+    const axis = counts.map((c) => c.urgency);
+
+    for (const label of axis) expect(URGENCY_DISPLAY_ORDER).toContain(label);
+    expect(axis).toEqual(["Within 15 minutes", URGENCY_NOT_SET_LABEL]);
+    expect(counts.find((c) => c.urgency === URGENCY_NOT_SET_LABEL)?.count).toBe(2);
+
+    // Every per-day bucket exposes only canonical legend keys.
+    for (const row of perDay) {
+      for (const k of Object.keys(row).filter((k) => k !== "date")) {
+        expect(URGENCY_LEGEND_KEYS).toContain(k);
+      }
+    }
+    const stackTotal = perDay.reduce(
+      (s, r) => s + URGENCY_LEGEND_KEYS.reduce((x, k) => x + ((r[k] as number) ?? 0), 0),
+      0
+    );
+    expect(stackTotal).toBe(rows.length);
+  });
+
+  it("missing / undefined urgency falls back to 'Not set' across all surfaces", () => {
+    const rows = [
+      { referral_received_at: `${dayKeys[0]}T08:00:00Z` },
+      { admission_urgency: undefined, referral_received_at: `${dayKeys[1]}T08:00:00Z` },
+      { admission_urgency: null, referral_received_at: `${dayKeys[2]}T08:00:00Z` },
+    ] as unknown as UrgencyRow[];
+
+    const counts = aggregateUrgencyCounts(rows);
+    expect(counts).toEqual([{ urgency: URGENCY_NOT_SET_LABEL, count: 3 }]);
+
+    const perDay = aggregateUrgencyPerDay(rows, dayKeys);
+    const total = perDay.reduce((s, r) => s + ((r[URGENCY_NOT_SET_LABEL] as number) ?? 0), 0);
+    expect(total).toBe(3);
+  });
+
+  it("invalid / missing referral_received_at is bucketed into the first day, never dropped", () => {
+    const rows = [
+      { admission_urgency: "within_15_min", referral_received_at: "not-a-date" },
+      { admission_urgency: "within_30_min", referral_received_at: "" },
+      { admission_urgency: null, referral_received_at: null },
+    ] as unknown as UrgencyRow[];
+
+    const counts = aggregateUrgencyCounts(rows);
+    const perDay = aggregateUrgencyPerDay(rows, dayKeys);
+
+    // Counts side preserves every row by urgency label.
+    const countsTotal = counts.reduce((a, b) => a + b.count, 0);
+    expect(countsTotal).toBe(rows.length);
+
+    // Stack side: per-day totals also equal row count (no silent loss).
+    const stackTotal = perDay.reduce(
+      (s, r) => s + URGENCY_LEGEND_KEYS.reduce((x, k) => x + ((r[k] as number) ?? 0), 0),
+      0
+    );
+    expect(stackTotal).toBe(rows.length);
+
+    // Axis labels are a subsequence of the canonical display order.
+    const axis = counts.map((c) => c.urgency);
+    const filteredOrder = URGENCY_DISPLAY_ORDER.filter((l) => axis.includes(l));
+    expect(axis).toEqual(filteredOrder);
+  });
+
+  it("mixed valid + invalid rows: surfaces stay aligned and totals match row count", () => {
+    const rows = [
+      { admission_urgency: "within_15_min", referral_received_at: `${dayKeys[2]}T08:00:00Z` },
+      { admission_urgency: "mystery", referral_received_at: `${dayKeys[3]}T08:00:00Z` },
+      { admission_urgency: null, referral_received_at: "garbage" },
+      { admission_urgency: "not_admitting", referral_received_at: `${dayKeys[5]}T08:00:00Z` },
+    ] as unknown as UrgencyRow[];
+
+    const counts = aggregateUrgencyCounts(rows);
+    const perDay = aggregateUrgencyPerDay(rows, dayKeys);
+
+    // Per-label totals between counts and stacked area agree.
+    const stackTotals: Record<string, number> = {};
+    for (const k of URGENCY_LEGEND_KEYS) stackTotals[k] = 0;
+    for (const row of perDay) {
+      for (const k of URGENCY_LEGEND_KEYS) stackTotals[k] += (row[k] as number) ?? 0;
+    }
+    for (const { urgency, count } of counts) {
+      expect(stackTotals[urgency]).toBe(count);
+    }
+
+    expect(counts.reduce((a, b) => a + b.count, 0)).toBe(rows.length);
+  });
+});
+
 
