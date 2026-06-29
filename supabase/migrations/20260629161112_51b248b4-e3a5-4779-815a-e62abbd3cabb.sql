@@ -1,0 +1,1 @@
+ALTER TABLE public.referrals ADD COLUMN IF NOT EXISTS consultant_to_consultant_only boolean NOT NULL DEFAULT false;

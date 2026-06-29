@@ -12,6 +12,7 @@ const refSchema = z.object({
   past_medical_history: z.string().trim().max(5000).nullable().optional(),
   baseline_function: z.string().trim().max(2000).nullable().optional(),
   dnacpr_respect: z.boolean().optional(),
+  consultant_to_consultant_only: z.boolean().optional(),
   referring_specialty: z.string().trim().max(100).nullable().optional(),
   reason_for_referral: z.string().trim().max(5000).nullable().optional(),
   referral_received_at: z.string().optional(),
@@ -355,6 +356,7 @@ export const getNoteHistory = createServerFn({ method: "POST" })
 const AUDITED_REFERRAL_FIELDS = [
   "age", "sex", "hospital_number", "current_ward", "current_bed",
   "past_medical_history", "baseline_function", "dnacpr_respect",
+  "consultant_to_consultant_only",
   "referring_specialty", "reason_for_referral",
   "referral_received_at", "first_seen_at", "decision_at", "arrived_on_unit_at",
   "status", "decline_reason",
@@ -660,7 +662,7 @@ export const findReferralsByHospitalNumber = createServerFn({ method: "POST" })
     let q = supabase
       .from("referrals")
       .select(
-        "id, hospital_number, referral_received_at, status, referring_specialty, current_ward, current_bed, reason_for_referral, age, sex",
+        "id, hospital_number, referral_received_at, status, referring_specialty, current_ward, current_bed, reason_for_referral, age, sex, consultant_to_consultant_only",
       )
       .eq("hospital_number", data.hospital_number)
       .is("deleted_at", null)

@@ -48,6 +48,7 @@ type PriorReferral = {
   reason_for_referral: string | null;
   age: number | null;
   sex: string | null;
+  consultant_to_consultant_only: boolean | null;
 };
 
 export const Route = createFileRoute("/_authenticated/referrals/new")({
@@ -73,6 +74,7 @@ type DraftForm = {
   past_medical_history: string;
   baseline_function: string;
   dnacpr_respect: boolean;
+  consultant_to_consultant_only: boolean;
   referring_specialty: string;
   reason_for_referral: string;
   referral_received_at: string;
@@ -93,6 +95,7 @@ const blankForm = (): DraftForm => ({
   past_medical_history: "",
   baseline_function: "",
   dnacpr_respect: false,
+  consultant_to_consultant_only: false,
   referring_specialty: "",
   reason_for_referral: "",
   referral_received_at: localISO(),
@@ -209,6 +212,16 @@ function NewReferralPage() {
       clearTimeout(t);
     };
   }, [f.hospital_number, findPrior]);
+
+  const priorC2C = priors.some((p) => p.consultant_to_consultant_only === true);
+
+  // Auto-persist the C2C flag from any prior referral for this patient.
+  useEffect(() => {
+    if (priorC2C && !f.consultant_to_consultant_only) {
+      setF((cur) => ({ ...cur, consultant_to_consultant_only: true }));
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [priorC2C]);
 
   const showAlert =
     priors.length > 0 && dismissedFor !== f.hospital_number.trim();
@@ -327,6 +340,19 @@ function NewReferralPage() {
               </AlertDescription>
             </Alert>
           )}
+          {priorC2C && (
+            <Alert variant="destructive" className="mt-2">
+              <AlertCircle className="h-4 w-4" />
+              <AlertTitle>Consultant-to-consultant referral only</AlertTitle>
+              <AlertDescription>
+                A previous referral for this patient (hospital number{" "}
+                <strong>{f.hospital_number}</strong>) was flagged as{" "}
+                <strong>consultant-to-consultant only</strong>. This referral must
+                be made consultant-to-consultant. The flag has been applied
+                automatically below.
+              </AlertDescription>
+            </Alert>
+          )}
         </Section>
 
 
@@ -368,6 +394,14 @@ function NewReferralPage() {
           <div className="flex items-center gap-3">
             <Switch id="dnacpr" checked={f.dnacpr_respect} onCheckedChange={(v) => set("dnacpr_respect", v)} />
             <Label htmlFor="dnacpr">DNACPR / ReSPECT form already in place</Label>
+          </div>
+          <div className="flex items-center gap-3">
+            <Switch
+              id="c2c"
+              checked={f.consultant_to_consultant_only}
+              onCheckedChange={(v) => set("consultant_to_consultant_only", v)}
+            />
+            <Label htmlFor="c2c">Consultant-to-consultant referral only</Label>
           </div>
         </Section>
 

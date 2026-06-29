@@ -235,6 +235,7 @@ function ReferralDetail() {
         current_ward: ref.current_ward, current_bed: ref.current_bed,
         past_medical_history: ref.past_medical_history, baseline_function: ref.baseline_function,
         dnacpr_respect: ref.dnacpr_respect, referring_specialty: ref.referring_specialty,
+        consultant_to_consultant_only: (ref as any).consultant_to_consultant_only ?? false,
         reason_for_referral: ref.reason_for_referral, status: ref.status,
         decline_reason: ref.decline_reason,
         admission_urgency: ref.admission_urgency ?? null,
@@ -373,6 +374,14 @@ function ReferralDetail() {
           <div className="flex items-center gap-3">
             <Switch checked={ref.dnacpr_respect} onCheckedChange={(v) => set("dnacpr_respect", v)} id="dn" />
             <Label htmlFor="dn">DNACPR / ReSPECT in place</Label>
+          </div>
+          <div className="flex items-center gap-3">
+            <Switch
+              checked={(ref as any).consultant_to_consultant_only ?? false}
+              onCheckedChange={(v) => set("consultant_to_consultant_only" as any, v as any)}
+              id="c2c"
+            />
+            <Label htmlFor="c2c">Consultant-to-consultant referral only</Label>
           </div>
         </Card>
 
@@ -867,6 +876,7 @@ const FIELD_LABELS: Record<string, string> = {
   past_medical_history: "Past medical history",
   baseline_function: "Baseline function",
   dnacpr_respect: "DNACPR / ReSPECT",
+  consultant_to_consultant_only: "Consultant-to-consultant only",
   referring_specialty: "Referring specialty",
   reason_for_referral: "Reason for referral",
   referral_received_at: "Referral received",
