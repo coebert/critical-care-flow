@@ -204,7 +204,7 @@ function NewReferralPage() {
     const t = setTimeout(async () => {
       try {
         const res = await findPrior({ data: { hospital_number: hn } });
-        if (!cancelled) setPriors((res ?? []) as PriorReferral[]);
+        if (!cancelled) setPriors((res ?? []) as unknown as PriorReferral[]);
       } catch {
         if (!cancelled) setPriors([]);
       }
