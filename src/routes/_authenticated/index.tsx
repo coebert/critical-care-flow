@@ -83,12 +83,14 @@ export const Route = createFileRoute("/_authenticated/")({
 
 const statusStyles: Record<string, string> = {
   pending: "bg-warning/15 text-warning-foreground border-warning/30",
+  accepted: "bg-success/15 text-success border-success/30",
   admitted: "bg-success/15 text-success border-success/30",
   declined: "bg-destructive/10 text-destructive border-destructive/30",
 };
 
 const rowBgStyles: Record<string, string> = {
   pending: "bg-warning/[0.08]",
+  accepted: "bg-success/[0.08]",
   admitted: "bg-success/[0.08]",
   declined: "bg-destructive/[0.06]",
 };
