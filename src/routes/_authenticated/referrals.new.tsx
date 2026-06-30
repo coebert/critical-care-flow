@@ -420,7 +420,16 @@ function NewReferralPage() {
         <Section title="Outcome">
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <Field label="Status">
-              <Select value={f.status} onValueChange={(v) => set("status", v as DraftForm["status"])}>
+              <Select value={f.status} onValueChange={(v) => {
+                const status = v as DraftForm["status"];
+                setF((prev) => {
+                  const next = { ...prev, status };
+                  if ((status === "accepted" || status === "admitted") && !prev.decision_at) {
+                    next.decision_at = localISO();
+                  }
+                  return next;
+                });
+              }}>
                 <SelectTrigger><SelectValue /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="pending">Pending</SelectItem>
