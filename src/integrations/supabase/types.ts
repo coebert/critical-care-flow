@@ -173,6 +173,7 @@ export type Database = {
         Row: {
           author_id: string
           body: string
+          body_enc: string | null
           created_at: string
           edited_at: string | null
           id: string
@@ -182,6 +183,7 @@ export type Database = {
         Insert: {
           author_id: string
           body: string
+          body_enc?: string | null
           created_at?: string
           edited_at?: string | null
           id?: string
@@ -191,6 +193,7 @@ export type Database = {
         Update: {
           author_id?: string
           body?: string
+          body_enc?: string | null
           created_at?: string
           edited_at?: string | null
           id?: string
@@ -216,6 +219,7 @@ export type Database = {
           age: number | null
           arrived_on_unit_at: string | null
           baseline_function: string | null
+          baseline_function_enc: string | null
           consultant_to_consultant_only: boolean
           created_at: string
           created_by: string | null
@@ -228,9 +232,12 @@ export type Database = {
           dnacpr_respect: boolean
           first_seen_at: string | null
           hospital_number: string | null
+          hospital_number_hash: string | null
           id: string
           past_medical_history: string | null
+          past_medical_history_enc: string | null
           reason_for_referral: string | null
+          reason_for_referral_enc: string | null
           referral_received_at: string
           referring_specialty: string | null
           sex: Database["public"]["Enums"]["patient_sex"] | null
@@ -246,6 +253,7 @@ export type Database = {
           age?: number | null
           arrived_on_unit_at?: string | null
           baseline_function?: string | null
+          baseline_function_enc?: string | null
           consultant_to_consultant_only?: boolean
           created_at?: string
           created_by?: string | null
@@ -258,9 +266,12 @@ export type Database = {
           dnacpr_respect?: boolean
           first_seen_at?: string | null
           hospital_number?: string | null
+          hospital_number_hash?: string | null
           id?: string
           past_medical_history?: string | null
+          past_medical_history_enc?: string | null
           reason_for_referral?: string | null
+          reason_for_referral_enc?: string | null
           referral_received_at?: string
           referring_specialty?: string | null
           sex?: Database["public"]["Enums"]["patient_sex"] | null
@@ -276,6 +287,7 @@ export type Database = {
           age?: number | null
           arrived_on_unit_at?: string | null
           baseline_function?: string | null
+          baseline_function_enc?: string | null
           consultant_to_consultant_only?: boolean
           created_at?: string
           created_by?: string | null
@@ -288,9 +300,12 @@ export type Database = {
           dnacpr_respect?: boolean
           first_seen_at?: string | null
           hospital_number?: string | null
+          hospital_number_hash?: string | null
           id?: string
           past_medical_history?: string | null
+          past_medical_history_enc?: string | null
           reason_for_referral?: string | null
+          reason_for_referral_enc?: string | null
           referral_received_at?: string
           referring_specialty?: string | null
           sex?: Database["public"]["Enums"]["patient_sex"] | null
