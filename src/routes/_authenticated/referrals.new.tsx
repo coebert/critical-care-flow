@@ -284,7 +284,7 @@ function NewReferralPage() {
     if (!timing.isValid || declineReasonMissing || declineConsultantMissing || acceptingConsultantMissing) {
       setShowErrors(true);
       const msg = acceptingConsultantMissing && timing.isValid && !declineReasonMissing && !declineConsultantMissing
-        ? "An accepting consultant is required when admitting a referral."
+        ? "Please select the accepting critical care consultant before marking this referral as Accepted or Admitted."
         : declineConsultantMissing && timing.isValid && !declineReasonMissing && !acceptingConsultantMissing
         ? "Please record which critical care consultant the referral was discussed with."
         : declineReasonMissing && timing.isValid && !acceptingConsultantMissing && !declineConsultantMissing
