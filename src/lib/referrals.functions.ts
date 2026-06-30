@@ -308,7 +308,7 @@ export const updateReferral = createServerFn({ method: "POST" })
         ? data.patch.accepting_consultant
         : (prior as any)?.accepting_consultant;
     if ((finalStatus === "admitted" || finalStatus === "accepted") && !(finalConsultant ?? "").trim()) {
-      throw new Error("An accepting consultant is required when admitting a referral.");
+      throw new Error("An accepting critical care consultant must be selected when a referral is marked Accepted or Admitted.");
     }
 
     const patchEncrypted = applyEncryption({ ...data.patch, updated_by: userId });
