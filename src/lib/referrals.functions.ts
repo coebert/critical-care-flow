@@ -22,6 +22,7 @@ const refSchema = z.object({
   arrived_on_unit_at: z.string().nullable().optional(),
   status: z.enum(["pending", "accepted", "declined", "admitted"]).optional(),
   decline_reason: z.string().trim().max(2000).nullable().optional(),
+  discussed_with_consultant: z.string().trim().max(120).nullable().optional(),
   accepting_consultant: z.string().trim().max(120).nullable().optional(),
   admission_urgency: z
     .enum(["within_15_min", "within_30_min", "within_1_hour", "within_1_2_hours", "not_admitting"])
@@ -206,6 +207,9 @@ export const createReferral = createServerFn({ method: "POST" })
     if (data.status === "declined" && !(data.decline_reason ?? "").trim()) {
       throw new Error("A reason is required when declining a referral.");
     }
+    if (data.status === "declined" && !(data.discussed_with_consultant ?? "").trim()) {
+      throw new Error("Please record which critical care consultant the referral was discussed with.");
+    }
     if (data.status === "admitted" && !(data.accepting_consultant ?? "").trim()) {
       throw new Error("An accepting consultant is required when admitting a referral.");
     }
@@ -280,7 +284,7 @@ export const updateReferral = createServerFn({ method: "POST" })
     const { supabase, userId } = context;
     const { data: prior } = await supabase
       .from("referrals")
-      .select("status, decline_reason, accepting_consultant")
+      .select("status, decline_reason, accepting_consultant, discussed_with_consultant")
       .eq("id", data.id)
       .maybeSingle();
 
@@ -291,6 +295,13 @@ export const updateReferral = createServerFn({ method: "POST" })
         : prior?.decline_reason;
     if (finalStatus === "declined" && !(finalReason ?? "").trim()) {
       throw new Error("A reason is required when declining a referral.");
+    }
+    const finalDiscussed =
+      data.patch.discussed_with_consultant !== undefined
+        ? data.patch.discussed_with_consultant
+        : (prior as any)?.discussed_with_consultant;
+    if (finalStatus === "declined" && !(finalDiscussed ?? "").trim()) {
+      throw new Error("Please record which critical care consultant the referral was discussed with.");
     }
     const finalConsultant =
       data.patch.accepting_consultant !== undefined
@@ -555,7 +566,7 @@ const AUDITED_REFERRAL_FIELDS = [
   "consultant_to_consultant_only",
   "referring_specialty", "reason_for_referral",
   "referral_received_at", "first_seen_at", "decision_at", "arrived_on_unit_at",
-  "status", "decline_reason",
+  "status", "decline_reason", "discussed_with_consultant", "accepting_consultant", "admission_urgency",
 ] as const;
 
 export type AuditValue = string | number | boolean | null;

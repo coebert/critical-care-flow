@@ -225,6 +225,7 @@ export type Database = {
           decline_reason: string | null
           deleted_at: string | null
           deleted_by: string | null
+          discussed_with_consultant: string | null
           dnacpr_respect: boolean
           first_seen_at: string | null
           hospital_number_enc: string | null
@@ -256,6 +257,7 @@ export type Database = {
           decline_reason?: string | null
           deleted_at?: string | null
           deleted_by?: string | null
+          discussed_with_consultant?: string | null
           dnacpr_respect?: boolean
           first_seen_at?: string | null
           hospital_number_enc?: string | null
@@ -287,6 +289,7 @@ export type Database = {
           decline_reason?: string | null
           deleted_at?: string | null
           deleted_by?: string | null
+          discussed_with_consultant?: string | null
           dnacpr_respect?: boolean
           first_seen_at?: string | null
           hospital_number_enc?: string | null

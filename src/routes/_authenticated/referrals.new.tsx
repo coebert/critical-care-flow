@@ -83,6 +83,7 @@ type DraftForm = {
   arrived_on_unit_at: string;
   status: "pending" | "accepted" | "declined" | "admitted";
   decline_reason: string;
+  discussed_with_consultant: string;
   accepting_consultant: string;
   admission_urgency: AdmissionUrgency | "";
 };
@@ -105,6 +106,7 @@ const blankForm = (): DraftForm => ({
   arrived_on_unit_at: "",
   status: "pending",
   decline_reason: "",
+  discussed_with_consultant: "",
   accepting_consultant: "",
   admission_urgency: "",
 });
@@ -243,16 +245,20 @@ function NewReferralPage() {
 
   const declineReasonMissing =
     f.status === "declined" && !f.decline_reason.trim();
+  const declineConsultantMissing =
+    f.status === "declined" && !f.discussed_with_consultant.trim();
   const acceptingConsultantMissing =
     f.status === "admitted" && !f.accepting_consultant.trim();
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!timing.isValid || declineReasonMissing || acceptingConsultantMissing) {
+    if (!timing.isValid || declineReasonMissing || declineConsultantMissing || acceptingConsultantMissing) {
       setShowErrors(true);
-      const msg = acceptingConsultantMissing && timing.isValid && !declineReasonMissing
+      const msg = acceptingConsultantMissing && timing.isValid && !declineReasonMissing && !declineConsultantMissing
         ? "An accepting consultant is required when admitting a referral."
-        : declineReasonMissing && timing.isValid && !acceptingConsultantMissing
+        : declineConsultantMissing && timing.isValid && !declineReasonMissing && !acceptingConsultantMissing
+        ? "Please record which critical care consultant the referral was discussed with."
+        : declineReasonMissing && timing.isValid && !acceptingConsultantMissing && !declineConsultantMissing
         ? "A reason is required when declining a referral."
         : "Please fix the highlighted fields before saving.";
       toast.error(msg);
@@ -272,7 +278,7 @@ function NewReferralPage() {
       };
       for (const k of [
         "hospital_number","current_ward","current_bed","past_medical_history",
-        "baseline_function","referring_specialty","reason_for_referral","decline_reason","accepting_consultant",
+        "baseline_function","referring_specialty","reason_for_referral","decline_reason","discussed_with_consultant","accepting_consultant",
       ]) if (!payload[k]) payload[k] = null;
 
       const res = await create({ data: payload });
@@ -442,18 +448,34 @@ function NewReferralPage() {
             </Field>
           </div>
           {f.status === "declined" && (
-            <Field
-              label="Reason for declining"
-              required
-              error={showErrors && declineReasonMissing ? "Required when declining a referral." : undefined}
-            >
-              <Textarea
-                rows={3}
-                value={f.decline_reason}
-                onChange={(e) => set("decline_reason", e.target.value)}
-                className={cn(showErrors && declineReasonMissing && "border-destructive focus-visible:ring-destructive")}
-              />
-            </Field>
+            <>
+              <Field
+                label="Reason for declining"
+                required
+                error={showErrors && declineReasonMissing ? "Required when declining a referral." : undefined}
+              >
+                <Textarea
+                  rows={3}
+                  value={f.decline_reason}
+                  onChange={(e) => set("decline_reason", e.target.value)}
+                  className={cn(showErrors && declineReasonMissing && "border-destructive focus-visible:ring-destructive")}
+                />
+              </Field>
+              <Field
+                label="Discussed with critical care consultant"
+                required
+                error={showErrors && declineConsultantMissing ? "Required when declining a referral." : undefined}
+              >
+                <div className={cn(showErrors && declineConsultantMissing && "rounded-md ring-1 ring-destructive")}>
+                  <ComboboxAdd
+                    value={f.discussed_with_consultant}
+                    onChange={(v) => set("discussed_with_consultant", v)}
+                    options={consultants}
+                    placeholder="Select or add consultant…"
+                  />
+                </div>
+              </Field>
+            </>
           )}
           {f.status === "admitted" && (
             <Field
@@ -482,7 +504,7 @@ function NewReferralPage() {
 
         <div className="flex justify-end gap-2">
           <Button type="button" variant="outline" onClick={() => navigate({ to: "/" })}>Cancel</Button>
-          <Button type="submit" disabled={saving || acceptingConsultantMissing}>{saving ? "Saving…" : "Save referral"}</Button>
+          <Button type="submit" disabled={saving || acceptingConsultantMissing || declineConsultantMissing}>{saving ? "Saving…" : "Save referral"}</Button>
         </div>
       </form>
 
