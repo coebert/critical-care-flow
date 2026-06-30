@@ -135,50 +135,64 @@ function ReferralDetail() {
     if (data) setAuthors((cur) => ({ ...cur, [data.id]: data.full_name ?? "Clinician" }));
   };
 
+  const fetchDetail = useServerFn(getReferralDetail);
+  const fetchNotes = useServerFn(listReferralNotesDecrypted);
+  const fetchPriors = useServerFn(
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    (require("@/lib/referrals.functions") as typeof import("@/lib/referrals.functions")).findReferralsByHospitalNumber,
+  );
+
+  const loadRef = async () => {
+    try {
+      const r = await fetchDetail({ data: { id } });
+      setRef(r as Referral | null);
+    } catch (e: any) {
+      toast.error(e?.message ?? "Failed to load referral");
+    }
+  };
+
+  const loadNotes = async () => {
+    try {
+      const data = await fetchNotes({ data: { referral_id: id } });
+      // Show newest first to match prior UI.
+      const sorted = [...(data ?? [])].sort(
+        (a: any, b: any) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime(),
+      );
+      setNotes(sorted as Note[]);
+      const ids = Array.from(new Set(sorted.map((n: any) => n.author_id)));
+      if (ids.length) {
+        const { data: ps } = await supabase
+          .from("profiles")
+          .select("id,full_name")
+          .in("id", ids as string[]);
+        const map: Record<string, string> = {};
+        ps?.forEach((p) => { map[p.id] = p.full_name ?? "Clinician"; });
+        setAuthors(map);
+      }
+    } catch (e: any) {
+      toast.error(e?.message ?? "Failed to load notes");
+    }
+  };
+
   useEffect(() => {
     logView({ data: { referral_id: id } }).catch(() => {});
-    supabase.from("referrals").select("*").eq("id", id).maybeSingle().then(({ data }) => setRef(data));
-    supabase
-      .from("referral_notes")
-      .select("*")
-      .eq("referral_id", id)
-      .order("created_at", { ascending: false })
-      .then(async ({ data }) => {
-        setNotes(data ?? []);
-        const ids = Array.from(new Set((data ?? []).map((n) => n.author_id)));
-        if (ids.length) {
-          const { data: ps } = await supabase.from("profiles").select("id,full_name").in("id", ids);
-          const map: Record<string, string> = {};
-          ps?.forEach((p) => { map[p.id] = p.full_name ?? "Clinician"; });
-          setAuthors(map);
-        }
-      });
+    loadRef();
+    loadNotes();
 
+    // Realtime payloads contain ciphertext, so we use them only as a
+    // signal to refetch via the decrypting server fn.
     const ch = supabase
       .channel(`ref-${id}`)
       .on("postgres_changes", { event: "UPDATE", schema: "public", table: "referrals", filter: `id=eq.${id}` },
-        (p) => setRef(p.new as Referral))
-      .on("postgres_changes", { event: "INSERT", schema: "public", table: "referral_notes", filter: `referral_id=eq.${id}` },
-        (p) => {
-          const n = p.new as Note;
-          setNotes((cur) => (cur.some((x) => x.id === n.id) ? cur : [n, ...cur]));
-          upsertAuthorName(n.author_id);
-        })
-      .on("postgres_changes", { event: "UPDATE", schema: "public", table: "referral_notes", filter: `referral_id=eq.${id}` },
-        (p) => {
-          const n = p.new as Note;
-          setNotes((cur) => cur.map((x) => (x.id === n.id ? n : x)));
-        })
-      .on("postgres_changes", { event: "DELETE", schema: "public", table: "referral_notes", filter: `referral_id=eq.${id}` },
-        (p) => {
-          const old = p.old as { id: string };
-          setNotes((cur) => cur.filter((x) => x.id !== old.id));
-        })
+        () => { loadRef(); })
+      .on("postgres_changes", { event: "*", schema: "public", table: "referral_notes", filter: `referral_id=eq.${id}` },
+        () => { loadNotes(); })
       .subscribe();
     return () => { supabase.removeChannel(ch); };
-  }, [id, logView]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [id]);
 
-  // Fetch other declined referrals for the same patient (by hospital number).
+  // Fetch other declined referrals for the same patient.
   useEffect(() => {
     const hn = ref?.hospital_number?.trim();
     if (!hn) {
@@ -186,20 +200,15 @@ function ReferralDetail() {
       return;
     }
     let cancelled = false;
-    supabase
-      .from("referrals")
-      .select("*")
-      .eq("hospital_number", hn)
-      .eq("status", "declined")
-      .is("deleted_at", null)
-      .neq("id", id)
-      .order("decision_at", { ascending: false, nullsFirst: false })
-      .order("referral_received_at", { ascending: false })
-      .then(({ data }) => {
-        if (!cancelled) setPriorDeclined((data ?? []) as Referral[]);
-      });
+    fetchPriors({ data: { hospital_number: hn, exclude_id: id } })
+      .then((rows: any[]) => {
+        if (cancelled) return;
+        setPriorDeclined(((rows ?? []) as Referral[]).filter((r) => r.status === "declined"));
+      })
+      .catch(() => { if (!cancelled) setPriorDeclined([]); });
     return () => { cancelled = true; };
-  }, [ref?.hospital_number, id]);
+  }, [ref?.hospital_number, id, fetchPriors]);
+
 
 
   if (!ref) return <div className="p-6 text-muted-foreground">Loading…</div>;
