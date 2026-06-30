@@ -780,7 +780,7 @@ function NoteItem({
         <div className="space-y-2">
           <Textarea rows={3} value={draft} onChange={(e) => setDraft(e.target.value)} disabled={busy} />
           <div className="flex justify-end gap-2">
-            <Button size="sm" variant="ghost" onClick={() => { setDraft(note.body); setEditing(false); }} disabled={busy}>
+            <Button size="sm" variant="ghost" onClick={() => { setDraft(note.body ?? ""); setEditing(false); }} disabled={busy}>
               <X className="w-3.5 h-3.5 mr-1" /> Cancel
             </Button>
             <Button size="sm" onClick={save} disabled={busy || !draft.trim()}>
@@ -795,7 +795,7 @@ function NoteItem({
         <NoteHistoryButton noteId={note.id} />
         {canEdit && !editing && (
           <>
-            <Button size="sm" variant="ghost" className="h-7 px-2 text-xs" onClick={() => { setDraft(note.body); setEditing(true); }} disabled={busy}>
+            <Button size="sm" variant="ghost" className="h-7 px-2 text-xs" onClick={() => { setDraft(note.body ?? ""); setEditing(true); }} disabled={busy}>
               <Pencil className="w-3.5 h-3.5 mr-1" /> Edit
             </Button>
             <AlertDialog>
