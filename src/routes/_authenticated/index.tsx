@@ -147,47 +147,44 @@ function ReferralsList() {
     }
   };
 
+  const fetchList = useServerFn(listReferralsForList);
+
   useEffect(() => {
     let cancelled = false;
+    let pending = false;
+    let queued = false;
 
-    supabase
-      .from("referrals")
-      .select("*")
-      .is("deleted_at", null)
-      .order("referral_received_at", { ascending: false })
-      .limit(500)
-      .then(({ data }) => {
-        if (!cancelled) {
-          setRows(data ?? []);
-          setLoading(false);
-        }
-      });
+    const load = async () => {
+      if (pending) { queued = true; return; }
+      pending = true;
+      try {
+        const data = await fetchList();
+        if (!cancelled) setRows((data ?? []) as Referral[]);
+      } catch {
+        // leave existing rows in place on transient failure
+      } finally {
+        if (!cancelled) setLoading(false);
+        pending = false;
+        if (queued) { queued = false; load(); }
+      }
+    };
 
+    load();
 
+    // Realtime payloads contain encrypted fields, so use them only as a
+    // signal to refetch the decrypted list from the server.
     const ch = supabase
       .channel("referrals-list")
-      .on("postgres_changes", { event: "*", schema: "public", table: "referrals" }, (payload) => {
-        setRows((cur) => {
-          if (payload.eventType === "INSERT") {
-            const r = payload.new as Referral;
-            return r.deleted_at ? cur : [r, ...cur];
-          }
-          if (payload.eventType === "UPDATE") {
-            const r = payload.new as Referral;
-            if (r.deleted_at) return cur.filter((x) => x.id !== r.id);
-            return cur.map((x) => (x.id === r.id ? r : x));
-          }
-          if (payload.eventType === "DELETE") return cur.filter((r) => r.id !== (payload.old as Referral).id);
-          return cur;
-        });
+      .on("postgres_changes", { event: "*", schema: "public", table: "referrals" }, () => {
+        load();
       })
-
       .subscribe();
     return () => {
       cancelled = true;
       supabase.removeChannel(ch);
     };
-  }, []);
+  }, [fetchList]);
+
 
   // Resolve clinician names for the "Taken by" column.
   useEffect(() => {
