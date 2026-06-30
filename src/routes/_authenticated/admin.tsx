@@ -185,46 +185,4 @@ function AuditPanel() {
   );
 }
 
-function EncryptionBackfillPanel() {
-  const runBackfill = useServerFn(backfillEncryption);
-  const [busy, setBusy] = useState(false);
-  const [result, setResult] = useState<{ referralsUpdated: number; notesUpdated: number } | null>(null);
-
-  const onRun = async () => {
-    setBusy(true);
-    setResult(null);
-    try {
-      const r = await runBackfill();
-      setResult(r);
-      toast.success(`Backfill complete — ${r.referralsUpdated} referrals, ${r.notesUpdated} notes`);
-    } catch (e: any) {
-      toast.error(e?.message ?? "Backfill failed");
-    } finally {
-      setBusy(false);
-    }
-  };
-
-  return (
-    <Card className="p-4 space-y-3">
-      <div>
-        <h2 className="font-semibold">Encryption backfill</h2>
-        <p className="text-sm text-muted-foreground mt-1">
-          Encrypts patient narrative fields and hashes hospital numbers for any
-          historical rows still stored in plain text. Safe to re-run — rows that
-          are already encrypted are skipped.
-        </p>
-      </div>
-      <div className="flex items-center gap-3">
-        <Button onClick={onRun} disabled={busy}>
-          {busy ? "Running…" : "Run encryption backfill"}
-        </Button>
-        {result && (
-          <span className="text-sm text-muted-foreground">
-            Updated {result.referralsUpdated} referral(s), {result.notesUpdated} note(s).
-          </span>
-        )}
-      </div>
-    </Card>
-  );
-}
 
