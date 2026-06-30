@@ -34,6 +34,17 @@ describe("validateReferralTimings — required fields", () => {
     expect(r.fieldErrors.arrived_on_unit_at).toBeDefined();
   });
 
+  it("accepted requires first_seen and decision but not arrived", () => {
+    const r = validateReferralTimings(
+      base({
+        status: "accepted",
+        first_seen_at: iso(-50),
+        decision_at: iso(-40),
+      }),
+    );
+    expect(r.isValid).toBe(true);
+  });
+
   it("declined requires first_seen and decision but not arrived", () => {
     const r = validateReferralTimings(
       base({
