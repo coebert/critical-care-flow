@@ -46,6 +46,8 @@ type PriorReferral = {
   current_ward: string | null;
   current_bed: string | null;
   reason_for_referral: string | null;
+  past_medical_history: string | null;
+  baseline_function: string | null;
   age: number | null;
   sex: string | null;
   consultant_to_consultant_only: boolean | null;
