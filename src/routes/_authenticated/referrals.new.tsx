@@ -278,7 +278,7 @@ function NewReferralPage() {
       };
       for (const k of [
         "hospital_number","current_ward","current_bed","past_medical_history",
-        "baseline_function","referring_specialty","reason_for_referral","decline_reason","accepting_consultant",
+        "baseline_function","referring_specialty","reason_for_referral","decline_reason","discussed_with_consultant","accepting_consultant",
       ]) if (!payload[k]) payload[k] = null;
 
       const res = await create({ data: payload });
