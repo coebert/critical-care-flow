@@ -2,6 +2,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { useServerFn } from "@tanstack/react-start";
 import { inviteClinician, listUsers, setUserRole, getAuditLog } from "@/lib/admin.functions";
+import { backfillEncryption } from "@/lib/referrals.functions";
 import { useRole } from "@/hooks/use-auth";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
