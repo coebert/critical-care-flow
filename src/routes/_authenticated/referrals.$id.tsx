@@ -137,10 +137,7 @@ function ReferralDetail() {
 
   const fetchDetail = useServerFn(getReferralDetail);
   const fetchNotes = useServerFn(listReferralNotesDecrypted);
-  const fetchPriors = useServerFn(
-    // eslint-disable-next-line @typescript-eslint/no-require-imports
-    (require("@/lib/referrals.functions") as typeof import("@/lib/referrals.functions")).findReferralsByHospitalNumber,
-  );
+  const fetchPriors = useServerFn(findReferralsByHospitalNumber);
 
   const loadRef = async () => {
     try {
