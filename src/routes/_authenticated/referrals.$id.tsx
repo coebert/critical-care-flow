@@ -2,7 +2,7 @@ import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useEffect, useRef, useState } from "react";
 import { useServerFn } from "@tanstack/react-start";
 import { supabase } from "@/integrations/supabase/client";
-import { addNote, deleteNote, deleteReferral, findReferralsByHospitalNumber, getNoteHistory, getReferralDetail, getReferralHistory, listReferralNotesDecrypted, logReferralView, updateNote, updateReferral, type ReferralAuditEntry } from "@/lib/referrals.functions";
+import { addNote, deleteNote, deleteReferral, findReferralsByHospitalNumber, getNoteHistory, getReferralDetail, getReferralHistory, listReferralNotesDecrypted, logReferralView, updateNote, updateReferral, type ReferralAuditEntry, type DecryptedReferral, type DecryptedReferralNote } from "@/lib/referrals.functions";
 import { useAuth, useRole } from "@/hooks/use-auth";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -30,8 +30,8 @@ import { ADMISSION_URGENCY_OPTIONS, type AdmissionUrgency } from "@/lib/admissio
 import { cn } from "@/lib/utils";
 
 
-type Referral = Tables<"referrals">;
-type Note = Tables<"referral_notes">;
+type Referral = Tables<"referrals"> & DecryptedReferral;
+type Note = Tables<"referral_notes"> & DecryptedReferralNote;
 
 export const Route = createFileRoute("/_authenticated/referrals/$id")({
   validateSearch: (search: Record<string, unknown>) => ({
@@ -747,7 +747,7 @@ function NoteItem({
   onDelete: () => Promise<void>;
 }) {
   const [editing, setEditing] = useState(false);
-  const [draft, setDraft] = useState(note.body);
+  const [draft, setDraft] = useState(note.body ?? "");
   const [busy, setBusy] = useState(false);
   const edited = (note as any).edited_at as string | null | undefined;
 
@@ -780,7 +780,7 @@ function NoteItem({
         <div className="space-y-2">
           <Textarea rows={3} value={draft} onChange={(e) => setDraft(e.target.value)} disabled={busy} />
           <div className="flex justify-end gap-2">
-            <Button size="sm" variant="ghost" onClick={() => { setDraft(note.body); setEditing(false); }} disabled={busy}>
+            <Button size="sm" variant="ghost" onClick={() => { setDraft(note.body ?? ""); setEditing(false); }} disabled={busy}>
               <X className="w-3.5 h-3.5 mr-1" /> Cancel
             </Button>
             <Button size="sm" onClick={save} disabled={busy || !draft.trim()}>
@@ -795,7 +795,7 @@ function NoteItem({
         <NoteHistoryButton noteId={note.id} />
         {canEdit && !editing && (
           <>
-            <Button size="sm" variant="ghost" className="h-7 px-2 text-xs" onClick={() => { setDraft(note.body); setEditing(true); }} disabled={busy}>
+            <Button size="sm" variant="ghost" className="h-7 px-2 text-xs" onClick={() => { setDraft(note.body ?? ""); setEditing(true); }} disabled={busy}>
               <Pencil className="w-3.5 h-3.5 mr-1" /> Edit
             </Button>
             <AlertDialog>
