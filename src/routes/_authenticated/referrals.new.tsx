@@ -83,6 +83,7 @@ type DraftForm = {
   arrived_on_unit_at: string;
   status: "pending" | "accepted" | "declined" | "admitted";
   decline_reason: string;
+  discussed_with_consultant: string;
   accepting_consultant: string;
   admission_urgency: AdmissionUrgency | "";
 };
