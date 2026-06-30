@@ -30,7 +30,6 @@ function AdminPage() {
         <TabsList>
           <TabsTrigger value="users">Team members</TabsTrigger>
           <TabsTrigger value="audit">Audit log</TabsTrigger>
-          <TabsTrigger value="security">Security</TabsTrigger>
         </TabsList>
         <TabsContent value="users" className="mt-4 space-y-6">
           <InvitePanel />
@@ -38,9 +37,6 @@ function AdminPage() {
         </TabsContent>
         <TabsContent value="audit" className="mt-4">
           <AuditPanel />
-        </TabsContent>
-        <TabsContent value="security" className="mt-4">
-          <EncryptionBackfillPanel />
         </TabsContent>
       </Tabs>
 
