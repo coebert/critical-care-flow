@@ -487,7 +487,13 @@ function ReferralDetail() {
           <h2 className="font-semibold">Outcome</h2>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <F label="Status">
-              <Select value={ref.status} onValueChange={(v) => set("status", v)}>
+              <Select value={ref.status} onValueChange={(v) => {
+                const next: Partial<Referral> = { status: v as Referral["status"] };
+                if ((v === "accepted" || v === "admitted") && !ref.decision_at) {
+                  next.decision_at = new Date().toISOString();
+                }
+                setRef({ ...ref, ...next });
+              }}>
                 <SelectTrigger><SelectValue /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="pending">Pending</SelectItem>
