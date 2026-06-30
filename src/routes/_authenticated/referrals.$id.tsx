@@ -515,17 +515,29 @@ function ReferralDetail() {
             </F>
           </div>
           {ref.status === "declined" && (
-            <ExpandableSection label="Reason for declining" command={expandCmd}>
-              <Textarea
-                rows={3}
-                value={ref.decline_reason ?? ""}
-                onChange={(e) => set("decline_reason", e.target.value)}
-                className={declineReasonMissing ? "border-destructive focus-visible:ring-destructive" : undefined}
-              />
-              {declineReasonMissing && (
-                <p className="text-xs text-destructive mt-1">Required when declining a referral.</p>
-              )}
-            </ExpandableSection>
+            <>
+              <ExpandableSection label="Reason for declining" command={expandCmd}>
+                <Textarea
+                  rows={3}
+                  value={ref.decline_reason ?? ""}
+                  onChange={(e) => set("decline_reason", e.target.value)}
+                  className={declineReasonMissing ? "border-destructive focus-visible:ring-destructive" : undefined}
+                />
+                {declineReasonMissing && (
+                  <p className="text-xs text-destructive mt-1">Required when declining a referral.</p>
+                )}
+              </ExpandableSection>
+              <F label="Discussed with critical care consultant" required error={declineConsultantMissing ? "Required when declining a referral." : undefined}>
+                <div className={cn(declineConsultantMissing && "rounded-md ring-1 ring-destructive")}>
+                  <ComboboxAdd
+                    value={(ref as any).discussed_with_consultant ?? ""}
+                    onChange={(v) => set("discussed_with_consultant" as any, (v || null) as any)}
+                    options={consultants}
+                    placeholder="Select or add consultant…"
+                  />
+                </div>
+              </F>
+            </>
           )}
           {ref.status === "admitted" && (
             <F label="Accepting critical care consultant" required error={acceptingConsultantMissing ? "Required when admitting a referral." : undefined}>
@@ -542,7 +554,7 @@ function ReferralDetail() {
         </Card>
 
         <div className="flex justify-end">
-          <Button onClick={save} disabled={saving || acceptingConsultantMissing}><Save className="w-4 h-4 mr-1" />{saving ? "Saving…" : "Save changes"}</Button>
+          <Button onClick={save} disabled={saving || acceptingConsultantMissing || declineConsultantMissing}><Save className="w-4 h-4 mr-1" />{saving ? "Saving…" : "Save changes"}</Button>
         </div>
 
         <Card className="p-5">
