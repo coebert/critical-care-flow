@@ -30,8 +30,8 @@ import { ADMISSION_URGENCY_OPTIONS, type AdmissionUrgency } from "@/lib/admissio
 import { cn } from "@/lib/utils";
 
 
-type Referral = Tables<"referrals">;
-type Note = Tables<"referral_notes">;
+type Referral = Tables<"referrals"> & DecryptedReferral;
+type Note = Tables<"referral_notes"> & DecryptedReferralNote;
 
 export const Route = createFileRoute("/_authenticated/referrals/$id")({
   validateSearch: (search: Record<string, unknown>) => ({
