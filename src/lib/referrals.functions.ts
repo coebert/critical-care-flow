@@ -2,6 +2,7 @@ import { createServerFn } from "@tanstack/react-start";
 import { safeError } from "./safe-error";
 import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
+import { encryptString, decryptString, hashHospitalNumber } from "./crypto.server";
 
 const refSchema = z.object({
   age: z.number().int().min(0).max(130).nullable().optional(),
@@ -33,6 +34,72 @@ async function getAdmin() {
   return supabaseAdmin;
 }
 
+// ---------------------------------------------------------------------------
+// Encryption mapping helpers
+// ---------------------------------------------------------------------------
+// These fields are stored encrypted in *_enc columns. The original
+// plaintext columns are kept in the schema for now (legacy rows) but
+// new writes ALWAYS null them and use the encrypted columns instead.
+// The follow-up migration drops the plaintext columns once backfill
+// has run on all rows.
+
+const ENCRYPTED_TEXT_FIELDS = [
+  "past_medical_history",
+  "baseline_function",
+  "reason_for_referral",
+] as const;
+
+type EncryptedField = (typeof ENCRYPTED_TEXT_FIELDS)[number];
+
+function applyEncryption(input: Record<string, unknown>): Record<string, unknown> {
+  const out: Record<string, unknown> = { ...input };
+  for (const k of ENCRYPTED_TEXT_FIELDS) {
+    if (k in out) {
+      const plain = out[k];
+      out[`${k}_enc`] = encryptString(plain == null ? null : String(plain));
+      out[k] = null; // never store plaintext for these fields
+    }
+  }
+  if ("hospital_number" in out) {
+    const hn = out.hospital_number;
+    out.hospital_number_hash = hashHospitalNumber(hn == null ? null : String(hn));
+  }
+  return out;
+}
+
+function decryptReferralRow<T extends Record<string, any>>(row: T): T {
+  if (!row) return row;
+  const out: any = { ...row };
+  for (const k of ENCRYPTED_TEXT_FIELDS) {
+    const enc = out[`${k}_enc`] as string | null | undefined;
+    if (enc) {
+      try {
+        out[k] = decryptString(enc);
+      } catch {
+        out[k] = null;
+      }
+    }
+    // If only legacy plaintext exists (pre-backfill), leave it as-is.
+  }
+  return out;
+}
+
+// Audit diffs must not contain plaintext for encrypted fields, otherwise
+// a DB leak of audit_log would reveal what the referral columns hide.
+function redactEncryptedFromDiff(diff: Record<string, unknown>): Record<string, unknown> {
+  const out: Record<string, unknown> = { ...diff };
+  for (const k of ENCRYPTED_TEXT_FIELDS) {
+    if (k in out && out[k] != null && out[k] !== "") {
+      out[k] = "[encrypted]";
+    }
+    // Strip the ciphertext too — there is no point storing it twice.
+    delete out[`${k}_enc`];
+  }
+  // hospital_number stays in the diff but the hash column is redundant noise.
+  delete (out as any).hospital_number_hash;
+  return out;
+}
+
 async function writeAudit(entry: {
   user_id: string;
   action: string;
@@ -41,7 +108,26 @@ async function writeAudit(entry: {
   diff?: any;
 }) {
   const admin = await getAdmin();
-  await admin.from("audit_log").insert(entry as any);
+  const safeEntry =
+    entry.entity === "referral" && entry.diff && typeof entry.diff === "object"
+      ? { ...entry, diff: redactEncryptedFromDiff(entry.diff as Record<string, unknown>) }
+      : entry.entity === "referral_note" && entry.diff && typeof entry.diff === "object"
+      ? { ...entry, diff: redactNoteDiff(entry.diff as Record<string, unknown>) }
+      : entry;
+  await admin.from("audit_log").insert(safeEntry as any);
+}
+
+function redactNoteDiff(diff: Record<string, unknown>): Record<string, unknown> {
+  const out: Record<string, unknown> = { ...diff };
+  if ("body" in out && out.body != null && out.body !== "") out.body = "[encrypted]";
+  if (out.before && typeof out.before === "object") {
+    out.before = { ...(out.before as any), body: "[encrypted]" };
+  }
+  if (out.after && typeof out.after === "object") {
+    out.after = { ...(out.after as any), body: "[encrypted]" };
+  }
+  delete (out as any).body_enc;
+  return out;
 }
 
 async function fanOutNotifications(
@@ -105,37 +191,42 @@ export const createReferral = createServerFn({ method: "POST" })
     if (data.status === "admitted" && !(data.accepting_consultant ?? "").trim()) {
       throw new Error("An accepting consultant is required when admitting a referral.");
     }
-    const insert = {
+    const baseInsert = applyEncryption({
       ...data,
       created_by: userId,
       updated_by: userId,
       referral_received_at: data.referral_received_at ?? new Date().toISOString(),
-    };
+    });
     const { data: row, error } = await supabase
       .from("referrals")
-      .insert(insert as any)
+      .insert(baseInsert as any)
       .select()
       .single();
     if (error) throw safeError("referrals.create", error, "Failed to create referral.");
+
+    const decrypted = decryptReferralRow(row as any);
 
     await writeAudit({
       user_id: userId,
       action: "create",
       entity: "referral",
       entity_id: row.id,
-      diff: row as any,
+      diff: { ...(data as any) },
     });
 
-    const summary = `${row.referring_specialty ?? "Referral"} — ${row.current_ward ?? "ward unknown"}`;
+    const summary = `${decrypted.referring_specialty ?? "Referral"} — ${decrypted.current_ward ?? "ward unknown"}`;
     await fanOutNotifications(userId, row.id, "new", `New referral: ${summary}`);
 
     // If this patient has a prior DECLINED referral on record, flag it loudly.
-    if (row.hospital_number) {
+    // We match by the new hash column so the lookup keeps working even when
+    // the plaintext hospital_number column is dropped.
+    const hashed = hashHospitalNumber((data as any).hospital_number);
+    if (hashed) {
       const admin = await getAdmin();
       const { data: priorDeclined } = await admin
         .from("referrals")
         .select("id, decision_at, referral_received_at, decline_reason")
-        .eq("hospital_number", row.hospital_number)
+        .eq("hospital_number_hash", hashed)
         .eq("status", "declined")
         .is("deleted_at", null)
         .neq("id", row.id)
@@ -156,9 +247,8 @@ export const createReferral = createServerFn({ method: "POST" })
           `/referrals/${prev.id}?highlight=declined`,
         );
       }
-
     }
-    return row;
+    return decrypted;
   });
 
 
@@ -170,9 +260,6 @@ export const updateReferral = createServerFn({ method: "POST" })
   )
   .handler(async ({ data, context }) => {
     const { supabase, userId } = context;
-    // Read prior status & decline reason to decide notifications and enforce
-    // the "decline_reason required when declined" rule even when the patch
-    // only touches one of the two fields.
     const { data: prior } = await supabase
       .from("referrals")
       .select("status, decline_reason, accepting_consultant")
@@ -195,10 +282,11 @@ export const updateReferral = createServerFn({ method: "POST" })
       throw new Error("An accepting consultant is required when admitting a referral.");
     }
 
+    const patchEncrypted = applyEncryption({ ...data.patch, updated_by: userId });
 
     const { data: row, error } = await supabase
       .from("referrals")
-      .update({ ...data.patch, updated_by: userId } as any)
+      .update(patchEncrypted as any)
       .eq("id", data.id)
       .select()
       .single();
@@ -209,13 +297,15 @@ export const updateReferral = createServerFn({ method: "POST" })
       action: "update",
       entity: "referral",
       entity_id: row.id,
-      diff: data.patch as any,
+      diff: { ...(data.patch as any) },
     });
+
+    const decrypted = decryptReferralRow(row as any);
 
     const statusChanged =
       data.patch.status !== undefined && prior?.status !== row.status;
     if (statusChanged) {
-      const summary = `${row.referring_specialty ?? "Referral"} — ${row.current_ward ?? "ward unknown"}`;
+      const summary = `${decrypted.referring_specialty ?? "Referral"} — ${decrypted.current_ward ?? "ward unknown"}`;
       await fanOutNotifications(
         userId,
         row.id,
@@ -223,7 +313,67 @@ export const updateReferral = createServerFn({ method: "POST" })
         `Status changed to ${row.status}: ${summary}`,
       );
     }
-    return row;
+    return decrypted;
+  });
+
+
+// ---------------------------------------------------------------------------
+// Read paths: clients fetch referrals through these so the server can
+// decrypt before sending. Realtime channels on the client deliver
+// ciphertext payloads and should be used only as a refetch trigger.
+// ---------------------------------------------------------------------------
+
+export const listReferralsForList = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ context }) => {
+    const { supabase } = context;
+    const { data, error } = await supabase
+      .from("referrals")
+      .select("*")
+      .is("deleted_at", null)
+      .order("referral_received_at", { ascending: false })
+      .limit(500);
+    if (error) throw safeError("referrals.list", error, "Failed to load referrals.");
+    return (data ?? []).map((r) => decryptReferralRow(r as any));
+  });
+
+export const getReferralDetail = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d: unknown) => z.object({ id: z.string().uuid() }).parse(d))
+  .handler(async ({ data, context }) => {
+    const { supabase } = context;
+    const { data: row, error } = await supabase
+      .from("referrals")
+      .select("*")
+      .eq("id", data.id)
+      .maybeSingle();
+    if (error) throw safeError("referrals.get", error, "Failed to load referral.");
+    if (!row) return null;
+    return decryptReferralRow(row as any);
+  });
+
+export const listReferralNotesDecrypted = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d: unknown) => z.object({ referral_id: z.string().uuid() }).parse(d))
+  .handler(async ({ data, context }) => {
+    const { supabase } = context;
+    const { data: rows, error } = await supabase
+      .from("referral_notes")
+      .select("*")
+      .eq("referral_id", data.referral_id)
+      .order("created_at", { ascending: true });
+    if (error) throw safeError("referrals.listNotes", error, "Failed to load notes.");
+    return (rows ?? []).map((n: any) => {
+      const out = { ...n };
+      if (out.body_enc) {
+        try {
+          out.body = decryptString(out.body_enc);
+        } catch {
+          out.body = null;
+        }
+      }
+      return out;
+    });
   });
 
 
@@ -238,7 +388,12 @@ export const addNote = createServerFn({ method: "POST" })
     const { supabase, userId } = context;
     const { data: row, error } = await supabase
       .from("referral_notes")
-      .insert({ referral_id: data.referral_id, author_id: userId, body: data.body })
+      .insert({
+        referral_id: data.referral_id,
+        author_id: userId,
+        body: null,
+        body_enc: encryptString(data.body),
+      } as any)
       .select()
       .single();
     if (error) throw safeError("referrals.addNote", error, "Failed to add note.");
@@ -257,7 +412,7 @@ export const addNote = createServerFn({ method: "POST" })
       "updated",
       `New note added to referral`,
     );
-    return row;
+    return { ...row, body: data.body };
   });
 
 
@@ -272,18 +427,28 @@ export const updateNote = createServerFn({ method: "POST" })
     const { supabase, userId } = context;
     const { data: existing } = await supabase
       .from("referral_notes")
-      .select("id, body, referral_id, author_id")
+      .select("id, body, body_enc, referral_id, author_id")
       .eq("id", data.id)
       .maybeSingle();
     if (!existing) throw new Error("Note not found");
 
     const { data: row, error } = await supabase
       .from("referral_notes")
-      .update({ body: data.body, edited_at: new Date().toISOString() } as any)
+      .update({
+        body: null,
+        body_enc: encryptString(data.body),
+        edited_at: new Date().toISOString(),
+      } as any)
       .eq("id", data.id)
       .select()
       .single();
     if (error) throw safeError("referrals.updateNote", error, "Failed to update note.");
+
+    let beforeBody: string | null = (existing as any).body ?? null;
+    const beforeEnc = (existing as any).body_enc as string | null | undefined;
+    if (beforeEnc) {
+      try { beforeBody = decryptString(beforeEnc); } catch { beforeBody = null; }
+    }
 
     await writeAudit({
       user_id: userId,
@@ -292,11 +457,11 @@ export const updateNote = createServerFn({ method: "POST" })
       entity_id: row.id,
       diff: {
         referral_id: existing.referral_id,
-        before: { body: existing.body },
+        before: { body: beforeBody },
         after: { body: data.body },
       },
     });
-    return row;
+    return { ...row, body: data.body };
   });
 
 
@@ -307,7 +472,7 @@ export const deleteNote = createServerFn({ method: "POST" })
     const { supabase, userId } = context;
     const { data: existing } = await supabase
       .from("referral_notes")
-      .select("id, body, referral_id, author_id, created_at")
+      .select("id, body, body_enc, referral_id, author_id, created_at")
       .eq("id", data.id)
       .maybeSingle();
     if (!existing) throw new Error("Note not found");
@@ -383,7 +548,6 @@ export type ReferralAuditEntry = {
   user_id: string | null;
   user_name: string;
   changes: { field: string; from: AuditValue; to: AuditValue }[];
-  // For "create": initial snapshot of the audited fields.
   snapshot?: Record<string, AuditValue>;
 };
 
@@ -416,7 +580,6 @@ export const getReferralHistory = createServerFn({ method: "POST" })
     const { data: access } = await supabase.rpc("has_clinical_access", { _user_id: userId });
     if (!access) throw new Error("Forbidden");
 
-    // Confirm the caller can see the referral via RLS before exposing history.
     const { data: ref } = await supabase
       .from("referrals")
       .select("id")
@@ -425,9 +588,6 @@ export const getReferralHistory = createServerFn({ method: "POST" })
     if (!ref) throw new Error("Referral not found");
 
     const admin = await getAdmin();
-    // We must walk all rows chronologically to reconstruct from->to diffs,
-    // then slice for pagination. The audit_log is indexed by entity/entity_id
-    // and rows are small, so this stays cheap per referral.
     const { data: rows, error } = await admin
       .from("audit_log")
       .select("id, user_id, action, diff, created_at")
@@ -437,15 +597,12 @@ export const getReferralHistory = createServerFn({ method: "POST" })
       .order("created_at", { ascending: true });
     if (error) throw safeError("referrals.getReferralHistory", error, "Failed to load referral history.");
 
-    // Normalize a JSONB value to a simple scalar suitable for display.
     const norm = (v: unknown): AuditValue => {
       if (v === null || v === undefined) return null;
       if (typeof v === "string" || typeof v === "number" || typeof v === "boolean") return v;
       return JSON.stringify(v);
     };
 
-    // Track previous values so each update entry can be shown as
-    // before -> after for the fields that actually changed.
     const prev: Record<string, AuditValue> = {};
     const built: ReferralAuditEntry[] = [];
 
@@ -456,7 +613,7 @@ export const getReferralHistory = createServerFn({ method: "POST" })
         action: r.action,
         created_at: r.created_at,
         user_id: r.user_id,
-        user_name: "Clinician", // filled in after slicing
+        user_name: "Clinician",
         changes: [],
       };
 
@@ -479,20 +636,16 @@ export const getReferralHistory = createServerFn({ method: "POST" })
             }
           }
         }
-        // Skip update rows that didn't touch any audited field.
         if (base.changes.length === 0) continue;
       }
-      // "delete" actions are recorded as-is with no changes list.
 
       built.push(base);
     }
 
-    // Newest first for display, then slice the requested window.
     built.reverse();
     const total = built.length;
     const page = built.slice(offset, offset + limit);
 
-    // Only resolve profile names for the users actually shown on this page.
     const userIds = Array.from(new Set(page.map((e) => e.user_id).filter(Boolean) as string[]));
     if (userIds.length) {
       const { data: profs } = await admin
@@ -530,7 +683,6 @@ export const logReferralView = createServerFn({ method: "POST" })
     const { data: access } = await supabase.rpc("has_clinical_access", { _user_id: userId });
     if (!access) throw new Error("Forbidden");
 
-    // Verify the referral exists and is readable by the caller via RLS.
     const { data: ref } = await supabase
       .from("referrals")
       .select("id")
@@ -570,8 +722,6 @@ export const deleteReferral = createServerFn({ method: "POST" })
       throw new Error("Only the creator or an admin can delete this referral");
     }
 
-    // Use admin client to bypass RLS, which restricts deleted_at writes to admins.
-    // Authorization is enforced above in application code.
     const admin = await getAdmin();
     const { error } = await admin
       .from("referrals")
@@ -592,7 +742,6 @@ export const deleteReferral = createServerFn({ method: "POST" })
   });
 
 
-// Window during which a soft-deleted referral can still be restored.
 export const RESTORE_WINDOW_DAYS = 7;
 
 export const listDeletedReferrals = createServerFn({ method: "GET" })
@@ -613,7 +762,7 @@ export const listDeletedReferrals = createServerFn({ method: "GET" })
     if (!isAdmin) query = query.eq("created_by", userId);
     const { data, error } = await query;
     if (error) throw safeError("referrals.listDeleted", error, "Failed to load deleted referrals.");
-    return data ?? [];
+    return (data ?? []).map((r) => decryptReferralRow(r as any));
   });
 
 export const restoreReferral = createServerFn({ method: "POST" })
@@ -671,20 +820,117 @@ export const findReferralsByHospitalNumber = createServerFn({ method: "POST" })
   )
   .handler(async ({ data, context }) => {
     const { supabase } = context;
+    const hashed = hashHospitalNumber(data.hospital_number);
     let q = supabase
       .from("referrals")
       .select(
-        "id, hospital_number, referral_received_at, status, referring_specialty, current_ward, current_bed, reason_for_referral, age, sex, consultant_to_consultant_only",
+        "id, hospital_number, hospital_number_hash, referral_received_at, status, referring_specialty, current_ward, current_bed, reason_for_referral, reason_for_referral_enc, age, sex, consultant_to_consultant_only",
       )
-      .eq("hospital_number", data.hospital_number)
       .is("deleted_at", null)
       .order("referral_received_at", { ascending: false })
       .limit(50);
+    // Match by hash (new rows) OR by plaintext (legacy rows pre-backfill).
+    if (hashed) {
+      q = q.or(`hospital_number_hash.eq.${hashed},hospital_number.eq.${data.hospital_number}`);
+    } else {
+      q = q.eq("hospital_number", data.hospital_number);
+    }
     if (data.exclude_id) q = q.neq("id", data.exclude_id);
     const { data: rows, error } = await q;
     if (error) throw safeError("referrals.findByHospitalNumber", error, "Failed to search referrals.");
-    return rows ?? [];
+    return (rows ?? []).map((r) => decryptReferralRow(r as any));
   });
 
 
+// ---------------------------------------------------------------------------
+// Admin: one-shot backfill of encrypted columns + hospital_number_hash for
+// any historical rows that still hold plaintext only. Idempotent: rows
+// that already have ciphertext are left alone. Run from the admin page,
+// then a follow-up migration drops the plaintext columns.
+// ---------------------------------------------------------------------------
 
+export const backfillEncryption = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ context }) => {
+    const { supabase, userId } = context;
+    const { data: isAdmin } = await supabase.rpc("has_role", {
+      _user_id: userId,
+      _role: "admin",
+    });
+    if (!isAdmin) throw new Error("Forbidden");
+
+    const admin = await getAdmin();
+    let referralsUpdated = 0;
+    let notesUpdated = 0;
+
+    // Referrals: paginate to keep memory bounded.
+    const pageSize = 200;
+    let from = 0;
+    // We intentionally pull deleted rows too so soft-deleted history is also
+    // protected after the plaintext columns are dropped.
+    // eslint-disable-next-line no-constant-condition
+    while (true) {
+      const { data: rows, error } = await admin
+        .from("referrals")
+        .select(
+          "id, hospital_number, hospital_number_hash, past_medical_history, past_medical_history_enc, baseline_function, baseline_function_enc, reason_for_referral, reason_for_referral_enc",
+        )
+        .order("id", { ascending: true })
+        .range(from, from + pageSize - 1);
+      if (error) throw safeError("referrals.backfill", error, "Backfill failed.");
+      if (!rows || rows.length === 0) break;
+
+      for (const r of rows as any[]) {
+        const patch: Record<string, unknown> = {};
+        for (const k of ENCRYPTED_TEXT_FIELDS) {
+          const plain = r[k];
+          const enc = r[`${k}_enc`];
+          if (plain && !enc) {
+            patch[`${k}_enc`] = encryptString(String(plain));
+            patch[k] = null;
+          }
+        }
+        if (r.hospital_number && !r.hospital_number_hash) {
+          patch.hospital_number_hash = hashHospitalNumber(r.hospital_number);
+        }
+        if (Object.keys(patch).length > 0) {
+          const { error: upErr } = await admin
+            .from("referrals")
+            .update(patch as any)
+            .eq("id", r.id);
+          if (upErr) throw safeError("referrals.backfill.update", upErr, "Backfill update failed.");
+          referralsUpdated++;
+        }
+      }
+      if (rows.length < pageSize) break;
+      from += pageSize;
+    }
+
+    // Notes
+    from = 0;
+    // eslint-disable-next-line no-constant-condition
+    while (true) {
+      const { data: rows, error } = await admin
+        .from("referral_notes")
+        .select("id, body, body_enc")
+        .order("id", { ascending: true })
+        .range(from, from + pageSize - 1);
+      if (error) throw safeError("notes.backfill", error, "Backfill failed.");
+      if (!rows || rows.length === 0) break;
+
+      for (const n of rows as any[]) {
+        if (n.body && !n.body_enc) {
+          const { error: upErr } = await admin
+            .from("referral_notes")
+            .update({ body_enc: encryptString(String(n.body)), body: null } as any)
+            .eq("id", n.id);
+          if (upErr) throw safeError("notes.backfill.update", upErr, "Backfill update failed.");
+          notesUpdated++;
+        }
+      }
+      if (rows.length < pageSize) break;
+      from += pageSize;
+    }
+
+    return { referralsUpdated, notesUpdated };
+  });
