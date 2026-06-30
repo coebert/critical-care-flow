@@ -284,7 +284,7 @@ export const updateReferral = createServerFn({ method: "POST" })
     const { supabase, userId } = context;
     const { data: prior } = await supabase
       .from("referrals")
-      .select("status, decline_reason, accepting_consultant")
+      .select("status, decline_reason, accepting_consultant, discussed_with_consultant")
       .eq("id", data.id)
       .maybeSingle();
 
@@ -295,6 +295,13 @@ export const updateReferral = createServerFn({ method: "POST" })
         : prior?.decline_reason;
     if (finalStatus === "declined" && !(finalReason ?? "").trim()) {
       throw new Error("A reason is required when declining a referral.");
+    }
+    const finalDiscussed =
+      data.patch.discussed_with_consultant !== undefined
+        ? data.patch.discussed_with_consultant
+        : (prior as any)?.discussed_with_consultant;
+    if (finalStatus === "declined" && !(finalDiscussed ?? "").trim()) {
+      throw new Error("Please record which critical care consultant the referral was discussed with.");
     }
     const finalConsultant =
       data.patch.accepting_consultant !== undefined
