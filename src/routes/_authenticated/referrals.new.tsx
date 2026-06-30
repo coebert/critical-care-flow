@@ -248,7 +248,7 @@ function NewReferralPage() {
   const declineConsultantMissing =
     f.status === "declined" && !f.discussed_with_consultant.trim();
   const acceptingConsultantMissing =
-    f.status === "admitted" && !f.accepting_consultant.trim();
+    (f.status === "admitted" || f.status === "accepted") && !f.accepting_consultant.trim();
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -477,11 +477,11 @@ function NewReferralPage() {
               </Field>
             </>
           )}
-          {f.status === "admitted" && (
+          {(f.status === "admitted" || f.status === "accepted") && (
             <Field
               label="Accepting critical care consultant"
               required
-              error={acceptingConsultantMissing ? "Required when admitting a referral." : undefined}
+              error={acceptingConsultantMissing ? "Required when a referral is accepted or admitted." : undefined}
             >
               <div className={cn(acceptingConsultantMissing && "rounded-md ring-1 ring-destructive")}>
                 <ComboboxAdd

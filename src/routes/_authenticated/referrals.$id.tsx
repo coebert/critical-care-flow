@@ -227,7 +227,7 @@ function ReferralDetail() {
   const declineConsultantMissing =
     ref.status === "declined" && !((ref as any).discussed_with_consultant ?? "").trim();
   const acceptingConsultantMissing =
-    ref.status === "admitted" && !((ref as any).accepting_consultant ?? "").trim();
+    (ref.status === "admitted" || ref.status === "accepted") && !((ref as any).accepting_consultant ?? "").trim();
 
   const save = async () => {
     if (!timing.isValid) {
@@ -539,8 +539,8 @@ function ReferralDetail() {
               </F>
             </>
           )}
-          {ref.status === "admitted" && (
-            <F label="Accepting critical care consultant" required error={acceptingConsultantMissing ? "Required when admitting a referral." : undefined}>
+          {(ref.status === "admitted" || ref.status === "accepted") && (
+            <F label="Accepting critical care consultant" required error={acceptingConsultantMissing ? "Required when a referral is accepted or admitted." : undefined}>
               <div className={cn(acceptingConsultantMissing && "rounded-md ring-1 ring-destructive")}>
                 <ComboboxAdd
                   value={ref.accepting_consultant ?? ""}

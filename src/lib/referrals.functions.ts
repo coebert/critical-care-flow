@@ -210,7 +210,7 @@ export const createReferral = createServerFn({ method: "POST" })
     if (data.status === "declined" && !(data.discussed_with_consultant ?? "").trim()) {
       throw new Error("Please record which critical care consultant the referral was discussed with.");
     }
-    if (data.status === "admitted" && !(data.accepting_consultant ?? "").trim()) {
+    if ((data.status === "admitted" || data.status === "accepted") && !(data.accepting_consultant ?? "").trim()) {
       throw new Error("An accepting consultant is required when admitting a referral.");
     }
     const baseInsert = applyEncryption({
@@ -307,7 +307,7 @@ export const updateReferral = createServerFn({ method: "POST" })
       data.patch.accepting_consultant !== undefined
         ? data.patch.accepting_consultant
         : (prior as any)?.accepting_consultant;
-    if (finalStatus === "admitted" && !(finalConsultant ?? "").trim()) {
+    if ((finalStatus === "admitted" || finalStatus === "accepted") && !(finalConsultant ?? "").trim()) {
       throw new Error("An accepting consultant is required when admitting a referral.");
     }
 
