@@ -38,37 +38,54 @@ async function getAdmin() {
 // Encryption mapping helpers
 // ---------------------------------------------------------------------------
 // These fields are stored encrypted in *_enc columns. The original
-// plaintext columns are kept in the schema for now (legacy rows) but
-// new writes ALWAYS null them and use the encrypted columns instead.
-// The follow-up migration drops the plaintext columns once backfill
-// has run on all rows.
+// plaintext columns no longer exist in the database — every write
+// must encrypt and every read must decrypt. `hospital_number` is
+// additionally hashed (HMAC-SHA256) into `hospital_number_hash` so
+// repeat-patient lookups still work without ever storing plaintext.
 
 const ENCRYPTED_TEXT_FIELDS = [
   "past_medical_history",
   "baseline_function",
   "reason_for_referral",
+  "hospital_number",
 ] as const;
 
 type EncryptedField = (typeof ENCRYPTED_TEXT_FIELDS)[number];
 
+export type DecryptedReferral = Record<string, any> & {
+  id: string;
+  hospital_number: string | null;
+  past_medical_history: string | null;
+  baseline_function: string | null;
+  reason_for_referral: string | null;
+};
+
+export type DecryptedReferralNote = Record<string, any> & {
+  id: string;
+  referral_id: string;
+  body: string | null;
+};
+
 function applyEncryption(input: Record<string, unknown>): Record<string, unknown> {
   const out: Record<string, unknown> = { ...input };
-  for (const k of ENCRYPTED_TEXT_FIELDS) {
-    if (k in out) {
-      const plain = out[k];
-      out[`${k}_enc`] = encryptString(plain == null ? null : String(plain));
-      out[k] = null; // never store plaintext for these fields
-    }
-  }
+  // Compute hash BEFORE the encryption loop nulls the plaintext key.
   if ("hospital_number" in out) {
     const hn = out.hospital_number;
     out.hospital_number_hash = hashHospitalNumber(hn == null ? null : String(hn));
   }
+  for (const k of ENCRYPTED_TEXT_FIELDS) {
+    if (k in out) {
+      const plain = out[k];
+      out[`${k}_enc`] = encryptString(plain == null ? null : String(plain));
+      // Plaintext columns have been dropped — strip the key entirely.
+      delete out[k];
+    }
+  }
   return out;
 }
 
-function decryptReferralRow<T extends Record<string, any>>(row: T): T {
-  if (!row) return row;
+function decryptReferralRow<T extends Record<string, any>>(row: T): T & DecryptedReferral {
+  if (!row) return row as T & DecryptedReferral;
   const out: any = { ...row };
   for (const k of ENCRYPTED_TEXT_FIELDS) {
     const enc = out[`${k}_enc`] as string | null | undefined;
@@ -78,10 +95,11 @@ function decryptReferralRow<T extends Record<string, any>>(row: T): T {
       } catch {
         out[k] = null;
       }
+    } else {
+      out[k] = null;
     }
-    // If only legacy plaintext exists (pre-backfill), leave it as-is.
   }
-  return out;
+  return out as T & DecryptedReferral;
 }
 
 // Audit diffs must not contain plaintext for encrypted fields, otherwise
@@ -95,10 +113,10 @@ function redactEncryptedFromDiff(diff: Record<string, unknown>): Record<string, 
     // Strip the ciphertext too — there is no point storing it twice.
     delete out[`${k}_enc`];
   }
-  // hospital_number stays in the diff but the hash column is redundant noise.
   delete (out as any).hospital_number_hash;
   return out;
 }
+
 
 async function writeAudit(entry: {
   user_id: string;
