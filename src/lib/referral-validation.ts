@@ -2,7 +2,7 @@
 // Returns per-field error messages plus a list of cross-field issues.
 
 export type ReferralTimingInput = {
-  status: "pending" | "admitted" | "declined" | string;
+  status: "pending" | "accepted" | "admitted" | "declined" | string;
   referral_received_at: string | null | undefined;
   first_seen_at: string | null | undefined;
   decision_at: string | null | undefined;
