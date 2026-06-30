@@ -26,7 +26,7 @@ function formatElapsed(ms: number): string {
 
 function getTimerElapsedMs(r: Referral, now: number): number | null {
   if (r.status === "pending") return now - new Date(r.referral_received_at).getTime();
-  if (r.status === "admitted") {
+  if (r.status === "accepted" || r.status === "admitted") {
     const startSrc = r.decision_at ?? r.updated_at;
     if (!startSrc) return null;
     const end = r.arrived_on_unit_at ? new Date(r.arrived_on_unit_at).getTime() : now;
@@ -40,7 +40,7 @@ function getTimerInfo(r: Referral, now: number): { label: string; value: string;
     const start = new Date(r.referral_received_at).getTime();
     return { label: "Waiting", value: formatElapsed(now - start), tone: "text-warning-foreground" };
   }
-  if (r.status === "admitted") {
+  if (r.status === "accepted" || r.status === "admitted") {
     const startSrc = r.decision_at ?? r.updated_at;
     if (!startSrc) return null;
     const start = new Date(startSrc).getTime();
