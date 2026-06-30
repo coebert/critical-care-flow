@@ -747,7 +747,7 @@ function NoteItem({
   onDelete: () => Promise<void>;
 }) {
   const [editing, setEditing] = useState(false);
-  const [draft, setDraft] = useState(note.body);
+  const [draft, setDraft] = useState(note.body ?? "");
   const [busy, setBusy] = useState(false);
   const edited = (note as any).edited_at as string | null | undefined;
 
