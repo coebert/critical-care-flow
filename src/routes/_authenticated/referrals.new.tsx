@@ -106,6 +106,7 @@ const blankForm = (): DraftForm => ({
   arrived_on_unit_at: "",
   status: "pending",
   decline_reason: "",
+  discussed_with_consultant: "",
   accepting_consultant: "",
   admission_urgency: "",
 });
