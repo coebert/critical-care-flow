@@ -232,6 +232,33 @@ function NewReferralPage() {
   const showAlert =
     priors.length > 0 && dismissedFor !== f.hospital_number.trim();
 
+  // Most-recent prior with usable PMH or baseline function for autofill.
+  const priorWithHistory = priors.find(
+    (p) => (p.past_medical_history && p.past_medical_history.trim()) ||
+           (p.baseline_function && p.baseline_function.trim()),
+  );
+
+  const autofillPMH = () => {
+    if (!priorWithHistory) return;
+    const incomingPMH = priorWithHistory.past_medical_history?.trim() ?? "";
+    const incomingBaseline = priorWithHistory.baseline_function?.trim() ?? "";
+    const hasExisting =
+      (f.past_medical_history.trim() && incomingPMH && f.past_medical_history.trim() !== incomingPMH) ||
+      (f.baseline_function.trim() && incomingBaseline && f.baseline_function.trim() !== incomingBaseline);
+    if (hasExisting) {
+      const ok = typeof window !== "undefined"
+        ? window.confirm("Overwrite the past medical history / baseline function you've already entered with the previous referral's values?")
+        : true;
+      if (!ok) return;
+    }
+    setF((cur) => ({
+      ...cur,
+      past_medical_history: incomingPMH || cur.past_medical_history,
+      baseline_function: incomingBaseline || cur.baseline_function,
+    }));
+    toast.success("Past medical history auto-filled from previous referral.");
+  };
+
   const timing = validateReferralTimings({
     status: f.status,
     referral_received_at: f.referral_received_at
