@@ -343,7 +343,7 @@ export const updateReferral = createServerFn({ method: "POST" })
 
 export const listReferralsForList = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
-  .handler(async ({ context }) => {
+  .handler(async ({ context }): Promise<DecryptedReferral[]> => {
     const { supabase } = context;
     const { data, error } = await supabase
       .from("referrals")
@@ -354,6 +354,7 @@ export const listReferralsForList = createServerFn({ method: "GET" })
     if (error) throw safeError("referrals.list", error, "Failed to load referrals.");
     return (data ?? []).map((r) => decryptReferralRow(r as any));
   });
+
 
 export const getReferralDetail = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
