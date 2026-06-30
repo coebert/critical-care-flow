@@ -419,7 +419,7 @@ function ReferralsList() {
             className="pl-9"
           />
         </div>
-        {(["all", "pending", "admitted", "declined"] as const).map((s) => (
+        {(["all", "pending", "accepted", "admitted", "declined"] as const).map((s) => (
           <Button
             key={s}
             size="sm"
