@@ -491,7 +491,7 @@ export const deleteNote = createServerFn({ method: "POST" })
     const { supabase, userId } = context;
     const { data: existing } = await supabase
       .from("referral_notes")
-      .select("id, body, body_enc, referral_id, author_id, created_at")
+      .select("id, body_enc, referral_id, author_id, created_at")
       .eq("id", data.id)
       .maybeSingle();
     if (!existing) throw new Error("Note not found");
