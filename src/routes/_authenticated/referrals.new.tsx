@@ -448,18 +448,34 @@ function NewReferralPage() {
             </Field>
           </div>
           {f.status === "declined" && (
-            <Field
-              label="Reason for declining"
-              required
-              error={showErrors && declineReasonMissing ? "Required when declining a referral." : undefined}
-            >
-              <Textarea
-                rows={3}
-                value={f.decline_reason}
-                onChange={(e) => set("decline_reason", e.target.value)}
-                className={cn(showErrors && declineReasonMissing && "border-destructive focus-visible:ring-destructive")}
-              />
-            </Field>
+            <>
+              <Field
+                label="Reason for declining"
+                required
+                error={showErrors && declineReasonMissing ? "Required when declining a referral." : undefined}
+              >
+                <Textarea
+                  rows={3}
+                  value={f.decline_reason}
+                  onChange={(e) => set("decline_reason", e.target.value)}
+                  className={cn(showErrors && declineReasonMissing && "border-destructive focus-visible:ring-destructive")}
+                />
+              </Field>
+              <Field
+                label="Discussed with critical care consultant"
+                required
+                error={showErrors && declineConsultantMissing ? "Required when declining a referral." : undefined}
+              >
+                <div className={cn(showErrors && declineConsultantMissing && "rounded-md ring-1 ring-destructive")}>
+                  <ComboboxAdd
+                    value={f.discussed_with_consultant}
+                    onChange={(v) => set("discussed_with_consultant", v)}
+                    options={consultants}
+                    placeholder="Select or add consultant…"
+                  />
+                </div>
+              </Field>
+            </>
           )}
           {f.status === "admitted" && (
             <Field
