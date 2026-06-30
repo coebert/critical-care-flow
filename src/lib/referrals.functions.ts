@@ -837,119 +837,22 @@ export const findReferralsByHospitalNumber = createServerFn({ method: "POST" })
       })
       .parse(d),
   )
-  .handler(async ({ data, context }) => {
+  .handler(async ({ data, context }): Promise<DecryptedReferral[]> => {
     const { supabase } = context;
     const hashed = hashHospitalNumber(data.hospital_number);
+    if (!hashed) return [];
     let q = supabase
       .from("referrals")
       .select(
-        "id, hospital_number, hospital_number_hash, referral_received_at, status, referring_specialty, current_ward, current_bed, reason_for_referral, reason_for_referral_enc, age, sex, consultant_to_consultant_only",
+        "id, hospital_number_enc, hospital_number_hash, referral_received_at, status, referring_specialty, current_ward, current_bed, reason_for_referral_enc, age, sex, consultant_to_consultant_only, decision_at, decline_reason",
       )
       .is("deleted_at", null)
+      .eq("hospital_number_hash", hashed)
       .order("referral_received_at", { ascending: false })
       .limit(50);
-    // Match by hash (new rows) OR by plaintext (legacy rows pre-backfill).
-    if (hashed) {
-      q = q.or(`hospital_number_hash.eq.${hashed},hospital_number.eq.${data.hospital_number}`);
-    } else {
-      q = q.eq("hospital_number", data.hospital_number);
-    }
     if (data.exclude_id) q = q.neq("id", data.exclude_id);
     const { data: rows, error } = await q;
     if (error) throw safeError("referrals.findByHospitalNumber", error, "Failed to search referrals.");
     return (rows ?? []).map((r) => decryptReferralRow(r as any));
   });
 
-
-// ---------------------------------------------------------------------------
-// Admin: one-shot backfill of encrypted columns + hospital_number_hash for
-// any historical rows that still hold plaintext only. Idempotent: rows
-// that already have ciphertext are left alone. Run from the admin page,
-// then a follow-up migration drops the plaintext columns.
-// ---------------------------------------------------------------------------
-
-export const backfillEncryption = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
-  .handler(async ({ context }) => {
-    const { supabase, userId } = context;
-    const { data: isAdmin } = await supabase.rpc("has_role", {
-      _user_id: userId,
-      _role: "admin",
-    });
-    if (!isAdmin) throw new Error("Forbidden");
-
-    const admin = await getAdmin();
-    let referralsUpdated = 0;
-    let notesUpdated = 0;
-
-    // Referrals: paginate to keep memory bounded.
-    const pageSize = 200;
-    let from = 0;
-    // We intentionally pull deleted rows too so soft-deleted history is also
-    // protected after the plaintext columns are dropped.
-    // eslint-disable-next-line no-constant-condition
-    while (true) {
-      const { data: rows, error } = await admin
-        .from("referrals")
-        .select(
-          "id, hospital_number, hospital_number_hash, past_medical_history, past_medical_history_enc, baseline_function, baseline_function_enc, reason_for_referral, reason_for_referral_enc",
-        )
-        .order("id", { ascending: true })
-        .range(from, from + pageSize - 1);
-      if (error) throw safeError("referrals.backfill", error, "Backfill failed.");
-      if (!rows || rows.length === 0) break;
-
-      for (const r of rows as any[]) {
-        const patch: Record<string, unknown> = {};
-        for (const k of ENCRYPTED_TEXT_FIELDS) {
-          const plain = r[k];
-          const enc = r[`${k}_enc`];
-          if (plain && !enc) {
-            patch[`${k}_enc`] = encryptString(String(plain));
-            patch[k] = null;
-          }
-        }
-        if (r.hospital_number && !r.hospital_number_hash) {
-          patch.hospital_number_hash = hashHospitalNumber(r.hospital_number);
-        }
-        if (Object.keys(patch).length > 0) {
-          const { error: upErr } = await admin
-            .from("referrals")
-            .update(patch as any)
-            .eq("id", r.id);
-          if (upErr) throw safeError("referrals.backfill.update", upErr, "Backfill update failed.");
-          referralsUpdated++;
-        }
-      }
-      if (rows.length < pageSize) break;
-      from += pageSize;
-    }
-
-    // Notes
-    from = 0;
-    // eslint-disable-next-line no-constant-condition
-    while (true) {
-      const { data: rows, error } = await admin
-        .from("referral_notes")
-        .select("id, body, body_enc")
-        .order("id", { ascending: true })
-        .range(from, from + pageSize - 1);
-      if (error) throw safeError("notes.backfill", error, "Backfill failed.");
-      if (!rows || rows.length === 0) break;
-
-      for (const n of rows as any[]) {
-        if (n.body && !n.body_enc) {
-          const { error: upErr } = await admin
-            .from("referral_notes")
-            .update({ body_enc: encryptString(String(n.body)), body: null } as any)
-            .eq("id", n.id);
-          if (upErr) throw safeError("notes.backfill.update", upErr, "Backfill update failed.");
-          notesUpdated++;
-        }
-      }
-      if (rows.length < pageSize) break;
-      from += pageSize;
-    }
-
-    return { referralsUpdated, notesUpdated };
-  });
