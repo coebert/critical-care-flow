@@ -245,16 +245,20 @@ function NewReferralPage() {
 
   const declineReasonMissing =
     f.status === "declined" && !f.decline_reason.trim();
+  const declineConsultantMissing =
+    f.status === "declined" && !f.discussed_with_consultant.trim();
   const acceptingConsultantMissing =
     f.status === "admitted" && !f.accepting_consultant.trim();
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!timing.isValid || declineReasonMissing || acceptingConsultantMissing) {
+    if (!timing.isValid || declineReasonMissing || declineConsultantMissing || acceptingConsultantMissing) {
       setShowErrors(true);
-      const msg = acceptingConsultantMissing && timing.isValid && !declineReasonMissing
+      const msg = acceptingConsultantMissing && timing.isValid && !declineReasonMissing && !declineConsultantMissing
         ? "An accepting consultant is required when admitting a referral."
-        : declineReasonMissing && timing.isValid && !acceptingConsultantMissing
+        : declineConsultantMissing && timing.isValid && !declineReasonMissing && !acceptingConsultantMissing
+        ? "Please record which critical care consultant the referral was discussed with."
+        : declineReasonMissing && timing.isValid && !acceptingConsultantMissing && !declineConsultantMissing
         ? "A reason is required when declining a referral."
         : "Please fix the highlighted fields before saving.";
       toast.error(msg);
