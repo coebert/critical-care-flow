@@ -566,7 +566,7 @@ const AUDITED_REFERRAL_FIELDS = [
   "consultant_to_consultant_only",
   "referring_specialty", "reason_for_referral",
   "referral_received_at", "first_seen_at", "decision_at", "arrived_on_unit_at",
-  "status", "decline_reason",
+  "status", "decline_reason", "discussed_with_consultant", "accepting_consultant", "admission_urgency",
 ] as const;
 
 export type AuditValue = string | number | boolean | null;
