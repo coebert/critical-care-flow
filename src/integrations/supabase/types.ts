@@ -227,6 +227,7 @@ export type Database = {
           deleted_by: string | null
           dnacpr_respect: boolean
           first_seen_at: string | null
+          hospital_number_enc: string | null
           hospital_number_hash: string | null
           id: string
           past_medical_history_enc: string | null
@@ -257,6 +258,7 @@ export type Database = {
           deleted_by?: string | null
           dnacpr_respect?: boolean
           first_seen_at?: string | null
+          hospital_number_enc?: string | null
           hospital_number_hash?: string | null
           id?: string
           past_medical_history_enc?: string | null
@@ -287,6 +289,7 @@ export type Database = {
           deleted_by?: string | null
           dnacpr_respect?: boolean
           first_seen_at?: string | null
+          hospital_number_enc?: string | null
           hospital_number_hash?: string | null
           id?: string
           past_medical_history_enc?: string | null
