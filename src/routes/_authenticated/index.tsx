@@ -8,11 +8,12 @@ import { Badge } from "@/components/ui/badge";
 import { Plus, Search, RotateCcw, Trash2, MapPin } from "lucide-react";
 import type { Tables } from "@/integrations/supabase/types";
 import { format, formatDistanceToNow } from "date-fns";
-import { listDeletedReferrals, listReferralsForList, restoreReferral, RESTORE_WINDOW_DAYS } from "@/lib/referrals.functions";
+import { listDeletedReferrals, listReferralsForList, restoreReferral, RESTORE_WINDOW_DAYS, type DecryptedReferral } from "@/lib/referrals.functions";
 import { ADMISSION_URGENCY_LABELS, ADMISSION_URGENCY_BADGE, ADMISSION_URGENCY_OPTIONS, type AdmissionUrgency } from "@/lib/admission-urgency";
 import { toast } from "sonner";
 
-type Referral = Tables<"referrals">;
+type Referral = Tables<"referrals"> & DecryptedReferral;
+
 
 function formatElapsed(ms: number): string {
   if (ms < 0) ms = 0;
