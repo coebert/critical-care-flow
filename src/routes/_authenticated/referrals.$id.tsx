@@ -224,6 +224,8 @@ function ReferralDetail() {
 
   const declineReasonMissing =
     ref.status === "declined" && !(ref.decline_reason ?? "").trim();
+  const declineConsultantMissing =
+    ref.status === "declined" && !((ref as any).discussed_with_consultant ?? "").trim();
   const acceptingConsultantMissing =
     ref.status === "admitted" && !((ref as any).accepting_consultant ?? "").trim();
 
@@ -234,6 +236,10 @@ function ReferralDetail() {
     }
     if (declineReasonMissing) {
       toast.error("A reason is required when declining a referral.");
+      return;
+    }
+    if (declineConsultantMissing) {
+      toast.error("Please record which critical care consultant the referral was discussed with.");
       return;
     }
     if (acceptingConsultantMissing) {
@@ -250,6 +256,7 @@ function ReferralDetail() {
         consultant_to_consultant_only: (ref as any).consultant_to_consultant_only ?? false,
         reason_for_referral: ref.reason_for_referral, status: ref.status,
         decline_reason: ref.decline_reason,
+        discussed_with_consultant: (ref as any).discussed_with_consultant ?? null,
         admission_urgency: ref.admission_urgency ?? null,
         accepting_consultant: (ref as any).accepting_consultant ?? null,
         referral_received_at: ref.referral_received_at,
