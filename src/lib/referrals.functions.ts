@@ -307,7 +307,7 @@ export const updateReferral = createServerFn({ method: "POST" })
       data.patch.accepting_consultant !== undefined
         ? data.patch.accepting_consultant
         : (prior as any)?.accepting_consultant;
-    if (finalStatus === "admitted" && !(finalConsultant ?? "").trim()) {
+    if ((finalStatus === "admitted" || finalStatus === "accepted") && !(finalConsultant ?? "").trim()) {
       throw new Error("An accepting consultant is required when admitting a referral.");
     }
 
