@@ -243,7 +243,7 @@ function ReferralDetail() {
       return;
     }
     if (acceptingConsultantMissing) {
-      toast.error("An accepting consultant is required when admitting a referral.");
+      toast.error("Please select the accepting critical care consultant before marking this referral as Accepted or Admitted.");
       return;
     }
     setSaving(true);
