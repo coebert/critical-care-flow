@@ -378,6 +378,7 @@ function AnalyticsPage() {
             <li className="flex justify-between"><span className="text-muted-foreground">Mean referral → first seen</span><span className="font-medium">{meanTimeToSeen ? `${Math.round(meanTimeToSeen)} min` : "—"}</span></li>
             <li className="flex justify-between"><span className="text-muted-foreground">Mean decision → on unit</span><span className="font-medium">{meanDecisionToArrival ? `${Math.round(meanDecisionToArrival)} min` : "—"}</span></li>
             <li className="flex justify-between"><span className="text-muted-foreground">Admitted</span><span className="font-medium">{byStatus.find((s) => s.name === "admitted")?.value ?? 0}</span></li>
+            <li className="flex justify-between"><span className="text-muted-foreground">Accepted</span><span className="font-medium">{byStatus.find((s) => s.name === "accepted")?.value ?? 0}</span></li>
             <li className="flex justify-between"><span className="text-muted-foreground">Declined</span><span className="font-medium">{byStatus.find((s) => s.name === "declined")?.value ?? 0}</span></li>
             <li className="flex justify-between"><span className="text-muted-foreground">Pending</span><span className="font-medium">{byStatus.find((s) => s.name === "pending")?.value ?? 0}</span></li>
           </ul>
