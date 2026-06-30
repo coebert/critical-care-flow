@@ -1,0 +1,1 @@
+ALTER TYPE public.referral_status ADD VALUE IF NOT EXISTS 'accepted';
