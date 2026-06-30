@@ -227,7 +227,7 @@ function ReferralDetail() {
   const declineConsultantMissing =
     ref.status === "declined" && !((ref as any).discussed_with_consultant ?? "").trim();
   const acceptingConsultantMissing =
-    ref.status === "admitted" && !((ref as any).accepting_consultant ?? "").trim();
+    (ref.status === "admitted" || ref.status === "accepted") && !((ref as any).accepting_consultant ?? "").trim();
 
   const save = async () => {
     if (!timing.isValid) {
