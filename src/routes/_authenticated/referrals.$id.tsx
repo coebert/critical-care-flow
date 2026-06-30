@@ -484,6 +484,7 @@ function ReferralDetail() {
                 <SelectTrigger><SelectValue /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="pending">Pending</SelectItem>
+                  <SelectItem value="accepted">Accepted</SelectItem>
                   <SelectItem value="admitted">Admitted</SelectItem>
                   <SelectItem value="declined">Declined</SelectItem>
                 </SelectContent>

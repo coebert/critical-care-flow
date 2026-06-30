@@ -20,7 +20,7 @@ const refSchema = z.object({
   first_seen_at: z.string().nullable().optional(),
   decision_at: z.string().nullable().optional(),
   arrived_on_unit_at: z.string().nullable().optional(),
-  status: z.enum(["pending", "declined", "admitted"]).optional(),
+  status: z.enum(["pending", "accepted", "declined", "admitted"]).optional(),
   decline_reason: z.string().trim().max(2000).nullable().optional(),
   accepting_consultant: z.string().trim().max(120).nullable().optional(),
   admission_urgency: z

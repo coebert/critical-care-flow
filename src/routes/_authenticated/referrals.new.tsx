@@ -81,7 +81,7 @@ type DraftForm = {
   first_seen_at: string;
   decision_at: string;
   arrived_on_unit_at: string;
-  status: "pending" | "declined" | "admitted";
+  status: "pending" | "accepted" | "declined" | "admitted";
   decline_reason: string;
   accepting_consultant: string;
   admission_urgency: AdmissionUrgency | "";
@@ -418,6 +418,7 @@ function NewReferralPage() {
                 <SelectTrigger><SelectValue /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="pending">Pending</SelectItem>
+                  <SelectItem value="accepted">Accepted</SelectItem>
                   <SelectItem value="admitted">Admitted</SelectItem>
                   <SelectItem value="declined">Declined</SelectItem>
                 </SelectContent>

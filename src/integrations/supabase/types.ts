@@ -365,7 +365,7 @@ export type Database = {
       app_role: "admin" | "clinician"
       audit_action: "view" | "create" | "update" | "delete"
       patient_sex: "male" | "female" | "other" | "unknown"
-      referral_status: "pending" | "declined" | "admitted"
+      referral_status: "pending" | "declined" | "admitted" | "accepted"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -503,7 +503,7 @@ export const Constants = {
       app_role: ["admin", "clinician"],
       audit_action: ["view", "create", "update", "delete"],
       patient_sex: ["male", "female", "other", "unknown"],
-      referral_status: ["pending", "declined", "admitted"],
+      referral_status: ["pending", "declined", "admitted", "accepted"],
     },
   },
 } as const

@@ -26,7 +26,7 @@ function formatElapsed(ms: number): string {
 
 function getTimerElapsedMs(r: Referral, now: number): number | null {
   if (r.status === "pending") return now - new Date(r.referral_received_at).getTime();
-  if (r.status === "admitted") {
+  if (r.status === "accepted" || r.status === "admitted") {
     const startSrc = r.decision_at ?? r.updated_at;
     if (!startSrc) return null;
     const end = r.arrived_on_unit_at ? new Date(r.arrived_on_unit_at).getTime() : now;
@@ -40,7 +40,7 @@ function getTimerInfo(r: Referral, now: number): { label: string; value: string;
     const start = new Date(r.referral_received_at).getTime();
     return { label: "Waiting", value: formatElapsed(now - start), tone: "text-warning-foreground" };
   }
-  if (r.status === "admitted") {
+  if (r.status === "accepted" || r.status === "admitted") {
     const startSrc = r.decision_at ?? r.updated_at;
     if (!startSrc) return null;
     const start = new Date(startSrc).getTime();
@@ -83,12 +83,14 @@ export const Route = createFileRoute("/_authenticated/")({
 
 const statusStyles: Record<string, string> = {
   pending: "bg-warning/15 text-warning-foreground border-warning/30",
+  accepted: "bg-success/15 text-success border-success/30",
   admitted: "bg-success/15 text-success border-success/30",
   declined: "bg-destructive/10 text-destructive border-destructive/30",
 };
 
 const rowBgStyles: Record<string, string> = {
   pending: "bg-warning/[0.08]",
+  accepted: "bg-success/[0.08]",
   admitted: "bg-success/[0.08]",
   declined: "bg-destructive/[0.06]",
 };
@@ -417,7 +419,7 @@ function ReferralsList() {
             className="pl-9"
           />
         </div>
-        {(["all", "pending", "admitted", "declined"] as const).map((s) => (
+        {(["all", "pending", "accepted", "admitted", "declined"] as const).map((s) => (
           <Button
             key={s}
             size="sm"
