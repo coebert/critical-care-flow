@@ -365,10 +365,15 @@ function NewReferralPage() {
                 <span>
                   This patient (hospital number <strong>{f.hospital_number}</strong>) has been referred to critical care {priors.length} time{priors.length > 1 ? "s" : ""} before.
                 </span>
-                <div className="flex gap-2">
+                <div className="flex gap-2 flex-wrap">
                   <Button type="button" size="sm" variant="outline" onClick={() => setPriorOpen(true)}>
                     View previous referrals for this patient
                   </Button>
+                  {priorWithHistory && (
+                    <Button type="button" size="sm" variant="outline" onClick={autofillPMH}>
+                      Auto-fill past medical history
+                    </Button>
+                  )}
                   <Button
                     type="button"
                     size="sm"
