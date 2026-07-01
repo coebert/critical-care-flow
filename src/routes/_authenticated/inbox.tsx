@@ -77,7 +77,7 @@ function InboxPage() {
   useEffect(() => {
     if (qInput === search.q) return;
     const t = setTimeout(() => {
-      navigate({ search: (prev) => ({ ...prev, q: qInput, page: 1 }) });
+      navigate({ search: (prev: Record<string, unknown>) => ({ ...prev, q: qInput, page: 1 }) });
     }, 300);
     return () => clearTimeout(t);
   }, [qInput, search.q, navigate]);
@@ -206,11 +206,11 @@ function InboxPage() {
   };
 
   const setSearch = (patch: Partial<z.infer<typeof inboxSearchSchema>>) => {
-    navigate({ search: (prev) => ({ ...prev, ...patch, page: patch.page ?? 1 }) });
+    navigate({ search: (prev: Record<string, unknown>) => ({ ...prev, ...patch, page: patch.page ?? 1 }) });
   };
   const clearFilters = () => {
     setQInput("");
-    navigate({ search: (prev) => ({ ...prev, q: "", kind: "all", from: "", to: "", page: 1 }) });
+    navigate({ search: (prev: Record<string, unknown>) => ({ ...prev, q: "", kind: "all", from: "", to: "", page: 1 }) });
   };
 
   return (
