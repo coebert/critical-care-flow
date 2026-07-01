@@ -140,65 +140,88 @@ function InboxPage() {
                 {tab === "unread" ? "No unread notifications" : "No notifications yet"}
               </div>
             ) : (
-              visible.map((n) => (
-                <div
-                  key={n.id}
-                  className={`flex items-start gap-3 p-3 ${!n.read_at ? "bg-accent/40" : ""}`}
-                >
-                  <div className="mt-1">
-                    <span
-                      className={`inline-block w-2 h-2 rounded-full ${
-                        n.read_at ? "bg-muted-foreground/30" : "bg-primary"
-                      }`}
-                      aria-label={n.read_at ? "Read" : "Unread"}
-                    />
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2 flex-wrap">
-                      <Badge variant="secondary" className="text-[10px]">
-                        {kindLabel(n.kind)}
-                      </Badge>
-                      <span className="text-xs text-muted-foreground">
-                        {formatDistanceToNow(new Date(n.created_at), { addSuffix: true })}
-                      </span>
+              visible.map((n) => {
+                const content = (
+                  <>
+                    <div className="mt-1">
+                      <span
+                        className={`inline-block w-2 h-2 rounded-full ${
+                          n.read_at ? "bg-muted-foreground/30" : "bg-primary"
+                        }`}
+                        aria-label={n.read_at ? "Read" : "Unread"}
+                      />
                     </div>
-                    <div className="text-sm mt-1 break-words">{n.message}</div>
-                    <div className="flex items-center gap-2 mt-2">
-                      {n.referral_id && (
-                        <Link
-                          to="/referrals/$id"
-                          params={{ id: n.referral_id }}
-                          onClick={() => {
-                            if (!n.read_at) markRead(n.id);
-                          }}
-                          className="text-xs text-primary hover:underline"
-                        >
-                          Open referral
-                        </Link>
-                      )}
-                      {n.read_at ? (
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          className="h-7 px-2 text-xs"
-                          onClick={() => markUnread(n.id)}
-                        >
-                          Mark unread
-                        </Button>
-                      ) : (
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          className="h-7 px-2 text-xs"
-                          onClick={() => markRead(n.id)}
-                        >
-                          <Check className="w-3 h-3 mr-1" /> Mark read
-                        </Button>
-                      )}
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <Badge variant="secondary" className="text-[10px]">
+                          {kindLabel(n.kind)}
+                        </Badge>
+                        <span className="text-xs text-muted-foreground">
+                          {formatDistanceToNow(new Date(n.created_at), { addSuffix: true })}
+                        </span>
+                        {n.referral_id && (
+                          <span className="text-xs text-primary ml-auto">Open referral →</span>
+                        )}
+                      </div>
+                      <div className="text-sm mt-1 break-words">{n.message}</div>
+                      <div className="flex items-center gap-2 mt-2">
+                        {n.read_at ? (
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="h-7 px-2 text-xs"
+                            onClick={(e) => {
+                              e.preventDefault();
+                              e.stopPropagation();
+                              markUnread(n.id);
+                            }}
+                          >
+                            Mark unread
+                          </Button>
+                        ) : (
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="h-7 px-2 text-xs"
+                            onClick={(e) => {
+                              e.preventDefault();
+                              e.stopPropagation();
+                              markRead(n.id);
+                            }}
+                          >
+                            <Check className="w-3 h-3 mr-1" /> Mark read
+                          </Button>
+                        )}
+                      </div>
                     </div>
+                  </>
+                );
+
+                const rowClass = `flex items-start gap-3 p-3 ${
+                  !n.read_at ? "bg-accent/40" : ""
+                } ${n.referral_id ? "hover:bg-accent cursor-pointer" : ""}`;
+
+                if (n.referral_id) {
+                  return (
+                    <Link
+                      key={n.id}
+                      to="/referrals/$id"
+                      params={{ id: n.referral_id }}
+                      onClick={() => {
+                        if (!n.read_at) markRead(n.id);
+                      }}
+                      className={rowClass}
+                    >
+                      {content}
+                    </Link>
+                  );
+                }
+                return (
+                  <div key={n.id} className={rowClass}>
+                    {content}
                   </div>
-                </div>
-              ))
+                );
+              })
             )}
           </Card>
         </TabsContent>
