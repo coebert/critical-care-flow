@@ -207,16 +207,19 @@ function NotificationDetailPage() {
               <div className="flex items-center justify-between gap-2 flex-wrap">
                 <div className="text-sm">
                   <div className="font-medium">
-                    {ref.patient_initials ?? "Referral"}{" "}
+                    {[
+                      ref.age != null ? `Age ${ref.age}` : null,
+                      ref.current_ward,
+                    ].filter(Boolean).join(" · ") || "Referral"}{" "}
                     {ref.status && (
                       <Badge variant="outline" className="ml-1 text-[10px]">
                         {ref.status}
                       </Badge>
                     )}
                   </div>
-                  {ref.referral_time && (
+                  {ref.referral_received_at && (
                     <div className="text-xs text-muted-foreground">
-                      Referred {format(new Date(ref.referral_time), "PPpp")}
+                      Received {format(new Date(ref.referral_received_at), "PPpp")}
                     </div>
                   )}
                 </div>
