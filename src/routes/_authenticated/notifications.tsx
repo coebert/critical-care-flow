@@ -4,10 +4,15 @@ import { Bell, BellOff, CheckCircle2, AlertTriangle, XCircle, HelpCircle } from 
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Switch } from "@/components/ui/switch";
+import { Label } from "@/components/ui/label";
 import { usePush } from "@/hooks/use-push";
 import { TestPushButton } from "@/components/test-push-button";
 import { readLastTestPushAt } from "@/lib/last-test-push";
+import { useServerFn } from "@tanstack/react-start";
+import { getNotificationPrefs, setNotificationPrefs } from "@/lib/notification-prefs.functions";
 import { toast } from "sonner";
+
 
 export const Route = createFileRoute("/_authenticated/notifications")({
   head: () => ({
