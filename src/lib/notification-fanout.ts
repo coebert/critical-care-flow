@@ -119,6 +119,7 @@ export async function fanOutNotifications(
     notificationsInserted: 0,
     pushSent: 0,
     goneEndpointsCleared: 0,
+    deliveriesRecorded: 0,
   };
 
   const roleRows = await deps.fetchEligibleRoles(args.actorId);
@@ -139,7 +140,24 @@ export async function fanOutNotifications(
     kind: args.kind,
     message: args.message,
   }));
-  await deps.insertNotifications(rows);
+  const inserted = await deps.insertNotifications(rows);
+  const notifIdByUser = new Map<string, string>();
+  if (Array.isArray(inserted)) {
+    for (const r of inserted) notifIdByUser.set(r.user_id, r.id);
+  }
+
+  const auditRows: DeliveryAuditRow[] = recipientIds.map((uid) => ({
+    notification_id: notifIdByUser.get(uid) ?? null,
+    recipient_id: uid,
+    actor_id: args.actorId,
+    referral_id: args.referralId,
+    kind: args.kind,
+    channel: "inapp",
+    status: "generated",
+    endpoint: null,
+    error: null,
+    delivered_at: new Date().toISOString(),
+  }));
 
   let pushSent = 0;
   let goneCleared = 0;
@@ -149,7 +167,7 @@ export async function fanOutNotifications(
     const recipientSet = new Set(recipientIds);
     const safeSubs = subs.filter((s) => recipientSet.has(s.user_id));
     if (safeSubs.length) {
-      const { goneEndpoints } = await deps.sendPush(safeSubs, {
+      const { goneEndpoints, results } = await deps.sendPush(safeSubs, {
         title: args.title ?? "SDH Critical Care",
         body: args.message,
         url: args.url ?? `/referrals/${args.referralId}`,
@@ -160,9 +178,68 @@ export async function fanOutNotifications(
         await deps.deletePushSubs(goneEndpoints);
         goneCleared = goneEndpoints.length;
       }
+      const gone = new Set(goneEndpoints);
+      const now = new Date().toISOString();
+      if (results && results.length) {
+        for (const r of results) {
+          auditRows.push({
+            notification_id: notifIdByUser.get(r.user_id) ?? null,
+            recipient_id: r.user_id,
+            actor_id: args.actorId,
+            referral_id: args.referralId,
+            kind: args.kind,
+            channel: "push",
+            status: r.gone ? "gone" : r.ok ? "sent" : "failed",
+            endpoint: r.endpoint,
+            error: r.error ?? null,
+            delivered_at: now,
+          });
+        }
+      } else {
+        // Fallback when sendPush didn't return per-endpoint results.
+        for (const s of safeSubs) {
+          auditRows.push({
+            notification_id: notifIdByUser.get(s.user_id) ?? null,
+            recipient_id: s.user_id,
+            actor_id: args.actorId,
+            referral_id: args.referralId,
+            kind: args.kind,
+            channel: "push",
+            status: gone.has(s.endpoint) ? "gone" : "sent",
+            endpoint: s.endpoint,
+            error: null,
+            delivered_at: now,
+          });
+        }
+      }
     }
   } catch (e) {
     console.error("[fanOutNotifications] push error", e);
+    const now = new Date().toISOString();
+    for (const uid of recipientIds) {
+      auditRows.push({
+        notification_id: notifIdByUser.get(uid) ?? null,
+        recipient_id: uid,
+        actor_id: args.actorId,
+        referral_id: args.referralId,
+        kind: args.kind,
+        channel: "push",
+        status: "failed",
+        endpoint: null,
+        error: e instanceof Error ? e.message : String(e),
+        delivered_at: now,
+      });
+    }
+  }
+
+  let deliveriesRecorded = 0;
+  if (deps.recordDeliveries && auditRows.length) {
+    try {
+      await deps.recordDeliveries(auditRows);
+      deliveriesRecorded = auditRows.length;
+    } catch (e) {
+      console.error("[fanOutNotifications] delivery audit error", e);
+    }
   }
 
   return {
@@ -170,5 +247,6 @@ export async function fanOutNotifications(
     notificationsInserted: rows.length,
     pushSent,
     goneEndpointsCleared: goneCleared,
+    deliveriesRecorded,
   };
 }
