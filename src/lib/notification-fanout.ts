@@ -142,7 +142,7 @@ export async function fanOutNotifications(
   if (!eligibleIds.length) return empty;
 
   const atWork = await deps.fetchAtWorkProfiles(eligibleIds);
-  const recipientIds = selectRecipients(roleRows, atWork, args.actorId);
+  const recipientIds = selectRecipients(roleRows, atWork, args.actorId, args.kind);
   if (!recipientIds.length) return empty;
 
   const rows: NotificationRow[] = recipientIds.map((uid) => ({
