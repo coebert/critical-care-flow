@@ -47,13 +47,35 @@ export function NotificationBell() {
         (payload) => {
           const n = payload.new as Notification;
           setItems((cur) => [n, ...cur].slice(0, 30));
-          if (
+
+          const title =
+            n.kind === "new"
+              ? "New referral"
+              : n.kind === "status"
+              ? "Referral status changed"
+              : n.kind === "note"
+              ? "New referral note"
+              : "Referral updated";
+
+          // In-app toast when the tab is visible; native browser notification
+          // when it isn't (so users still get notified when app is backgrounded).
+          if (typeof document !== "undefined" && document.visibilityState === "visible") {
+            toast(title, {
+              description: n.message,
+              action: n.referral_id
+                ? {
+                    label: "Open",
+                    onClick: () =>
+                      navigate({ to: "/referrals/$id", params: { id: n.referral_id! } }),
+                  }
+                : undefined,
+            });
+          } else if (
             typeof window !== "undefined" &&
             "Notification" in window &&
-            Notification.permission === "granted" &&
-            document.visibilityState !== "visible"
+            Notification.permission === "granted"
           ) {
-            new Notification("SDH Critical Care", { body: n.message });
+            new Notification(title, { body: n.message });
           }
         },
       )
