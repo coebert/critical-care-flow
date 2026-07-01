@@ -1,6 +1,6 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
-import { Bell, Check, CheckCheck, ExternalLink, Inbox as InboxIcon, Search, X, ChevronLeft, ChevronRight } from "lucide-react";
+import { Bell, Check, CheckCheck, ExternalLink, Inbox as InboxIcon, Search, X, ChevronLeft, ChevronRight, ArrowUpDown } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
 import { zodValidator, fallback } from "@tanstack/zod-adapter";
 import { z } from "zod";
@@ -25,6 +25,7 @@ const inboxSearchSchema = z.object({
   kind: fallback(z.enum(KIND_VALUES), "all").default("all"),
   from: fallback(z.string(), "").default(""),
   to: fallback(z.string(), "").default(""),
+  sort: fallback(z.enum(["newest", "oldest"]), "newest").default("newest"),
   page: fallback(z.number().int().min(1), 1).default(1),
 });
 
@@ -121,7 +122,7 @@ function InboxPage() {
     const q = search.q.trim().toLowerCase();
     const fromTs = search.from ? new Date(search.from + "T00:00:00").getTime() : null;
     const toTs = search.to ? new Date(search.to + "T23:59:59.999").getTime() : null;
-    return items.filter((n) => {
+    const arr = items.filter((n) => {
       if (search.tab === "unread" && n.read_at) return false;
       if (search.kind !== "all" && n.kind !== search.kind) return false;
       if (q) {
@@ -135,7 +136,13 @@ function InboxPage() {
       }
       return true;
     });
-  }, [items, search.tab, search.q, search.kind, search.from, search.to]);
+    arr.sort((a, b) => {
+      const ta = new Date(a.created_at).getTime();
+      const tb = new Date(b.created_at).getTime();
+      return search.sort === "oldest" ? ta - tb : tb - ta;
+    });
+    return arr;
+  }, [items, search.tab, search.q, search.kind, search.from, search.to, search.sort]);
 
   const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
   const page = Math.min(search.page, totalPages);
@@ -149,7 +156,7 @@ function InboxPage() {
   const allVisibleSelected = visibleIds.length > 0 && selectedVisible.length === visibleIds.length;
   const someVisibleSelected = selectedVisible.length > 0 && !allVisibleSelected;
 
-  const hasFilters = search.q !== "" || search.kind !== "all" || search.from !== "" || search.to !== "";
+  const hasFilters = search.q !== "" || search.kind !== "all" || search.from !== "" || search.to !== "" || search.sort !== "newest";
 
   const toggleOne = (id: string, checked: boolean) => {
     setSelected((cur) => {
@@ -210,7 +217,7 @@ function InboxPage() {
   };
   const clearFilters = () => {
     setQInput("");
-    navigate({ search: (prev: Record<string, unknown>) => ({ ...prev, q: "", kind: "all", from: "", to: "", page: 1 }) });
+    navigate({ search: (prev: Record<string, unknown>) => ({ ...prev, q: "", kind: "all", from: "", to: "", sort: "newest", page: 1 }) });
   };
 
   return (
@@ -250,7 +257,7 @@ function InboxPage() {
             </button>
           )}
         </div>
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2">
           <div>
             <Label className="text-xs">Type</Label>
             <Select value={search.kind} onValueChange={(v) => setSearch({ kind: v as typeof search.kind })}>
@@ -272,6 +279,16 @@ function InboxPage() {
           <div>
             <Label htmlFor="to" className="text-xs">To</Label>
             <Input id="to" type="date" value={search.to} onChange={(e) => setSearch({ to: e.target.value })} />
+          </div>
+          <div>
+            <Label className="text-xs">Sort</Label>
+            <Select value={search.sort} onValueChange={(v) => setSearch({ sort: v as "newest" | "oldest" })}>
+              <SelectTrigger><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="newest">Newest first</SelectItem>
+                <SelectItem value="oldest">Oldest first</SelectItem>
+              </SelectContent>
+            </Select>
           </div>
         </div>
         {hasFilters && (
