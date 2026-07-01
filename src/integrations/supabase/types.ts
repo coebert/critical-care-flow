@@ -68,6 +68,59 @@ export type Database = {
         }
         Relationships: []
       }
+      notification_deliveries: {
+        Row: {
+          actor_id: string | null
+          channel: string
+          delivered_at: string | null
+          endpoint: string | null
+          error: string | null
+          generated_at: string
+          id: string
+          kind: string
+          notification_id: string | null
+          recipient_id: string
+          referral_id: string | null
+          status: string
+        }
+        Insert: {
+          actor_id?: string | null
+          channel: string
+          delivered_at?: string | null
+          endpoint?: string | null
+          error?: string | null
+          generated_at?: string
+          id?: string
+          kind: string
+          notification_id?: string | null
+          recipient_id: string
+          referral_id?: string | null
+          status: string
+        }
+        Update: {
+          actor_id?: string | null
+          channel?: string
+          delivered_at?: string | null
+          endpoint?: string | null
+          error?: string | null
+          generated_at?: string
+          id?: string
+          kind?: string
+          notification_id?: string | null
+          recipient_id?: string
+          referral_id?: string | null
+          status?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "notification_deliveries_notification_id_fkey"
+            columns: ["notification_id"]
+            isOneToOne: false
+            referencedRelation: "notifications"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       notifications: {
         Row: {
           created_at: string
