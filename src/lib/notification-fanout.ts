@@ -19,10 +19,12 @@ export interface PushSubRow {
   auth: string;
 }
 
+export type NotificationKind = "new" | "updated" | "status" | "note";
+
 export interface NotificationRow {
   user_id: string;
   referral_id: string;
-  kind: "new" | "updated";
+  kind: NotificationKind;
   message: string;
 }
 
@@ -48,9 +50,10 @@ export interface FanOutDeps {
 export interface FanOutArgs {
   actorId: string;
   referralId: string;
-  kind: "new" | "updated";
+  kind: NotificationKind;
   message: string;
   url?: string;
+  title?: string;
 }
 
 export interface FanOutResult {
