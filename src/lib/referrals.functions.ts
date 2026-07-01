@@ -185,7 +185,11 @@ async function fanOutNotifications(
         return (data ?? []) as any;
       },
       insertNotifications: async (rows) => {
-        await admin.from("notifications").insert(rows as any);
+        const { data } = await admin
+          .from("notifications")
+          .insert(rows as any)
+          .select("id, user_id");
+        return (data ?? []) as any;
       },
       sendPush: async (subs, payload) => {
         const { sendPushToMany } = await import("./push.server");
@@ -193,6 +197,12 @@ async function fanOutNotifications(
       },
       deletePushSubs: async (endpoints) => {
         await admin.from("push_subscriptions").delete().in("endpoint", endpoints);
+      },
+      recordDeliveries: async (rows) => {
+        const { error } = await admin
+          .from("notification_deliveries" as any)
+          .insert(rows as any);
+        if (error) console.error("[fanOut] recordDeliveries", error);
       },
     },
     { actorId: userId, referralId, kind, message, url, title },
