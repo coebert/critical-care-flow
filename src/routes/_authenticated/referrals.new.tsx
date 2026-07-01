@@ -163,18 +163,31 @@ function NewReferralPage() {
   const [draftRestored, setDraftRestored] = useState(false);
   const [draftSavedAt, setDraftSavedAt] = useState<Date | null>(null);
 
-  // Restore any in-progress draft from localStorage on mount.
+  // Restore any in-progress draft from localStorage on mount. We never persist
+  // PHI, so restoring only refills non-identifying workflow fields — the user
+  // must re-enter hospital number, PMH, baseline function, reason, etc.
   useEffect(() => {
     if (typeof window === "undefined") return;
     try {
       const raw = window.localStorage.getItem(DRAFT_KEY);
       if (!raw) return;
-      const parsed = JSON.parse(raw) as Partial<DraftForm>;
-      const restored: DraftForm = { ...blankForm(), ...parsed };
-      if (isDraftDirty(restored)) {
+      const parsed = JSON.parse(raw) as SafeDraft & Partial<DraftForm>;
+      // Ignore (and clear) any legacy draft written before we stripped PHI.
+      if (parsed && parsed.__v !== DRAFT_SAFE_VERSION) {
+        window.localStorage.removeItem(DRAFT_KEY);
+        return;
+      }
+      const { __v: _v, ...safe } = parsed;
+      // Belt & braces: drop any sensitive keys even if the stored blob
+      // somehow contains them.
+      for (const k of SENSITIVE_DRAFT_KEYS) {
+        delete (safe as Partial<DraftForm>)[k];
+      }
+      const restored: DraftForm = { ...blankForm(), ...(safe as Partial<DraftForm>) };
+      if (isSafeDraftDirty(restored)) {
         setF(restored);
         setDraftRestored(true);
-        toast.info("Restored your in-progress referral draft.");
+        toast.info("Restored your in-progress referral draft. Patient details were not saved and must be re-entered.");
       }
     } catch {
       // ignore corrupt draft
@@ -182,13 +195,13 @@ function NewReferralPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Auto-save the draft (debounced) whenever the form changes.
+  // Auto-save the (sanitised) draft (debounced) whenever the form changes.
   useEffect(() => {
     if (typeof window === "undefined") return;
     const t = setTimeout(() => {
       try {
-        if (isDraftDirty(f)) {
-          window.localStorage.setItem(DRAFT_KEY, JSON.stringify(f));
+        if (isSafeDraftDirty(f)) {
+          window.localStorage.setItem(DRAFT_KEY, JSON.stringify(toSafeDraft(f)));
           setDraftSavedAt(new Date());
         } else {
           window.localStorage.removeItem(DRAFT_KEY);
@@ -204,7 +217,7 @@ function NewReferralPage() {
   useEffect(() => {
     if (typeof window === "undefined") return;
     const handler = (e: BeforeUnloadEvent) => {
-      if (isDraftDirty(f)) {
+      if (isSafeDraftDirty(f)) {
         e.preventDefault();
         e.returnValue = "";
       }
@@ -212,6 +225,7 @@ function NewReferralPage() {
     window.addEventListener("beforeunload", handler);
     return () => window.removeEventListener("beforeunload", handler);
   }, [f]);
+
 
   const discardDraft = () => {
     if (typeof window !== "undefined") window.localStorage.removeItem(DRAFT_KEY);
