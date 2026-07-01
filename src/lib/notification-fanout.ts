@@ -35,16 +35,41 @@ export interface PushPayload {
   tag?: string;
 }
 
+export interface PushDeliveryResult {
+  endpoint: string;
+  user_id: string;
+  ok: boolean;
+  gone?: boolean;
+  error?: string;
+}
+
+export interface DeliveryAuditRow {
+  notification_id: string | null;
+  recipient_id: string;
+  actor_id: string;
+  referral_id: string;
+  kind: NotificationKind;
+  channel: "inapp" | "push";
+  status: "generated" | "sent" | "failed" | "gone";
+  endpoint: string | null;
+  error: string | null;
+  delivered_at: string | null;
+}
+
 export interface FanOutDeps {
   fetchEligibleRoles: (actorId: string) => Promise<RoleRow[]>;
   fetchAtWorkProfiles: (userIds: string[]) => Promise<ProfileRow[]>;
   fetchPushSubs: (userIds: string[]) => Promise<PushSubRow[]>;
-  insertNotifications: (rows: NotificationRow[]) => Promise<void>;
+  // May return void (legacy) or the inserted rows for delivery-audit linking.
+  insertNotifications: (
+    rows: NotificationRow[],
+  ) => Promise<void | Array<{ id: string; user_id: string }>>;
   sendPush: (
     subs: PushSubRow[],
     payload: PushPayload,
-  ) => Promise<{ goneEndpoints: string[] }>;
+  ) => Promise<{ goneEndpoints: string[]; results?: PushDeliveryResult[] }>;
   deletePushSubs: (endpoints: string[]) => Promise<void>;
+  recordDeliveries?: (rows: DeliveryAuditRow[]) => Promise<void>;
 }
 
 export interface FanOutArgs {
@@ -61,6 +86,7 @@ export interface FanOutResult {
   notificationsInserted: number;
   pushSent: number;
   goneEndpointsCleared: number;
+  deliveriesRecorded: number;
 }
 
 /**
