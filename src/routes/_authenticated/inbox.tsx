@@ -1,6 +1,6 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
-import { Bell, Check, CheckCheck, Inbox as InboxIcon, Search, X, ChevronLeft, ChevronRight } from "lucide-react";
+import { Bell, Check, CheckCheck, ExternalLink, Inbox as InboxIcon, Search, X, ChevronLeft, ChevronRight } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
 import { zodValidator, fallback } from "@tanstack/zod-adapter";
 import { z } from "zod";
