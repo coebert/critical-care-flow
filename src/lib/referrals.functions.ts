@@ -443,8 +443,10 @@ export const addNote = createServerFn({ method: "POST" })
     await fanOutNotifications(
       userId,
       data.referral_id,
-      "updated",
+      "note",
       `New note added to referral`,
+      undefined,
+      "New referral note",
     );
     return { ...row, body: data.body };
   });
