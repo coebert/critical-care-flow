@@ -257,7 +257,7 @@ function InboxPage() {
             </button>
           )}
         </div>
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2">
           <div>
             <Label className="text-xs">Type</Label>
             <Select value={search.kind} onValueChange={(v) => setSearch({ kind: v as typeof search.kind })}>
@@ -279,6 +279,16 @@ function InboxPage() {
           <div>
             <Label htmlFor="to" className="text-xs">To</Label>
             <Input id="to" type="date" value={search.to} onChange={(e) => setSearch({ to: e.target.value })} />
+          </div>
+          <div>
+            <Label className="text-xs">Sort</Label>
+            <Select value={search.sort} onValueChange={(v) => setSearch({ sort: v as "newest" | "oldest" })}>
+              <SelectTrigger><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="newest">Newest first</SelectItem>
+                <SelectItem value="oldest">Oldest first</SelectItem>
+              </SelectContent>
+            </Select>
           </div>
         </div>
         {hasFilters && (
