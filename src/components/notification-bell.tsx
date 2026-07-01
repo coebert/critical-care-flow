@@ -135,6 +135,15 @@ export function NotificationBell() {
             ))
           )}
         </div>
+        <div className="p-2 border-t text-center">
+          <Link
+            to="/inbox"
+            onClick={() => setOpen(false)}
+            className="text-xs text-primary hover:underline"
+          >
+            View all notifications
+          </Link>
+        </div>
       </PopoverContent>
     </Popover>
   );
