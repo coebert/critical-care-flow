@@ -265,6 +265,47 @@ function NotificationSettingsPage() {
           hint="Recorded on this device when you use the Test push button."
         />
       </Card>
+
+      <Card className="p-5">
+        <h2 className="font-medium mb-1">Alert types</h2>
+        <p className="text-sm text-muted-foreground mb-4">
+          New and updated referrals always alert you while on shift. Choose whether to also
+          receive alerts for note additions and status changes.
+        </p>
+        <div className="flex items-start justify-between gap-4 py-3 border-b">
+          <div className="min-w-0">
+            <Label htmlFor="pref-notes" className="text-sm font-medium">
+              New notes on referrals
+            </Label>
+            <div className="text-xs text-muted-foreground mt-0.5">
+              Push and in-app alert when someone adds a note to a referral.
+            </div>
+          </div>
+          <Switch
+            id="pref-notes"
+            checked={notifyNotes}
+            disabled={!prefsLoaded || savingPref !== null}
+            onCheckedChange={(v) => togglePref("notes", v)}
+          />
+        </div>
+        <div className="flex items-start justify-between gap-4 py-3">
+          <div className="min-w-0">
+            <Label htmlFor="pref-status" className="text-sm font-medium">
+              Referral status changes
+            </Label>
+            <div className="text-xs text-muted-foreground mt-0.5">
+              Alerts for accepted, declined, admitted and other status transitions.
+            </div>
+          </div>
+          <Switch
+            id="pref-status"
+            checked={notifyStatus}
+            disabled={!prefsLoaded || savingPref !== null}
+            onCheckedChange={(v) => togglePref("status", v)}
+          />
+        </div>
+      </Card>
     </div>
+
   );
 }
