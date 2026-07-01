@@ -79,6 +79,29 @@ export function NotificationBell() {
           }
         },
       )
+      .on(
+        "postgres_changes",
+        { event: "UPDATE", schema: "public", table: "notifications", filter: `user_id=eq.${user.id}` },
+        (payload) => {
+          const n = payload.new as Notification;
+          setItems((cur) => {
+            const idx = cur.findIndex((i) => i.id === n.id);
+            if (idx === -1) return cur;
+            const next = cur.slice();
+            next[idx] = { ...next[idx], read_at: n.read_at };
+            return next;
+          });
+        },
+      )
+      .on(
+        "postgres_changes",
+        { event: "DELETE", schema: "public", table: "notifications", filter: `user_id=eq.${user.id}` },
+        (payload) => {
+          const oldId = (payload.old as { id?: string }).id;
+          if (!oldId) return;
+          setItems((cur) => cur.filter((i) => i.id !== oldId));
+        },
+      )
       .subscribe();
 
     return () => {
