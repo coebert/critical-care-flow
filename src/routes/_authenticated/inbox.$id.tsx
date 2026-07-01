@@ -40,9 +40,10 @@ interface Notification {
 
 interface ReferralSummary {
   id: string;
-  patient_initials: string | null;
+  age: number | null;
+  current_ward: string | null;
   status: string | null;
-  referral_time: string | null;
+  referral_received_at: string | null;
 }
 
 function kindLabel(kind: string): string {
