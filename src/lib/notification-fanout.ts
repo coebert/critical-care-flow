@@ -19,10 +19,12 @@ export interface PushSubRow {
   auth: string;
 }
 
+export type NotificationKind = "new" | "updated" | "status" | "note";
+
 export interface NotificationRow {
   user_id: string;
   referral_id: string;
-  kind: "new" | "updated";
+  kind: NotificationKind;
   message: string;
 }
 
@@ -48,9 +50,10 @@ export interface FanOutDeps {
 export interface FanOutArgs {
   actorId: string;
   referralId: string;
-  kind: "new" | "updated";
+  kind: NotificationKind;
   message: string;
   url?: string;
+  title?: string;
 }
 
 export interface FanOutResult {
@@ -121,7 +124,7 @@ export async function fanOutNotifications(
     const safeSubs = subs.filter((s) => recipientSet.has(s.user_id));
     if (safeSubs.length) {
       const { goneEndpoints } = await deps.sendPush(safeSubs, {
-        title: "SDH Critical Care",
+        title: args.title ?? "SDH Critical Care",
         body: args.message,
         url: args.url ?? `/referrals/${args.referralId}`,
         tag: `referral-${args.referralId}`,

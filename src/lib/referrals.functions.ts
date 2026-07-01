@@ -152,9 +152,10 @@ function redactNoteDiff(diff: Record<string, unknown>): Record<string, unknown> 
 async function fanOutNotifications(
   userId: string,
   referralId: string,
-  kind: "new" | "updated",
+  kind: "new" | "updated" | "status" | "note",
   message: string,
   url?: string,
+  title?: string,
 ) {
   const admin = await getAdmin();
   const { fanOutNotifications: runFanOut } = await import("./notification-fanout");
@@ -194,7 +195,7 @@ async function fanOutNotifications(
         await admin.from("push_subscriptions").delete().in("endpoint", endpoints);
       },
     },
-    { actorId: userId, referralId, kind, message, url },
+    { actorId: userId, referralId, kind, message, url, title },
   );
 }
 
@@ -335,11 +336,14 @@ export const updateReferral = createServerFn({ method: "POST" })
       data.patch.status !== undefined && prior?.status !== row.status;
     if (statusChanged) {
       const summary = `${decrypted.referring_specialty ?? "Referral"} — ${decrypted.current_ward ?? "ward unknown"}`;
+      const statusLabel = String(row.status ?? "updated").toUpperCase();
       await fanOutNotifications(
         userId,
         row.id,
-        "updated",
-        `Status changed to ${row.status}: ${summary}`,
+        "status",
+        `Status → ${statusLabel}: ${summary}`,
+        undefined,
+        `Referral ${statusLabel}`,
       );
     }
     return decrypted;
@@ -439,8 +443,10 @@ export const addNote = createServerFn({ method: "POST" })
     await fanOutNotifications(
       userId,
       data.referral_id,
-      "updated",
+      "note",
       `New note added to referral`,
+      undefined,
+      "New referral note",
     );
     return { ...row, body: data.body };
   });
