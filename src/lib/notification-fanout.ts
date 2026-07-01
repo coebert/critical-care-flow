@@ -10,7 +10,10 @@ export interface RoleRow {
 export interface ProfileRow {
   id: string;
   is_at_work: boolean;
+  notify_notes?: boolean;
+  notify_status?: boolean;
 }
+
 
 export interface PushSubRow {
   user_id: string;
