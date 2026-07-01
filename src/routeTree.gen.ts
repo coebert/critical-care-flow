@@ -21,6 +21,7 @@ import { Route as AuthenticatedAnalyticsRouteImport } from './routes/_authentica
 import { Route as AuthenticatedAdminRouteImport } from './routes/_authenticated/admin'
 import { Route as AuthenticatedReferralsNewRouteImport } from './routes/_authenticated/referrals.new'
 import { Route as AuthenticatedReferralsIdRouteImport } from './routes/_authenticated/referrals.$id'
+import { Route as AuthenticatedInboxIdRouteImport } from './routes/_authenticated/inbox.$id'
 
 const SetupRoute = SetupRouteImport.update({
   id: '/setup',
@@ -84,6 +85,11 @@ const AuthenticatedReferralsIdRoute =
     path: '/referrals/$id',
     getParentRoute: () => AuthenticatedRouteRoute,
   } as any)
+const AuthenticatedInboxIdRoute = AuthenticatedInboxIdRouteImport.update({
+  id: '/$id',
+  path: '/$id',
+  getParentRoute: () => AuthenticatedInboxRoute,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof AuthenticatedIndexRoute
@@ -92,9 +98,10 @@ export interface FileRoutesByFullPath {
   '/setup': typeof SetupRoute
   '/admin': typeof AuthenticatedAdminRoute
   '/analytics': typeof AuthenticatedAnalyticsRoute
-  '/inbox': typeof AuthenticatedInboxRoute
+  '/inbox': typeof AuthenticatedInboxRouteWithChildren
   '/notifications': typeof AuthenticatedNotificationsRoute
   '/push-test': typeof AuthenticatedPushTestRoute
+  '/inbox/$id': typeof AuthenticatedInboxIdRoute
   '/referrals/$id': typeof AuthenticatedReferralsIdRoute
   '/referrals/new': typeof AuthenticatedReferralsNewRoute
 }
@@ -104,10 +111,11 @@ export interface FileRoutesByTo {
   '/setup': typeof SetupRoute
   '/admin': typeof AuthenticatedAdminRoute
   '/analytics': typeof AuthenticatedAnalyticsRoute
-  '/inbox': typeof AuthenticatedInboxRoute
+  '/inbox': typeof AuthenticatedInboxRouteWithChildren
   '/notifications': typeof AuthenticatedNotificationsRoute
   '/push-test': typeof AuthenticatedPushTestRoute
   '/': typeof AuthenticatedIndexRoute
+  '/inbox/$id': typeof AuthenticatedInboxIdRoute
   '/referrals/$id': typeof AuthenticatedReferralsIdRoute
   '/referrals/new': typeof AuthenticatedReferralsNewRoute
 }
@@ -119,10 +127,11 @@ export interface FileRoutesById {
   '/setup': typeof SetupRoute
   '/_authenticated/admin': typeof AuthenticatedAdminRoute
   '/_authenticated/analytics': typeof AuthenticatedAnalyticsRoute
-  '/_authenticated/inbox': typeof AuthenticatedInboxRoute
+  '/_authenticated/inbox': typeof AuthenticatedInboxRouteWithChildren
   '/_authenticated/notifications': typeof AuthenticatedNotificationsRoute
   '/_authenticated/push-test': typeof AuthenticatedPushTestRoute
   '/_authenticated/': typeof AuthenticatedIndexRoute
+  '/_authenticated/inbox/$id': typeof AuthenticatedInboxIdRoute
   '/_authenticated/referrals/$id': typeof AuthenticatedReferralsIdRoute
   '/_authenticated/referrals/new': typeof AuthenticatedReferralsNewRoute
 }
@@ -138,6 +147,7 @@ export interface FileRouteTypes {
     | '/inbox'
     | '/notifications'
     | '/push-test'
+    | '/inbox/$id'
     | '/referrals/$id'
     | '/referrals/new'
   fileRoutesByTo: FileRoutesByTo
@@ -151,6 +161,7 @@ export interface FileRouteTypes {
     | '/notifications'
     | '/push-test'
     | '/'
+    | '/inbox/$id'
     | '/referrals/$id'
     | '/referrals/new'
   id:
@@ -165,6 +176,7 @@ export interface FileRouteTypes {
     | '/_authenticated/notifications'
     | '/_authenticated/push-test'
     | '/_authenticated/'
+    | '/_authenticated/inbox/$id'
     | '/_authenticated/referrals/$id'
     | '/_authenticated/referrals/new'
   fileRoutesById: FileRoutesById
@@ -262,13 +274,31 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedReferralsIdRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
+    '/_authenticated/inbox/$id': {
+      id: '/_authenticated/inbox/$id'
+      path: '/$id'
+      fullPath: '/inbox/$id'
+      preLoaderRoute: typeof AuthenticatedInboxIdRouteImport
+      parentRoute: typeof AuthenticatedInboxRoute
+    }
   }
 }
+
+interface AuthenticatedInboxRouteChildren {
+  AuthenticatedInboxIdRoute: typeof AuthenticatedInboxIdRoute
+}
+
+const AuthenticatedInboxRouteChildren: AuthenticatedInboxRouteChildren = {
+  AuthenticatedInboxIdRoute: AuthenticatedInboxIdRoute,
+}
+
+const AuthenticatedInboxRouteWithChildren =
+  AuthenticatedInboxRoute._addFileChildren(AuthenticatedInboxRouteChildren)
 
 interface AuthenticatedRouteRouteChildren {
   AuthenticatedAdminRoute: typeof AuthenticatedAdminRoute
   AuthenticatedAnalyticsRoute: typeof AuthenticatedAnalyticsRoute
-  AuthenticatedInboxRoute: typeof AuthenticatedInboxRoute
+  AuthenticatedInboxRoute: typeof AuthenticatedInboxRouteWithChildren
   AuthenticatedNotificationsRoute: typeof AuthenticatedNotificationsRoute
   AuthenticatedPushTestRoute: typeof AuthenticatedPushTestRoute
   AuthenticatedIndexRoute: typeof AuthenticatedIndexRoute
@@ -279,7 +309,7 @@ interface AuthenticatedRouteRouteChildren {
 const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedAdminRoute: AuthenticatedAdminRoute,
   AuthenticatedAnalyticsRoute: AuthenticatedAnalyticsRoute,
-  AuthenticatedInboxRoute: AuthenticatedInboxRoute,
+  AuthenticatedInboxRoute: AuthenticatedInboxRouteWithChildren,
   AuthenticatedNotificationsRoute: AuthenticatedNotificationsRoute,
   AuthenticatedPushTestRoute: AuthenticatedPushTestRoute,
   AuthenticatedIndexRoute: AuthenticatedIndexRoute,
