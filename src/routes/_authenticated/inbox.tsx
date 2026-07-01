@@ -197,29 +197,19 @@ function InboxPage() {
                   </>
                 );
 
-                const rowClass = `flex items-start gap-3 p-3 ${
+                const rowClass = `flex items-start gap-3 p-3 hover:bg-accent cursor-pointer ${
                   !n.read_at ? "bg-accent/40" : ""
-                } ${n.referral_id ? "hover:bg-accent cursor-pointer" : ""}`;
+                }`;
 
-                if (n.referral_id) {
-                  return (
-                    <Link
-                      key={n.id}
-                      to="/referrals/$id"
-                      params={{ id: n.referral_id }}
-                      onClick={() => {
-                        if (!n.read_at) markRead(n.id);
-                      }}
-                      className={rowClass}
-                    >
-                      {content}
-                    </Link>
-                  );
-                }
                 return (
-                  <div key={n.id} className={rowClass}>
+                  <Link
+                    key={n.id}
+                    to="/inbox/$id"
+                    params={{ id: n.id }}
+                    className={rowClass}
+                  >
                     {content}
-                  </div>
+                  </Link>
                 );
               })
             )}
