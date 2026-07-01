@@ -1,12 +1,13 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
-import { Bell, Check, CheckCheck, Inbox as InboxIcon } from "lucide-react";
+import { Bell, Check, CheckCheck, Inbox as InboxIcon, X } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/use-auth";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { toast } from "sonner";
 
@@ -47,6 +48,7 @@ function InboxPage() {
   const [loading, setLoading] = useState(true);
   const [tab, setTab] = useState<"all" | "unread">("all");
   const [busy, setBusy] = useState(false);
+  const [selected, setSelected] = useState<Set<string>>(new Set());
 
   useEffect(() => {
     if (!user) return;
@@ -83,6 +85,33 @@ function InboxPage() {
 
   const unreadCount = useMemo(() => items.filter((i) => !i.read_at).length, [items]);
   const visible = tab === "unread" ? items.filter((i) => !i.read_at) : items;
+  const visibleIds = useMemo(() => visible.map((i) => i.id), [visible]);
+  const selectedVisible = useMemo(
+    () => visibleIds.filter((id) => selected.has(id)),
+    [visibleIds, selected],
+  );
+  const allVisibleSelected = visibleIds.length > 0 && selectedVisible.length === visibleIds.length;
+  const someVisibleSelected = selectedVisible.length > 0 && !allVisibleSelected;
+
+  const toggleOne = (id: string, checked: boolean) => {
+    setSelected((cur) => {
+      const next = new Set(cur);
+      if (checked) next.add(id);
+      else next.delete(id);
+      return next;
+    });
+  };
+
+  const toggleAllVisible = (checked: boolean) => {
+    setSelected((cur) => {
+      const next = new Set(cur);
+      if (checked) visibleIds.forEach((id) => next.add(id));
+      else visibleIds.forEach((id) => next.delete(id));
+      return next;
+    });
+  };
+
+  const clearSelection = () => setSelected(new Set());
 
   const markRead = async (id: string) => {
     const now = new Date().toISOString();
@@ -109,6 +138,27 @@ function InboxPage() {
     else toast.success(`Marked ${ids.length} as read`);
   };
 
+  const bulkMark = async (asRead: boolean) => {
+    const ids = Array.from(selected);
+    if (!ids.length) return;
+    setBusy(true);
+    const now = asRead ? new Date().toISOString() : null;
+    setItems((cur) =>
+      cur.map((i) => (selected.has(i.id) ? { ...i, read_at: now } : i)),
+    );
+    const { error } = await supabase
+      .from("notifications")
+      .update({ read_at: now })
+      .in("id", ids);
+    setBusy(false);
+    if (error) {
+      toast.error("Some notifications could not be updated");
+    } else {
+      toast.success(`Marked ${ids.length} as ${asRead ? "read" : "unread"}`);
+      clearSelection();
+    }
+  };
+
   return (
     <div className="max-w-3xl mx-auto p-4 space-y-4">
       <div className="flex items-center justify-between gap-2 flex-wrap">
@@ -125,12 +175,38 @@ function InboxPage() {
         </Button>
       </div>
 
-      <Tabs value={tab} onValueChange={(v) => setTab(v as "all" | "unread")}>
+      <Tabs value={tab} onValueChange={(v) => { setTab(v as "all" | "unread"); clearSelection(); }}>
         <TabsList>
           <TabsTrigger value="all">All ({items.length})</TabsTrigger>
           <TabsTrigger value="unread">Unread ({unreadCount})</TabsTrigger>
         </TabsList>
-        <TabsContent value={tab} className="mt-3">
+        <TabsContent value={tab} className="mt-3 space-y-2">
+          {visible.length > 0 && (
+            <div className="flex items-center gap-2 flex-wrap px-1">
+              <Checkbox
+                id="select-all-visible"
+                checked={allVisibleSelected ? true : someVisibleSelected ? "indeterminate" : false}
+                onCheckedChange={(c) => toggleAllVisible(c === true)}
+                aria-label="Select all visible notifications"
+              />
+              <label htmlFor="select-all-visible" className="text-sm text-muted-foreground cursor-pointer">
+                {selected.size > 0 ? `${selected.size} selected` : "Select all"}
+              </label>
+              {selected.size > 0 && (
+                <div className="flex items-center gap-2 ml-auto">
+                  <Button size="sm" variant="outline" disabled={busy} onClick={() => bulkMark(true)}>
+                    <Check className="w-4 h-4 mr-1" /> Mark read
+                  </Button>
+                  <Button size="sm" variant="outline" disabled={busy} onClick={() => bulkMark(false)}>
+                    Mark unread
+                  </Button>
+                  <Button size="sm" variant="ghost" onClick={clearSelection} aria-label="Clear selection">
+                    <X className="w-4 h-4" />
+                  </Button>
+                </div>
+              )}
+            </div>
+          )}
           <Card className="divide-y">
             {loading ? (
               <div className="p-6 text-sm text-muted-foreground text-center">Loading…</div>
@@ -141,75 +217,77 @@ function InboxPage() {
               </div>
             ) : (
               visible.map((n) => {
-                const content = (
-                  <>
-                    <div className="mt-1">
-                      <span
-                        className={`inline-block w-2 h-2 rounded-full ${
-                          n.read_at ? "bg-muted-foreground/30" : "bg-primary"
-                        }`}
-                        aria-label={n.read_at ? "Read" : "Unread"}
-                      />
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2 flex-wrap">
-                        <Badge variant="secondary" className="text-[10px]">
-                          {kindLabel(n.kind)}
-                        </Badge>
-                        <span className="text-xs text-muted-foreground">
-                          {formatDistanceToNow(new Date(n.created_at), { addSuffix: true })}
-                        </span>
-                        {n.referral_id && (
-                          <span className="text-xs text-primary ml-auto">Open referral →</span>
-                        )}
-                      </div>
-                      <div className="text-sm mt-1 break-words">{n.message}</div>
-                      <div className="flex items-center gap-2 mt-2">
-                        {n.read_at ? (
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            className="h-7 px-2 text-xs"
-                            onClick={(e) => {
-                              e.preventDefault();
-                              e.stopPropagation();
-                              markUnread(n.id);
-                            }}
-                          >
-                            Mark unread
-                          </Button>
-                        ) : (
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            className="h-7 px-2 text-xs"
-                            onClick={(e) => {
-                              e.preventDefault();
-                              e.stopPropagation();
-                              markRead(n.id);
-                            }}
-                          >
-                            <Check className="w-3 h-3 mr-1" /> Mark read
-                          </Button>
-                        )}
-                      </div>
-                    </div>
-                  </>
-                );
-
-                const rowClass = `flex items-start gap-3 p-3 hover:bg-accent cursor-pointer ${
+                const isChecked = selected.has(n.id);
+                const rowClass = `flex items-start gap-3 p-3 hover:bg-accent ${
                   !n.read_at ? "bg-accent/40" : ""
                 }`;
-
                 return (
-                  <Link
-                    key={n.id}
-                    to="/inbox/$id"
-                    params={{ id: n.id }}
-                    className={rowClass}
-                  >
-                    {content}
-                  </Link>
+                  <div key={n.id} className={rowClass}>
+                    <div className="pt-1" onClick={(e) => e.stopPropagation()}>
+                      <Checkbox
+                        checked={isChecked}
+                        onCheckedChange={(c) => toggleOne(n.id, c === true)}
+                        aria-label={`Select notification ${n.message}`}
+                      />
+                    </div>
+                    <Link
+                      to="/inbox/$id"
+                      params={{ id: n.id }}
+                      className="flex items-start gap-3 flex-1 min-w-0"
+                    >
+                      <div className="mt-1">
+                        <span
+                          className={`inline-block w-2 h-2 rounded-full ${
+                            n.read_at ? "bg-muted-foreground/30" : "bg-primary"
+                          }`}
+                          aria-label={n.read_at ? "Read" : "Unread"}
+                        />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <Badge variant="secondary" className="text-[10px]">
+                            {kindLabel(n.kind)}
+                          </Badge>
+                          <span className="text-xs text-muted-foreground">
+                            {formatDistanceToNow(new Date(n.created_at), { addSuffix: true })}
+                          </span>
+                          {n.referral_id && (
+                            <span className="text-xs text-primary ml-auto">Open referral →</span>
+                          )}
+                        </div>
+                        <div className="text-sm mt-1 break-words">{n.message}</div>
+                        <div className="flex items-center gap-2 mt-2">
+                          {n.read_at ? (
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              className="h-7 px-2 text-xs"
+                              onClick={(e) => {
+                                e.preventDefault();
+                                e.stopPropagation();
+                                markUnread(n.id);
+                              }}
+                            >
+                              Mark unread
+                            </Button>
+                          ) : (
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              className="h-7 px-2 text-xs"
+                              onClick={(e) => {
+                                e.preventDefault();
+                                e.stopPropagation();
+                                markRead(n.id);
+                              }}
+                            >
+                              <Check className="w-3 h-3 mr-1" /> Mark read
+                            </Button>
+                          )}
+                        </div>
+                      </div>
+                    </Link>
+                  </div>
                 );
               })
             )}
