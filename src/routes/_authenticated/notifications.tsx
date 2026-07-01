@@ -69,13 +69,42 @@ function NotificationSettingsPage() {
   const { supported, permission, subscribed, enable, disable, requestPermission, permissionContextError, openPushPermissionSetupWindow } = usePush();
   const [lastTestAt, setLastTestAt] = useState<Date | null>(null);
   const [busy, setBusy] = useState<"enable" | "disable" | null>(null);
+  const [notifyNotes, setNotifyNotes] = useState(true);
+  const [notifyStatus, setNotifyStatus] = useState(true);
+  const [prefsLoaded, setPrefsLoaded] = useState(false);
+  const [savingPref, setSavingPref] = useState<"notes" | "status" | null>(null);
+  const getPrefs = useServerFn(getNotificationPrefs);
+  const savePrefs = useServerFn(setNotificationPrefs);
 
-  // Read on mount, and re-read when test push succeeds.
   useEffect(() => {
     setLastTestAt(readLastTestPushAt());
-  }, []);
+    getPrefs({})
+      .then((p) => {
+        setNotifyNotes(p.notify_notes);
+        setNotifyStatus(p.notify_status);
+      })
+      .catch(() => {})
+      .finally(() => setPrefsLoaded(true));
+  }, [getPrefs]);
 
   const refreshLastTest = () => setLastTestAt(readLastTestPushAt());
+
+  const togglePref = async (key: "notes" | "status", next: boolean) => {
+    const prev = key === "notes" ? notifyNotes : notifyStatus;
+    (key === "notes" ? setNotifyNotes : setNotifyStatus)(next);
+    setSavingPref(key);
+    try {
+      await savePrefs({
+        data: key === "notes" ? { notify_notes: next } : { notify_status: next },
+      });
+    } catch (e: any) {
+      (key === "notes" ? setNotifyNotes : setNotifyStatus)(prev);
+      toast.error(e?.message ?? "Could not save preference.");
+    } finally {
+      setSavingPref(null);
+    }
+  };
+
 
   // Synchronous handler — fire Notification.requestPermission() before any
   // await so Safari/Firefox keep user-activation and show their prompt.
