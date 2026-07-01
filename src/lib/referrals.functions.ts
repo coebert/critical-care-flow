@@ -336,11 +336,14 @@ export const updateReferral = createServerFn({ method: "POST" })
       data.patch.status !== undefined && prior?.status !== row.status;
     if (statusChanged) {
       const summary = `${decrypted.referring_specialty ?? "Referral"} — ${decrypted.current_ward ?? "ward unknown"}`;
+      const statusLabel = String(row.status ?? "updated").toUpperCase();
       await fanOutNotifications(
         userId,
         row.id,
-        "updated",
-        `Status changed to ${row.status}: ${summary}`,
+        "status",
+        `Status → ${statusLabel}: ${summary}`,
+        undefined,
+        `Referral ${statusLabel}`,
       );
     }
     return decrypted;
