@@ -152,9 +152,10 @@ function redactNoteDiff(diff: Record<string, unknown>): Record<string, unknown> 
 async function fanOutNotifications(
   userId: string,
   referralId: string,
-  kind: "new" | "updated",
+  kind: "new" | "updated" | "status" | "note",
   message: string,
   url?: string,
+  title?: string,
 ) {
   const admin = await getAdmin();
   const { fanOutNotifications: runFanOut } = await import("./notification-fanout");
@@ -194,7 +195,7 @@ async function fanOutNotifications(
         await admin.from("push_subscriptions").delete().in("endpoint", endpoints);
       },
     },
-    { actorId: userId, referralId, kind, message, url },
+    { actorId: userId, referralId, kind, message, url, title },
   );
 }
 
