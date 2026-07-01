@@ -172,7 +172,7 @@ async function fanOutNotifications(
       fetchAtWorkProfiles: async (ids) => {
         const { data } = await admin
           .from("profiles")
-          .select("id, is_at_work")
+          .select("id, is_at_work, notify_notes, notify_status")
           .in("id", ids)
           .eq("is_at_work", true);
         return (data ?? []) as any;

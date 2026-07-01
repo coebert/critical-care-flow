@@ -10,7 +10,10 @@ export interface RoleRow {
 export interface ProfileRow {
   id: string;
   is_at_work: boolean;
+  notify_notes?: boolean;
+  notify_status?: boolean;
 }
+
 
 export interface PushSubRow {
   user_id: string;
@@ -101,14 +104,22 @@ export function selectRecipients(
   roleRows: RoleRow[],
   atWorkProfiles: ProfileRow[],
   actorId: string,
+  kind?: NotificationKind,
 ): string[] {
   const eligible = new Set(
     roleRows.map((r) => r.user_id).filter((id) => id !== actorId),
   );
   return atWorkProfiles
-    .filter((p) => p.is_at_work === true && eligible.has(p.id) && p.id !== actorId)
+    .filter((p) => {
+      if (!p.is_at_work) return false;
+      if (!eligible.has(p.id) || p.id === actorId) return false;
+      if (kind === "note" && p.notify_notes === false) return false;
+      if (kind === "status" && p.notify_status === false) return false;
+      return true;
+    })
     .map((p) => p.id);
 }
+
 
 export async function fanOutNotifications(
   deps: FanOutDeps,
@@ -131,7 +142,7 @@ export async function fanOutNotifications(
   if (!eligibleIds.length) return empty;
 
   const atWork = await deps.fetchAtWorkProfiles(eligibleIds);
-  const recipientIds = selectRecipients(roleRows, atWork, args.actorId);
+  const recipientIds = selectRecipients(roleRows, atWork, args.actorId, args.kind);
   if (!recipientIds.length) return empty;
 
   const rows: NotificationRow[] = recipientIds.map((uid) => ({

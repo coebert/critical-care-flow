@@ -166,6 +166,8 @@ export type Database = {
           id: string
           is_at_work: boolean
           job_title: string | null
+          notify_notes: boolean
+          notify_status: boolean
           shift_updated_at: string | null
           updated_at: string
         }
@@ -175,6 +177,8 @@ export type Database = {
           id: string
           is_at_work?: boolean
           job_title?: string | null
+          notify_notes?: boolean
+          notify_status?: boolean
           shift_updated_at?: string | null
           updated_at?: string
         }
@@ -184,6 +188,8 @@ export type Database = {
           id?: string
           is_at_work?: boolean
           job_title?: string | null
+          notify_notes?: boolean
+          notify_status?: boolean
           shift_updated_at?: string | null
           updated_at?: string
         }

@@ -4,10 +4,15 @@ import { Bell, BellOff, CheckCircle2, AlertTriangle, XCircle, HelpCircle } from 
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Switch } from "@/components/ui/switch";
+import { Label } from "@/components/ui/label";
 import { usePush } from "@/hooks/use-push";
 import { TestPushButton } from "@/components/test-push-button";
 import { readLastTestPushAt } from "@/lib/last-test-push";
+import { useServerFn } from "@tanstack/react-start";
+import { getNotificationPrefs, setNotificationPrefs } from "@/lib/notification-prefs.functions";
 import { toast } from "sonner";
+
 
 export const Route = createFileRoute("/_authenticated/notifications")({
   head: () => ({
@@ -64,13 +69,42 @@ function NotificationSettingsPage() {
   const { supported, permission, subscribed, enable, disable, requestPermission, permissionContextError, openPushPermissionSetupWindow } = usePush();
   const [lastTestAt, setLastTestAt] = useState<Date | null>(null);
   const [busy, setBusy] = useState<"enable" | "disable" | null>(null);
+  const [notifyNotes, setNotifyNotes] = useState(true);
+  const [notifyStatus, setNotifyStatus] = useState(true);
+  const [prefsLoaded, setPrefsLoaded] = useState(false);
+  const [savingPref, setSavingPref] = useState<"notes" | "status" | null>(null);
+  const getPrefs = useServerFn(getNotificationPrefs);
+  const savePrefs = useServerFn(setNotificationPrefs);
 
-  // Read on mount, and re-read when test push succeeds.
   useEffect(() => {
     setLastTestAt(readLastTestPushAt());
-  }, []);
+    getPrefs({})
+      .then((p) => {
+        setNotifyNotes(p.notify_notes);
+        setNotifyStatus(p.notify_status);
+      })
+      .catch(() => {})
+      .finally(() => setPrefsLoaded(true));
+  }, [getPrefs]);
 
   const refreshLastTest = () => setLastTestAt(readLastTestPushAt());
+
+  const togglePref = async (key: "notes" | "status", next: boolean) => {
+    const prev = key === "notes" ? notifyNotes : notifyStatus;
+    (key === "notes" ? setNotifyNotes : setNotifyStatus)(next);
+    setSavingPref(key);
+    try {
+      await savePrefs({
+        data: key === "notes" ? { notify_notes: next } : { notify_status: next },
+      });
+    } catch (e: any) {
+      (key === "notes" ? setNotifyNotes : setNotifyStatus)(prev);
+      toast.error(e?.message ?? "Could not save preference.");
+    } finally {
+      setSavingPref(null);
+    }
+  };
+
 
   // Synchronous handler — fire Notification.requestPermission() before any
   // await so Safari/Firefox keep user-activation and show their prompt.
@@ -231,6 +265,47 @@ function NotificationSettingsPage() {
           hint="Recorded on this device when you use the Test push button."
         />
       </Card>
+
+      <Card className="p-5">
+        <h2 className="font-medium mb-1">Alert types</h2>
+        <p className="text-sm text-muted-foreground mb-4">
+          New and updated referrals always alert you while on shift. Choose whether to also
+          receive alerts for note additions and status changes.
+        </p>
+        <div className="flex items-start justify-between gap-4 py-3 border-b">
+          <div className="min-w-0">
+            <Label htmlFor="pref-notes" className="text-sm font-medium">
+              New notes on referrals
+            </Label>
+            <div className="text-xs text-muted-foreground mt-0.5">
+              Push and in-app alert when someone adds a note to a referral.
+            </div>
+          </div>
+          <Switch
+            id="pref-notes"
+            checked={notifyNotes}
+            disabled={!prefsLoaded || savingPref !== null}
+            onCheckedChange={(v) => togglePref("notes", v)}
+          />
+        </div>
+        <div className="flex items-start justify-between gap-4 py-3">
+          <div className="min-w-0">
+            <Label htmlFor="pref-status" className="text-sm font-medium">
+              Referral status changes
+            </Label>
+            <div className="text-xs text-muted-foreground mt-0.5">
+              Alerts for accepted, declined, admitted and other status transitions.
+            </div>
+          </div>
+          <Switch
+            id="pref-status"
+            checked={notifyStatus}
+            disabled={!prefsLoaded || savingPref !== null}
+            onCheckedChange={(v) => togglePref("status", v)}
+          />
+        </div>
+      </Card>
     </div>
+
   );
 }
