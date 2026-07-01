@@ -353,9 +353,6 @@ function InboxPage() {
                           <span className="text-xs text-muted-foreground">
                             {formatDistanceToNow(new Date(n.created_at), { addSuffix: true })}
                           </span>
-                          {n.referral_id && (
-                            <span className="text-xs text-primary ml-auto">Open referral →</span>
-                          )}
                         </div>
                         <div className="text-sm mt-1 break-words">{n.message}</div>
                         <div className="flex items-center gap-2 mt-2">
@@ -373,6 +370,19 @@ function InboxPage() {
                         </div>
                       </div>
                     </Link>
+                    {n.referral_id && (
+                      <div className="pt-1">
+                        <Button variant="ghost" size="sm" className="h-8 w-8 p-0"
+                          title="Open referral"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            if (!n.read_at) markRead(n.id);
+                            navigate({ to: "/referrals/$id", params: { id: n.referral_id! } });
+                          }}>
+                          <ExternalLink className="w-4 h-4" />
+                        </Button>
+                      </div>
+                    )}
                   </div>
                 );
               })
