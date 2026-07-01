@@ -122,7 +122,7 @@ function InboxPage() {
     const q = search.q.trim().toLowerCase();
     const fromTs = search.from ? new Date(search.from + "T00:00:00").getTime() : null;
     const toTs = search.to ? new Date(search.to + "T23:59:59.999").getTime() : null;
-    return items.filter((n) => {
+    const arr = items.filter((n) => {
       if (search.tab === "unread" && n.read_at) return false;
       if (search.kind !== "all" && n.kind !== search.kind) return false;
       if (q) {
@@ -136,7 +136,13 @@ function InboxPage() {
       }
       return true;
     });
-  }, [items, search.tab, search.q, search.kind, search.from, search.to]);
+    arr.sort((a, b) => {
+      const ta = new Date(a.created_at).getTime();
+      const tb = new Date(b.created_at).getTime();
+      return search.sort === "oldest" ? ta - tb : tb - ta;
+    });
+    return arr;
+  }, [items, search.tab, search.q, search.kind, search.from, search.to, search.sort]);
 
   const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
   const page = Math.min(search.page, totalPages);
@@ -150,7 +156,7 @@ function InboxPage() {
   const allVisibleSelected = visibleIds.length > 0 && selectedVisible.length === visibleIds.length;
   const someVisibleSelected = selectedVisible.length > 0 && !allVisibleSelected;
 
-  const hasFilters = search.q !== "" || search.kind !== "all" || search.from !== "" || search.to !== "";
+  const hasFilters = search.q !== "" || search.kind !== "all" || search.from !== "" || search.to !== "" || search.sort !== "newest";
 
   const toggleOne = (id: string, checked: boolean) => {
     setSelected((cur) => {
@@ -211,7 +217,7 @@ function InboxPage() {
   };
   const clearFilters = () => {
     setQInput("");
-    navigate({ search: (prev: Record<string, unknown>) => ({ ...prev, q: "", kind: "all", from: "", to: "", page: 1 }) });
+    navigate({ search: (prev: Record<string, unknown>) => ({ ...prev, q: "", kind: "all", from: "", to: "", sort: "newest", page: 1 }) });
   };
 
   return (
