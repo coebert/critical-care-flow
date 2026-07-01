@@ -84,7 +84,7 @@ function NotificationDetailPage() {
         if (data.referral_id) {
           const { data: r } = await supabase
             .from("referrals")
-            .select("id, patient_initials, status, referral_time")
+            .select("id, age, current_ward, status, referral_received_at")
             .eq("id", data.referral_id)
             .maybeSingle();
           if (!cancelled) setRef(r ?? null);
