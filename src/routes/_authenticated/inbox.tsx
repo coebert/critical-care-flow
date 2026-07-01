@@ -1,6 +1,6 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
-import { Bell, Check, CheckCheck, ExternalLink, Inbox as InboxIcon, Search, X, ChevronLeft, ChevronRight } from "lucide-react";
+import { Bell, Check, CheckCheck, ExternalLink, Inbox as InboxIcon, Search, X, ChevronLeft, ChevronRight, ArrowUpDown } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
 import { zodValidator, fallback } from "@tanstack/zod-adapter";
 import { z } from "zod";
@@ -25,6 +25,7 @@ const inboxSearchSchema = z.object({
   kind: fallback(z.enum(KIND_VALUES), "all").default("all"),
   from: fallback(z.string(), "").default(""),
   to: fallback(z.string(), "").default(""),
+  sort: fallback(z.enum(["newest", "oldest"]), "newest").default("newest"),
   page: fallback(z.number().int().min(1), 1).default(1),
 });
 
