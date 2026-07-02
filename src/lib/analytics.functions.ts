@@ -2,7 +2,7 @@ import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { safeError } from "./safe-error";
-import { decryptRow } from "./postop-bookings.functions";
+
 
 async function assertAdmin(context: any) {
   const { data, error } = await context.supabase.rpc("has_role", {
