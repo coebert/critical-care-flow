@@ -55,6 +55,7 @@ function NewPostopBookingPage() {
   const [reason, setReason] = useState("");
   const [level, setLevel] = useState<Level | "">("");
   const [surgeryDate, setSurgeryDate] = useState("");
+  const [specialty, setSpecialty] = useState<SurgicalSpecialty | "">("");
 
   const bmi = useMemo(() => {
     const w = parseFloat(weight);
