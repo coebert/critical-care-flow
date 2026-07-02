@@ -89,7 +89,9 @@ function PostopBookingsList() {
 
   useEffect(() => {
     let cancelled = false;
-    load()
+    setRows(null);
+    setError(null);
+    load(showDeleted ? { data: { includeDeleted: true } } : undefined)
       .then((data) => {
         if (!cancelled) setRows(data as Booking[]);
       })
@@ -99,7 +101,7 @@ function PostopBookingsList() {
     return () => {
       cancelled = true;
     };
-  }, [load]);
+  }, [load, showDeleted]);
 
   return (
     <div className="max-w-5xl mx-auto p-4 sm:p-6 space-y-4">
