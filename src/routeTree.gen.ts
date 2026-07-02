@@ -23,6 +23,7 @@ import { Route as AuthenticatedPostopBookingsIndexRouteImport } from './routes/_
 import { Route as AuthenticatedReferralsNewRouteImport } from './routes/_authenticated/referrals.new'
 import { Route as AuthenticatedReferralsIdRouteImport } from './routes/_authenticated/referrals.$id'
 import { Route as AuthenticatedPostopBookingsNewRouteImport } from './routes/_authenticated/postop-bookings.new'
+import { Route as AuthenticatedPostopBookingsAnalyticsRouteImport } from './routes/_authenticated/postop-bookings.analytics'
 import { Route as AuthenticatedInboxIdRouteImport } from './routes/_authenticated/inbox.$id'
 import { Route as AuthenticatedPostopBookingsIdEditRouteImport } from './routes/_authenticated/postop-bookings.$id.edit'
 
@@ -100,6 +101,12 @@ const AuthenticatedPostopBookingsNewRoute =
     path: '/postop-bookings/new',
     getParentRoute: () => AuthenticatedRouteRoute,
   } as any)
+const AuthenticatedPostopBookingsAnalyticsRoute =
+  AuthenticatedPostopBookingsAnalyticsRouteImport.update({
+    id: '/postop-bookings/analytics',
+    path: '/postop-bookings/analytics',
+    getParentRoute: () => AuthenticatedRouteRoute,
+  } as any)
 const AuthenticatedInboxIdRoute = AuthenticatedInboxIdRouteImport.update({
   id: '/$id',
   path: '/$id',
@@ -123,6 +130,7 @@ export interface FileRoutesByFullPath {
   '/notifications': typeof AuthenticatedNotificationsRoute
   '/push-test': typeof AuthenticatedPushTestRoute
   '/inbox/$id': typeof AuthenticatedInboxIdRoute
+  '/postop-bookings/analytics': typeof AuthenticatedPostopBookingsAnalyticsRoute
   '/postop-bookings/new': typeof AuthenticatedPostopBookingsNewRoute
   '/referrals/$id': typeof AuthenticatedReferralsIdRoute
   '/referrals/new': typeof AuthenticatedReferralsNewRoute
@@ -140,6 +148,7 @@ export interface FileRoutesByTo {
   '/push-test': typeof AuthenticatedPushTestRoute
   '/': typeof AuthenticatedIndexRoute
   '/inbox/$id': typeof AuthenticatedInboxIdRoute
+  '/postop-bookings/analytics': typeof AuthenticatedPostopBookingsAnalyticsRoute
   '/postop-bookings/new': typeof AuthenticatedPostopBookingsNewRoute
   '/referrals/$id': typeof AuthenticatedReferralsIdRoute
   '/referrals/new': typeof AuthenticatedReferralsNewRoute
@@ -159,6 +168,7 @@ export interface FileRoutesById {
   '/_authenticated/push-test': typeof AuthenticatedPushTestRoute
   '/_authenticated/': typeof AuthenticatedIndexRoute
   '/_authenticated/inbox/$id': typeof AuthenticatedInboxIdRoute
+  '/_authenticated/postop-bookings/analytics': typeof AuthenticatedPostopBookingsAnalyticsRoute
   '/_authenticated/postop-bookings/new': typeof AuthenticatedPostopBookingsNewRoute
   '/_authenticated/referrals/$id': typeof AuthenticatedReferralsIdRoute
   '/_authenticated/referrals/new': typeof AuthenticatedReferralsNewRoute
@@ -178,6 +188,7 @@ export interface FileRouteTypes {
     | '/notifications'
     | '/push-test'
     | '/inbox/$id'
+    | '/postop-bookings/analytics'
     | '/postop-bookings/new'
     | '/referrals/$id'
     | '/referrals/new'
@@ -195,6 +206,7 @@ export interface FileRouteTypes {
     | '/push-test'
     | '/'
     | '/inbox/$id'
+    | '/postop-bookings/analytics'
     | '/postop-bookings/new'
     | '/referrals/$id'
     | '/referrals/new'
@@ -213,6 +225,7 @@ export interface FileRouteTypes {
     | '/_authenticated/push-test'
     | '/_authenticated/'
     | '/_authenticated/inbox/$id'
+    | '/_authenticated/postop-bookings/analytics'
     | '/_authenticated/postop-bookings/new'
     | '/_authenticated/referrals/$id'
     | '/_authenticated/referrals/new'
@@ -327,6 +340,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedPostopBookingsNewRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
+    '/_authenticated/postop-bookings/analytics': {
+      id: '/_authenticated/postop-bookings/analytics'
+      path: '/postop-bookings/analytics'
+      fullPath: '/postop-bookings/analytics'
+      preLoaderRoute: typeof AuthenticatedPostopBookingsAnalyticsRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
     '/_authenticated/inbox/$id': {
       id: '/_authenticated/inbox/$id'
       path: '/$id'
@@ -362,6 +382,7 @@ interface AuthenticatedRouteRouteChildren {
   AuthenticatedNotificationsRoute: typeof AuthenticatedNotificationsRoute
   AuthenticatedPushTestRoute: typeof AuthenticatedPushTestRoute
   AuthenticatedIndexRoute: typeof AuthenticatedIndexRoute
+  AuthenticatedPostopBookingsAnalyticsRoute: typeof AuthenticatedPostopBookingsAnalyticsRoute
   AuthenticatedPostopBookingsNewRoute: typeof AuthenticatedPostopBookingsNewRoute
   AuthenticatedReferralsIdRoute: typeof AuthenticatedReferralsIdRoute
   AuthenticatedReferralsNewRoute: typeof AuthenticatedReferralsNewRoute
@@ -376,6 +397,8 @@ const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedNotificationsRoute: AuthenticatedNotificationsRoute,
   AuthenticatedPushTestRoute: AuthenticatedPushTestRoute,
   AuthenticatedIndexRoute: AuthenticatedIndexRoute,
+  AuthenticatedPostopBookingsAnalyticsRoute:
+    AuthenticatedPostopBookingsAnalyticsRoute,
   AuthenticatedPostopBookingsNewRoute: AuthenticatedPostopBookingsNewRoute,
   AuthenticatedReferralsIdRoute: AuthenticatedReferralsIdRoute,
   AuthenticatedReferralsNewRoute: AuthenticatedReferralsNewRoute,
