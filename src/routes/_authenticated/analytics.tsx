@@ -363,6 +363,23 @@ function AnalyticsPage() {
       )}
 
       <div className="grid md:grid-cols-2 gap-6">
+        <Card className="p-5 md:col-span-2">
+          <h2 className="font-semibold mb-3">Referrals &amp; post-op bookings trend</h2>
+          <div className="h-72">
+            <ResponsiveContainer width="100%" height="100%">
+              <LineChart data={combinedPerDay}>
+                <CartesianGrid strokeDasharray="3 3" opacity={0.3} />
+                <XAxis dataKey="date" fontSize={11} />
+                <YAxis allowDecimals={false} fontSize={11} />
+                <Tooltip />
+                <Legend wrapperStyle={{ fontSize: 11 }} />
+                <Line type="monotone" dataKey="referrals" name="Referrals" stroke="var(--chart-1)" strokeWidth={2} dot={false} />
+                <Line type="monotone" dataKey="bookings" name="Post-op bookings" stroke="var(--chart-2)" strokeWidth={2} dot={false} />
+              </LineChart>
+            </ResponsiveContainer>
+          </div>
+        </Card>
+
         <Card className="p-5">
           <h2 className="font-semibold mb-3">Referrals over time</h2>
           <div className="h-64">
