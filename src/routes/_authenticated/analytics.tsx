@@ -129,6 +129,35 @@ function AnalyticsPage() {
 
   const bySpecialtyTop = useMemo(() => bySpecialty.slice(0, 10), [bySpecialty]);
 
+  const bmiBySpecialtyKey = useMemo(() => {
+    const map = new Map<string, { sum: number; n: number }>();
+    postopBmi.forEach((b) => {
+      if (typeof b.bmi !== "number" || !Number.isFinite(b.bmi)) return;
+      const label = b.surgical_specialty
+        ? (SURGICAL_SPECIALTY_LABEL[b.surgical_specialty as SurgicalSpecialty] ?? b.surgical_specialty)
+        : "Unknown";
+      const key = label.trim().toLowerCase();
+      const bucket = map.get(key) ?? { sum: 0, n: 0 };
+      bucket.sum += b.bmi;
+      bucket.n += 1;
+      map.set(key, bucket);
+    });
+    const out = new Map<string, { mean: number; n: number }>();
+    map.forEach((v, k) => out.set(k, { mean: v.sum / v.n, n: v.n }));
+    return out;
+  }, [postopBmi]);
+
+  const lookupBmi = (specialty: string): { mean: number; n: number } | null => {
+    const key = specialty.trim().toLowerCase();
+    const exact = bmiBySpecialtyKey.get(key);
+    if (exact) return exact;
+    // Fuzzy: partial match either direction (e.g. "Orthopaedics" ↔ "Orthopaedics / Trauma")
+    for (const [k, v] of bmiBySpecialtyKey.entries()) {
+      if (k.includes(key) || key.includes(k)) return v;
+    }
+    return null;
+  };
+
 
   const byStatus = useMemo(() => {
     const map = new Map<string, number>();
