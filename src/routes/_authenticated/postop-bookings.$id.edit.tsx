@@ -217,9 +217,22 @@ function EditPostopBookingPage() {
 
           <Card className="p-4 sm:p-6 space-y-4">
             <h2 className="font-semibold">Surgical plan</h2>
-            <div className="space-y-1.5">
-              <Label htmlFor="proc">Proposed surgical procedure</Label>
-              <Textarea id="proc" rows={2} value={procedure} onChange={(e) => setProcedure(e.target.value)} maxLength={2000} />
+            <div className="grid sm:grid-cols-2 gap-4">
+              <div className="space-y-1.5">
+                <Label htmlFor="proc">Proposed surgical procedure</Label>
+                <Textarea id="proc" rows={2} value={procedure} onChange={(e) => setProcedure(e.target.value)} maxLength={2000} />
+              </div>
+              <div className="space-y-1.5">
+                <Label>Surgical specialty</Label>
+                <Select value={specialty} onValueChange={(v) => setSpecialty(v as SurgicalSpecialty)}>
+                  <SelectTrigger><SelectValue placeholder="Select specialty" /></SelectTrigger>
+                  <SelectContent>
+                    {SURGICAL_SPECIALTY_OPTIONS.map((s) => (
+                      <SelectItem key={s} value={s}>{SURGICAL_SPECIALTY_LABEL[s]}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
             </div>
             <div className="grid sm:grid-cols-2 gap-4">
               <div className="space-y-1.5">
