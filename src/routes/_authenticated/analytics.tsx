@@ -379,6 +379,67 @@ function AnalyticsPage() {
           </div>
         </Card>
 
+        <Card className="p-5 md:col-span-2">
+          <div className="flex items-baseline justify-between mb-3 gap-3">
+            <h2 className="font-semibold">Referrals by specialty (top 10)</h2>
+            <span className="text-xs text-muted-foreground">{bySpecialty.length} total specialties</span>
+          </div>
+          <div className="h-72">
+            <ResponsiveContainer width="100%" height="100%">
+              <BarChart data={bySpecialtyTop}>
+                <CartesianGrid strokeDasharray="3 3" opacity={0.3} />
+                <XAxis dataKey="specialty" fontSize={11} angle={-15} textAnchor="end" height={70} />
+                <YAxis allowDecimals={false} fontSize={11} />
+                <Tooltip />
+                <Bar dataKey="count" fill="var(--chart-2)" radius={[4, 4, 0, 0]} />
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
+        </Card>
+
+        <Card className="p-5 md:col-span-2">
+          <div className="flex items-baseline justify-between mb-3 gap-3">
+            <h2 className="font-semibold">Specialty breakdown</h2>
+            <span className="text-xs text-muted-foreground">
+              Mean age per specialty. BMI is not captured on referrals — see post-op bookings analytics for BMI.
+            </span>
+          </div>
+          {bySpecialty.length === 0 ? (
+            <p className="text-sm text-muted-foreground">No referrals in this period.</p>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead className="text-xs uppercase text-muted-foreground border-b">
+                  <tr>
+                    <th className="text-left py-2 pr-3">Specialty</th>
+                    <th className="text-right py-2 pr-3">Referrals</th>
+                    <th className="text-right py-2 pr-3">% of total</th>
+                    <th className="text-right py-2 pr-3">Mean age</th>
+                    <th className="text-right py-2 pr-3">Accepted</th>
+                    <th className="text-right py-2 pr-3">Declined</th>
+                    <th className="text-right py-2 pr-3">Pending</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {bySpecialty.map((s) => (
+                    <tr key={s.specialty} className="border-b last:border-0 hover:bg-muted/40">
+                      <td className="py-2 pr-3 font-medium">{s.specialty}</td>
+                      <td className="py-2 pr-3 text-right">{s.count}</td>
+                      <td className="py-2 pr-3 text-right">
+                        {filtered.length ? ((s.count / filtered.length) * 100).toFixed(1) : "0.0"}%
+                      </td>
+                      <td className="py-2 pr-3 text-right">{s.meanAge != null ? `${s.meanAge.toFixed(1)} yrs` : "—"}</td>
+                      <td className="py-2 pr-3 text-right">{s.accepted}</td>
+                      <td className="py-2 pr-3 text-right">{s.declined}</td>
+                      <td className="py-2 pr-3 text-right">{s.pending}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </Card>
+
         <Card className="p-5">
           <h2 className="font-semibold mb-3">Sex distribution</h2>
           <div className="h-56">
@@ -393,6 +454,7 @@ function AnalyticsPage() {
             </ResponsiveContainer>
           </div>
         </Card>
+
 
         <Card className="p-5">
           <h2 className="font-semibold mb-3">Process times</h2>
