@@ -286,6 +286,12 @@ export const getPostopBookingHistory = createServerFn({ method: "POST" })
         .order("created_at", { ascending: false });
       if (error) throw error;
 
+      const norm = (v: unknown): AuditValue => {
+        if (v === null || v === undefined) return null;
+        if (typeof v === "string" || typeof v === "number" || typeof v === "boolean") return v;
+        return JSON.stringify(v);
+      };
+
       const entries: PostopAuditEntry[] = (rows ?? []).map((r: any) => {
         const diff = (r.diff ?? {}) as Record<string, any>;
         const entry: PostopAuditEntry = {
@@ -297,14 +303,16 @@ export const getPostopBookingHistory = createServerFn({ method: "POST" })
           changes: [],
         };
         if (r.action === "create") {
-          entry.snapshot = diff;
+          const snap: Record<string, AuditValue> = {};
+          for (const [k, v] of Object.entries(diff)) snap[k] = norm(v);
+          entry.snapshot = snap;
         } else if (r.action === "update") {
           for (const [field, change] of Object.entries(diff)) {
             if (change && typeof change === "object" && "from" in (change as any)) {
               entry.changes.push({
                 field,
-                from: (change as any).from,
-                to: (change as any).to,
+                from: norm((change as any).from),
+                to: norm((change as any).to),
               });
             }
           }
