@@ -2,7 +2,16 @@ import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { safeError } from "./safe-error";
-import { encryptString, decryptString, hashHospitalNumber } from "./crypto.server";
+// crypto helpers are loaded dynamically inside handlers via
+// ./postop-bookings-crypto.server so the Node "crypto" module never lands
+// in the client bundle (this file is part of the client module graph;
+// only handler bodies are stripped).
+type PostopCrypto = typeof import("./postop-bookings-crypto.server");
+let _cryptoMod: Promise<PostopCrypto> | null = null;
+function loadCrypto(): Promise<PostopCrypto> {
+  if (!_cryptoMod) _cryptoMod = import("./postop-bookings-crypto.server");
+  return _cryptoMod;
+}
 
 const bookingSchema = z.object({
   hospital_number: z.string().trim().max(50).nullable().optional(),
@@ -121,43 +130,14 @@ async function writeAudit(entry: {
     } as any);
 }
 
-function encryptPayload(input: PostopBookingInput) {
-  const out: Record<string, unknown> = {
-    age: input.age ?? null,
-    sex: input.sex ?? null,
-    weight_kg: input.weight_kg ?? null,
-    height_cm: input.height_cm ?? null,
-    bmi: input.bmi ?? null,
-    predicted_level: input.predicted_level,
-    proposed_surgery_date: input.proposed_surgery_date ?? null,
-    arrived_at: input.arrived_at ?? null,
-    surgical_specialty: input.surgical_specialty ?? null,
-    hospital_number_enc: encryptString(input.hospital_number ?? null),
-    hospital_number_hash: hashHospitalNumber(input.hospital_number ?? null),
-  };
-  for (const k of ENC_FIELDS) {
-    out[`${k}_enc`] = encryptString((input as any)[k] ?? null);
-  }
-  return out;
-}
 
-export function decryptRow(row: Record<string, any>) {
-  const out: Record<string, any> = { ...row };
-  out.hospital_number = decryptString(row.hospital_number_enc ?? null);
-  for (const k of ENC_FIELDS) {
-    out[k] = decryptString(row[`${k}_enc`] ?? null);
-    delete out[`${k}_enc`];
-  }
-  delete out.hospital_number_enc;
-  delete out.hospital_number_hash;
-  return out;
-}
 
 export const createPostopBooking = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((d) => bookingSchema.parse(d))
   .handler(async ({ data, context }) => {
     try {
+      const { encryptPayload } = await loadCrypto();
       const payload = encryptPayload(data);
       const { data: row, error } = await context.supabase
         .from("postop_bookings")
@@ -208,7 +188,8 @@ export const listPostopBookings = createServerFn({ method: "GET" })
       if (!includeDeleted) query = query.is("deleted_at", null);
       const { data: rows, error } = await query;
       if (error) throw error;
-      return (rows ?? []).map(decryptRow);
+      const { decryptRow } = await loadCrypto();
+      return ((rows ?? []) as Array<Record<string, any>>).map(decryptRow) as Array<Record<string, any>>;
     } catch (err) {
       throw safeError("listPostopBookings", err, "Could not load post-op bookings");
     }
@@ -227,6 +208,7 @@ export const getPostopBooking = createServerFn({ method: "GET" })
         .maybeSingle();
       if (error) throw error;
       if (!row) throw new Error("Booking not found");
+      const { decryptRow } = await loadCrypto();
       return decryptRow(row);
     } catch (err) {
       throw safeError("getPostopBooking", err, "Could not load post-op booking");
@@ -246,6 +228,7 @@ export const updatePostopBooking = createServerFn({ method: "POST" })
         .is("deleted_at", null)
         .maybeSingle();
       if (!prev) throw new Error("Booking not found");
+      const { decryptRow, encryptPayload } = await loadCrypto();
       const decryptedPrev = decryptRow(prev as Record<string, any>);
       const diff = buildUpdateDiff(decryptedPrev, rest);
       const payload = encryptPayload(rest);

@@ -2,7 +2,7 @@ import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { safeError } from "./safe-error";
-import { decryptRow } from "./postop-bookings.functions";
+
 
 async function assertAdmin(context: any) {
   const { data, error } = await context.supabase.rpc("has_role", {
@@ -72,7 +72,8 @@ export const getPostopAnalytics = createServerFn({ method: "GET" })
       if (data.to) query = query.lte("created_at", data.to);
       const { data: rows, error } = await query;
       if (error) throw error;
-      return (rows ?? []).map(decryptRow);
+      const { decryptRow } = await import("./postop-bookings-crypto.server");
+      return ((rows ?? []) as Array<Record<string, any>>).map(decryptRow) as Array<Record<string, any>>;
     } catch (err) {
       throw safeError("analytics.getPostopAnalytics", err, "Could not load post-op analytics.");
     }
