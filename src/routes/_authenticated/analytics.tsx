@@ -43,7 +43,7 @@ export const Route = createFileRoute("/_authenticated/analytics")({
   head: () => ({ meta: [{ title: "Analytics — SDH Critical Care" }] }),
   validateSearch: analyticsSearchSchema,
   component: () => (
-    <AdminOnly>
+    <AdminOnly redirectTo="/postop-bookings">
       <AnalyticsPage />
     </AdminOnly>
   ),
