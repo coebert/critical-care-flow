@@ -159,6 +159,78 @@ export type Database = {
           },
         ]
       }
+      postop_bookings: {
+        Row: {
+          age: number | null
+          bmi: number | null
+          created_at: string
+          created_by: string
+          deleted_at: string | null
+          deleted_by: string | null
+          height_cm: number | null
+          hospital_number_enc: string | null
+          hospital_number_hash: string | null
+          id: string
+          past_medical_history_enc: string | null
+          past_surgical_history_enc: string | null
+          predicted_level: Database["public"]["Enums"]["postop_level"]
+          proposed_procedure_enc: string | null
+          proposed_surgery_date: string | null
+          reason_for_bed_enc: string | null
+          sex: string | null
+          social_history_enc: string | null
+          updated_at: string
+          updated_by: string | null
+          weight_kg: number | null
+        }
+        Insert: {
+          age?: number | null
+          bmi?: number | null
+          created_at?: string
+          created_by?: string
+          deleted_at?: string | null
+          deleted_by?: string | null
+          height_cm?: number | null
+          hospital_number_enc?: string | null
+          hospital_number_hash?: string | null
+          id?: string
+          past_medical_history_enc?: string | null
+          past_surgical_history_enc?: string | null
+          predicted_level: Database["public"]["Enums"]["postop_level"]
+          proposed_procedure_enc?: string | null
+          proposed_surgery_date?: string | null
+          reason_for_bed_enc?: string | null
+          sex?: string | null
+          social_history_enc?: string | null
+          updated_at?: string
+          updated_by?: string | null
+          weight_kg?: number | null
+        }
+        Update: {
+          age?: number | null
+          bmi?: number | null
+          created_at?: string
+          created_by?: string
+          deleted_at?: string | null
+          deleted_by?: string | null
+          height_cm?: number | null
+          hospital_number_enc?: string | null
+          hospital_number_hash?: string | null
+          id?: string
+          past_medical_history_enc?: string | null
+          past_surgical_history_enc?: string | null
+          predicted_level?: Database["public"]["Enums"]["postop_level"]
+          proposed_procedure_enc?: string | null
+          proposed_surgery_date?: string | null
+          reason_for_bed_enc?: string | null
+          sex?: string | null
+          social_history_enc?: string | null
+          updated_at?: string
+          updated_by?: string | null
+          weight_kg?: number | null
+        }
+        Relationships: []
+      }
       profiles: {
         Row: {
           created_at: string
@@ -427,6 +499,7 @@ export type Database = {
       app_role: "admin" | "clinician"
       audit_action: "view" | "create" | "update" | "delete"
       patient_sex: "male" | "female" | "other" | "unknown"
+      postop_level: "level_1" | "level_2" | "level_3"
       referral_status: "pending" | "declined" | "admitted" | "accepted"
     }
     CompositeTypes: {
@@ -565,6 +638,7 @@ export const Constants = {
       app_role: ["admin", "clinician"],
       audit_action: ["view", "create", "update", "delete"],
       patient_sex: ["male", "female", "other", "unknown"],
+      postop_level: ["level_1", "level_2", "level_3"],
       referral_status: ["pending", "declined", "admitted", "accepted"],
     },
   },
