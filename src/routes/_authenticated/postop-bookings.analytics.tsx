@@ -393,7 +393,14 @@ function PostopAnalyticsPage() {
                 <Tooltip />
                 <Legend wrapperStyle={{ fontSize: 11 }} />
                 {Object.values(LEVEL_LABELS).map((label, i) => (
-                  <Bar key={label} dataKey={label} stackId="lvl" fill={COLORS[i % COLORS.length]} />
+                  <Bar
+                    key={label}
+                    dataKey={label}
+                    stackId="lvl"
+                    fill={COLORS[i % COLORS.length]}
+                    cursor="pointer"
+                    onClick={(d: any) => d?.key && drillByDay(d.key, label)}
+                  />
                 ))}
               </BarChart>
             </ResponsiveContainer>
