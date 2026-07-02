@@ -72,14 +72,15 @@ export const createPostopBooking = createServerFn({ method: "POST" })
       const payload = encryptPayload(data);
       const { data: row, error } = await context.supabase
         .from("postop_bookings")
-        .insert({ ...payload, created_by: context.userId })
+        .insert({ ...payload, created_by: context.userId } as any)
         .select("id")
         .single();
       if (error) throw error;
       return { id: row.id as string };
     } catch (err) {
-      throw safeError(err, "Could not save post-op booking");
+      throw safeError("createPostopBooking", err, "Could not save post-op booking");
     }
+
   });
 
 export const listPostopBookings = createServerFn({ method: "GET" })
