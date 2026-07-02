@@ -112,7 +112,19 @@ function PostopBookingsList() {
             Pre-booked critical care beds for planned high-risk surgical patients.
           </p>
         </div>
-        <div className="flex gap-2">
+        <div className="flex gap-2 items-center flex-wrap">
+          {isAdmin && (
+            <div className="flex items-center gap-2 mr-1">
+              <Switch
+                id="show-deleted"
+                checked={showDeleted}
+                onCheckedChange={setShowDeleted}
+              />
+              <Label htmlFor="show-deleted" className="text-sm cursor-pointer">
+                Show deleted
+              </Label>
+            </div>
+          )}
           <Button asChild variant="outline">
             <Link to="/postop-bookings/analytics">
               <BarChart3 className="w-4 h-4 mr-1" /> Analytics
