@@ -1,5 +1,8 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
+import { z } from "zod";
+import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
+import { PostopAnalyticsPanel } from "@/components/postop-analytics-panel";
 import { supabase } from "@/integrations/supabase/client";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -30,8 +33,13 @@ type Referral = Tables<"referrals">;
 
 import { AdminOnly } from "@/components/admin-only";
 
+const analyticsSearchSchema = z.object({
+  view: z.enum(["referrals", "postop"]).optional(),
+});
+
 export const Route = createFileRoute("/_authenticated/analytics")({
   head: () => ({ meta: [{ title: "Analytics — SDH Critical Care" }] }),
+  validateSearch: analyticsSearchSchema,
   component: () => (
     <AdminOnly>
       <AnalyticsPage />
@@ -242,11 +250,28 @@ function AnalyticsPage() {
   const meanTimeToSeen = meanMinutes((r) => [r.referral_received_at, r.first_seen_at]);
   const meanDecisionToArrival = meanMinutes((r) => [r.decision_at, r.arrived_on_unit_at]);
 
+  const search = Route.useSearch();
+  const navigate = Route.useNavigate();
+  const tab: "referrals" | "postop" = search.view === "postop" ? "postop" : "referrals";
+
   return (
     <div className="p-4 sm:p-6 max-w-7xl mx-auto">
+      <div className="mb-4">
+        <h1 className="text-2xl font-semibold tracking-tight">Analytics</h1>
+      </div>
+      <Tabs
+        value={tab}
+        onValueChange={(v) =>
+          navigate({ search: { view: v === "postop" ? "postop" : undefined } as any, replace: true })
+        }
+      >
+        <TabsList className="mb-4">
+          <TabsTrigger value="referrals">Referrals</TabsTrigger>
+          <TabsTrigger value="postop">Post-op bookings</TabsTrigger>
+        </TabsList>
+        <TabsContent value="referrals">
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-6">
         <div className="min-w-0">
-          <h1 className="text-2xl font-semibold tracking-tight">Analytics</h1>
           <p className="text-sm text-muted-foreground">
             {format(from, "dd MMM yyyy")} – {format(to, "dd MMM yyyy")} · {days} day{days === 1 ? "" : "s"} · {filtered.length} referrals
           </p>
@@ -554,6 +579,11 @@ function AnalyticsPage() {
           )}
         </Card>
       </div>
+        </TabsContent>
+        <TabsContent value="postop">
+          <PostopAnalyticsPanel />
+        </TabsContent>
+      </Tabs>
     </div>
   );
 }
