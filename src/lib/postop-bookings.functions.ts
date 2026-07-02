@@ -268,6 +268,33 @@ export const updatePostopBooking = createServerFn({ method: "POST" })
     }
   });
 
+export type PostopSoftDeleteRow = {
+  created_by: string | null;
+  deleted_at: string | null;
+} | null;
+
+export type PostopSoftDeleteDecision =
+  | { kind: "not_found" }
+  | { kind: "already_deleted"; deleted_at: string }
+  | { kind: "forbidden" }
+  | { kind: "allow" };
+
+/**
+ * Pure authorization helper used by `deletePostopBooking`. A booking may only
+ * be soft-deleted by its original creator or by an admin. Exposed so unit
+ * tests can exercise every branch without a live Supabase context.
+ */
+export function decidePostopSoftDelete(
+  row: PostopSoftDeleteRow,
+  userId: string,
+  isAdmin: boolean,
+): PostopSoftDeleteDecision {
+  if (!row) return { kind: "not_found" };
+  if (row.deleted_at) return { kind: "already_deleted", deleted_at: row.deleted_at };
+  if (row.created_by !== userId && !isAdmin) return { kind: "forbidden" };
+  return { kind: "allow" };
+}
+
 export const deletePostopBooking = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((d) => z.object({ id: z.string().uuid() }).parse(d))
@@ -279,14 +306,22 @@ export const deletePostopBooking = createServerFn({ method: "POST" })
         .eq("id", data.id)
         .maybeSingle();
       if (fetchErr) throw fetchErr;
-      if (!existing) throw new Error("Booking not found");
-      if (existing.deleted_at) return { id: data.id, deleted_at: existing.deleted_at };
 
       const { data: isAdmin } = await context.supabase.rpc("has_role", {
         _user_id: context.userId,
         _role: "admin",
       });
-      if (existing.created_by !== context.userId && !isAdmin) {
+
+      const decision = decidePostopSoftDelete(
+        existing as PostopSoftDeleteRow,
+        context.userId,
+        !!isAdmin,
+      );
+      if (decision.kind === "not_found") throw new Error("Booking not found");
+      if (decision.kind === "already_deleted") {
+        return { id: data.id, deleted_at: decision.deleted_at };
+      }
+      if (decision.kind === "forbidden") {
         throw safeError(
           "deletePostopBooking",
           new Error("forbidden"),
@@ -312,6 +347,8 @@ export const deletePostopBooking = createServerFn({ method: "POST" })
       throw safeError("deletePostopBooking", err, "Could not delete post-op booking");
     }
   });
+
+
 
 
 export const restorePostopBooking = createServerFn({ method: "POST" })
