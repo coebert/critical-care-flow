@@ -43,6 +43,7 @@ const COLORS = ["var(--chart-1)", "var(--chart-2)", "var(--chart-3)", "var(--cha
 
 function AnalyticsPage() {
   const [rows, setRows] = useState<Referral[]>([]);
+  const [postopBmi, setPostopBmi] = useState<Array<{ surgical_specialty: string | null; bmi: number | null }>>([]);
   const [range, setRange] = useState<DateRange>(() => ({
     from: startOfDay(subDays(new Date(), 29)),
     to: endOfDay(new Date()),
