@@ -24,6 +24,7 @@ import {
   aggregateUrgencyPerDay,
   URGENCY_LEGEND_KEYS,
 } from "@/lib/analytics-urgency";
+import { SURGICAL_SPECIALTY_LABEL, type SurgicalSpecialty } from "@/lib/surgical-specialties";
 
 type Referral = Tables<"referrals">;
 
