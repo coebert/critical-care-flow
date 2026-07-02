@@ -116,6 +116,7 @@ function encryptPayload(input: PostopBookingInput) {
     bmi: input.bmi ?? null,
     predicted_level: input.predicted_level,
     proposed_surgery_date: input.proposed_surgery_date ?? null,
+    arrived_at: input.arrived_at ?? null,
     hospital_number_enc: encryptString(input.hospital_number ?? null),
     hospital_number_hash: hashHospitalNumber(input.hospital_number ?? null),
   };
