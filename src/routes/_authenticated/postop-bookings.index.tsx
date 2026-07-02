@@ -100,11 +100,18 @@ function PostopBookingsList() {
             Pre-booked critical care beds for planned high-risk surgical patients.
           </p>
         </div>
-        <Button asChild>
-          <Link to="/postop-bookings/new">
-            <Plus className="w-4 h-4 mr-1" /> New booking
-          </Link>
-        </Button>
+        <div className="flex gap-2">
+          <Button asChild variant="outline">
+            <Link to="/postop-bookings/analytics">
+              <BarChart3 className="w-4 h-4 mr-1" /> Analytics
+            </Link>
+          </Button>
+          <Button asChild>
+            <Link to="/postop-bookings/new">
+              <Plus className="w-4 h-4 mr-1" /> New booking
+            </Link>
+          </Button>
+        </div>
       </div>
 
       {error && (
