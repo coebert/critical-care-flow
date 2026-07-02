@@ -579,6 +579,11 @@ function AnalyticsPage() {
           )}
         </Card>
       </div>
+        </TabsContent>
+        <TabsContent value="postop">
+          <PostopAnalyticsPanel />
+        </TabsContent>
+      </Tabs>
     </div>
   );
 }
