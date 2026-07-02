@@ -131,6 +131,7 @@ function EditPostopBookingPage() {
           reason_for_bed: reason.trim() || null,
           predicted_level: level as Level,
           proposed_surgery_date: surgeryDate.trim() || null,
+          arrived_at: arrivedAt.trim() ? new Date(arrivedAt).toISOString() : null,
         },
       });
       toast.success("Post-op booking updated");
