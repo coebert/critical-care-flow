@@ -125,11 +125,13 @@ function PostopBookingsList() {
               </Label>
             </div>
           )}
-          <Button asChild variant="outline">
-            <Link to="/postop-bookings/analytics">
-              <BarChart3 className="w-4 h-4 mr-1" /> Analytics
-            </Link>
-          </Button>
+          {isAdmin && (
+            <Button asChild variant="outline">
+              <Link to="/postop-bookings/analytics">
+                <BarChart3 className="w-4 h-4 mr-1" /> Analytics
+              </Link>
+            </Button>
+          )}
           <Button asChild>
             <Link to="/postop-bookings/new">
               <Plus className="w-4 h-4 mr-1" /> New booking
