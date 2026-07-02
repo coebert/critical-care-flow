@@ -429,7 +429,7 @@ function AnalyticsPage() {
           <div className="flex items-baseline justify-between mb-3 gap-3">
             <h2 className="font-semibold">Specialty breakdown</h2>
             <span className="text-xs text-muted-foreground">
-              Mean age per specialty. BMI is not captured on referrals — see post-op bookings analytics for BMI.
+              Mean age from referrals. Mean BMI is derived from matching post-op bookings in this period; specialties without a match show N/A.
             </span>
           </div>
           {bySpecialty.length === 0 ? (
@@ -443,25 +443,38 @@ function AnalyticsPage() {
                     <th className="text-right py-2 pr-3">Referrals</th>
                     <th className="text-right py-2 pr-3">% of total</th>
                     <th className="text-right py-2 pr-3">Mean age</th>
+                    <th className="text-right py-2 pr-3">Mean BMI</th>
                     <th className="text-right py-2 pr-3">Accepted</th>
                     <th className="text-right py-2 pr-3">Declined</th>
                     <th className="text-right py-2 pr-3">Pending</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {bySpecialty.map((s) => (
-                    <tr key={s.specialty} className="border-b last:border-0 hover:bg-muted/40">
-                      <td className="py-2 pr-3 font-medium">{s.specialty}</td>
-                      <td className="py-2 pr-3 text-right">{s.count}</td>
-                      <td className="py-2 pr-3 text-right">
-                        {filtered.length ? ((s.count / filtered.length) * 100).toFixed(1) : "0.0"}%
-                      </td>
-                      <td className="py-2 pr-3 text-right">{s.meanAge != null ? `${s.meanAge.toFixed(1)} yrs` : "—"}</td>
-                      <td className="py-2 pr-3 text-right">{s.accepted}</td>
-                      <td className="py-2 pr-3 text-right">{s.declined}</td>
-                      <td className="py-2 pr-3 text-right">{s.pending}</td>
-                    </tr>
-                  ))}
+                  {bySpecialty.map((s) => {
+                    const bmi = lookupBmi(s.specialty);
+                    return (
+                      <tr key={s.specialty} className="border-b last:border-0 hover:bg-muted/40">
+                        <td className="py-2 pr-3 font-medium">{s.specialty}</td>
+                        <td className="py-2 pr-3 text-right">{s.count}</td>
+                        <td className="py-2 pr-3 text-right">
+                          {filtered.length ? ((s.count / filtered.length) * 100).toFixed(1) : "0.0"}%
+                        </td>
+                        <td className="py-2 pr-3 text-right">{s.meanAge != null ? `${s.meanAge.toFixed(1)} yrs` : "—"}</td>
+                        <td className="py-2 pr-3 text-right">
+                          {bmi ? (
+                            <span title={`Based on ${bmi.n} post-op booking${bmi.n === 1 ? "" : "s"}`}>
+                              {bmi.mean.toFixed(1)}
+                            </span>
+                          ) : (
+                            <span className="text-muted-foreground">N/A</span>
+                          )}
+                        </td>
+                        <td className="py-2 pr-3 text-right">{s.accepted}</td>
+                        <td className="py-2 pr-3 text-right">{s.declined}</td>
+                        <td className="py-2 pr-3 text-right">{s.pending}</td>
+                      </tr>
+                    );
+                  })}
                 </tbody>
               </table>
             </div>
