@@ -21,6 +21,7 @@ import { Route as AuthenticatedAnalyticsRouteImport } from './routes/_authentica
 import { Route as AuthenticatedAdminRouteImport } from './routes/_authenticated/admin'
 import { Route as AuthenticatedReferralsNewRouteImport } from './routes/_authenticated/referrals.new'
 import { Route as AuthenticatedReferralsIdRouteImport } from './routes/_authenticated/referrals.$id'
+import { Route as AuthenticatedPostopBookingsNewRouteImport } from './routes/_authenticated/postop-bookings.new'
 import { Route as AuthenticatedInboxIdRouteImport } from './routes/_authenticated/inbox.$id'
 
 const SetupRoute = SetupRouteImport.update({
@@ -85,6 +86,12 @@ const AuthenticatedReferralsIdRoute =
     path: '/referrals/$id',
     getParentRoute: () => AuthenticatedRouteRoute,
   } as any)
+const AuthenticatedPostopBookingsNewRoute =
+  AuthenticatedPostopBookingsNewRouteImport.update({
+    id: '/postop-bookings/new',
+    path: '/postop-bookings/new',
+    getParentRoute: () => AuthenticatedRouteRoute,
+  } as any)
 const AuthenticatedInboxIdRoute = AuthenticatedInboxIdRouteImport.update({
   id: '/$id',
   path: '/$id',
@@ -102,6 +109,7 @@ export interface FileRoutesByFullPath {
   '/notifications': typeof AuthenticatedNotificationsRoute
   '/push-test': typeof AuthenticatedPushTestRoute
   '/inbox/$id': typeof AuthenticatedInboxIdRoute
+  '/postop-bookings/new': typeof AuthenticatedPostopBookingsNewRoute
   '/referrals/$id': typeof AuthenticatedReferralsIdRoute
   '/referrals/new': typeof AuthenticatedReferralsNewRoute
 }
@@ -116,6 +124,7 @@ export interface FileRoutesByTo {
   '/push-test': typeof AuthenticatedPushTestRoute
   '/': typeof AuthenticatedIndexRoute
   '/inbox/$id': typeof AuthenticatedInboxIdRoute
+  '/postop-bookings/new': typeof AuthenticatedPostopBookingsNewRoute
   '/referrals/$id': typeof AuthenticatedReferralsIdRoute
   '/referrals/new': typeof AuthenticatedReferralsNewRoute
 }
@@ -132,6 +141,7 @@ export interface FileRoutesById {
   '/_authenticated/push-test': typeof AuthenticatedPushTestRoute
   '/_authenticated/': typeof AuthenticatedIndexRoute
   '/_authenticated/inbox/$id': typeof AuthenticatedInboxIdRoute
+  '/_authenticated/postop-bookings/new': typeof AuthenticatedPostopBookingsNewRoute
   '/_authenticated/referrals/$id': typeof AuthenticatedReferralsIdRoute
   '/_authenticated/referrals/new': typeof AuthenticatedReferralsNewRoute
 }
@@ -148,6 +158,7 @@ export interface FileRouteTypes {
     | '/notifications'
     | '/push-test'
     | '/inbox/$id'
+    | '/postop-bookings/new'
     | '/referrals/$id'
     | '/referrals/new'
   fileRoutesByTo: FileRoutesByTo
@@ -162,6 +173,7 @@ export interface FileRouteTypes {
     | '/push-test'
     | '/'
     | '/inbox/$id'
+    | '/postop-bookings/new'
     | '/referrals/$id'
     | '/referrals/new'
   id:
@@ -177,6 +189,7 @@ export interface FileRouteTypes {
     | '/_authenticated/push-test'
     | '/_authenticated/'
     | '/_authenticated/inbox/$id'
+    | '/_authenticated/postop-bookings/new'
     | '/_authenticated/referrals/$id'
     | '/_authenticated/referrals/new'
   fileRoutesById: FileRoutesById
@@ -274,6 +287,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedReferralsIdRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
+    '/_authenticated/postop-bookings/new': {
+      id: '/_authenticated/postop-bookings/new'
+      path: '/postop-bookings/new'
+      fullPath: '/postop-bookings/new'
+      preLoaderRoute: typeof AuthenticatedPostopBookingsNewRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
     '/_authenticated/inbox/$id': {
       id: '/_authenticated/inbox/$id'
       path: '/$id'
@@ -302,6 +322,7 @@ interface AuthenticatedRouteRouteChildren {
   AuthenticatedNotificationsRoute: typeof AuthenticatedNotificationsRoute
   AuthenticatedPushTestRoute: typeof AuthenticatedPushTestRoute
   AuthenticatedIndexRoute: typeof AuthenticatedIndexRoute
+  AuthenticatedPostopBookingsNewRoute: typeof AuthenticatedPostopBookingsNewRoute
   AuthenticatedReferralsIdRoute: typeof AuthenticatedReferralsIdRoute
   AuthenticatedReferralsNewRoute: typeof AuthenticatedReferralsNewRoute
 }
@@ -313,6 +334,7 @@ const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedNotificationsRoute: AuthenticatedNotificationsRoute,
   AuthenticatedPushTestRoute: AuthenticatedPushTestRoute,
   AuthenticatedIndexRoute: AuthenticatedIndexRoute,
+  AuthenticatedPostopBookingsNewRoute: AuthenticatedPostopBookingsNewRoute,
   AuthenticatedReferralsIdRoute: AuthenticatedReferralsIdRoute,
   AuthenticatedReferralsNewRoute: AuthenticatedReferralsNewRoute,
 }
