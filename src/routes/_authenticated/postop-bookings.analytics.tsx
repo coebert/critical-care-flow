@@ -303,7 +303,12 @@ function PostopAnalyticsPage() {
                   <XAxis dataKey="name" fontSize={11} />
                   <YAxis allowDecimals={false} fontSize={11} />
                   <Tooltip />
-                  <Bar dataKey="count" fill="var(--chart-2)" />
+                  <Bar
+                    dataKey="count"
+                    fill="var(--chart-2)"
+                    cursor="pointer"
+                    onClick={(d: any) => drillByBucket(d.name, d.min, d.max)}
+                  />
                 </BarChart>
               </ResponsiveContainer>
             )}
