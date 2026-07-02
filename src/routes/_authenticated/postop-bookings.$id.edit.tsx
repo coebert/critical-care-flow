@@ -58,6 +58,7 @@ function EditPostopBookingPage() {
   const [reason, setReason] = useState("");
   const [level, setLevel] = useState<Level | "">("");
   const [surgeryDate, setSurgeryDate] = useState("");
+  const [arrivedAt, setArrivedAt] = useState("");
 
   useEffect(() => {
     let cancelled = false;
