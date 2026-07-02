@@ -1,0 +1,1 @@
+ALTER TABLE public.postop_bookings ADD COLUMN IF NOT EXISTS surgical_specialty TEXT;
