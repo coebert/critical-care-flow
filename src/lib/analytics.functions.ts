@@ -72,6 +72,7 @@ export const getPostopAnalytics = createServerFn({ method: "GET" })
       if (data.to) query = query.lte("created_at", data.to);
       const { data: rows, error } = await query;
       if (error) throw error;
+      const { decryptRow } = await import("./postop-bookings-crypto.server");
       return (rows ?? []).map(decryptRow);
     } catch (err) {
       throw safeError("analytics.getPostopAnalytics", err, "Could not load post-op analytics.");
