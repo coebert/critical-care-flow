@@ -155,7 +155,7 @@ function PostopBookingsList() {
       {rows && rows.length > 0 && (
         <div className="grid gap-3">
           {rows.map((b) => (
-            <Card key={b.id} className="p-4 space-y-2">
+            <Card key={b.id} className={`p-4 space-y-2 ${b.deleted_at ? "opacity-60 border-dashed" : ""}`}>
               <div className="flex items-start justify-between gap-3 flex-wrap">
                 <div className="min-w-0">
                   <div className="flex items-center gap-2 flex-wrap">
@@ -165,6 +165,11 @@ function PostopBookingsList() {
                     <Badge className={LEVEL_CLASS[b.predicted_level]} variant="secondary">
                       {LEVEL_LABEL[b.predicted_level]}
                     </Badge>
+                    {b.deleted_at && (
+                      <Badge variant="outline" className="text-destructive border-destructive/50">
+                        Deleted
+                      </Badge>
+                    )}
                   </div>
                   <div className="text-xs text-muted-foreground mt-0.5">
                     {[
