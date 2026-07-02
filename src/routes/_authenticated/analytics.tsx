@@ -104,6 +104,24 @@ function AnalyticsPage() {
     return Array.from(map.entries()).map(([date, count]) => ({ date: format(new Date(date), "dd MMM"), count }));
   }, [filtered, dayKeys]);
 
+  const combinedPerDay = useMemo(() => {
+    const refMap = new Map<string, number>(dayKeys.map((k) => [k, 0]));
+    filtered.forEach((r) => {
+      const k = format(startOfDay(new Date(r.referral_received_at)), "yyyy-MM-dd");
+      if (refMap.has(k)) refMap.set(k, (refMap.get(k) ?? 0) + 1);
+    });
+    const bookMap = new Map<string, number>(dayKeys.map((k) => [k, 0]));
+    postopBmi.forEach((b) => {
+      const k = format(startOfDay(new Date(b.created_at)), "yyyy-MM-dd");
+      if (bookMap.has(k)) bookMap.set(k, (bookMap.get(k) ?? 0) + 1);
+    });
+    return dayKeys.map((k) => ({
+      date: format(new Date(k), "dd MMM"),
+      referrals: refMap.get(k) ?? 0,
+      bookings: bookMap.get(k) ?? 0,
+    }));
+  }, [filtered, postopBmi, dayKeys]);
+
   const meanPer24h = filtered.length / Math.max(days, 1);
   const meanAge = (() => {
     const ages = filtered.map((r) => r.age).filter((x): x is number => x != null);
