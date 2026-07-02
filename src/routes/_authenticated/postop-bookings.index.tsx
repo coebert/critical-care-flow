@@ -19,7 +19,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { toast } from "sonner";
-import { Plus, CalendarClock, Pencil, Trash2, BarChart3 } from "lucide-react";
+import { Plus, CalendarClock, Pencil, Trash2 } from "lucide-react";
 import { format, parseISO } from "date-fns";
 
 export const Route = createFileRoute("/_authenticated/postop-bookings/")({
@@ -145,13 +145,6 @@ function PostopBookingsList() {
                 Show deleted
               </Label>
             </div>
-          )}
-          {isAdmin && (
-            <Button asChild variant="outline">
-              <Link to="/analytics" search={{ view: "postop" } as any}>
-                <BarChart3 className="w-4 h-4 mr-1" /> Analytics
-              </Link>
-            </Button>
           )}
           <Button asChild>
             <Link to="/postop-bookings/new">
