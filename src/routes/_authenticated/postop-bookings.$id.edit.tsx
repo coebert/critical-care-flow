@@ -84,6 +84,7 @@ function EditPostopBookingPage() {
         setLevel(row.predicted_level ?? "");
         setSurgeryDate(row.proposed_surgery_date ?? "");
         setArrivedAt(row.arrived_at ? new Date(row.arrived_at).toISOString().slice(0, 16) : "");
+        setSpecialty((row.surgical_specialty ?? "") as SurgicalSpecialty | "");
         setLoading(false);
       })
       .catch((err) => {
