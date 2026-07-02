@@ -137,6 +137,7 @@ export const createPostopBooking = createServerFn({ method: "POST" })
   .inputValidator((d) => bookingSchema.parse(d))
   .handler(async ({ data, context }) => {
     try {
+      const { encryptPayload } = await loadCrypto();
       const payload = encryptPayload(data);
       const { data: row, error } = await context.supabase
         .from("postop_bookings")
