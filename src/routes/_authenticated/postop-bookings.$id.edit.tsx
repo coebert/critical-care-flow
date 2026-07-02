@@ -77,6 +77,7 @@ function EditPostopBookingPage() {
         setReason(row.reason_for_bed ?? "");
         setLevel(row.predicted_level ?? "");
         setSurgeryDate(row.proposed_surgery_date ?? "");
+        setArrivedAt(row.arrived_at ? new Date(row.arrived_at).toISOString().slice(0, 16) : "");
         setLoading(false);
       })
       .catch((err) => {
