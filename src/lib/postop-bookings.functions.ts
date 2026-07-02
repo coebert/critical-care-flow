@@ -228,6 +228,7 @@ export const updatePostopBooking = createServerFn({ method: "POST" })
         .is("deleted_at", null)
         .maybeSingle();
       if (!prev) throw new Error("Booking not found");
+      const { decryptRow, encryptPayload } = await loadCrypto();
       const decryptedPrev = decryptRow(prev as Record<string, any>);
       const diff = buildUpdateDiff(decryptedPrev, rest);
       const payload = encryptPayload(rest);
