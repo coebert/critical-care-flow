@@ -51,7 +51,7 @@ const COLORS = ["var(--chart-1)", "var(--chart-2)", "var(--chart-3)", "var(--cha
 
 function AnalyticsPage() {
   const [rows, setRows] = useState<Referral[]>([]);
-  const [postopBmi, setPostopBmi] = useState<Array<{ surgical_specialty: string | null; bmi: number | null }>>([]);
+  const [postopBmi, setPostopBmi] = useState<Array<{ surgical_specialty: string | null; bmi: number | null; created_at: string }>>([]);
   const [range, setRange] = useState<DateRange>(() => ({
     from: startOfDay(subDays(new Date(), 29)),
     to: endOfDay(new Date()),
@@ -75,12 +75,12 @@ function AnalyticsPage() {
   useEffect(() => {
     supabase
       .from("postop_bookings")
-      .select("surgical_specialty,bmi")
+      .select("surgical_specialty,bmi,created_at")
       .is("deleted_at", null)
       .gte("created_at", from.toISOString())
       .lte("created_at", to.toISOString())
       .limit(5000)
-      .then(({ data }) => setPostopBmi((data ?? []) as Array<{ surgical_specialty: string | null; bmi: number | null }>));
+      .then(({ data }) => setPostopBmi((data ?? []) as Array<{ surgical_specialty: string | null; bmi: number | null; created_at: string }>));
   }, [from.getTime(), to.getTime()]);
 
   const filtered = useMemo(() => {
@@ -103,6 +103,24 @@ function AnalyticsPage() {
     });
     return Array.from(map.entries()).map(([date, count]) => ({ date: format(new Date(date), "dd MMM"), count }));
   }, [filtered, dayKeys]);
+
+  const combinedPerDay = useMemo(() => {
+    const refMap = new Map<string, number>(dayKeys.map((k) => [k, 0]));
+    filtered.forEach((r) => {
+      const k = format(startOfDay(new Date(r.referral_received_at)), "yyyy-MM-dd");
+      if (refMap.has(k)) refMap.set(k, (refMap.get(k) ?? 0) + 1);
+    });
+    const bookMap = new Map<string, number>(dayKeys.map((k) => [k, 0]));
+    postopBmi.forEach((b) => {
+      const k = format(startOfDay(new Date(b.created_at)), "yyyy-MM-dd");
+      if (bookMap.has(k)) bookMap.set(k, (bookMap.get(k) ?? 0) + 1);
+    });
+    return dayKeys.map((k) => ({
+      date: format(new Date(k), "dd MMM"),
+      referrals: refMap.get(k) ?? 0,
+      bookings: bookMap.get(k) ?? 0,
+    }));
+  }, [filtered, postopBmi, dayKeys]);
 
   const meanPer24h = filtered.length / Math.max(days, 1);
   const meanAge = (() => {
@@ -345,6 +363,23 @@ function AnalyticsPage() {
       )}
 
       <div className="grid md:grid-cols-2 gap-6">
+        <Card className="p-5 md:col-span-2">
+          <h2 className="font-semibold mb-3">Referrals &amp; post-op bookings trend</h2>
+          <div className="h-72">
+            <ResponsiveContainer width="100%" height="100%">
+              <LineChart data={combinedPerDay}>
+                <CartesianGrid strokeDasharray="3 3" opacity={0.3} />
+                <XAxis dataKey="date" fontSize={11} />
+                <YAxis allowDecimals={false} fontSize={11} />
+                <Tooltip />
+                <Legend wrapperStyle={{ fontSize: 11 }} />
+                <Line type="monotone" dataKey="referrals" name="Referrals" stroke="var(--chart-1)" strokeWidth={2} dot={false} />
+                <Line type="monotone" dataKey="bookings" name="Post-op bookings" stroke="var(--chart-2)" strokeWidth={2} dot={false} />
+              </LineChart>
+            </ResponsiveContainer>
+          </div>
+        </Card>
+
         <Card className="p-5">
           <h2 className="font-semibold mb-3">Referrals over time</h2>
           <div className="h-64">
