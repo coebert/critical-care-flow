@@ -90,16 +90,32 @@ function AnalyticsPage() {
   })();
 
   const bySpecialty = useMemo(() => {
-    const map = new Map<string, number>();
+    const map = new Map<string, { count: number; ageSum: number; ageN: number; accepted: number; declined: number; pending: number }>();
     filtered.forEach((r) => {
       const k = r.referring_specialty || "Unknown";
-      map.set(k, (map.get(k) ?? 0) + 1);
+      const bucket = map.get(k) ?? { count: 0, ageSum: 0, ageN: 0, accepted: 0, declined: 0, pending: 0 };
+      bucket.count += 1;
+      if (typeof r.age === "number") { bucket.ageSum += r.age; bucket.ageN += 1; }
+      const s = (r.status ?? "").toLowerCase();
+      if (s === "accepted" || s === "admitted") bucket.accepted += 1;
+      else if (s === "declined") bucket.declined += 1;
+      else bucket.pending += 1;
+      map.set(k, bucket);
     });
     return Array.from(map.entries())
-      .map(([specialty, count]) => ({ specialty, count }))
-      .sort((a, b) => b.count - a.count)
-      .slice(0, 10);
+      .map(([specialty, v]) => ({
+        specialty,
+        count: v.count,
+        meanAge: v.ageN ? v.ageSum / v.ageN : null,
+        accepted: v.accepted,
+        declined: v.declined,
+        pending: v.pending,
+      }))
+      .sort((a, b) => b.count - a.count);
   }, [filtered]);
+
+  const bySpecialtyTop = useMemo(() => bySpecialty.slice(0, 10), [bySpecialty]);
+
 
   const byStatus = useMemo(() => {
     const map = new Map<string, number>();
@@ -348,11 +364,15 @@ function AnalyticsPage() {
           </ul>
         </Card>
 
+
         <Card className="p-5 md:col-span-2">
-          <h2 className="font-semibold mb-3">Referrals by specialty (top 10)</h2>
+          <div className="flex items-baseline justify-between mb-3 gap-3">
+            <h2 className="font-semibold">Referrals by specialty (top 10)</h2>
+            <span className="text-xs text-muted-foreground">{bySpecialty.length} total specialties</span>
+          </div>
           <div className="h-72">
             <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={bySpecialty}>
+              <BarChart data={bySpecialtyTop}>
                 <CartesianGrid strokeDasharray="3 3" opacity={0.3} />
                 <XAxis dataKey="specialty" fontSize={11} angle={-15} textAnchor="end" height={70} />
                 <YAxis allowDecimals={false} fontSize={11} />
@@ -361,6 +381,49 @@ function AnalyticsPage() {
               </BarChart>
             </ResponsiveContainer>
           </div>
+        </Card>
+
+        <Card className="p-5 md:col-span-2">
+          <div className="flex items-baseline justify-between mb-3 gap-3">
+            <h2 className="font-semibold">Specialty breakdown</h2>
+            <span className="text-xs text-muted-foreground">
+              Mean age per specialty. BMI is not captured on referrals — see post-op bookings analytics for BMI.
+            </span>
+          </div>
+          {bySpecialty.length === 0 ? (
+            <p className="text-sm text-muted-foreground">No referrals in this period.</p>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead className="text-xs uppercase text-muted-foreground border-b">
+                  <tr>
+                    <th className="text-left py-2 pr-3">Specialty</th>
+                    <th className="text-right py-2 pr-3">Referrals</th>
+                    <th className="text-right py-2 pr-3">% of total</th>
+                    <th className="text-right py-2 pr-3">Mean age</th>
+                    <th className="text-right py-2 pr-3">Accepted</th>
+                    <th className="text-right py-2 pr-3">Declined</th>
+                    <th className="text-right py-2 pr-3">Pending</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {bySpecialty.map((s) => (
+                    <tr key={s.specialty} className="border-b last:border-0 hover:bg-muted/40">
+                      <td className="py-2 pr-3 font-medium">{s.specialty}</td>
+                      <td className="py-2 pr-3 text-right">{s.count}</td>
+                      <td className="py-2 pr-3 text-right">
+                        {filtered.length ? ((s.count / filtered.length) * 100).toFixed(1) : "0.0"}%
+                      </td>
+                      <td className="py-2 pr-3 text-right">{s.meanAge != null ? `${s.meanAge.toFixed(1)} yrs` : "—"}</td>
+                      <td className="py-2 pr-3 text-right">{s.accepted}</td>
+                      <td className="py-2 pr-3 text-right">{s.declined}</td>
+                      <td className="py-2 pr-3 text-right">{s.pending}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
         </Card>
 
         <Card className="p-5">
@@ -377,6 +440,7 @@ function AnalyticsPage() {
             </ResponsiveContainer>
           </div>
         </Card>
+
 
         <Card className="p-5">
           <h2 className="font-semibold mb-3">Process times</h2>
