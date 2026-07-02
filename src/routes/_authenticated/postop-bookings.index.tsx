@@ -146,13 +146,6 @@ function PostopBookingsList() {
               </Label>
             </div>
           )}
-          {isAdmin && (
-            <Button asChild variant="outline">
-              <Link to="/analytics" search={{ view: "postop" } as any}>
-                <BarChart3 className="w-4 h-4 mr-1" /> Analytics
-              </Link>
-            </Button>
-          )}
           <Button asChild>
             <Link to="/postop-bookings/new">
               <Plus className="w-4 h-4 mr-1" /> New booking
