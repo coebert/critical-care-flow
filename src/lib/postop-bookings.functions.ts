@@ -208,6 +208,7 @@ export const getPostopBooking = createServerFn({ method: "GET" })
         .maybeSingle();
       if (error) throw error;
       if (!row) throw new Error("Booking not found");
+      const { decryptRow } = await loadCrypto();
       return decryptRow(row);
     } catch (err) {
       throw safeError("getPostopBooking", err, "Could not load post-op booking");
