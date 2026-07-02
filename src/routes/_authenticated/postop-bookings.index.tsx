@@ -148,7 +148,7 @@ function PostopBookingsList() {
           )}
           {isAdmin && (
             <Button asChild variant="outline">
-              <Link to="/postop-bookings/analytics">
+              <Link to="/analytics" search={{ view: "postop" } as any}>
                 <BarChart3 className="w-4 h-4 mr-1" /> Analytics
               </Link>
             </Button>
