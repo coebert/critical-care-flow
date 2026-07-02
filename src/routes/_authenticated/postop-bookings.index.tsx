@@ -19,7 +19,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { toast } from "sonner";
-import { Plus, CalendarClock, Pencil, Trash2, BarChart3 } from "lucide-react";
+import { Plus, CalendarClock, Pencil, Trash2 } from "lucide-react";
 import { format, parseISO } from "date-fns";
 
 export const Route = createFileRoute("/_authenticated/postop-bookings/")({
