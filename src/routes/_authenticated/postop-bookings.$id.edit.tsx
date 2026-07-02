@@ -220,6 +220,11 @@ function EditPostopBookingPage() {
                 <p className="text-xs text-muted-foreground">Leave blank if not yet known.</p>
               </div>
               <div className="space-y-1.5">
+                <Label htmlFor="arrived-at">Patient arrived at HDU/ICU</Label>
+                <Input id="arrived-at" type="datetime-local" value={arrivedAt} onChange={(e) => setArrivedAt(e.target.value)} />
+                <p className="text-xs text-muted-foreground">Record when the patient actually arrived to measure booking-to-arrival delay.</p>
+              </div>
+              <div className="space-y-1.5 sm:col-span-2">
                 <Label>Predicted level of support required *</Label>
                 <Select value={level} onValueChange={(v) => setLevel(v as Level)}>
                   <SelectTrigger><SelectValue placeholder="Select level" /></SelectTrigger>
