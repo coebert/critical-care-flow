@@ -16,6 +16,11 @@ import {
 } from "@/components/ui/select";
 import { toast } from "sonner";
 import { ArrowLeft } from "lucide-react";
+import {
+  SURGICAL_SPECIALTY_LABEL,
+  SURGICAL_SPECIALTY_OPTIONS,
+  type SurgicalSpecialty,
+} from "@/lib/surgical-specialties";
 
 export const Route = createFileRoute("/_authenticated/postop-bookings/$id/edit")({
   head: () => ({
