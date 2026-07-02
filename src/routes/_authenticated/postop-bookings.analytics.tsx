@@ -74,8 +74,9 @@ function PostopAnalyticsPage() {
       const k = format(startOfDay(new Date(b.created_at)), "yyyy-MM-dd");
       if (map.has(k)) map.set(k, (map.get(k) ?? 0) + 1);
     });
-    return Array.from(map.entries()).map(([date, count]) => ({
-      date: format(new Date(date), "dd MMM"),
+    return Array.from(map.entries()).map(([key, count]) => ({
+      key,
+      date: format(new Date(key), "dd MMM"),
       count,
     }));
   }, [filtered, dayKeys]);
@@ -85,7 +86,7 @@ function PostopAnalyticsPage() {
     const map = new Map<string, Record<string, number | string>>(
       dayKeys.map((k) => [
         k,
-        { date: format(new Date(k), "dd MMM"), ...Object.fromEntries(levels.map((l) => [LEVEL_LABELS[l], 0])) },
+        { key: k, date: format(new Date(k), "dd MMM"), ...Object.fromEntries(levels.map((l) => [LEVEL_LABELS[l], 0])) },
       ])
     );
     filtered.forEach((b) => {
@@ -96,6 +97,7 @@ function PostopAnalyticsPage() {
     });
     return Array.from(map.values());
   }, [filtered, dayKeys]);
+
 
   const meanAge = useMemo(() => {
     const xs = filtered.map((b) => b.age).filter((x): x is number => x != null);
