@@ -55,8 +55,27 @@ const LEVEL_CLASS = {
 
 function PostopBookingsList() {
   const load = useServerFn(listPostopBookings);
+  const remove = useServerFn(deletePostopBooking);
   const [rows, setRows] = useState<Booking[] | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [pendingDelete, setPendingDelete] = useState<Booking | null>(null);
+  const [deleting, setDeleting] = useState(false);
+
+  const onConfirmDelete = async () => {
+    if (!pendingDelete) return;
+    const target = pendingDelete;
+    setDeleting(true);
+    try {
+      await remove({ data: { id: target.id } });
+      setRows((prev) => (prev ? prev.filter((r) => r.id !== target.id) : prev));
+      toast.success("Post-op booking deleted");
+      setPendingDelete(null);
+    } catch (err: any) {
+      toast.error(err?.message ?? "Could not delete booking");
+    } finally {
+      setDeleting(false);
+    }
+  };
 
   useEffect(() => {
     let cancelled = false;
