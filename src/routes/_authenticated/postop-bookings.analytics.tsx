@@ -348,7 +348,16 @@ function PostopAnalyticsPage() {
           <div className="h-64">
             <ResponsiveContainer width="100%" height="100%">
               <PieChart>
-                <Pie data={byLevel} dataKey="value" nameKey="name" innerRadius={50} outerRadius={90} label>
+                <Pie
+                  data={byLevel}
+                  dataKey="value"
+                  nameKey="name"
+                  innerRadius={50}
+                  outerRadius={90}
+                  label
+                  cursor="pointer"
+                  onClick={(d: any) => drillByLevel(d.name)}
+                >
                   {byLevel.map((_, i) => <Cell key={i} fill={COLORS[i % COLORS.length]} />)}
                 </Pie>
                 <Legend />
