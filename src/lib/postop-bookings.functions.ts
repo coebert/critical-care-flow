@@ -274,6 +274,38 @@ export const deletePostopBooking = createServerFn({ method: "POST" })
     }
   });
 
+export const restorePostopBooking = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d) => z.object({ id: z.string().uuid() }).parse(d))
+  .handler(async ({ data, context }) => {
+    try {
+      const { data: existing, error: fetchErr } = await context.supabase
+        .from("postop_bookings")
+        .select("id, created_by, deleted_at")
+        .eq("id", data.id)
+        .maybeSingle();
+      if (fetchErr) throw fetchErr;
+      if (!existing) throw new Error("Booking not found");
+      if (!existing.deleted_at) return { id: data.id };
+
+      const { error } = await context.supabase
+        .from("postop_bookings")
+        .update({ deleted_at: null, deleted_by: null } as any)
+        .eq("id", data.id);
+      if (error) throw error;
+      await writeAudit({
+        user_id: context.userId,
+        action: "restore",
+        entity_id: data.id,
+        diff: { restored_at: new Date().toISOString() },
+      });
+      return { id: data.id };
+    } catch (err) {
+      throw safeError("restorePostopBooking", err, "Could not restore post-op booking");
+    }
+  });
+
+
 export type AuditValue = string | number | boolean | null;
 
 export type PostopAuditEntry = {
