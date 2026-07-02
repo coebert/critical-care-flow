@@ -127,6 +127,44 @@ function PostopAnalyticsPage() {
     return Array.from(map.entries()).map(([name, value]) => ({ name, value }));
   }, [filtered]);
 
+  const arrivalDelays = useMemo(() => {
+    return filtered
+      .map((b: any) => {
+        if (!b.arrived_at || !b.created_at) return null;
+        const start = new Date(b.created_at).getTime();
+        const end = new Date(b.arrived_at).getTime();
+        if (!isFinite(start) || !isFinite(end) || end < start) return null;
+        return (end - start) / 3_600_000; // hours
+      })
+      .filter((v): v is number => v != null);
+  }, [filtered]);
+
+  const arrivalStats = useMemo(() => {
+    const xs = [...arrivalDelays].sort((a, b) => a - b);
+    if (!xs.length) return { count: 0, mean: 0, median: 0, p90: 0, min: 0, max: 0 };
+    const mean = xs.reduce((a, b) => a + b, 0) / xs.length;
+    const q = (p: number) => xs[Math.min(xs.length - 1, Math.floor(p * xs.length))];
+    return { count: xs.length, mean, median: q(0.5), p90: q(0.9), min: xs[0], max: xs[xs.length - 1] };
+  }, [arrivalDelays]);
+
+  const arrivalBuckets = useMemo(() => {
+    const buckets = [
+      { name: "<1h", min: 0, max: 1 },
+      { name: "1–3h", min: 1, max: 3 },
+      { name: "3–6h", min: 3, max: 6 },
+      { name: "6–12h", min: 6, max: 12 },
+      { name: "12–24h", min: 12, max: 24 },
+      { name: "1–2d", min: 24, max: 48 },
+      { name: ">2d", min: 48, max: Infinity },
+    ];
+    return buckets.map((b) => ({
+      name: b.name,
+      count: arrivalDelays.filter((h) => h >= b.min && h < b.max).length,
+    }));
+  }, [arrivalDelays]);
+
+  const fmtH = (h: number) => (h >= 24 ? `${(h / 24).toFixed(1)}d` : `${h.toFixed(1)}h`);
+
   const meanPerWeek = (filtered.length / Math.max(days, 1)) * 7;
 
   return (
