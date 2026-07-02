@@ -250,11 +250,28 @@ function AnalyticsPage() {
   const meanTimeToSeen = meanMinutes((r) => [r.referral_received_at, r.first_seen_at]);
   const meanDecisionToArrival = meanMinutes((r) => [r.decision_at, r.arrived_on_unit_at]);
 
+  const search = Route.useSearch();
+  const navigate = Route.useNavigate();
+  const tab: "referrals" | "postop" = search.view === "postop" ? "postop" : "referrals";
+
   return (
     <div className="p-4 sm:p-6 max-w-7xl mx-auto">
+      <div className="mb-4">
+        <h1 className="text-2xl font-semibold tracking-tight">Analytics</h1>
+      </div>
+      <Tabs
+        value={tab}
+        onValueChange={(v) =>
+          navigate({ search: { view: v === "postop" ? "postop" : undefined } as any, replace: true })
+        }
+      >
+        <TabsList className="mb-4">
+          <TabsTrigger value="referrals">Referrals</TabsTrigger>
+          <TabsTrigger value="postop">Post-op bookings</TabsTrigger>
+        </TabsList>
+        <TabsContent value="referrals">
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-6">
         <div className="min-w-0">
-          <h1 className="text-2xl font-semibold tracking-tight">Analytics</h1>
           <p className="text-sm text-muted-foreground">
             {format(from, "dd MMM yyyy")} – {format(to, "dd MMM yyyy")} · {days} day{days === 1 ? "" : "s"} · {filtered.length} referrals
           </p>
