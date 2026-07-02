@@ -88,6 +88,23 @@ function EditPostopBookingPage() {
     };
   }, [id, load]);
 
+  const refreshHistory = () => {
+    setHistoryLoading(true);
+    loadHistory({ data: { id } })
+      .then((rows) => setHistory(rows))
+      .catch(() => setHistory([]))
+      .finally(() => setHistoryLoading(false));
+  };
+
+  useEffect(() => {
+    let cancelled = false;
+    loadHistory({ data: { id } })
+      .then((rows) => { if (!cancelled) setHistory(rows); })
+      .catch(() => { if (!cancelled) setHistory([]); })
+      .finally(() => { if (!cancelled) setHistoryLoading(false); });
+    return () => { cancelled = true; };
+  }, [id, loadHistory]);
+
   const bmi = useMemo(() => {
     const w = parseFloat(weight);
     const hCm = parseFloat(height);
