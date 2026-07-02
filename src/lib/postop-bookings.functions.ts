@@ -12,6 +12,19 @@ const bookingSchema = z.object({
   height_cm: z.number().positive().max(299).nullable().optional(),
   bmi: z.number().positive().max(199).nullable().optional(),
   proposed_procedure: z.string().trim().max(2000).nullable().optional(),
+  surgical_specialty: z
+    .enum([
+      "orthopaedics_trauma",
+      "plastics",
+      "ent",
+      "maxfax",
+      "general",
+      "urology",
+      "gynaecology",
+      "other",
+    ])
+    .nullable()
+    .optional(),
   past_medical_history: z.string().trim().max(5000).nullable().optional(),
   past_surgical_history: z.string().trim().max(5000).nullable().optional(),
   social_history: z.string().trim().max(2000).nullable().optional(),
