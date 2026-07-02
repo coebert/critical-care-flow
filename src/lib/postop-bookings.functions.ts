@@ -47,6 +47,7 @@ const AUDITED_FIELDS = [
   "bmi",
   "predicted_level",
   "proposed_surgery_date",
+  "arrived_at",
   "proposed_procedure",
   "past_medical_history",
   "past_surgical_history",
