@@ -161,9 +161,12 @@ function PostopAnalyticsPage() {
     ];
     return buckets.map((b) => ({
       name: b.name,
+      min: b.min,
+      max: b.max,
       count: arrivalDelays.filter((h) => h >= b.min && h < b.max).length,
     }));
   }, [arrivalDelays]);
+
 
   const fmtH = (h: number) => (h >= 24 ? `${(h / 24).toFixed(1)}d` : `${h.toFixed(1)}h`);
 
