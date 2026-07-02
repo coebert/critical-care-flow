@@ -100,3 +100,40 @@ export const listPostopBookings = createServerFn({ method: "GET" })
       throw safeError("listPostopBookings", err, "Could not load post-op bookings");
     }
   });
+
+export const getPostopBooking = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d) => z.object({ id: z.string().uuid() }).parse(d))
+  .handler(async ({ data, context }) => {
+    try {
+      const { data: row, error } = await context.supabase
+        .from("postop_bookings")
+        .select("*")
+        .eq("id", data.id)
+        .is("deleted_at", null)
+        .maybeSingle();
+      if (error) throw error;
+      if (!row) throw new Error("Booking not found");
+      return decryptRow(row);
+    } catch (err) {
+      throw safeError("getPostopBooking", err, "Could not load post-op booking");
+    }
+  });
+
+export const updatePostopBooking = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d) => bookingSchema.extend({ id: z.string().uuid() }).parse(d))
+  .handler(async ({ data, context }) => {
+    try {
+      const { id, ...rest } = data;
+      const payload = encryptPayload(rest);
+      const { error } = await context.supabase
+        .from("postop_bookings")
+        .update(payload as any)
+        .eq("id", id);
+      if (error) throw error;
+      return { id };
+    } catch (err) {
+      throw safeError("updatePostopBooking", err, "Could not update post-op booking");
+    }
+  });
