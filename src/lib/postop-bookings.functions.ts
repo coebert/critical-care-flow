@@ -137,3 +137,19 @@ export const updatePostopBooking = createServerFn({ method: "POST" })
       throw safeError("updatePostopBooking", err, "Could not update post-op booking");
     }
   });
+
+export const deletePostopBooking = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d) => z.object({ id: z.string().uuid() }).parse(d))
+  .handler(async ({ data, context }) => {
+    try {
+      const { error } = await context.supabase
+        .from("postop_bookings")
+        .update({ deleted_at: new Date().toISOString(), deleted_by: context.userId } as any)
+        .eq("id", data.id);
+      if (error) throw error;
+      return { id: data.id };
+    } catch (err) {
+      throw safeError("deletePostopBooking", err, "Could not delete post-op booking");
+    }
+  });

@@ -1,11 +1,22 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { useServerFn } from "@tanstack/react-start";
-import { listPostopBookings } from "@/lib/postop-bookings.functions";
+import { listPostopBookings, deletePostopBooking } from "@/lib/postop-bookings.functions";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Plus, CalendarClock, Pencil } from "lucide-react";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import { toast } from "sonner";
+import { Plus, CalendarClock, Pencil, Trash2 } from "lucide-react";
 import { format, parseISO } from "date-fns";
 
 export const Route = createFileRoute("/_authenticated/postop-bookings/")({
@@ -44,8 +55,27 @@ const LEVEL_CLASS = {
 
 function PostopBookingsList() {
   const load = useServerFn(listPostopBookings);
+  const remove = useServerFn(deletePostopBooking);
   const [rows, setRows] = useState<Booking[] | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [pendingDelete, setPendingDelete] = useState<Booking | null>(null);
+  const [deleting, setDeleting] = useState(false);
+
+  const onConfirmDelete = async () => {
+    if (!pendingDelete) return;
+    const target = pendingDelete;
+    setDeleting(true);
+    try {
+      await remove({ data: { id: target.id } });
+      setRows((prev) => (prev ? prev.filter((r) => r.id !== target.id) : prev));
+      toast.success("Post-op booking deleted");
+      setPendingDelete(null);
+    } catch (err: any) {
+      toast.error(err?.message ?? "Could not delete booking");
+    } finally {
+      setDeleting(false);
+    }
+  };
 
   useEffect(() => {
     let cancelled = false;
@@ -132,6 +162,14 @@ function PostopBookingsList() {
                       <Pencil className="w-3.5 h-3.5 mr-1" /> Edit
                     </Link>
                   </Button>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="text-destructive hover:text-destructive"
+                    onClick={() => setPendingDelete(b)}
+                  >
+                    <Trash2 className="w-3.5 h-3.5 mr-1" /> Delete
+                  </Button>
                 </div>
               </div>
               {b.proposed_procedure && (
@@ -150,6 +188,38 @@ function PostopBookingsList() {
           ))}
         </div>
       )}
+
+      <AlertDialog
+        open={pendingDelete !== null}
+        onOpenChange={(open) => {
+          if (!open && !deleting) setPendingDelete(null);
+        }}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete this post-op booking?</AlertDialogTitle>
+            <AlertDialogDescription>
+              {pendingDelete?.hospital_number
+                ? `This will remove the pre-booked ${LEVEL_LABEL[pendingDelete.predicted_level]} bed for hospital number ${pendingDelete.hospital_number}.`
+                : "This will remove the pre-booked critical care bed."}{" "}
+              This action cannot be undone from the app.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={deleting}>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={(e) => {
+                e.preventDefault();
+                onConfirmDelete();
+              }}
+              disabled={deleting}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              {deleting ? "Deleting…" : "Delete booking"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
