@@ -90,16 +90,32 @@ function AnalyticsPage() {
   })();
 
   const bySpecialty = useMemo(() => {
-    const map = new Map<string, number>();
+    const map = new Map<string, { count: number; ageSum: number; ageN: number; accepted: number; declined: number; pending: number }>();
     filtered.forEach((r) => {
       const k = r.referring_specialty || "Unknown";
-      map.set(k, (map.get(k) ?? 0) + 1);
+      const bucket = map.get(k) ?? { count: 0, ageSum: 0, ageN: 0, accepted: 0, declined: 0, pending: 0 };
+      bucket.count += 1;
+      if (typeof r.age === "number") { bucket.ageSum += r.age; bucket.ageN += 1; }
+      const s = (r.status ?? "").toLowerCase();
+      if (s === "accepted" || s === "admitted") bucket.accepted += 1;
+      else if (s === "declined") bucket.declined += 1;
+      else bucket.pending += 1;
+      map.set(k, bucket);
     });
     return Array.from(map.entries())
-      .map(([specialty, count]) => ({ specialty, count }))
-      .sort((a, b) => b.count - a.count)
-      .slice(0, 10);
+      .map(([specialty, v]) => ({
+        specialty,
+        count: v.count,
+        meanAge: v.ageN ? v.ageSum / v.ageN : null,
+        accepted: v.accepted,
+        declined: v.declined,
+        pending: v.pending,
+      }))
+      .sort((a, b) => b.count - a.count);
   }, [filtered]);
+
+  const bySpecialtyTop = useMemo(() => bySpecialty.slice(0, 10), [bySpecialty]);
+
 
   const byStatus = useMemo(() => {
     const map = new Map<string, number>();
