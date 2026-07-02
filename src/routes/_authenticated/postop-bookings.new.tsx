@@ -87,6 +87,7 @@ function NewPostopBookingPage() {
         reason_for_bed: reason.trim() || null,
         predicted_level: level as Level,
         proposed_surgery_date: surgeryDate.trim() || null,
+        surgical_specialty: specialty || null,
       };
       await submit({ data: payload });
       toast.success("Post-op booking saved");
