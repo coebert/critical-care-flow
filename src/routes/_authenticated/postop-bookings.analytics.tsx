@@ -230,7 +230,42 @@ function PostopAnalyticsPage() {
         <Kpi label="Mean BMI" value={meanBmi ? meanBmi.toFixed(1) : "—"} />
       </div>
 
+      <div className="grid md:grid-cols-4 gap-4 mb-6">
+        <Kpi
+          label="Arrivals recorded"
+          value={`${arrivalStats.count}/${filtered.length}`}
+        />
+        <Kpi label="Mean delay" value={arrivalStats.count ? fmtH(arrivalStats.mean) : "—"} />
+        <Kpi label="Median delay" value={arrivalStats.count ? fmtH(arrivalStats.median) : "—"} />
+        <Kpi label="90th percentile" value={arrivalStats.count ? fmtH(arrivalStats.p90) : "—"} />
+      </div>
+
       <div className="grid md:grid-cols-2 gap-6">
+        <Card className="p-5 md:col-span-2">
+          <h2 className="font-semibold mb-1">Referral-to-arrival delay distribution</h2>
+          <p className="text-xs text-muted-foreground mb-3">
+            Time from booking creation to the patient arriving at HDU/ICU.
+            {arrivalStats.count > 0 && ` Range: ${fmtH(arrivalStats.min)} – ${fmtH(arrivalStats.max)}.`}
+          </p>
+          <div className="h-64">
+            {arrivalStats.count === 0 ? (
+              <div className="h-full flex items-center justify-center text-sm text-muted-foreground">
+                No arrival times recorded in this period.
+              </div>
+            ) : (
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={arrivalBuckets}>
+                  <CartesianGrid strokeDasharray="3 3" opacity={0.3} />
+                  <XAxis dataKey="name" fontSize={11} />
+                  <YAxis allowDecimals={false} fontSize={11} />
+                  <Tooltip />
+                  <Bar dataKey="count" fill="var(--chart-2)" />
+                </BarChart>
+              </ResponsiveContainer>
+            )}
+          </div>
+        </Card>
+
         <Card className="p-5 md:col-span-2">
           <h2 className="font-semibold mb-3">Bookings over time</h2>
           <div className="h-64">
