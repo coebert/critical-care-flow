@@ -33,8 +33,13 @@ type Referral = Tables<"referrals">;
 
 import { AdminOnly } from "@/components/admin-only";
 
+const analyticsSearchSchema = z.object({
+  view: z.enum(["referrals", "postop"]).optional(),
+});
+
 export const Route = createFileRoute("/_authenticated/analytics")({
   head: () => ({ meta: [{ title: "Analytics — SDH Critical Care" }] }),
+  validateSearch: analyticsSearchSchema,
   component: () => (
     <AdminOnly>
       <AnalyticsPage />
