@@ -97,6 +97,6 @@ export const listPostopBookings = createServerFn({ method: "GET" })
       if (error) throw error;
       return (data ?? []).map(decryptRow);
     } catch (err) {
-      throw safeError(err, "Could not load post-op bookings");
+      throw safeError("listPostopBookings", err, "Could not load post-op bookings");
     }
   });
