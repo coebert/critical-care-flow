@@ -65,13 +65,17 @@ function PostopBookingsList() {
     if (!pendingDelete) return;
     const target = pendingDelete;
     setDeleting(true);
+    // Optimistically remove from UI, snapshot previous rows for rollback.
+    const previous = rows;
+    setRows((prev) => (prev ? prev.filter((r) => r.id !== target.id) : prev));
+    setPendingDelete(null);
     try {
       await remove({ data: { id: target.id } });
-      setRows((prev) => (prev ? prev.filter((r) => r.id !== target.id) : prev));
       toast.success("Post-op booking deleted");
-      setPendingDelete(null);
     } catch (err: any) {
-      toast.error(err?.message ?? "Could not delete booking");
+      // Roll back the optimistic removal.
+      setRows(previous);
+      toast.error(err?.message ?? "Could not delete booking. Changes reverted.");
     } finally {
       setDeleting(false);
     }
