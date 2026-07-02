@@ -130,15 +130,6 @@ async function writeAudit(entry: {
     } as any);
 }
 
-async function encryptPayload(input: PostopBookingInput) {
-  const { encryptPayload: fn } = await loadCrypto();
-  return fn(input as Record<string, any>);
-}
-
-export async function decryptRow(row: Record<string, any>) {
-  const { decryptRow: fn } = await loadCrypto();
-  return fn(row);
-}
 
 
 export const createPostopBooking = createServerFn({ method: "POST" })
