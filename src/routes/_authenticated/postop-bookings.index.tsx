@@ -5,7 +5,7 @@ import { listPostopBookings } from "@/lib/postop-bookings.functions";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Plus, CalendarClock } from "lucide-react";
+import { Plus, CalendarClock, Pencil } from "lucide-react";
 import { format, parseISO } from "date-fns";
 
 export const Route = createFileRoute("/_authenticated/postop-bookings/")({
@@ -115,16 +115,23 @@ function PostopBookingsList() {
                       .join(" · ") || "—"}
                   </div>
                 </div>
-                <div className="text-sm text-right shrink-0">
-                  <div className="flex items-center gap-1 text-muted-foreground">
-                    <CalendarClock className="w-3.5 h-3.5" />
-                    {b.proposed_surgery_date
-                      ? format(parseISO(b.proposed_surgery_date), "PP")
-                      : "Date TBC"}
+                <div className="flex items-start gap-3 shrink-0">
+                  <div className="text-sm text-right">
+                    <div className="flex items-center gap-1 text-muted-foreground justify-end">
+                      <CalendarClock className="w-3.5 h-3.5" />
+                      {b.proposed_surgery_date
+                        ? format(parseISO(b.proposed_surgery_date), "PP")
+                        : "Date TBC"}
+                    </div>
+                    <div className="text-xs text-muted-foreground">
+                      Booked {format(parseISO(b.created_at), "PP")}
+                    </div>
                   </div>
-                  <div className="text-xs text-muted-foreground">
-                    Booked {format(parseISO(b.created_at), "PP")}
-                  </div>
+                  <Button asChild size="sm" variant="outline">
+                    <Link to="/postop-bookings/$id/edit" params={{ id: b.id }}>
+                      <Pencil className="w-3.5 h-3.5 mr-1" /> Edit
+                    </Link>
+                  </Button>
                 </div>
               </div>
               {b.proposed_procedure && (

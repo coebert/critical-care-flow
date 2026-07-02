@@ -24,6 +24,7 @@ import { Route as AuthenticatedReferralsNewRouteImport } from './routes/_authent
 import { Route as AuthenticatedReferralsIdRouteImport } from './routes/_authenticated/referrals.$id'
 import { Route as AuthenticatedPostopBookingsNewRouteImport } from './routes/_authenticated/postop-bookings.new'
 import { Route as AuthenticatedInboxIdRouteImport } from './routes/_authenticated/inbox.$id'
+import { Route as AuthenticatedPostopBookingsIdEditRouteImport } from './routes/_authenticated/postop-bookings.$id.edit'
 
 const SetupRoute = SetupRouteImport.update({
   id: '/setup',
@@ -104,6 +105,12 @@ const AuthenticatedInboxIdRoute = AuthenticatedInboxIdRouteImport.update({
   path: '/$id',
   getParentRoute: () => AuthenticatedInboxRoute,
 } as any)
+const AuthenticatedPostopBookingsIdEditRoute =
+  AuthenticatedPostopBookingsIdEditRouteImport.update({
+    id: '/postop-bookings/$id/edit',
+    path: '/postop-bookings/$id/edit',
+    getParentRoute: () => AuthenticatedRouteRoute,
+  } as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof AuthenticatedIndexRoute
@@ -120,6 +127,7 @@ export interface FileRoutesByFullPath {
   '/referrals/$id': typeof AuthenticatedReferralsIdRoute
   '/referrals/new': typeof AuthenticatedReferralsNewRoute
   '/postop-bookings/': typeof AuthenticatedPostopBookingsIndexRoute
+  '/postop-bookings/$id/edit': typeof AuthenticatedPostopBookingsIdEditRoute
 }
 export interface FileRoutesByTo {
   '/auth': typeof AuthRoute
@@ -136,6 +144,7 @@ export interface FileRoutesByTo {
   '/referrals/$id': typeof AuthenticatedReferralsIdRoute
   '/referrals/new': typeof AuthenticatedReferralsNewRoute
   '/postop-bookings': typeof AuthenticatedPostopBookingsIndexRoute
+  '/postop-bookings/$id/edit': typeof AuthenticatedPostopBookingsIdEditRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -154,6 +163,7 @@ export interface FileRoutesById {
   '/_authenticated/referrals/$id': typeof AuthenticatedReferralsIdRoute
   '/_authenticated/referrals/new': typeof AuthenticatedReferralsNewRoute
   '/_authenticated/postop-bookings/': typeof AuthenticatedPostopBookingsIndexRoute
+  '/_authenticated/postop-bookings/$id/edit': typeof AuthenticatedPostopBookingsIdEditRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -172,6 +182,7 @@ export interface FileRouteTypes {
     | '/referrals/$id'
     | '/referrals/new'
     | '/postop-bookings/'
+    | '/postop-bookings/$id/edit'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/auth'
@@ -188,6 +199,7 @@ export interface FileRouteTypes {
     | '/referrals/$id'
     | '/referrals/new'
     | '/postop-bookings'
+    | '/postop-bookings/$id/edit'
   id:
     | '__root__'
     | '/_authenticated'
@@ -205,6 +217,7 @@ export interface FileRouteTypes {
     | '/_authenticated/referrals/$id'
     | '/_authenticated/referrals/new'
     | '/_authenticated/postop-bookings/'
+    | '/_authenticated/postop-bookings/$id/edit'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -321,6 +334,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedInboxIdRouteImport
       parentRoute: typeof AuthenticatedInboxRoute
     }
+    '/_authenticated/postop-bookings/$id/edit': {
+      id: '/_authenticated/postop-bookings/$id/edit'
+      path: '/postop-bookings/$id/edit'
+      fullPath: '/postop-bookings/$id/edit'
+      preLoaderRoute: typeof AuthenticatedPostopBookingsIdEditRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
   }
 }
 
@@ -346,6 +366,7 @@ interface AuthenticatedRouteRouteChildren {
   AuthenticatedReferralsIdRoute: typeof AuthenticatedReferralsIdRoute
   AuthenticatedReferralsNewRoute: typeof AuthenticatedReferralsNewRoute
   AuthenticatedPostopBookingsIndexRoute: typeof AuthenticatedPostopBookingsIndexRoute
+  AuthenticatedPostopBookingsIdEditRoute: typeof AuthenticatedPostopBookingsIdEditRoute
 }
 
 const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
@@ -359,6 +380,8 @@ const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedReferralsIdRoute: AuthenticatedReferralsIdRoute,
   AuthenticatedReferralsNewRoute: AuthenticatedReferralsNewRoute,
   AuthenticatedPostopBookingsIndexRoute: AuthenticatedPostopBookingsIndexRoute,
+  AuthenticatedPostopBookingsIdEditRoute:
+    AuthenticatedPostopBookingsIdEditRoute,
 }
 
 const AuthenticatedRouteRouteWithChildren =
