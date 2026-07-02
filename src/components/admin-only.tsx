@@ -18,15 +18,19 @@ export function AdminOnly({ children }: { children: ReactNode }) {
 
   if (!hasRole) {
     return (
-      <div className="max-w-2xl mx-auto p-6">
+      <div className="max-w-2xl mx-auto p-6" role="alert" aria-labelledby="admin-only-title">
         <Card className="p-6 space-y-3">
           <div className="flex items-center gap-2 text-destructive">
             <ShieldAlert className="w-5 h-5" />
-            <h1 className="text-lg font-semibold">Admins only</h1>
+            <h1 id="admin-only-title" className="text-lg font-semibold">
+              403 — Forbidden
+            </h1>
           </div>
           <p className="text-sm text-muted-foreground">
-            Analytics are restricted to administrators. If you need access, ask an
-            existing admin to grant you the admin role.
+            Analytics are restricted to administrators. Your account does not
+            have the admin role, so this page and its data endpoints are
+            unavailable. If you need access, ask an existing admin to grant you
+            the admin role.
           </p>
           <Button asChild variant="outline" size="sm">
             <Link to="/">Back to referrals</Link>
