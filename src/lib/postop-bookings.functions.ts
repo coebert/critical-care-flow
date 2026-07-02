@@ -2,7 +2,16 @@ import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { safeError } from "./safe-error";
-import { encryptString, decryptString, hashHospitalNumber } from "./crypto.server";
+// crypto helpers are loaded dynamically inside handlers via
+// ./postop-bookings-crypto.server so the Node "crypto" module never lands
+// in the client bundle (this file is part of the client module graph;
+// only handler bodies are stripped).
+type PostopCrypto = typeof import("./postop-bookings-crypto.server");
+let _cryptoMod: Promise<PostopCrypto> | null = null;
+function loadCrypto(): Promise<PostopCrypto> {
+  if (!_cryptoMod) _cryptoMod = import("./postop-bookings-crypto.server");
+  return _cryptoMod;
+}
 
 const bookingSchema = z.object({
   hospital_number: z.string().trim().max(50).nullable().optional(),
