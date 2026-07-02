@@ -60,10 +60,12 @@ const LEVEL_CLASS = {
 function PostopBookingsList() {
   const load = useServerFn(listPostopBookings);
   const remove = useServerFn(deletePostopBooking);
+  const { hasRole: isAdmin } = useRole("admin");
   const [rows, setRows] = useState<Booking[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [pendingDelete, setPendingDelete] = useState<Booking | null>(null);
   const [deleting, setDeleting] = useState(false);
+  const [showDeleted, setShowDeleted] = useState(false);
 
   const onConfirmDelete = async () => {
     if (!pendingDelete) return;
