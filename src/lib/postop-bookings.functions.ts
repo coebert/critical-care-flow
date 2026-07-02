@@ -255,17 +255,20 @@ export const deletePostopBooking = createServerFn({ method: "POST" })
   .inputValidator((d) => z.object({ id: z.string().uuid() }).parse(d))
   .handler(async ({ data, context }) => {
     try {
+      const deletedAt = new Date().toISOString();
       const { error } = await context.supabase
         .from("postop_bookings")
-        .update({ deleted_at: new Date().toISOString(), deleted_by: context.userId } as any)
+        .update({ deleted_at: deletedAt, deleted_by: context.userId } as any)
         .eq("id", data.id);
       if (error) throw error;
       await writeAudit({
         user_id: context.userId,
         action: "delete",
         entity_id: data.id,
+        diff: { deleted_at: deletedAt, deleted_by: context.userId },
       });
-      return { id: data.id };
+      return { id: data.id, deleted_at: deletedAt };
+
     } catch (err) {
       throw safeError("deletePostopBooking", err, "Could not delete post-op booking");
     }
