@@ -141,7 +141,7 @@ function encryptPayload(input: PostopBookingInput) {
   return out;
 }
 
-function decryptRow(row: Record<string, any>) {
+export function decryptRow(row: Record<string, any>) {
   const out: Record<string, any> = { ...row };
   out.hospital_number = decryptString(row.hospital_number_enc ?? null);
   for (const k of ENC_FIELDS) {
