@@ -61,6 +61,7 @@ const AUDITED_FIELDS = [
   "predicted_level",
   "proposed_surgery_date",
   "arrived_at",
+  "surgical_specialty",
   "proposed_procedure",
   "past_medical_history",
   "past_surgical_history",
