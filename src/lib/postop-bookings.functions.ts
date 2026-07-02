@@ -130,37 +130,16 @@ async function writeAudit(entry: {
     } as any);
 }
 
-function encryptPayload(input: PostopBookingInput) {
-  const out: Record<string, unknown> = {
-    age: input.age ?? null,
-    sex: input.sex ?? null,
-    weight_kg: input.weight_kg ?? null,
-    height_cm: input.height_cm ?? null,
-    bmi: input.bmi ?? null,
-    predicted_level: input.predicted_level,
-    proposed_surgery_date: input.proposed_surgery_date ?? null,
-    arrived_at: input.arrived_at ?? null,
-    surgical_specialty: input.surgical_specialty ?? null,
-    hospital_number_enc: encryptString(input.hospital_number ?? null),
-    hospital_number_hash: hashHospitalNumber(input.hospital_number ?? null),
-  };
-  for (const k of ENC_FIELDS) {
-    out[`${k}_enc`] = encryptString((input as any)[k] ?? null);
-  }
-  return out;
+async function encryptPayload(input: PostopBookingInput) {
+  const { encryptPayload: fn } = await loadCrypto();
+  return fn(input as Record<string, any>);
 }
 
-export function decryptRow(row: Record<string, any>) {
-  const out: Record<string, any> = { ...row };
-  out.hospital_number = decryptString(row.hospital_number_enc ?? null);
-  for (const k of ENC_FIELDS) {
-    out[k] = decryptString(row[`${k}_enc`] ?? null);
-    delete out[`${k}_enc`];
-  }
-  delete out.hospital_number_enc;
-  delete out.hospital_number_hash;
-  return out;
+export async function decryptRow(row: Record<string, any>) {
+  const { decryptRow: fn } = await loadCrypto();
+  return fn(row);
 }
+
 
 export const createPostopBooking = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
