@@ -27,36 +27,64 @@ function ResetPage() {
   const [verified, setVerified] = useState(false);
 
   useEffect(() => {
-    // Recovery links from Lovable Cloud auth arrive as:
-    // /reset-password#type=recovery&access_token=...&refresh_token=...
-    const hash = window.location.hash.replace(/^#/, "");
-    const params = new URLSearchParams(hash);
-    const type = params.get("type");
-    const accessToken = params.get("access_token");
-    const refreshToken = params.get("refresh_token");
+    let cancelled = false;
+    const fail = () => {
+      if (!cancelled)
+        setRecoveryError(
+          "This password reset link is invalid or has expired. Please request a new one.",
+        );
+    };
+    const succeed = () => {
+      if (!cancelled) setVerified(true);
+    };
 
-    if (type !== "recovery" || !accessToken) {
-      setRecoveryError(
-        "This password reset link is invalid or has expired. Please request a new one."
-      );
+    // PKCE flow: reset link arrives as /reset-password?code=...
+    const url = new URL(window.location.href);
+    const code = url.searchParams.get("code");
+    const queryError =
+      url.searchParams.get("error_description") || url.searchParams.get("error");
+
+    // Legacy implicit flow: tokens arrive in the URL hash.
+    const hash = window.location.hash.replace(/^#/, "");
+    const hashParams = new URLSearchParams(hash);
+    const hashType = hashParams.get("type");
+    const accessToken = hashParams.get("access_token");
+    const refreshToken = hashParams.get("refresh_token");
+    const hashError =
+      hashParams.get("error_description") || hashParams.get("error");
+
+    if (queryError || hashError) {
+      fail();
       return;
     }
 
-    // Establish the temporary recovery session so updateUser can set the password.
-    supabase.auth
-      .setSession({
-        access_token: accessToken,
-        refresh_token: refreshToken ?? "",
-      })
-      .then(({ error }) => {
-        if (error) {
-          setRecoveryError(
-            "This password reset link is invalid or has expired. Please request a new one."
-          );
-          return;
-        }
-        setVerified(true);
+    // Listen for the PASSWORD_RECOVERY event Supabase fires after auto-processing the link.
+    const { data: sub } = supabase.auth.onAuthStateChange((event) => {
+      if (event === "PASSWORD_RECOVERY") succeed();
+    });
+
+    if (code) {
+      supabase.auth.exchangeCodeForSession(code).then(({ error }) => {
+        if (error) fail();
+        else succeed();
       });
+    } else if (hashType === "recovery" && accessToken) {
+      supabase.auth
+        .setSession({ access_token: accessToken, refresh_token: refreshToken ?? "" })
+        .then(({ error }) => (error ? fail() : succeed()));
+    } else {
+      // Supabase may have auto-consumed the token before this effect ran.
+      supabase.auth.getSession().then(({ data }) => {
+        if (data.session) succeed();
+        else setTimeout(() => { if (!cancelled && !verified) fail(); }, 1500);
+      });
+    }
+
+    return () => {
+      cancelled = true;
+      sub.subscription.unsubscribe();
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const submit = async (e: React.FormEvent) => {
