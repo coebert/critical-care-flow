@@ -319,12 +319,25 @@ function PostopAnalyticsPage() {
           <h2 className="font-semibold mb-3">Bookings over time</h2>
           <div className="h-64">
             <ResponsiveContainer width="100%" height="100%">
-              <LineChart data={perDay}>
+              <LineChart
+                data={perDay}
+                onClick={(e: any) => {
+                  const p = e?.activePayload?.[0]?.payload;
+                  if (p?.key) drillByDay(p.key);
+                }}
+              >
                 <CartesianGrid strokeDasharray="3 3" opacity={0.3} />
                 <XAxis dataKey="date" fontSize={11} />
                 <YAxis allowDecimals={false} fontSize={11} />
                 <Tooltip />
-                <Line type="monotone" dataKey="count" stroke="var(--chart-1)" strokeWidth={2} dot={false} />
+                <Line
+                  type="monotone"
+                  dataKey="count"
+                  stroke="var(--chart-1)"
+                  strokeWidth={2}
+                  dot={{ r: 3, cursor: "pointer" }}
+                  activeDot={{ r: 5, cursor: "pointer" }}
+                />
               </LineChart>
             </ResponsiveContainer>
           </div>
