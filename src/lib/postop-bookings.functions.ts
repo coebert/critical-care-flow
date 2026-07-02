@@ -161,17 +161,36 @@ export const createPostopBooking = createServerFn({ method: "POST" })
 
 export const listPostopBookings = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
-  .handler(async ({ context }) => {
+  .inputValidator((d: { includeDeleted?: boolean } | undefined) =>
+    z.object({ includeDeleted: z.boolean().optional() }).parse(d ?? {}),
+  )
+  .handler(async ({ data, context }) => {
     try {
-      const { data, error } = await context.supabase
+      let includeDeleted = false;
+      if (data.includeDeleted) {
+        const { data: isAdmin } = await context.supabase.rpc("has_role", {
+          _user_id: context.userId,
+          _role: "admin",
+        });
+        if (!isAdmin) {
+          throw safeError(
+            "listPostopBookings",
+            new Error("forbidden"),
+            "Only admins can view deleted bookings",
+          );
+        }
+        includeDeleted = true;
+      }
+      let query = context.supabase
         .from("postop_bookings")
         .select("*")
-        .is("deleted_at", null)
         .order("proposed_surgery_date", { ascending: true, nullsFirst: false })
         .order("created_at", { ascending: false })
         .limit(500);
+      if (!includeDeleted) query = query.is("deleted_at", null);
+      const { data: rows, error } = await query;
       if (error) throw error;
-      return (data ?? []).map(decryptRow);
+      return (rows ?? []).map(decryptRow);
     } catch (err) {
       throw safeError("listPostopBookings", err, "Could not load post-op bookings");
     }

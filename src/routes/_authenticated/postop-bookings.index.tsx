@@ -4,6 +4,9 @@ import { useServerFn } from "@tanstack/react-start";
 import { listPostopBookings, deletePostopBooking } from "@/lib/postop-bookings.functions";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
+import { Switch } from "@/components/ui/switch";
+import { Label } from "@/components/ui/label";
+import { useRole } from "@/hooks/use-auth";
 import { Badge } from "@/components/ui/badge";
 import {
   AlertDialog,
@@ -39,6 +42,7 @@ type Booking = {
   predicted_level: "level_1" | "level_2" | "level_3";
   proposed_surgery_date: string | null;
   created_at: string;
+  deleted_at?: string | null;
 };
 
 const LEVEL_LABEL = {
@@ -56,10 +60,12 @@ const LEVEL_CLASS = {
 function PostopBookingsList() {
   const load = useServerFn(listPostopBookings);
   const remove = useServerFn(deletePostopBooking);
+  const { hasRole: isAdmin } = useRole("admin");
   const [rows, setRows] = useState<Booking[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [pendingDelete, setPendingDelete] = useState<Booking | null>(null);
   const [deleting, setDeleting] = useState(false);
+  const [showDeleted, setShowDeleted] = useState(false);
 
   const onConfirmDelete = async () => {
     if (!pendingDelete) return;
@@ -83,7 +89,9 @@ function PostopBookingsList() {
 
   useEffect(() => {
     let cancelled = false;
-    load()
+    setRows(null);
+    setError(null);
+    load(showDeleted ? { data: { includeDeleted: true } } : undefined)
       .then((data) => {
         if (!cancelled) setRows(data as Booking[]);
       })
@@ -93,7 +101,7 @@ function PostopBookingsList() {
     return () => {
       cancelled = true;
     };
-  }, [load]);
+  }, [load, showDeleted]);
 
   return (
     <div className="max-w-5xl mx-auto p-4 sm:p-6 space-y-4">
@@ -104,7 +112,19 @@ function PostopBookingsList() {
             Pre-booked critical care beds for planned high-risk surgical patients.
           </p>
         </div>
-        <div className="flex gap-2">
+        <div className="flex gap-2 items-center flex-wrap">
+          {isAdmin && (
+            <div className="flex items-center gap-2 mr-1">
+              <Switch
+                id="show-deleted"
+                checked={showDeleted}
+                onCheckedChange={setShowDeleted}
+              />
+              <Label htmlFor="show-deleted" className="text-sm cursor-pointer">
+                Show deleted
+              </Label>
+            </div>
+          )}
           <Button asChild variant="outline">
             <Link to="/postop-bookings/analytics">
               <BarChart3 className="w-4 h-4 mr-1" /> Analytics
@@ -135,7 +155,7 @@ function PostopBookingsList() {
       {rows && rows.length > 0 && (
         <div className="grid gap-3">
           {rows.map((b) => (
-            <Card key={b.id} className="p-4 space-y-2">
+            <Card key={b.id} className={`p-4 space-y-2 ${b.deleted_at ? "opacity-60 border-dashed" : ""}`}>
               <div className="flex items-start justify-between gap-3 flex-wrap">
                 <div className="min-w-0">
                   <div className="flex items-center gap-2 flex-wrap">
@@ -145,6 +165,11 @@ function PostopBookingsList() {
                     <Badge className={LEVEL_CLASS[b.predicted_level]} variant="secondary">
                       {LEVEL_LABEL[b.predicted_level]}
                     </Badge>
+                    {b.deleted_at && (
+                      <Badge variant="outline" className="text-destructive border-destructive/50">
+                        Deleted
+                      </Badge>
+                    )}
                   </div>
                   <div className="text-xs text-muted-foreground mt-0.5">
                     {[
