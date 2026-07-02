@@ -260,6 +260,52 @@ function EditPostopBookingPage() {
           </div>
         </form>
       )}
+
+      <Card className="p-4 sm:p-6 space-y-3">
+        <div>
+          <h2 className="font-semibold">Audit trail</h2>
+          <p className="text-xs text-muted-foreground">
+            Who created or updated this booking and when. Sensitive free-text
+            changes are shown as “[redacted]” to protect patient data.
+          </p>
+        </div>
+        {historyLoading ? (
+          <p className="text-sm text-muted-foreground">Loading history…</p>
+        ) : history.length === 0 ? (
+          <p className="text-sm text-muted-foreground">No audit entries yet.</p>
+        ) : (
+          <ol className="space-y-3">
+            {history.map((e) => (
+              <li key={e.id} className="border-l-2 border-muted pl-3">
+                <div className="text-sm">
+                  <span className="font-medium capitalize">{e.action}</span>
+                  {" by "}
+                  <span className="font-medium">{e.user_name}</span>
+                  {" · "}
+                  <span className="text-muted-foreground">
+                    {new Date(e.created_at).toLocaleString()}
+                  </span>
+                </div>
+                {e.action === "update" && e.changes.length > 0 && (
+                  <ul className="mt-1 text-xs text-muted-foreground space-y-0.5">
+                    {e.changes.map((c, i) => (
+                      <li key={i}>
+                        <span className="font-medium text-foreground">{c.field}</span>
+                        : {String(c.from ?? "—")} → {String(c.to ?? "—")}
+                      </li>
+                    ))}
+                  </ul>
+                )}
+                {e.action === "create" && e.snapshot && (
+                  <p className="mt-1 text-xs text-muted-foreground">
+                    Booking created with initial details.
+                  </p>
+                )}
+              </li>
+            ))}
+          </ol>
+        )}
+      </Card>
     </div>
   );
 }
