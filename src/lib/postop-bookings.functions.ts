@@ -252,14 +252,16 @@ export const deletePostopBooking = createServerFn({ method: "POST" })
     }
   });
 
+export type AuditValue = string | number | boolean | null;
+
 export type PostopAuditEntry = {
   id: string;
   action: string;
   created_at: string;
   user_id: string | null;
   user_name: string;
-  changes: Array<{ field: string; from: unknown; to: unknown }>;
-  snapshot?: Record<string, unknown>;
+  changes: Array<{ field: string; from: AuditValue; to: AuditValue }>;
+  snapshot?: Record<string, AuditValue>;
 };
 
 export const getPostopBookingHistory = createServerFn({ method: "POST" })
