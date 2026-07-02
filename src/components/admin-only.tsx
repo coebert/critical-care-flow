@@ -1,12 +1,25 @@
-import type { ReactNode } from "react";
-import { Link } from "@tanstack/react-router";
+import { useEffect, type ReactNode } from "react";
+import { Link, useNavigate } from "@tanstack/react-router";
 import { useRole } from "@/hooks/use-auth";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { ShieldAlert } from "lucide-react";
 
-export function AdminOnly({ children }: { children: ReactNode }) {
+interface AdminOnlyProps {
+  children: ReactNode;
+  /** If set, non-admin users are redirected to this path instead of seeing the 403 state. */
+  redirectTo?: string;
+}
+
+export function AdminOnly({ children, redirectTo }: AdminOnlyProps) {
   const { hasRole, loading } = useRole("admin");
+  const navigate = useNavigate();
+
+  useEffect(() => {
+    if (!loading && !hasRole && redirectTo) {
+      navigate({ to: redirectTo, replace: true });
+    }
+  }, [loading, hasRole, redirectTo, navigate]);
 
   if (loading) {
     return (
@@ -17,6 +30,13 @@ export function AdminOnly({ children }: { children: ReactNode }) {
   }
 
   if (!hasRole) {
+    if (redirectTo) {
+      return (
+        <div className="max-w-5xl mx-auto p-6">
+          <Card className="p-6 text-sm text-muted-foreground">Redirecting…</Card>
+        </div>
+      );
+    }
     return (
       <div className="max-w-2xl mx-auto p-6" role="alert" aria-labelledby="admin-only-title">
         <Card className="p-6 space-y-3">
