@@ -172,6 +172,45 @@ function PostopAnalyticsPage() {
 
   const meanPerWeek = (filtered.length / Math.max(days, 1)) * 7;
 
+  type Booking = typeof filtered[number];
+  const [drill, setDrill] = useState<{ title: string; rows: Booking[] } | null>(null);
+
+  const dayKeyOf = (b: Booking) => format(startOfDay(new Date(b.created_at)), "yyyy-MM-dd");
+  const arrivalHoursOf = (b: Booking): number | null => {
+    const a = (b as any).arrived_at;
+    if (!a) return null;
+    const s = new Date(b.created_at).getTime();
+    const e = new Date(a).getTime();
+    if (!isFinite(s) || !isFinite(e) || e < s) return null;
+    return (e - s) / 3_600_000;
+  };
+
+  const drillByDay = (key: string, extraLabel?: string) => {
+    const rows = filtered.filter((b) => dayKeyOf(b) === key &&
+      (!extraLabel || LEVEL_LABELS[b.predicted_level as string] === extraLabel));
+    setDrill({
+      title: `${extraLabel ? `${extraLabel} · ` : ""}${format(new Date(key), "dd MMM yyyy")} — ${rows.length} booking${rows.length === 1 ? "" : "s"}`,
+      rows,
+    });
+  };
+  const drillByLevel = (levelLabel: string) => {
+    const key = Object.entries(LEVEL_LABELS).find(([, v]) => v === levelLabel)?.[0];
+    const rows = filtered.filter((b) => b.predicted_level === key);
+    setDrill({ title: `${levelLabel} — ${rows.length} booking${rows.length === 1 ? "" : "s"}`, rows });
+  };
+  const drillBySex = (sex: string) => {
+    const rows = filtered.filter((b) => (b.sex ?? "unknown") === sex);
+    setDrill({ title: `Sex: ${sex} — ${rows.length} booking${rows.length === 1 ? "" : "s"}`, rows });
+  };
+  const drillByBucket = (name: string, min: number, max: number) => {
+    const rows = filtered.filter((b) => {
+      const h = arrivalHoursOf(b);
+      return h != null && h >= min && h < max;
+    });
+    setDrill({ title: `Arrival delay ${name} — ${rows.length} booking${rows.length === 1 ? "" : "s"}`, rows });
+  };
+
+
   return (
     <div className="p-4 sm:p-6 max-w-7xl mx-auto">
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-6">
