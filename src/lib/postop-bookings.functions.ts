@@ -304,7 +304,7 @@ export const deletePostopBooking = createServerFn({ method: "POST" })
         user_id: context.userId,
         action: "delete",
         entity_id: data.id,
-        diff: { deleted_at: deletedAt, diff_deleted_by: context.userId },
+        diff: { deleted_at: deletedAt, deleted_by: context.userId },
       });
       return { id: data.id, deleted_at: deletedAt };
 
