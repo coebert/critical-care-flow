@@ -28,10 +28,10 @@ const LEVEL_LABELS: Record<string, string> = {
 };
 
 export function PostopAnalyticsPanel() {
-  const listFn = useServerFn(listPostopBookings);
+  const listFn = useServerFn(getPostopAnalytics);
   const { data: bookings = [] } = useQuery({
-    queryKey: ["postop-bookings", "analytics"],
-    queryFn: () => listFn(),
+    queryKey: ["postop-analytics"],
+    queryFn: () => listFn({ data: {} }),
   });
 
   const [range, setRange] = useState<DateRange>(() => ({
