@@ -64,6 +64,17 @@ function AnalyticsPage() {
       .then(({ data }) => setRows(data ?? []));
   }, [from.getTime(), to.getTime()]);
 
+  useEffect(() => {
+    supabase
+      .from("postop_bookings")
+      .select("surgical_specialty,bmi")
+      .is("deleted_at", null)
+      .gte("created_at", from.toISOString())
+      .lte("created_at", to.toISOString())
+      .limit(5000)
+      .then(({ data }) => setPostopBmi((data ?? []) as Array<{ surgical_specialty: string | null; bmi: number | null }>));
+  }, [from.getTime(), to.getTime()]);
+
   const filtered = useMemo(() => {
     return rows.filter((r) => {
       const t = new Date(r.referral_received_at).getTime();
