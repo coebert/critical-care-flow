@@ -364,20 +364,6 @@ function AnalyticsPage() {
           </ul>
         </Card>
 
-        <Card className="p-5 md:col-span-2">
-          <h2 className="font-semibold mb-3">Referrals by specialty (top 10)</h2>
-          <div className="h-72">
-            <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={bySpecialty}>
-                <CartesianGrid strokeDasharray="3 3" opacity={0.3} />
-                <XAxis dataKey="specialty" fontSize={11} angle={-15} textAnchor="end" height={70} />
-                <YAxis allowDecimals={false} fontSize={11} />
-                <Tooltip />
-                <Bar dataKey="count" fill="var(--chart-2)" radius={[4, 4, 0, 0]} />
-              </BarChart>
-            </ResponsiveContainer>
-          </div>
-        </Card>
 
         <Card className="p-5 md:col-span-2">
           <div className="flex items-baseline justify-between mb-3 gap-3">
