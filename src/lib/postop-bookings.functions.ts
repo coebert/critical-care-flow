@@ -22,6 +22,7 @@ const bookingSchema = z.object({
     .regex(/^\d{4}-\d{2}-\d{2}$/)
     .nullable()
     .optional(),
+  arrived_at: z.string().datetime().nullable().optional(),
 });
 
 export type PostopBookingInput = z.infer<typeof bookingSchema>;
@@ -46,6 +47,7 @@ const AUDITED_FIELDS = [
   "bmi",
   "predicted_level",
   "proposed_surgery_date",
+  "arrived_at",
   "proposed_procedure",
   "past_medical_history",
   "past_surgical_history",
@@ -114,6 +116,7 @@ function encryptPayload(input: PostopBookingInput) {
     bmi: input.bmi ?? null,
     predicted_level: input.predicted_level,
     proposed_surgery_date: input.proposed_surgery_date ?? null,
+    arrived_at: input.arrived_at ?? null,
     hospital_number_enc: encryptString(input.hospital_number ?? null),
     hospital_number_hash: hashHospitalNumber(input.hospital_number ?? null),
   };

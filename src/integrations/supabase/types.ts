@@ -162,6 +162,7 @@ export type Database = {
       postop_bookings: {
         Row: {
           age: number | null
+          arrived_at: string | null
           bmi: number | null
           created_at: string
           created_by: string
@@ -185,6 +186,7 @@ export type Database = {
         }
         Insert: {
           age?: number | null
+          arrived_at?: string | null
           bmi?: number | null
           created_at?: string
           created_by?: string
@@ -208,6 +210,7 @@ export type Database = {
         }
         Update: {
           age?: number | null
+          arrived_at?: string | null
           bmi?: number | null
           created_at?: string
           created_by?: string

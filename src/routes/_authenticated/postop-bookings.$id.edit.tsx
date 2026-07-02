@@ -58,6 +58,7 @@ function EditPostopBookingPage() {
   const [reason, setReason] = useState("");
   const [level, setLevel] = useState<Level | "">("");
   const [surgeryDate, setSurgeryDate] = useState("");
+  const [arrivedAt, setArrivedAt] = useState("");
 
   useEffect(() => {
     let cancelled = false;
@@ -76,6 +77,7 @@ function EditPostopBookingPage() {
         setReason(row.reason_for_bed ?? "");
         setLevel(row.predicted_level ?? "");
         setSurgeryDate(row.proposed_surgery_date ?? "");
+        setArrivedAt(row.arrived_at ? new Date(row.arrived_at).toISOString().slice(0, 16) : "");
         setLoading(false);
       })
       .catch((err) => {
@@ -129,6 +131,7 @@ function EditPostopBookingPage() {
           reason_for_bed: reason.trim() || null,
           predicted_level: level as Level,
           proposed_surgery_date: surgeryDate.trim() || null,
+          arrived_at: arrivedAt.trim() ? new Date(arrivedAt).toISOString() : null,
         },
       });
       toast.success("Post-op booking updated");
@@ -217,6 +220,11 @@ function EditPostopBookingPage() {
                 <p className="text-xs text-muted-foreground">Leave blank if not yet known.</p>
               </div>
               <div className="space-y-1.5">
+                <Label htmlFor="arrived-at">Patient arrived at HDU/ICU</Label>
+                <Input id="arrived-at" type="datetime-local" value={arrivedAt} onChange={(e) => setArrivedAt(e.target.value)} />
+                <p className="text-xs text-muted-foreground">Record when the patient actually arrived to measure booking-to-arrival delay.</p>
+              </div>
+              <div className="space-y-1.5 sm:col-span-2">
                 <Label>Predicted level of support required *</Label>
                 <Select value={level} onValueChange={(v) => setLevel(v as Level)}>
                   <SelectTrigger><SelectValue placeholder="Select level" /></SelectTrigger>

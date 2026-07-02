@@ -127,6 +127,44 @@ function PostopAnalyticsPage() {
     return Array.from(map.entries()).map(([name, value]) => ({ name, value }));
   }, [filtered]);
 
+  const arrivalDelays = useMemo(() => {
+    return filtered
+      .map((b: any) => {
+        if (!b.arrived_at || !b.created_at) return null;
+        const start = new Date(b.created_at).getTime();
+        const end = new Date(b.arrived_at).getTime();
+        if (!isFinite(start) || !isFinite(end) || end < start) return null;
+        return (end - start) / 3_600_000; // hours
+      })
+      .filter((v): v is number => v != null);
+  }, [filtered]);
+
+  const arrivalStats = useMemo(() => {
+    const xs = [...arrivalDelays].sort((a, b) => a - b);
+    if (!xs.length) return { count: 0, mean: 0, median: 0, p90: 0, min: 0, max: 0 };
+    const mean = xs.reduce((a, b) => a + b, 0) / xs.length;
+    const q = (p: number) => xs[Math.min(xs.length - 1, Math.floor(p * xs.length))];
+    return { count: xs.length, mean, median: q(0.5), p90: q(0.9), min: xs[0], max: xs[xs.length - 1] };
+  }, [arrivalDelays]);
+
+  const arrivalBuckets = useMemo(() => {
+    const buckets = [
+      { name: "<1h", min: 0, max: 1 },
+      { name: "1–3h", min: 1, max: 3 },
+      { name: "3–6h", min: 3, max: 6 },
+      { name: "6–12h", min: 6, max: 12 },
+      { name: "12–24h", min: 12, max: 24 },
+      { name: "1–2d", min: 24, max: 48 },
+      { name: ">2d", min: 48, max: Infinity },
+    ];
+    return buckets.map((b) => ({
+      name: b.name,
+      count: arrivalDelays.filter((h) => h >= b.min && h < b.max).length,
+    }));
+  }, [arrivalDelays]);
+
+  const fmtH = (h: number) => (h >= 24 ? `${(h / 24).toFixed(1)}d` : `${h.toFixed(1)}h`);
+
   const meanPerWeek = (filtered.length / Math.max(days, 1)) * 7;
 
   return (
@@ -192,7 +230,42 @@ function PostopAnalyticsPage() {
         <Kpi label="Mean BMI" value={meanBmi ? meanBmi.toFixed(1) : "—"} />
       </div>
 
+      <div className="grid md:grid-cols-4 gap-4 mb-6">
+        <Kpi
+          label="Arrivals recorded"
+          value={`${arrivalStats.count}/${filtered.length}`}
+        />
+        <Kpi label="Mean delay" value={arrivalStats.count ? fmtH(arrivalStats.mean) : "—"} />
+        <Kpi label="Median delay" value={arrivalStats.count ? fmtH(arrivalStats.median) : "—"} />
+        <Kpi label="90th percentile" value={arrivalStats.count ? fmtH(arrivalStats.p90) : "—"} />
+      </div>
+
       <div className="grid md:grid-cols-2 gap-6">
+        <Card className="p-5 md:col-span-2">
+          <h2 className="font-semibold mb-1">Referral-to-arrival delay distribution</h2>
+          <p className="text-xs text-muted-foreground mb-3">
+            Time from booking creation to the patient arriving at HDU/ICU.
+            {arrivalStats.count > 0 && ` Range: ${fmtH(arrivalStats.min)} – ${fmtH(arrivalStats.max)}.`}
+          </p>
+          <div className="h-64">
+            {arrivalStats.count === 0 ? (
+              <div className="h-full flex items-center justify-center text-sm text-muted-foreground">
+                No arrival times recorded in this period.
+              </div>
+            ) : (
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={arrivalBuckets}>
+                  <CartesianGrid strokeDasharray="3 3" opacity={0.3} />
+                  <XAxis dataKey="name" fontSize={11} />
+                  <YAxis allowDecimals={false} fontSize={11} />
+                  <Tooltip />
+                  <Bar dataKey="count" fill="var(--chart-2)" />
+                </BarChart>
+              </ResponsiveContainer>
+            )}
+          </div>
+        </Card>
+
         <Card className="p-5 md:col-span-2">
           <h2 className="font-semibold mb-3">Bookings over time</h2>
           <div className="h-64">
