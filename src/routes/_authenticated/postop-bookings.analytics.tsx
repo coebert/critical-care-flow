@@ -19,9 +19,15 @@ import {
   differenceInCalendarDays, eachDayOfInterval,
 } from "date-fns";
 
+import { AdminOnly } from "@/components/admin-only";
+
 export const Route = createFileRoute("/_authenticated/postop-bookings/analytics")({
   head: () => ({ meta: [{ title: "Post-op bookings analytics — SDH Critical Care" }] }),
-  component: PostopAnalyticsPage,
+  component: () => (
+    <AdminOnly>
+      <PostopAnalyticsPage />
+    </AdminOnly>
+  ),
 });
 
 const COLORS = ["var(--chart-1)", "var(--chart-2)", "var(--chart-3)", "var(--chart-4)", "var(--chart-5)"];

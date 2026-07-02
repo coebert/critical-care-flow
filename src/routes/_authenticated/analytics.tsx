@@ -27,9 +27,15 @@ import {
 
 type Referral = Tables<"referrals">;
 
+import { AdminOnly } from "@/components/admin-only";
+
 export const Route = createFileRoute("/_authenticated/analytics")({
   head: () => ({ meta: [{ title: "Analytics — SDH Critical Care" }] }),
-  component: AnalyticsPage,
+  component: () => (
+    <AdminOnly>
+      <AnalyticsPage />
+    </AdminOnly>
+  ),
 });
 
 const COLORS = ["var(--chart-1)", "var(--chart-2)", "var(--chart-3)", "var(--chart-4)", "var(--chart-5)"];
