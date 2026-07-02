@@ -12,6 +12,19 @@ const bookingSchema = z.object({
   height_cm: z.number().positive().max(299).nullable().optional(),
   bmi: z.number().positive().max(199).nullable().optional(),
   proposed_procedure: z.string().trim().max(2000).nullable().optional(),
+  surgical_specialty: z
+    .enum([
+      "orthopaedics_trauma",
+      "plastics",
+      "ent",
+      "maxfax",
+      "general",
+      "urology",
+      "gynaecology",
+      "other",
+    ])
+    .nullable()
+    .optional(),
   past_medical_history: z.string().trim().max(5000).nullable().optional(),
   past_surgical_history: z.string().trim().max(5000).nullable().optional(),
   social_history: z.string().trim().max(2000).nullable().optional(),
@@ -48,6 +61,7 @@ const AUDITED_FIELDS = [
   "predicted_level",
   "proposed_surgery_date",
   "arrived_at",
+  "surgical_specialty",
   "proposed_procedure",
   "past_medical_history",
   "past_surgical_history",
@@ -117,6 +131,7 @@ function encryptPayload(input: PostopBookingInput) {
     predicted_level: input.predicted_level,
     proposed_surgery_date: input.proposed_surgery_date ?? null,
     arrived_at: input.arrived_at ?? null,
+    surgical_specialty: input.surgical_specialty ?? null,
     hospital_number_enc: encryptString(input.hospital_number ?? null),
     hospital_number_hash: hashHospitalNumber(input.hospital_number ?? null),
   };

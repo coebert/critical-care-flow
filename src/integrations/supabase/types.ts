@@ -180,6 +180,7 @@ export type Database = {
           reason_for_bed_enc: string | null
           sex: string | null
           social_history_enc: string | null
+          surgical_specialty: string | null
           updated_at: string
           updated_by: string | null
           weight_kg: number | null
@@ -204,6 +205,7 @@ export type Database = {
           reason_for_bed_enc?: string | null
           sex?: string | null
           social_history_enc?: string | null
+          surgical_specialty?: string | null
           updated_at?: string
           updated_by?: string | null
           weight_kg?: number | null
@@ -228,6 +230,7 @@ export type Database = {
           reason_for_bed_enc?: string | null
           sex?: string | null
           social_history_enc?: string | null
+          surgical_specialty?: string | null
           updated_at?: string
           updated_by?: string | null
           weight_kg?: number | null

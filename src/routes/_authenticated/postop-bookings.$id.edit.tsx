@@ -16,6 +16,11 @@ import {
 } from "@/components/ui/select";
 import { toast } from "sonner";
 import { ArrowLeft } from "lucide-react";
+import {
+  SURGICAL_SPECIALTY_LABEL,
+  SURGICAL_SPECIALTY_OPTIONS,
+  type SurgicalSpecialty,
+} from "@/lib/surgical-specialties";
 
 export const Route = createFileRoute("/_authenticated/postop-bookings/$id/edit")({
   head: () => ({
@@ -59,6 +64,7 @@ function EditPostopBookingPage() {
   const [level, setLevel] = useState<Level | "">("");
   const [surgeryDate, setSurgeryDate] = useState("");
   const [arrivedAt, setArrivedAt] = useState("");
+  const [specialty, setSpecialty] = useState<SurgicalSpecialty | "">("");
 
   useEffect(() => {
     let cancelled = false;
@@ -78,6 +84,7 @@ function EditPostopBookingPage() {
         setLevel(row.predicted_level ?? "");
         setSurgeryDate(row.proposed_surgery_date ?? "");
         setArrivedAt(row.arrived_at ? new Date(row.arrived_at).toISOString().slice(0, 16) : "");
+        setSpecialty((row.surgical_specialty ?? "") as SurgicalSpecialty | "");
         setLoading(false);
       })
       .catch((err) => {
@@ -132,6 +139,7 @@ function EditPostopBookingPage() {
           predicted_level: level as Level,
           proposed_surgery_date: surgeryDate.trim() || null,
           arrived_at: arrivedAt.trim() ? new Date(arrivedAt).toISOString() : null,
+          surgical_specialty: specialty || null,
         },
       });
       toast.success("Post-op booking updated");
@@ -209,9 +217,22 @@ function EditPostopBookingPage() {
 
           <Card className="p-4 sm:p-6 space-y-4">
             <h2 className="font-semibold">Surgical plan</h2>
-            <div className="space-y-1.5">
-              <Label htmlFor="proc">Proposed surgical procedure</Label>
-              <Textarea id="proc" rows={2} value={procedure} onChange={(e) => setProcedure(e.target.value)} maxLength={2000} />
+            <div className="grid sm:grid-cols-2 gap-4">
+              <div className="space-y-1.5">
+                <Label htmlFor="proc">Proposed surgical procedure</Label>
+                <Textarea id="proc" rows={2} value={procedure} onChange={(e) => setProcedure(e.target.value)} maxLength={2000} />
+              </div>
+              <div className="space-y-1.5">
+                <Label>Surgical specialty</Label>
+                <Select value={specialty} onValueChange={(v) => setSpecialty(v as SurgicalSpecialty)}>
+                  <SelectTrigger><SelectValue placeholder="Select specialty" /></SelectTrigger>
+                  <SelectContent>
+                    {SURGICAL_SPECIALTY_OPTIONS.map((s) => (
+                      <SelectItem key={s} value={s}>{SURGICAL_SPECIALTY_LABEL[s]}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
             </div>
             <div className="grid sm:grid-cols-2 gap-4">
               <div className="space-y-1.5">
