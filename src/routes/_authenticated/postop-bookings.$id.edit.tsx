@@ -88,14 +88,6 @@ function EditPostopBookingPage() {
     };
   }, [id, load]);
 
-  const refreshHistory = () => {
-    setHistoryLoading(true);
-    loadHistory({ data: { id } })
-      .then((rows) => setHistory(rows))
-      .catch(() => setHistory([]))
-      .finally(() => setHistoryLoading(false));
-  };
-
   useEffect(() => {
     let cancelled = false;
     loadHistory({ data: { id } })
