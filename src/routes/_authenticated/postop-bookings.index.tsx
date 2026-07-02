@@ -1,11 +1,22 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { useServerFn } from "@tanstack/react-start";
-import { listPostopBookings } from "@/lib/postop-bookings.functions";
+import { listPostopBookings, deletePostopBooking } from "@/lib/postop-bookings.functions";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Plus, CalendarClock, Pencil } from "lucide-react";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import { toast } from "sonner";
+import { Plus, CalendarClock, Pencil, Trash2 } from "lucide-react";
 import { format, parseISO } from "date-fns";
 
 export const Route = createFileRoute("/_authenticated/postop-bookings/")({
