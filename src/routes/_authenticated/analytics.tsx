@@ -1,9 +1,11 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import { z } from "zod";
+import { useQuery } from "@tanstack/react-query";
+import { useServerFn } from "@tanstack/react-start";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { PostopAnalyticsPanel } from "@/components/postop-analytics-panel";
-import { supabase } from "@/integrations/supabase/client";
+import { getReferralsAnalytics, getPostopAnalytics } from "@/lib/analytics.functions";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -50,8 +52,6 @@ export const Route = createFileRoute("/_authenticated/analytics")({
 const COLORS = ["var(--chart-1)", "var(--chart-2)", "var(--chart-3)", "var(--chart-4)", "var(--chart-5)"];
 
 function AnalyticsPage() {
-  const [rows, setRows] = useState<Referral[]>([]);
-  const [postopBmi, setPostopBmi] = useState<Array<{ surgical_specialty: string | null; bmi: number | null; created_at: string }>>([]);
   const [range, setRange] = useState<DateRange>(() => ({
     from: startOfDay(subDays(new Date(), 29)),
     to: endOfDay(new Date()),
@@ -61,27 +61,20 @@ function AnalyticsPage() {
   const to = range.to ? endOfDay(range.to) : endOfDay(range.from ?? new Date());
   const days = Math.max(1, differenceInCalendarDays(to, from) + 1);
 
-  useEffect(() => {
-    supabase
-      .from("referrals")
-      .select("*")
-      .is("deleted_at", null)
-      .gte("referral_received_at", from.toISOString())
-      .lte("referral_received_at", to.toISOString())
-      .limit(5000)
-      .then(({ data }) => setRows(data ?? []));
-  }, [from.getTime(), to.getTime()]);
+  const referralsFn = useServerFn(getReferralsAnalytics);
+  const postopFn = useServerFn(getPostopAnalytics);
 
-  useEffect(() => {
-    supabase
-      .from("postop_bookings")
-      .select("surgical_specialty,bmi,created_at")
-      .is("deleted_at", null)
-      .gte("created_at", from.toISOString())
-      .lte("created_at", to.toISOString())
-      .limit(5000)
-      .then(({ data }) => setPostopBmi((data ?? []) as Array<{ surgical_specialty: string | null; bmi: number | null; created_at: string }>));
-  }, [from.getTime(), to.getTime()]);
+  const fromIso = from.toISOString();
+  const toIso = to.toISOString();
+
+  const { data: rows = [] } = useQuery({
+    queryKey: ["analytics", "referrals", fromIso, toIso],
+    queryFn: () => referralsFn({ data: { from: fromIso, to: toIso } }),
+  });
+  const { data: postopBmi = [] } = useQuery({
+    queryKey: ["analytics", "postop", fromIso, toIso],
+    queryFn: () => postopFn({ data: { from: fromIso, to: toIso } }),
+  });
 
   const filtered = useMemo(() => {
     return rows.filter((r) => {
