@@ -1,7 +1,7 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { useServerFn } from "@tanstack/react-start";
-import { listPostopBookings, deletePostopBooking } from "@/lib/postop-bookings.functions";
+import { listPostopBookings, deletePostopBooking, restorePostopBooking } from "@/lib/postop-bookings.functions";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Switch } from "@/components/ui/switch";
@@ -60,6 +60,7 @@ const LEVEL_CLASS = {
 function PostopBookingsList() {
   const load = useServerFn(listPostopBookings);
   const remove = useServerFn(deletePostopBooking);
+  const restore = useServerFn(restorePostopBooking);
   const { hasRole: isAdmin } = useRole("admin");
   const [rows, setRows] = useState<Booking[] | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -71,21 +72,41 @@ function PostopBookingsList() {
     if (!pendingDelete) return;
     const target = pendingDelete;
     setDeleting(true);
-    // Optimistically remove from UI, snapshot previous rows for rollback.
     const previous = rows;
     setRows((prev) => (prev ? prev.filter((r) => r.id !== target.id) : prev));
     setPendingDelete(null);
     try {
       await remove({ data: { id: target.id } });
-      toast.success("Post-op booking deleted");
+      let undone = false;
+      toast.success("Post-op booking deleted", {
+        duration: 8000,
+        action: {
+          label: "Undo",
+          onClick: async () => {
+            if (undone) return;
+            undone = true;
+            try {
+              await restore({ data: { id: target.id } });
+              setRows((prev) => {
+                if (!prev) return prev;
+                if (prev.some((r) => r.id === target.id)) return prev;
+                return [{ ...target, deleted_at: null }, ...prev];
+              });
+              toast.success("Booking restored");
+            } catch (err: any) {
+              toast.error(err?.message ?? "Could not restore booking");
+            }
+          },
+        },
+      });
     } catch (err: any) {
-      // Roll back the optimistic removal.
       setRows(previous);
       toast.error(err?.message ?? "Could not delete booking. Changes reverted.");
     } finally {
       setDeleting(false);
     }
   };
+
 
   useEffect(() => {
     let cancelled = false;
