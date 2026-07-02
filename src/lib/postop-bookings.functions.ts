@@ -188,6 +188,7 @@ export const listPostopBookings = createServerFn({ method: "GET" })
       if (!includeDeleted) query = query.is("deleted_at", null);
       const { data: rows, error } = await query;
       if (error) throw error;
+      const { decryptRow } = await loadCrypto();
       return (rows ?? []).map(decryptRow);
     } catch (err) {
       throw safeError("listPostopBookings", err, "Could not load post-op bookings");
