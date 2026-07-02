@@ -74,8 +74,9 @@ function PostopAnalyticsPage() {
       const k = format(startOfDay(new Date(b.created_at)), "yyyy-MM-dd");
       if (map.has(k)) map.set(k, (map.get(k) ?? 0) + 1);
     });
-    return Array.from(map.entries()).map(([date, count]) => ({
-      date: format(new Date(date), "dd MMM"),
+    return Array.from(map.entries()).map(([key, count]) => ({
+      key,
+      date: format(new Date(key), "dd MMM"),
       count,
     }));
   }, [filtered, dayKeys]);
@@ -85,7 +86,7 @@ function PostopAnalyticsPage() {
     const map = new Map<string, Record<string, number | string>>(
       dayKeys.map((k) => [
         k,
-        { date: format(new Date(k), "dd MMM"), ...Object.fromEntries(levels.map((l) => [LEVEL_LABELS[l], 0])) },
+        { key: k, date: format(new Date(k), "dd MMM"), ...Object.fromEntries(levels.map((l) => [LEVEL_LABELS[l], 0])) },
       ])
     );
     filtered.forEach((b) => {
@@ -96,6 +97,7 @@ function PostopAnalyticsPage() {
     });
     return Array.from(map.values());
   }, [filtered, dayKeys]);
+
 
   const meanAge = useMemo(() => {
     const xs = filtered.map((b) => b.age).filter((x): x is number => x != null);
@@ -159,13 +161,55 @@ function PostopAnalyticsPage() {
     ];
     return buckets.map((b) => ({
       name: b.name,
+      min: b.min,
+      max: b.max,
       count: arrivalDelays.filter((h) => h >= b.min && h < b.max).length,
     }));
   }, [arrivalDelays]);
 
+
   const fmtH = (h: number) => (h >= 24 ? `${(h / 24).toFixed(1)}d` : `${h.toFixed(1)}h`);
 
   const meanPerWeek = (filtered.length / Math.max(days, 1)) * 7;
+
+  type Booking = typeof filtered[number];
+  const [drill, setDrill] = useState<{ title: string; rows: Booking[] } | null>(null);
+
+  const dayKeyOf = (b: Booking) => format(startOfDay(new Date(b.created_at)), "yyyy-MM-dd");
+  const arrivalHoursOf = (b: Booking): number | null => {
+    const a = (b as any).arrived_at;
+    if (!a) return null;
+    const s = new Date(b.created_at).getTime();
+    const e = new Date(a).getTime();
+    if (!isFinite(s) || !isFinite(e) || e < s) return null;
+    return (e - s) / 3_600_000;
+  };
+
+  const drillByDay = (key: string, extraLabel?: string) => {
+    const rows = filtered.filter((b) => dayKeyOf(b) === key &&
+      (!extraLabel || LEVEL_LABELS[b.predicted_level as string] === extraLabel));
+    setDrill({
+      title: `${extraLabel ? `${extraLabel} · ` : ""}${format(new Date(key), "dd MMM yyyy")} — ${rows.length} booking${rows.length === 1 ? "" : "s"}`,
+      rows,
+    });
+  };
+  const drillByLevel = (levelLabel: string) => {
+    const key = Object.entries(LEVEL_LABELS).find(([, v]) => v === levelLabel)?.[0];
+    const rows = filtered.filter((b) => b.predicted_level === key);
+    setDrill({ title: `${levelLabel} — ${rows.length} booking${rows.length === 1 ? "" : "s"}`, rows });
+  };
+  const drillBySex = (sex: string) => {
+    const rows = filtered.filter((b) => (b.sex ?? "unknown") === sex);
+    setDrill({ title: `Sex: ${sex} — ${rows.length} booking${rows.length === 1 ? "" : "s"}`, rows });
+  };
+  const drillByBucket = (name: string, min: number, max: number) => {
+    const rows = filtered.filter((b) => {
+      const h = arrivalHoursOf(b);
+      return h != null && h >= min && h < max;
+    });
+    setDrill({ title: `Arrival delay ${name} — ${rows.length} booking${rows.length === 1 ? "" : "s"}`, rows });
+  };
+
 
   return (
     <div className="p-4 sm:p-6 max-w-7xl mx-auto">
@@ -259,7 +303,12 @@ function PostopAnalyticsPage() {
                   <XAxis dataKey="name" fontSize={11} />
                   <YAxis allowDecimals={false} fontSize={11} />
                   <Tooltip />
-                  <Bar dataKey="count" fill="var(--chart-2)" />
+                  <Bar
+                    dataKey="count"
+                    fill="var(--chart-2)"
+                    cursor="pointer"
+                    onClick={(d: any) => drillByBucket(d.name, d.min, d.max)}
+                  />
                 </BarChart>
               </ResponsiveContainer>
             )}
@@ -270,12 +319,25 @@ function PostopAnalyticsPage() {
           <h2 className="font-semibold mb-3">Bookings over time</h2>
           <div className="h-64">
             <ResponsiveContainer width="100%" height="100%">
-              <LineChart data={perDay}>
+              <LineChart
+                data={perDay}
+                onClick={(e: any) => {
+                  const p = e?.activePayload?.[0]?.payload;
+                  if (p?.key) drillByDay(p.key);
+                }}
+              >
                 <CartesianGrid strokeDasharray="3 3" opacity={0.3} />
                 <XAxis dataKey="date" fontSize={11} />
                 <YAxis allowDecimals={false} fontSize={11} />
                 <Tooltip />
-                <Line type="monotone" dataKey="count" stroke="var(--chart-1)" strokeWidth={2} dot={false} />
+                <Line
+                  type="monotone"
+                  dataKey="count"
+                  stroke="var(--chart-1)"
+                  strokeWidth={2}
+                  dot={{ r: 3, cursor: "pointer" }}
+                  activeDot={{ r: 5, cursor: "pointer" }}
+                />
               </LineChart>
             </ResponsiveContainer>
           </div>
@@ -286,7 +348,16 @@ function PostopAnalyticsPage() {
           <div className="h-64">
             <ResponsiveContainer width="100%" height="100%">
               <PieChart>
-                <Pie data={byLevel} dataKey="value" nameKey="name" innerRadius={50} outerRadius={90} label>
+                <Pie
+                  data={byLevel}
+                  dataKey="value"
+                  nameKey="name"
+                  innerRadius={50}
+                  outerRadius={90}
+                  label
+                  cursor="pointer"
+                  onClick={(d: any) => drillByLevel(d.name)}
+                >
                   {byLevel.map((_, i) => <Cell key={i} fill={COLORS[i % COLORS.length]} />)}
                 </Pie>
                 <Legend />
@@ -322,7 +393,14 @@ function PostopAnalyticsPage() {
                 <Tooltip />
                 <Legend wrapperStyle={{ fontSize: 11 }} />
                 {Object.values(LEVEL_LABELS).map((label, i) => (
-                  <Bar key={label} dataKey={label} stackId="lvl" fill={COLORS[i % COLORS.length]} />
+                  <Bar
+                    key={label}
+                    dataKey={label}
+                    stackId="lvl"
+                    fill={COLORS[i % COLORS.length]}
+                    cursor="pointer"
+                    onClick={(d: any) => d?.key && drillByDay(d.key, label)}
+                  />
                 ))}
               </BarChart>
             </ResponsiveContainer>
@@ -334,7 +412,15 @@ function PostopAnalyticsPage() {
           <div className="h-56">
             <ResponsiveContainer width="100%" height="100%">
               <PieChart>
-                <Pie data={bySex} dataKey="value" nameKey="name" outerRadius={80} label>
+                <Pie
+                  data={bySex}
+                  dataKey="value"
+                  nameKey="name"
+                  outerRadius={80}
+                  label
+                  cursor="pointer"
+                  onClick={(d: any) => drillBySex(d.name)}
+                >
                   {bySex.map((_, i) => <Cell key={i} fill={COLORS[(i + 1) % COLORS.length]} />)}
                 </Pie>
                 <Legend />
@@ -360,6 +446,58 @@ function PostopAnalyticsPage() {
           </ul>
         </Card>
       </div>
+
+      {drill && (
+        <Card className="p-5 mt-6">
+          <div className="flex items-center justify-between mb-3 gap-3">
+            <h2 className="font-semibold">{drill.title}</h2>
+            <Button variant="ghost" size="sm" onClick={() => setDrill(null)}>Close</Button>
+          </div>
+          {drill.rows.length === 0 ? (
+            <p className="text-sm text-muted-foreground">No bookings match this selection.</p>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead className="text-xs uppercase text-muted-foreground border-b">
+                  <tr>
+                    <th className="text-left py-2 pr-3">Created</th>
+                    <th className="text-left py-2 pr-3">Age</th>
+                    <th className="text-left py-2 pr-3">Sex</th>
+                    <th className="text-left py-2 pr-3">BMI</th>
+                    <th className="text-left py-2 pr-3">Level</th>
+                    <th className="text-left py-2 pr-3">Arrived</th>
+                    <th className="text-left py-2 pr-3">Delay</th>
+                    <th className="text-left py-2 pr-3"></th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {drill.rows.map((b) => {
+                    const h = arrivalHoursOf(b);
+                    return (
+                      <tr key={b.id} className="border-b last:border-0 hover:bg-muted/40">
+                        <td className="py-2 pr-3 whitespace-nowrap">{format(new Date(b.created_at), "dd MMM yy HH:mm")}</td>
+                        <td className="py-2 pr-3">{b.age ?? "—"}</td>
+                        <td className="py-2 pr-3">{b.sex ?? "—"}</td>
+                        <td className="py-2 pr-3">{b.bmi != null ? Number(b.bmi).toFixed(1) : "—"}</td>
+                        <td className="py-2 pr-3">{LEVEL_LABELS[b.predicted_level as string] ?? "—"}</td>
+                        <td className="py-2 pr-3 whitespace-nowrap">
+                          {(b as any).arrived_at ? format(new Date((b as any).arrived_at), "dd MMM yy HH:mm") : "—"}
+                        </td>
+                        <td className="py-2 pr-3">{h != null ? fmtH(h) : "—"}</td>
+                        <td className="py-2 pr-3">
+                          <Button variant="link" size="sm" asChild className="h-auto p-0">
+                            <Link to="/postop-bookings/$id/edit" params={{ id: b.id }}>Open</Link>
+                          </Button>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </Card>
+      )}
     </div>
   );
 }
