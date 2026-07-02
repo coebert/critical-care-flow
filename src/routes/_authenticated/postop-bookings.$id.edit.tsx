@@ -37,11 +37,14 @@ function EditPostopBookingPage() {
   const { id } = Route.useParams();
   const navigate = useNavigate();
   const load = useServerFn(getPostopBooking);
+  const loadHistory = useServerFn(getPostopBookingHistory);
   const submit = useServerFn(updatePostopBooking);
 
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
+  const [history, setHistory] = useState<PostopAuditEntry[]>([]);
+  const [historyLoading, setHistoryLoading] = useState(true);
 
   const [hospitalNumber, setHospitalNumber] = useState("");
   const [age, setAge] = useState("");
