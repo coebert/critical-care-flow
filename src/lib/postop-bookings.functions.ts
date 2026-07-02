@@ -273,6 +273,27 @@ export const deletePostopBooking = createServerFn({ method: "POST" })
   .inputValidator((d) => z.object({ id: z.string().uuid() }).parse(d))
   .handler(async ({ data, context }) => {
     try {
+      const { data: existing, error: fetchErr } = await context.supabase
+        .from("postop_bookings")
+        .select("id, created_by, deleted_at")
+        .eq("id", data.id)
+        .maybeSingle();
+      if (fetchErr) throw fetchErr;
+      if (!existing) throw new Error("Booking not found");
+      if (existing.deleted_at) return { id: data.id, deleted_at: existing.deleted_at };
+
+      const { data: isAdmin } = await context.supabase.rpc("has_role", {
+        _user_id: context.userId,
+        _role: "admin",
+      });
+      if (existing.created_by !== context.userId && !isAdmin) {
+        throw safeError(
+          "deletePostopBooking",
+          new Error("forbidden"),
+          "Only the creator or an admin can delete this booking",
+        );
+      }
+
       const deletedAt = new Date().toISOString();
       const { error } = await context.supabase
         .from("postop_bookings")
@@ -291,6 +312,7 @@ export const deletePostopBooking = createServerFn({ method: "POST" })
       throw safeError("deletePostopBooking", err, "Could not delete post-op booking");
     }
   });
+
 
 export const restorePostopBooking = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
