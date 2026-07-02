@@ -412,7 +412,15 @@ function PostopAnalyticsPage() {
           <div className="h-56">
             <ResponsiveContainer width="100%" height="100%">
               <PieChart>
-                <Pie data={bySex} dataKey="value" nameKey="name" outerRadius={80} label>
+                <Pie
+                  data={bySex}
+                  dataKey="value"
+                  nameKey="name"
+                  outerRadius={80}
+                  label
+                  cursor="pointer"
+                  onClick={(d: any) => drillBySex(d.name)}
+                >
                   {bySex.map((_, i) => <Cell key={i} fill={COLORS[(i + 1) % COLORS.length]} />)}
                 </Pie>
                 <Legend />
