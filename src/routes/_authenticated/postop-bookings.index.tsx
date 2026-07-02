@@ -162,6 +162,14 @@ function PostopBookingsList() {
                       <Pencil className="w-3.5 h-3.5 mr-1" /> Edit
                     </Link>
                   </Button>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="text-destructive hover:text-destructive"
+                    onClick={() => setPendingDelete(b)}
+                  >
+                    <Trash2 className="w-3.5 h-3.5 mr-1" /> Delete
+                  </Button>
                 </div>
               </div>
               {b.proposed_procedure && (
