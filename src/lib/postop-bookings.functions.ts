@@ -22,6 +22,7 @@ const bookingSchema = z.object({
     .regex(/^\d{4}-\d{2}-\d{2}$/)
     .nullable()
     .optional(),
+  arrived_at: z.string().datetime().nullable().optional(),
 });
 
 export type PostopBookingInput = z.infer<typeof bookingSchema>;
