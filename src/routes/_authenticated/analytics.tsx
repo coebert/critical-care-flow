@@ -75,12 +75,12 @@ function AnalyticsPage() {
   useEffect(() => {
     supabase
       .from("postop_bookings")
-      .select("surgical_specialty,bmi")
+      .select("surgical_specialty,bmi,created_at")
       .is("deleted_at", null)
       .gte("created_at", from.toISOString())
       .lte("created_at", to.toISOString())
       .limit(5000)
-      .then(({ data }) => setPostopBmi((data ?? []) as Array<{ surgical_specialty: string | null; bmi: number | null }>));
+      .then(({ data }) => setPostopBmi((data ?? []) as Array<{ surgical_specialty: string | null; bmi: number | null; created_at: string }>));
   }, [from.getTime(), to.getTime()]);
 
   const filtered = useMemo(() => {
