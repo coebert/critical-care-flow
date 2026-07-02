@@ -86,6 +86,7 @@ function AuthedShell() {
       <nav className="flex-1 px-2 py-3 space-y-1 text-sm">
         <NavItem to="/" icon={<ListChecks className="w-4 h-4" />} collapsed={collapsed}>Referrals</NavItem>
         <NavItem to="/referrals/new" icon={<Plus className="w-4 h-4" />} collapsed={collapsed}>New referral</NavItem>
+        <NavItem to="/postop-bookings" icon={<CalendarClock className="w-4 h-4" />} collapsed={collapsed}>Post-op bookings</NavItem>
         <NavItem to="/analytics" icon={<BarChart3 className="w-4 h-4" />} collapsed={collapsed}>Analytics</NavItem>
         <NavItem to="/inbox" icon={<Inbox className="w-4 h-4" />} collapsed={collapsed}>Inbox</NavItem>
         <NavItem to="/notifications" icon={<Bell className="w-4 h-4" />} collapsed={collapsed}>Notifications</NavItem>
