@@ -128,17 +128,8 @@ export const addEncryptedNote = createServerFn({ method: "POST" })
         .in("role", ["admin", "clinician"]),
       admin.from("user_public_keys").select("user_id"),
     ]);
-    const clinicianIds = new Set(
-      (clinicianRows ?? [])
-        .map((r: any) => r.user_id as string)
-        .filter((id) => id !== userId),
-    );
-    const enrolledIds = new Set(
-      (keyRows ?? []).map((r: any) => r.user_id as string),
-    );
-    const requestedRecipients = new Set(
-      data.wrapped_keys.map((w) => w.recipient_user_id),
-    );
+
+
 
     // Delegate the rules to the pure evaluator so they can be exercised in
     // isolation by unit tests (see e2e-recipient-coverage.test.ts).
