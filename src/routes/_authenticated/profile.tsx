@@ -177,7 +177,7 @@ function ProfilePage() {
       <E2EUnlockModal
         open={unlockOpen}
         onOpenChange={setUnlockOpen}
-        onUnlocked={refreshKeyStatus}
+        onUnlocked={() => useE2ESession.getState().refreshStatus()}
       />
       <ReissueDialog
         open={reissueOpen}
