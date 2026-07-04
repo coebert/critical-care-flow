@@ -4,11 +4,23 @@ import { useEffect, useState } from "react";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { KeyRound, ShieldCheck, ShieldAlert, Lock, Loader2 } from "lucide-react";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { KeyRound, ShieldCheck, ShieldAlert, Lock, Loader2, RefreshCw, AlertTriangle } from "lucide-react";
 import { useAuth } from "@/hooks/use-auth";
 import { useE2ESession } from "@/hooks/use-e2e-session";
-import { getMyPrivateKeyMaterial } from "@/lib/e2e-keys.functions";
+import { getMyPrivateKeyMaterial, reissueRecipientKeypair } from "@/lib/e2e-keys.functions";
+import { generateAndWrapKeypair, unwrapPrivateKey } from "@/lib/e2e-crypto";
 import { E2EUnlockModal } from "@/components/e2e-unlock-modal";
+import { toast } from "sonner";
 
 export const Route = createFileRoute("/_authenticated/profile")({
   head: () => ({
