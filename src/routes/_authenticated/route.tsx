@@ -56,6 +56,14 @@ function AuthedShell() {
   const { supported, permission, subscribed } = usePush();
   const { atWork } = useShiftStatus();
 
+  // Kick off a single global key-status fetch as soon as the user is
+  // authenticated. Every page then reads from useE2ESession without
+  // duplicating this network round-trip.
+  useEffect(() => {
+    if (!user?.id) return;
+    useE2ESession.getState().refreshStatus().catch(() => { /* non-fatal */ });
+  }, [user?.id]);
+
   // Close the mobile drawer on route change
   useEffect(() => {
     setMobileOpen(false);
