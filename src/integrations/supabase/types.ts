@@ -306,30 +306,68 @@ export type Database = {
         }
         Relationships: []
       }
+      referral_note_keys: {
+        Row: {
+          created_at: string
+          note_id: string
+          recipient_user_id: string
+          wrapped_key: string
+        }
+        Insert: {
+          created_at?: string
+          note_id: string
+          recipient_user_id: string
+          wrapped_key: string
+        }
+        Update: {
+          created_at?: string
+          note_id?: string
+          recipient_user_id?: string
+          wrapped_key?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "referral_note_keys_note_id_fkey"
+            columns: ["note_id"]
+            isOneToOne: false
+            referencedRelation: "referral_notes"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       referral_notes: {
         Row: {
           author_id: string
+          body_ciphertext: string | null
           body_enc: string | null
+          body_nonce: string | null
           created_at: string
           edited_at: string | null
+          enc_version: number | null
           id: string
           referral_id: string
           updated_at: string
         }
         Insert: {
           author_id: string
+          body_ciphertext?: string | null
           body_enc?: string | null
+          body_nonce?: string | null
           created_at?: string
           edited_at?: string | null
+          enc_version?: number | null
           id?: string
           referral_id: string
           updated_at?: string
         }
         Update: {
           author_id?: string
+          body_ciphertext?: string | null
           body_enc?: string | null
+          body_nonce?: string | null
           created_at?: string
           edited_at?: string | null
+          enc_version?: number | null
           id?: string
           referral_id?: string
           updated_at?: string
@@ -440,6 +478,60 @@ export type Database = {
           status?: Database["public"]["Enums"]["referral_status"]
           updated_at?: string
           updated_by?: string | null
+        }
+        Relationships: []
+      }
+      user_private_key_material: {
+        Row: {
+          created_at: string
+          encrypted_private_key: string
+          kdf_mem: number
+          kdf_ops: number
+          kdf_salt: string
+          nonce: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          encrypted_private_key: string
+          kdf_mem: number
+          kdf_ops: number
+          kdf_salt: string
+          nonce: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          encrypted_private_key?: string
+          kdf_mem?: number
+          kdf_ops?: number
+          kdf_salt?: string
+          nonce?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      user_public_keys: {
+        Row: {
+          created_at: string
+          public_key: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          public_key: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          public_key?: string
+          updated_at?: string
+          user_id?: string
         }
         Relationships: []
       }
