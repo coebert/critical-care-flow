@@ -464,10 +464,31 @@ function ReferralDetail() {
     setPosting(true);
     try {
       const enc = await encryptForRecipients(noteBody.trim(), selectedRecipients);
-      await submitEncNote({ data: { referral_id: id, ...enc } });
+      await submitEncNote({
+        data: {
+          referral_id: id,
+          ...enc,
+          // Server re-checks recipient coverage against the live key
+          // directory. Only pass the opt-in flag when the author has
+          // knowingly reduced the recipient set (touched the picker or
+          // confirmed the reduced-set dialog).
+          allow_reduced_recipients: recipientsTouched,
+        },
+      });
       setNoteBody("");
     } catch (err: any) {
-      toast.error(err.message ?? "Failed to post note");
+      // Server-side coverage race: re-sync the directory so the compose UI
+      // reflects the new state, then tell the user what changed.
+      const msg = String(err?.message ?? "");
+      if (msg.includes("recipient coverage changed") || msg.includes("no longer have a published")) {
+        await loadDirectory();
+        toast.error(
+          "Recipient list changed since you started composing. Review recipients and try again.",
+          { duration: 6000 },
+        );
+      } else {
+        toast.error(msg || "Failed to post note");
+      }
     } finally {
       setPosting(false);
     }

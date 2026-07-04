@@ -103,11 +103,79 @@ export const addEncryptedNote = createServerFn({ method: "POST" })
         body_nonce: b64,
         enc_version: z.number().int().min(1).max(255),
         wrapped_keys: z.array(wrappedKeySchema).min(1).max(500),
+        // Explicit acknowledgement that the author is knowingly posting to a
+        // reduced recipient set (some enrolled teammates excluded, or some
+        // clinicians without a published key). The client must set this
+        // after the user confirms the "post to reduced set" dialog.
+        allow_reduced_recipients: z.boolean().optional().default(false),
       })
       .parse(d),
   )
   .handler(async ({ data, context }) => {
     const { supabase, userId } = context;
+
+    // ---- Server-side recipient coverage check ---------------------------
+    // Even if the client thinks every teammate has a key, the directory may
+    // have changed between the last check and submit. Re-verify against the
+    // live public-key + clinician tables so a race can't sneak a note past
+    // a teammate who just enrolled (they'd be silently excluded) OR post
+    // when someone lost their key (they'd be silently unreadable to).
+    const admin = await getAdmin();
+    const [{ data: clinicianRows }, { data: keyRows }] = await Promise.all([
+      admin
+        .from("user_roles")
+        .select("user_id")
+        .in("role", ["admin", "clinician"]),
+      admin.from("user_public_keys").select("user_id"),
+    ]);
+    const clinicianIds = new Set(
+      (clinicianRows ?? [])
+        .map((r: any) => r.user_id as string)
+        .filter((id) => id !== userId),
+    );
+    const enrolledIds = new Set(
+      (keyRows ?? []).map((r: any) => r.user_id as string),
+    );
+    const requestedRecipients = new Set(
+      data.wrapped_keys.map((w) => w.recipient_user_id),
+    );
+
+    // Teammates who should be able to read this note but aren't recipients.
+    const missingNoKey: string[] = [];
+    const enrolledButExcluded: string[] = [];
+    for (const cid of clinicianIds) {
+      if (requestedRecipients.has(cid)) continue;
+      if (enrolledIds.has(cid)) enrolledButExcluded.push(cid);
+      else missingNoKey.push(cid);
+    }
+
+    if (!data.allow_reduced_recipients && (missingNoKey.length > 0 || enrolledButExcluded.length > 0)) {
+      const err: any = new Error(
+        "Cannot post: recipient coverage changed. " +
+          `${missingNoKey.length} teammate(s) have no encryption key and ` +
+          `${enrolledButExcluded.length} enrolled teammate(s) are not in the recipient list. ` +
+          "Re-open the note to review recipients or explicitly opt into a reduced recipient set.",
+      );
+      err.code = "recipient_coverage_changed";
+      err.details = {
+        missing_no_key: missingNoKey,
+        enrolled_but_excluded: enrolledButExcluded,
+      };
+      throw err;
+    }
+
+    // Also reject any wrapped_keys addressed to a user without a published
+    // key (either never enrolled, or their key was rotated/removed). Those
+    // rows would either fail FK checks or store a bogus wrapped ciphertext.
+    const strayRecipients = Array.from(requestedRecipients).filter(
+      (rid) => rid !== userId && !enrolledIds.has(rid),
+    );
+    if (strayRecipients.length > 0) {
+      throw new Error(
+        `Cannot post: ${strayRecipients.length} recipient(s) no longer have a published encryption key.`,
+      );
+    }
+    // ---------------------------------------------------------------------
 
     // Insert the note (no plaintext, no body_enc — pure ciphertext).
     const { data: row, error } = await supabase
