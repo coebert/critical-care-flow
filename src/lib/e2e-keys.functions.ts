@@ -99,3 +99,94 @@ export const getPublicKeyDirectory = createServerFn({ method: "POST" })
       public_key: keyOf.get(uid) ?? null,
     }));
   });
+
+// ---------------------------------------------------------------------------
+// Governance: re-issue a user's keypair.
+// Destructive — anything encrypted to their OLD public key becomes
+// unrecoverable for them. Governance checks enforced here:
+//   1. The caller must be signed in (requireSupabaseAuth).
+//   2. The caller must re-authenticate by supplying their current password.
+//      We verify with a server-local publishable client's signInWithPassword,
+//      so this survives a stolen session token that lacks the password.
+//   3. Every re-issue writes an audit_log entry (entity: "user_keypair").
+// ---------------------------------------------------------------------------
+export const reissueRecipientKeypair = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d: unknown) =>
+    z
+      .object({
+        password: z.string().min(1).max(256),
+        public_key: b64,
+        encrypted_private_key: b64,
+        kdf_salt: b64,
+        kdf_ops: z.number().int().min(1).max(20),
+        kdf_mem: z.number().int().min(1024).max(2_147_483_647),
+        nonce: b64,
+      })
+      .parse(d),
+  )
+  .handler(async ({ data, context }) => {
+    const { supabase, userId, claims } = context;
+    const email = (claims as any)?.email as string | undefined;
+    if (!email) {
+      throw safeError("e2e.reissue.email", new Error("No email in session"),
+        "Cannot re-issue keypair: no email associated with this account.");
+    }
+
+    // Re-authenticate the caller with the password they just typed. Uses a
+    // fresh server-local publishable client so the current session isn't
+    // touched. Wrong password → Supabase returns AuthApiError; we surface a
+    // generic message so we don't leak which of email/password was wrong.
+    const { createClient } = await import("@supabase/supabase-js");
+    const verifier = createClient(
+      process.env.SUPABASE_URL!,
+      process.env.SUPABASE_PUBLISHABLE_KEY!,
+      { auth: { storage: undefined, persistSession: false, autoRefreshToken: false } },
+    );
+    const { data: verified, error: verifyErr } = await verifier.auth.signInWithPassword({
+      email,
+      password: data.password,
+    });
+    if (verifyErr || verified?.user?.id !== userId) {
+      throw new Error("Password confirmation failed. Please re-enter your password.");
+    }
+    // Best-effort: release the verification session immediately.
+    try { await verifier.auth.signOut(); } catch { /* ignore */ }
+
+    // Write the audit entry BEFORE mutating so a failed audit doesn't leave a
+    // silent key change on record.
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { error: auditErr } = await supabaseAdmin.from("audit_log").insert({
+      user_id: userId,
+      action: "reissue",
+      entity: "user_keypair",
+      entity_id: userId,
+      diff: { public_key_fingerprint: data.public_key.slice(0, 16) },
+    } as any);
+    if (auditErr) throw safeError("e2e.reissue.audit", auditErr, "Failed to record re-issue.");
+
+    const { error: e1 } = await supabase
+      .from("user_public_keys")
+      .upsert(
+        { user_id: userId, public_key: data.public_key } as any,
+        { onConflict: "user_id" },
+      );
+    if (e1) throw safeError("e2e.reissue.pub", e1, "Failed to publish new public key.");
+
+    const { error: e2 } = await supabase
+      .from("user_private_key_material")
+      .upsert(
+        {
+          user_id: userId,
+          encrypted_private_key: data.encrypted_private_key,
+          kdf_salt: data.kdf_salt,
+          kdf_ops: data.kdf_ops,
+          kdf_mem: data.kdf_mem,
+          nonce: data.nonce,
+        } as any,
+        { onConflict: "user_id" },
+      );
+    if (e2) throw safeError("e2e.reissue.priv", e2, "Failed to store new encrypted key.");
+
+    return { ok: true };
+  });
