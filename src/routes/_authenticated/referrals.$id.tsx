@@ -552,7 +552,7 @@ function ReferralDetail() {
 
   const postNote = async () => {
     if (!noteBody.trim()) return;
-    if (!e2e.isUnlocked) { setUnlockOpen(true); return; }
+    if (!ensureUnlocked(postNote)) return;
     if (selectedRecipients.size === 0) {
       toast.error("Pick at least one recipient for this note.");
       return;
