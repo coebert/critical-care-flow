@@ -121,6 +121,11 @@ function AnalyticsPage() {
     });
   }, [rows, from, to]);
 
+  const complianceFiltered = useMemo(() => {
+    if (!complianceSpecialty) return filtered;
+    return filtered.filter((r) => (r.referring_specialty || "Unknown") === complianceSpecialty);
+  }, [filtered, complianceSpecialty]);
+
   const dayKeys = useMemo(
     () => eachDayOfInterval({ start: from, end: to }).map((d) => format(d, "yyyy-MM-dd")),
     [from, to]
