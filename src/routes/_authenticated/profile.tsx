@@ -207,7 +207,7 @@ function ProfilePage() {
           toast.success("New keypair issued");
           // Re-sync from the server so status/fingerprint reflect the new key
           // immediately, not on the next mount.
-          await refreshKeyStatus();
+          await useE2ESession.getState().refreshStatus();
         }}
       />
     </div>
