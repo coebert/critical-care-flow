@@ -146,6 +146,10 @@ export const useE2ESession = create<E2EState>((set, get) => ({
       status: deriveStatus(keypair.publicKey, material, true),
     });
     await writePersisted(keypair.publicKey, priv);
+    // Server-side key material just changed → tell sibling tabs so their
+    // profile / referral pages flip from "not_issued" to "locked" without
+    // waiting for a reload.
+    broadcastKeyChange("bootstrap");
   },
   hydrateFromSession: async () => {
     if (get().hydrated) return get().isUnlocked;
@@ -175,6 +179,8 @@ export const useE2ESession = create<E2EState>((set, get) => ({
   },
   refreshStatus: async () => {
     if (inFlightRefresh) return inFlightRefresh;
+    const prevStatus = get().status;
+    const prevPub = get().publicKey;
     set({ refreshing: true });
     inFlightRefresh = (async () => {
       try {
@@ -192,7 +198,13 @@ export const useE2ESession = create<E2EState>((set, get) => ({
         inFlightRefresh = null;
       }
     })();
-    return inFlightRefresh;
+    const result = await inFlightRefresh;
+    // Only broadcast when the observable state actually changed — a
+    // no-op refresh must not create a ping-pong between tabs.
+    if (get().status !== prevStatus || get().publicKey !== prevPub) {
+      broadcastKeyChange("refresh");
+    }
+    return result;
   },
   clear: () => {
     clearPersisted();
@@ -204,6 +216,8 @@ export const useE2ESession = create<E2EState>((set, get) => ({
       material: null,
       status: "not_issued",
     });
+    // Sign-out in one tab must lock every other tab too.
+    broadcastKeyChange("clear");
   },
 }));
 
@@ -215,3 +229,86 @@ export const useE2ESession = create<E2EState>((set, get) => ({
 export function useKeyStatus(): KeyStatus {
   return useE2ESession((s) => s.status);
 }
+
+// ---------------------------------------------------------------------------
+// Cross-tab propagation
+// ---------------------------------------------------------------------------
+// When one tab issues, refreshes, or clears the recipient key, every other
+// tab open on the same origin must re-derive its badge/button state without
+// a manual reload. BroadcastChannel is the right primitive: same-origin,
+// per-user (localStorage isolation), and won't fire in the tab that posted.
+//
+// The private key itself is never broadcast — each tab still has to unlock
+// with the password locally. The message is a pure "server-side key material
+// changed, please re-fetch" ping.
+
+const CHANNEL_NAME = "e2e-key-status.v1";
+export type KeyChangeReason = "bootstrap" | "refresh" | "clear";
+export interface KeyChangeMessage {
+  reason: KeyChangeReason;
+  // A monotonically-increasing id lets tests / consumers de-dupe if they
+  // ever want to; the receiver here doesn't need it, but including it
+  // future-proofs the wire format.
+  seq: number;
+}
+
+let channel: BroadcastChannel | null = null;
+let seq = 0;
+// Set by tests (and any embedding that wants an alternate transport). When
+// null, we fall back to a real BroadcastChannel in browsers.
+let transportOverride: BroadcastChannel | null = null;
+
+function getChannel(): BroadcastChannel | null {
+  if (transportOverride) return transportOverride;
+  if (channel) return channel;
+  if (typeof BroadcastChannel === "undefined") return null;
+  try {
+    channel = new BroadcastChannel(CHANNEL_NAME);
+  } catch {
+    channel = null;
+  }
+  return channel;
+}
+
+function broadcastKeyChange(reason: KeyChangeReason): void {
+  const c = getChannel();
+  if (!c) return;
+  try {
+    c.postMessage({ reason, seq: ++seq } satisfies KeyChangeMessage);
+  } catch {
+    /* transport closed — non-fatal */
+  }
+}
+
+/**
+ * Wire up cross-tab key-status sync. Call once from the authenticated shell.
+ * Returns a teardown fn for tests / hot-reload.
+ */
+export function initKeyStatusCrossTabSync(): () => void {
+  const c = getChannel();
+  if (!c) return () => {};
+  const handler = (ev: MessageEvent<KeyChangeMessage>) => {
+    const msg = ev?.data;
+    if (!msg || typeof msg !== "object") return;
+    if (msg.reason === "clear") {
+      // A sibling signed out — drop our local unlocked session so a
+      // subsequent visit to this tab doesn't leak the previous user's key.
+      useE2ESession.getState().clear();
+      return;
+    }
+    // Any other reason means server-side material may have changed. Let
+    // refreshStatus() reconcile — it de-dupes concurrent callers.
+    useE2ESession.getState().refreshStatus().catch(() => { /* non-fatal */ });
+  };
+  c.addEventListener("message", handler);
+  return () => {
+    try { c.removeEventListener("message", handler); } catch { /* ignore */ }
+  };
+}
+
+/** Test-only: swap the BroadcastChannel implementation. */
+export function __setKeyStatusTransport(t: BroadcastChannel | null): void {
+  transportOverride = t;
+  channel = null;
+}
+
