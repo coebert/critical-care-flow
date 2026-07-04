@@ -330,7 +330,7 @@ function ReferralsList() {
                 type="button"
                 aria-label="Clear specialty filter"
                 className="ml-1 opacity-70 hover:opacity-100"
-                onClick={() => navigate({ to: "/", search: (p) => ({ ...p, specialty: undefined }) })}
+                onClick={() => navigate({ to: "/", search: (p: Record<string, unknown>) => ({ ...p, specialty: undefined }) })}
               >×</button>
             </Badge>
           )}
@@ -341,7 +341,7 @@ function ReferralsList() {
                 type="button"
                 aria-label="Clear date filter"
                 className="ml-1 opacity-70 hover:opacity-100"
-                onClick={() => navigate({ to: "/", search: (p) => ({ ...p, from: undefined, to: undefined }) })}
+                onClick={() => navigate({ to: "/", search: (p: Record<string, unknown>) => ({ ...p, from: undefined, to: undefined }) })}
               >×</button>
             </Badge>
           )}
