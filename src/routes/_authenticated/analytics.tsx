@@ -69,6 +69,7 @@ function AnalyticsPage() {
     to: endOfDay(new Date()),
   }));
   const [complianceBucket, setComplianceBucket] = useState<"day" | "week" | "month">("day");
+  const [complianceSpecialty, setComplianceSpecialty] = useState<string | null>(null);
 
   const from = range.from ? startOfDay(range.from) : startOfDay(subDays(new Date(), 29));
   const to = range.to ? endOfDay(range.to) : endOfDay(range.from ?? new Date());
