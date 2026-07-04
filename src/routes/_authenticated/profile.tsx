@@ -210,7 +210,11 @@ function ProfilePage() {
         </Button>
       </Card>
 
-      <E2EUnlockModal open={unlockOpen} onOpenChange={setUnlockOpen} />
+      <E2EUnlockModal
+        open={unlockOpen}
+        onOpenChange={setUnlockOpen}
+        onUnlocked={refreshKeyStatus}
+      />
       <ReissueDialog
         open={reissueOpen}
         onOpenChange={setReissueOpen}
