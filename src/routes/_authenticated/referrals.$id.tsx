@@ -273,10 +273,30 @@ function ReferralDetail() {
         () => { loadRef(); })
       .on("postgres_changes", { event: "*", schema: "public", table: "referral_notes", filter: `referral_id=eq.${id}` },
         () => { loadNotes(); })
+      // A teammate publishing / rotating / removing their public key changes
+      // who this note can be encrypted for. Refresh the directory live so the
+      // compose UI and the missing-recipients block reflect reality.
+      .on("postgres_changes", { event: "*", schema: "public", table: "user_public_keys" },
+        () => { loadDirectory(); })
       .subscribe();
-    return () => { supabase.removeChannel(ch); };
+
+    // Also re-check when the tab regains focus / comes back online, in case
+    // realtime dropped an event while the tab was backgrounded.
+    const refresh = () => { loadDirectory(); };
+    const onVis = () => { if (document.visibilityState === "visible") refresh(); };
+    window.addEventListener("focus", refresh);
+    window.addEventListener("online", refresh);
+    document.addEventListener("visibilitychange", onVis);
+
+    return () => {
+      supabase.removeChannel(ch);
+      window.removeEventListener("focus", refresh);
+      window.removeEventListener("online", refresh);
+      document.removeEventListener("visibilitychange", onVis);
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id]);
+
 
   // Fetch other declined referrals for the same patient.
   useEffect(() => {
