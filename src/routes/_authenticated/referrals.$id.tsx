@@ -370,8 +370,9 @@ function ReferralDetail() {
     if (!noteBody.trim()) return;
     if (!e2e.isUnlocked) { setUnlockOpen(true); return; }
     // Refresh directory just before posting so the warning reflects reality.
-    await loadDirectory();
-    if (missingRecipients.length > 0) {
+    const list = await loadDirectory();
+    const missing = (list ?? directory).filter((r) => !r.public_key && r.user_id !== user?.id);
+    if (missing.length > 0) {
       pendingActionRef.current = doPostNote;
       setConfirmMissingOpen(true);
       return;
