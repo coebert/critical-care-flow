@@ -365,6 +365,33 @@ function AnalyticsPage() {
         <Kpi label="Mean time-to-first-seen" value={meanTimeToSeen ? `${Math.round(meanTimeToSeen)} min` : "—"} />
       </div>
 
+      <Card className="p-5 mb-6">
+        <div className="flex items-baseline justify-between gap-3 mb-4 flex-wrap">
+          <h2 className="font-semibold">ICNARC timing KPIs</h2>
+          <span className="text-xs text-muted-foreground">
+            Referral-workflow targets aligned to ICNARC / GPICS timing standards.
+          </span>
+        </div>
+        <div className="grid md:grid-cols-2 gap-4">
+          <IcnarcKpi
+            label="Referral → first seen"
+            targetLabel={`≤ ${icnarc.seen.target} min`}
+            pct={icnarc.seen.pct}
+            median={icnarc.seen.median}
+            n={icnarc.seen.n}
+          />
+          <IcnarcKpi
+            label="Decision → on unit"
+            targetLabel={`≤ ${Math.round(icnarc.arrival.target / 60)} h`}
+            pct={icnarc.arrival.pct}
+            median={icnarc.arrival.median}
+            n={icnarc.arrival.n}
+          />
+        </div>
+      </Card>
+
+
+
       {admittedMissingConsultant > 0 && (
         <Card className="mb-6 p-4 border-amber-200 bg-amber-50 dark:bg-amber-950 dark:border-amber-800">
           <div className="flex items-center gap-3">
