@@ -161,6 +161,7 @@ function ReferralDetail() {
   const [unlockOpen, setUnlockOpen] = useState(false);
   const [directory, setDirectory] = useState<Array<{ user_id: string; full_name: string; public_key: string | null }>>([]);
   const [confirmMissingOpen, setConfirmMissingOpen] = useState(false);
+  const [ackReducedSet, setAckReducedSet] = useState(false);
   const pendingActionRef = useRef<null | (() => Promise<void>)>(null);
   const [selectedRecipients, setSelectedRecipients] = useState<Set<string>>(new Set());
   const [recipientsTouched, setRecipientsTouched] = useState(false);
