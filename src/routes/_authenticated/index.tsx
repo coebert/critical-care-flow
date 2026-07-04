@@ -247,10 +247,24 @@ function ReferralsList() {
     else if (dateFilter === "7d") fromTs = now.getTime() - 7 * 86400000;
     else if (dateFilter === "30d") fromTs = now.getTime() - 30 * 86400000;
 
+    // Drill-down date range from search params (yyyy-MM-dd, inclusive on both ends).
+    // Overrides the quick date buttons above so a chart-click narrows precisely.
+    if (search.from) {
+      const t = Date.parse(`${search.from}T00:00:00`);
+      if (!Number.isNaN(t)) fromTs = t;
+    }
+    if (search.to) {
+      const t = Date.parse(`${search.to}T00:00:00`);
+      if (!Number.isNaN(t)) toTs = t + 86400000; // exclusive upper bound
+    }
+
+    const specialtyNeedle = search.specialty?.trim().toLowerCase() ?? "";
+
     return rows.filter((r) => {
       if (statusFilter !== "all" && r.status !== statusFilter) return false;
       if (urgencyFilter !== "all" && r.admission_urgency !== urgencyFilter) return false;
       if (locFilter !== "all" && r.current_ward !== locFilter) return false;
+      if (specialtyNeedle && (r.referring_specialty ?? "").trim().toLowerCase() !== specialtyNeedle) return false;
       if (fromTs !== null) {
         const t = new Date(r.referral_received_at).getTime();
         if (t < fromTs) return false;
@@ -265,7 +279,7 @@ function ReferralsList() {
         .filter(Boolean)
         .some((v) => v!.toString().toLowerCase().includes(needle));
     });
-  }, [rows, q, hospSearch, statusFilter, urgencyFilter, locFilter, dateFilter]);
+  }, [rows, q, hospSearch, statusFilter, urgencyFilter, locFilter, dateFilter, search.specialty, search.from, search.to]);
 
   const displayed = useMemo(() => {
     if (timerSort === "none") return filtered;
