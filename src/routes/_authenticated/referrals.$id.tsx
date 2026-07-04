@@ -209,6 +209,16 @@ function ReferralDetail() {
 
   const missingRecipients = directory.filter((r) => !r.public_key && r.user_id !== user?.id);
   const eligibleRecipientCount = Array.from(selectedRecipients).length;
+  // Teammates who will NOT be able to read the note as currently composed —
+  // split by reason so the inline warning can spell out exactly who is excluded.
+  const excludedMissingKey = directory.filter(
+    (r) => r.user_id !== user?.id && !r.public_key,
+  );
+  const excludedDeselected = directory.filter(
+    (r) => r.user_id !== user?.id && !!r.public_key && !selectedRecipients.has(r.user_id),
+  );
+  const partialCoverage =
+    eligibleRecipientCount > 0 && (excludedMissingKey.length + excludedDeselected.length) > 0;
 
   const loadRef = async () => {
     try {
