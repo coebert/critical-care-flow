@@ -444,6 +444,64 @@ function AnalyticsPage() {
         </div>
       </Card>
 
+      <Card className="p-5 mb-6">
+        <div className="flex items-baseline justify-between gap-3 mb-3 flex-wrap">
+          <div>
+            <h2 className="font-semibold">ICNARC compliance trend</h2>
+            <p className="text-xs text-muted-foreground">
+              % within target for referral → first seen (≤{ICNARC_TIME_TO_SEEN_TARGET_MIN} min) and decision → on unit (≤{Math.round(ICNARC_DECISION_TO_ARRIVAL_TARGET_MIN / 60)} h).
+            </p>
+          </div>
+          <div className="flex gap-1">
+            {(["day", "week", "month"] as const).map((g) => (
+              <Button
+                key={g}
+                size="sm"
+                variant={complianceBucket === g ? "default" : "outline"}
+                onClick={() => setComplianceBucket(g)}
+              >
+                {g[0].toUpperCase() + g.slice(1)}
+              </Button>
+            ))}
+          </div>
+        </div>
+        <div className="h-72">
+          <ResponsiveContainer width="100%" height="100%">
+            <LineChart data={complianceTrend}>
+              <CartesianGrid strokeDasharray="3 3" opacity={0.3} />
+              <XAxis dataKey="date" fontSize={11} />
+              <YAxis domain={[0, 100]} tickFormatter={(v) => `${v}%`} fontSize={11} />
+              <Tooltip
+                formatter={(v: number | null, name: string) =>
+                  v == null ? ["—", name] : [`${v.toFixed(0)}%`, name]
+                }
+              />
+              <Legend wrapperStyle={{ fontSize: 11 }} />
+              <Line
+                type="monotone"
+                dataKey="seenPct"
+                name="Referral → first seen"
+                stroke="var(--chart-1)"
+                strokeWidth={2}
+                connectNulls
+                dot={{ r: 3 }}
+              />
+              <Line
+                type="monotone"
+                dataKey="arrivalPct"
+                name="Decision → on unit"
+                stroke="var(--chart-2)"
+                strokeWidth={2}
+                connectNulls
+                dot={{ r: 3 }}
+              />
+            </LineChart>
+          </ResponsiveContainer>
+        </div>
+      </Card>
+
+
+
 
 
       {admittedMissingConsultant > 0 && (
