@@ -319,6 +319,35 @@ export function decidePostopUpdate(
   return { kind: "allow" };
 }
 
+export type PostopRestoreRow = {
+  created_by: string | null;
+  deleted_at: string | null;
+} | null;
+
+export type PostopRestoreDecision =
+  | { kind: "not_found" }
+  | { kind: "not_deleted" }
+  | { kind: "forbidden" }
+  | { kind: "allow" };
+
+/**
+ * Pure authorization helper used by `restorePostopBooking`. A soft-deleted
+ * booking may only be restored by its original creator or by an admin. This
+ * mirrors the `postop_bookings_guard_soft_delete` trigger so the server can
+ * return a clear error rather than surfacing a Postgres 42501. Exposed so
+ * unit tests can exercise every branch without a live Supabase context.
+ */
+export function decidePostopRestore(
+  row: PostopRestoreRow,
+  userId: string,
+  isAdmin: boolean,
+): PostopRestoreDecision {
+  if (!row) return { kind: "not_found" };
+  if (!row.deleted_at) return { kind: "not_deleted" };
+  if (row.created_by !== userId && !isAdmin) return { kind: "forbidden" };
+  return { kind: "allow" };
+}
+
 export const deletePostopBooking = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((d) => z.object({ id: z.string().uuid() }).parse(d))
@@ -386,8 +415,26 @@ export const restorePostopBooking = createServerFn({ method: "POST" })
         .eq("id", data.id)
         .maybeSingle();
       if (fetchErr) throw fetchErr;
-      if (!existing) throw new Error("Booking not found");
-      if (!existing.deleted_at) return { id: data.id };
+
+      const { data: isAdmin } = await context.supabase.rpc("has_role", {
+        _user_id: context.userId,
+        _role: "admin",
+      });
+
+      const decision = decidePostopRestore(
+        existing as PostopRestoreRow,
+        context.userId,
+        !!isAdmin,
+      );
+      if (decision.kind === "not_found") throw new Error("Booking not found");
+      if (decision.kind === "not_deleted") return { id: data.id };
+      if (decision.kind === "forbidden") {
+        throw safeError(
+          "restorePostopBooking",
+          new Error("forbidden"),
+          "Only the creator or an admin can restore this booking",
+        );
+      }
 
       const { error } = await context.supabase
         .from("postop_bookings")
