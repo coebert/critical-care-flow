@@ -277,6 +277,14 @@ function ReferralDetail() {
 
 
 
+  const filteredNotes = notes.filter((n) => {
+    if (noteFilter === "all") return true;
+    if (noteFilter === "e2e") return n._e2eStatus === "e2e-decrypted" || n._e2eStatus === "e2e-locked" || n._e2eStatus === "e2e-no-key" || n._e2eStatus === "e2e-failed";
+    if (noteFilter === "legacy") return n._e2eStatus === "legacy-server-enc" || n._e2eStatus === "plaintext";
+    if (noteFilter === "failed") return n._e2eStatus === "e2e-failed";
+    return true;
+  });
+
   if (!ref) return <div className="p-6 text-muted-foreground">Loading…</div>;
 
   const canDelete = !!user && (user.id === ref.created_by || isAdmin);
