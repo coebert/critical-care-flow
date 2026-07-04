@@ -171,7 +171,20 @@ function ReferralDetail() {
     try {
       const d = (await fetchKeyDir({ data: undefined as any })) as any[];
       const list = (d ?? []) as Array<{ user_id: string; full_name: string; public_key: string | null }>;
-      setDirectory(list);
+      setDirectory((prev) => {
+        // Detect teammates who newly published a key since the last snapshot
+        // and surface it — helps the author know the block might now lift.
+        const wasMissing = new Map(prev.map((r) => [r.user_id, !r.public_key] as const));
+        const newlyEnrolled = list.filter(
+          (r) => r.public_key && wasMissing.get(r.user_id) === true && r.user_id !== user?.id,
+        );
+        if (newlyEnrolled.length > 0 && prev.length > 0) {
+          const names = newlyEnrolled.map((r) => r.full_name).slice(0, 3).join(", ");
+          const extra = newlyEnrolled.length > 3 ? ` and ${newlyEnrolled.length - 3} more` : "";
+          toast.success(`${names}${extra} enabled encryption — recipients updated.`);
+        }
+        return list;
+      });
       return list;
     } catch { return null; }
   };
@@ -273,10 +286,30 @@ function ReferralDetail() {
         () => { loadRef(); })
       .on("postgres_changes", { event: "*", schema: "public", table: "referral_notes", filter: `referral_id=eq.${id}` },
         () => { loadNotes(); })
+      // A teammate publishing / rotating / removing their public key changes
+      // who this note can be encrypted for. Refresh the directory live so the
+      // compose UI and the missing-recipients block reflect reality.
+      .on("postgres_changes", { event: "*", schema: "public", table: "user_public_keys" },
+        () => { loadDirectory(); })
       .subscribe();
-    return () => { supabase.removeChannel(ch); };
+
+    // Also re-check when the tab regains focus / comes back online, in case
+    // realtime dropped an event while the tab was backgrounded.
+    const refresh = () => { loadDirectory(); };
+    const onVis = () => { if (document.visibilityState === "visible") refresh(); };
+    window.addEventListener("focus", refresh);
+    window.addEventListener("online", refresh);
+    document.addEventListener("visibilitychange", onVis);
+
+    return () => {
+      supabase.removeChannel(ch);
+      window.removeEventListener("focus", refresh);
+      window.removeEventListener("online", refresh);
+      document.removeEventListener("visibilitychange", onVis);
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id]);
+
 
   // Fetch other declined referrals for the same patient.
   useEffect(() => {
