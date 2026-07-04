@@ -320,6 +320,44 @@ function ReferralsList() {
         </div>
       </div>
 
+      {(search.specialty || search.from || search.to) && (
+        <div className="mb-4 flex flex-wrap items-center gap-2 rounded-md border bg-muted/30 px-3 py-2 text-sm">
+          <span className="text-xs uppercase text-muted-foreground">Drill-down</span>
+          {search.specialty && (
+            <Badge variant="secondary" className="gap-1">
+              Specialty: {search.specialty}
+              <button
+                type="button"
+                aria-label="Clear specialty filter"
+                className="ml-1 opacity-70 hover:opacity-100"
+                onClick={() => navigate({ to: "/", search: (p) => ({ ...p, specialty: undefined }) })}
+              >×</button>
+            </Badge>
+          )}
+          {(search.from || search.to) && (
+            <Badge variant="secondary" className="gap-1">
+              Date: {search.from ?? "…"}{search.to && search.to !== search.from ? ` → ${search.to}` : ""}
+              <button
+                type="button"
+                aria-label="Clear date filter"
+                className="ml-1 opacity-70 hover:opacity-100"
+                onClick={() => navigate({ to: "/", search: (p) => ({ ...p, from: undefined, to: undefined }) })}
+              >×</button>
+            </Badge>
+          )}
+          <Button
+            variant="ghost"
+            size="sm"
+            className="ml-auto h-7"
+            onClick={() => navigate({ to: "/", search: {} })}
+          >
+            Clear all
+          </Button>
+        </div>
+      )}
+
+
+
       {showDeleted && (
         <div className="border rounded-md bg-card overflow-hidden mb-6">
           <div className="px-3 py-2 border-b bg-muted/40 text-sm flex items-center justify-between">
