@@ -815,6 +815,46 @@ function ReferralDetail() {
               </AlertDescription>
             </Alert>
           )}
+          {e2e.isUnlocked && partialCoverage && (recipientsTouched || excludedDeselected.length > 0) && (
+            <Alert className="mb-3 border-amber-500/40 bg-amber-500/10 text-amber-900 dark:text-amber-200 [&>svg]:text-amber-600">
+              <ShieldAlert className="w-4 h-4" />
+              <AlertTitle>
+                Only {eligibleRecipientCount} of {eligibleRecipientCount + excludedMissingKey.length + excludedDeselected.length} teammates will be able to read this note
+              </AlertTitle>
+              <AlertDescription>
+                <div className="mb-2 text-xs">
+                  The people below <strong>will not</strong> be able to decrypt this note as composed.
+                  Adjust recipients or ask them to enable encryption before posting.
+                </div>
+                {excludedDeselected.length > 0 && (
+                  <div className="mb-2">
+                    <div className="text-[11px] font-medium uppercase tracking-wide opacity-80">
+                      Deselected ({excludedDeselected.length})
+                    </div>
+                    <ul className="list-disc pl-5 text-xs max-h-24 overflow-auto">
+                      {excludedDeselected.slice(0, 8).map((r) => (
+                        <li key={r.user_id}>{r.full_name}</li>
+                      ))}
+                      {excludedDeselected.length > 8 && <li>and {excludedDeselected.length - 8} more…</li>}
+                    </ul>
+                  </div>
+                )}
+                {excludedMissingKey.length > 0 && (
+                  <div>
+                    <div className="text-[11px] font-medium uppercase tracking-wide opacity-80">
+                      No encryption key yet ({excludedMissingKey.length})
+                    </div>
+                    <ul className="list-disc pl-5 text-xs max-h-24 overflow-auto">
+                      {excludedMissingKey.slice(0, 8).map((r) => (
+                        <li key={r.user_id}>{r.full_name}</li>
+                      ))}
+                      {excludedMissingKey.length > 8 && <li>and {excludedMissingKey.length - 8} more…</li>}
+                    </ul>
+                  </div>
+                )}
+              </AlertDescription>
+            </Alert>
+          )}
           <div className="space-y-2 mb-4">
             <Textarea rows={3} value={noteBody} onChange={(e) => setNoteBody(e.target.value)} placeholder="e.g. seen in ED resus, awaiting bloods, for re-review at 6pm" />
             <div className="flex items-center justify-between gap-2 flex-wrap">
