@@ -278,6 +278,34 @@ export function decidePostopSoftDelete(
   return { kind: "allow" };
 }
 
+export type PostopUpdateRow = {
+  created_by: string | null;
+  deleted_at: string | null;
+} | null;
+
+export type PostopUpdateDecision =
+  | { kind: "not_found" }
+  | { kind: "already_deleted"; deleted_at: string }
+  | { kind: "forbidden" }
+  | { kind: "allow" };
+
+/**
+ * Pure authorization helper used by `updatePostopBooking`. A booking may only
+ * be updated by its original creator or by an admin. Mirrors the RLS policy
+ * on `postop_bookings` so the server returns a clear error instead of a
+ * silent no-op update. Exposed so unit tests can exercise every branch.
+ */
+export function decidePostopUpdate(
+  row: PostopUpdateRow,
+  userId: string,
+  isAdmin: boolean,
+): PostopUpdateDecision {
+  if (!row) return { kind: "not_found" };
+  if (row.deleted_at) return { kind: "already_deleted", deleted_at: row.deleted_at };
+  if (row.created_by !== userId && !isAdmin) return { kind: "forbidden" };
+  return { kind: "allow" };
+}
+
 export const deletePostopBooking = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((d) => z.object({ id: z.string().uuid() }).parse(d))
