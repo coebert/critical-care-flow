@@ -296,9 +296,26 @@ export const updateReferral = createServerFn({ method: "POST" })
     const { supabase, userId } = context;
     const { data: prior } = await supabase
       .from("referrals")
-      .select("status, decline_reason, accepting_consultant, discussed_with_consultant")
+      .select("status, decline_reason, accepting_consultant, discussed_with_consultant, created_by, deleted_at")
       .eq("id", data.id)
       .maybeSingle();
+
+    // Defence-in-depth: RLS already blocks non-creator/non-admin writes to
+    // soft-deleted rows, but we mirror the rule here so the server returns a
+    // clear error instead of a silent no-op update.
+    const { data: isAdmin } = await supabase.rpc("has_role", {
+      _user_id: userId,
+      _role: "admin",
+    });
+    const gate = decideReferralUpdate({
+      row: prior ? { created_by: (prior as any).created_by ?? null, deleted_at: (prior as any).deleted_at ?? null } : null,
+      userId,
+      isAdmin: !!isAdmin,
+    });
+    if (gate.kind === "forbidden_soft_deleted") {
+      throw new Error("Only the creator or an admin can restore this referral");
+    }
+
 
     const finalStatus = data.patch.status ?? prior?.status;
     const finalReason =
