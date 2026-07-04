@@ -306,10 +306,6 @@ function AnalyticsPage() {
   const meanTimeToSeen = mean(timeToSeenSamples);
   const meanDecisionToArrival = mean(decisionToArrivalSamples);
 
-  // ICNARC / GPICS-aligned targets for critical-care referral workflow.
-  // Values are in minutes and can be tuned to local standards.
-  const ICNARC_TIME_TO_SEEN_TARGET_MIN = 30;   // review within 30 min of referral
-  const ICNARC_DECISION_TO_ARRIVAL_TARGET_MIN = 240; // on unit within 4 h of decision
   const icnarc = {
     seen: {
       n: timeToSeenSamples.length,
