@@ -64,6 +64,12 @@ function AuthedShell() {
     useE2ESession.getState().refreshStatus().catch(() => { /* non-fatal */ });
   }, [user?.id]);
 
+  // Subscribe to sibling tabs so a bootstrap / refresh / sign-out in one
+  // tab propagates to this tab's badges and buttons without a reload.
+  useEffect(() => {
+    return initKeyStatusCrossTabSync();
+  }, []);
+
   // Close the mobile drawer on route change
   useEffect(() => {
     setMobileOpen(false);
