@@ -96,7 +96,9 @@ export function E2EUnlockModal({
       if (isBootstrap) {
         await bootstrap(password, async (m) => {
           setStatus("finalizing");
-          return publish({ data: m });
+          // User-driven bootstrap from the unlock modal → audit as "enable"
+          // (vs the sign-in auto-bootstrap, which audits as "issue").
+          return publish({ data: { ...m, source: "enable" as const } });
         });
         toast.success("End-to-end encryption enabled.");
       } else {
