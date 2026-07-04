@@ -156,6 +156,24 @@ function ReferralDetail() {
 
   const e2e = useE2ESession();
   const [unlockOpen, setUnlockOpen] = useState(false);
+  const [directory, setDirectory] = useState<Array<{ user_id: string; full_name: string; public_key: string | null }>>([]);
+  const [confirmMissingOpen, setConfirmMissingOpen] = useState(false);
+  const pendingActionRef = useRef<null | (() => Promise<void>)>(null);
+
+  const loadDirectory = async () => {
+    try {
+      const d = (await fetchKeyDir({ data: undefined as any })) as any[];
+      const list = (d ?? []) as Array<{ user_id: string; full_name: string; public_key: string | null }>;
+      setDirectory(list);
+      return list;
+    } catch { return null; }
+  };
+  useEffect(() => { if (user) loadDirectory(); /* eslint-disable-next-line */ }, [user?.id, e2e.isUnlocked]);
+
+  const missingRecipients = directory.filter((r) => !r.public_key && r.user_id !== user?.id);
+  const eligibleRecipientCount =
+    directory.filter((r) => !!r.public_key).length +
+    (e2e.publicKey && !directory.some((r) => r.user_id === user?.id && !!r.public_key) ? 1 : 0);
 
   const loadRef = async () => {
     try {
@@ -335,9 +353,7 @@ function ReferralDetail() {
     return e2eEncryptNote(body, recipients);
   };
 
-  const postNote = async () => {
-    if (!noteBody.trim()) return;
-    if (!e2e.isUnlocked) { setUnlockOpen(true); return; }
+  const doPostNote = async () => {
     setPosting(true);
     try {
       const enc = await encryptForRecipients(noteBody.trim());
@@ -348,6 +364,20 @@ function ReferralDetail() {
     } finally {
       setPosting(false);
     }
+  };
+
+  const postNote = async () => {
+    if (!noteBody.trim()) return;
+    if (!e2e.isUnlocked) { setUnlockOpen(true); return; }
+    // Refresh directory just before posting so the warning reflects reality.
+    const list = await loadDirectory();
+    const missing = (list ?? directory).filter((r) => !r.public_key && r.user_id !== user?.id);
+    if (missing.length > 0) {
+      pendingActionRef.current = doPostNote;
+      setConfirmMissingOpen(true);
+      return;
+    }
+    await doPostNote();
   };
 
   const onDelete = async () => {
@@ -651,9 +681,35 @@ function ReferralDetail() {
           <p className="text-xs text-muted-foreground mb-3">
             Messages are end-to-end encrypted in your browser — the server only stores ciphertext.
           </p>
+          {e2e.isUnlocked && missingRecipients.length > 0 && (
+            <Alert variant="destructive" className="mb-3">
+              <ShieldAlert className="w-4 h-4" />
+              <AlertTitle>
+                {missingRecipients.length} teammate{missingRecipients.length === 1 ? "" : "s"} can't read encrypted notes yet
+              </AlertTitle>
+              <AlertDescription>
+                <div className="mb-2">
+                  They haven't enabled end-to-end encryption on their account, so anything you post now will be
+                  <strong> undecryptable for them</strong> until they enroll and you re-post. Ask them to open the
+                  noteboard and choose <em>Enable encryption</em>.
+                </div>
+                <ul className="list-disc pl-5 text-xs max-h-24 overflow-auto">
+                  {missingRecipients.slice(0, 8).map((r) => (
+                    <li key={r.user_id}>{r.full_name}</li>
+                  ))}
+                  {missingRecipients.length > 8 && <li>and {missingRecipients.length - 8} more…</li>}
+                </ul>
+              </AlertDescription>
+            </Alert>
+          )}
           <div className="space-y-2 mb-4">
             <Textarea rows={3} value={noteBody} onChange={(e) => setNoteBody(e.target.value)} placeholder="e.g. seen in ED resus, awaiting bloods, for re-review at 6pm" />
-            <div className="flex justify-end">
+            <div className="flex items-center justify-between gap-2">
+              <span className="text-[11px] text-muted-foreground">
+                {e2e.isUnlocked
+                  ? `Will be readable by ${eligibleRecipientCount} teammate${eligibleRecipientCount === 1 ? "" : "s"}.`
+                  : ""}
+              </span>
               <Button size="sm" onClick={postNote} disabled={posting || !noteBody.trim()}>
                 {posting ? "Posting…" : e2e.isUnlocked ? "Post encrypted note" : "Unlock & post"}
               </Button>
@@ -694,6 +750,50 @@ function ReferralDetail() {
           onOpenChange={setUnlockOpen}
           onUnlocked={() => { loadNotes(); }}
         />
+
+        <AlertDialog open={confirmMissingOpen} onOpenChange={setConfirmMissingOpen}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle className="flex items-center gap-2">
+                <ShieldAlert className="w-4 h-4 text-destructive" />
+                Some teammates won't be able to read this note
+              </AlertDialogTitle>
+              <AlertDialogDescription asChild>
+                <div className="space-y-2 text-sm">
+                  <div>
+                    The following {missingRecipients.length} teammate{missingRecipients.length === 1 ? "" : "s"} haven't enabled
+                    end-to-end encryption yet. If you post now, they won't be able to decrypt this note —
+                    even later, after they enroll.
+                  </div>
+                  <ul className="list-disc pl-5 text-xs max-h-32 overflow-auto">
+                    {missingRecipients.map((r) => (
+                      <li key={r.user_id}>{r.full_name}</li>
+                    ))}
+                  </ul>
+                  <div>
+                    It will still be readable by {eligibleRecipientCount} enrolled teammate{eligibleRecipientCount === 1 ? "" : "s"}.
+                    You can cancel and ask the missing teammates to enable encryption first.
+                  </div>
+                </div>
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel onClick={() => { pendingActionRef.current = null; }}>
+                Cancel
+              </AlertDialogCancel>
+              <AlertDialogAction
+                onClick={async () => {
+                  const fn = pendingActionRef.current;
+                  pendingActionRef.current = null;
+                  setConfirmMissingOpen(false);
+                  if (fn) await fn();
+                }}
+              >
+                Post to enrolled teammates only
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
 
 
         <Card className="p-5">
