@@ -1,7 +1,7 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useMemo, useState } from "react";
 import { z } from "zod";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { PostopAnalyticsPanel } from "@/components/postop-analytics-panel";
@@ -11,8 +11,16 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { CalendarIcon } from "lucide-react";
+import {
+  Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription,
+  DialogFooter, DialogTrigger, DialogClose,
+} from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { CalendarIcon, Settings2 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { supabase } from "@/integrations/supabase/client";
+import { toast } from "sonner";
 import type { DateRange } from "react-day-picker";
 import type { Tables } from "@/integrations/supabase/types";
 import {
@@ -85,6 +93,22 @@ function AnalyticsPage() {
     queryKey: ["analytics", "postop", fromIso, toIso],
     queryFn: () => postopFn({ data: { from: fromIso, to: toIso } }),
   });
+
+  const queryClient = useQueryClient();
+  const { data: icnarcTargets } = useQuery({
+    queryKey: ["icnarc-targets"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("icnarc_targets")
+        .select("time_to_seen_target_min, decision_to_arrival_target_min")
+        .maybeSingle();
+      if (error) throw error;
+      return data;
+    },
+  });
+  // ICNARC / GPICS-aligned targets, configurable via the dialog below.
+  const ICNARC_TIME_TO_SEEN_TARGET_MIN = icnarcTargets?.time_to_seen_target_min ?? 30;
+  const ICNARC_DECISION_TO_ARRIVAL_TARGET_MIN = icnarcTargets?.decision_to_arrival_target_min ?? 240;
 
   const filtered = useMemo(() => {
     return rows.filter((r) => {
@@ -282,10 +306,6 @@ function AnalyticsPage() {
   const meanTimeToSeen = mean(timeToSeenSamples);
   const meanDecisionToArrival = mean(decisionToArrivalSamples);
 
-  // ICNARC / GPICS-aligned targets for critical-care referral workflow.
-  // Values are in minutes and can be tuned to local standards.
-  const ICNARC_TIME_TO_SEEN_TARGET_MIN = 30;   // review within 30 min of referral
-  const ICNARC_DECISION_TO_ARRIVAL_TARGET_MIN = 240; // on unit within 4 h of decision
   const icnarc = {
     seen: {
       n: timeToSeenSamples.length,
@@ -421,10 +441,17 @@ function AnalyticsPage() {
 
       <Card className="p-5 mb-6">
         <div className="flex items-baseline justify-between gap-3 mb-4 flex-wrap">
-          <h2 className="font-semibold">ICNARC timing KPIs</h2>
-          <span className="text-xs text-muted-foreground">
-            Referral-workflow targets aligned to ICNARC / GPICS timing standards.
-          </span>
+          <div className="flex items-baseline gap-3 flex-wrap">
+            <h2 className="font-semibold">ICNARC timing KPIs</h2>
+            <span className="text-xs text-muted-foreground">
+              Referral-workflow targets aligned to ICNARC / GPICS timing standards.
+            </span>
+          </div>
+          <IcnarcTargetsDialog
+            timeToSeen={ICNARC_TIME_TO_SEEN_TARGET_MIN}
+            decisionToArrival={ICNARC_DECISION_TO_ARRIVAL_TARGET_MIN}
+            onSaved={() => queryClient.invalidateQueries({ queryKey: ["icnarc-targets"] })}
+          />
         </div>
         <div className="grid md:grid-cols-2 gap-4">
           <IcnarcKpi
@@ -858,5 +885,121 @@ function IcnarcKpi({
         <span>n = {n}</span>
       </div>
     </div>
+  );
+}
+
+function IcnarcTargetsDialog({
+  timeToSeen,
+  decisionToArrival,
+  onSaved,
+}: {
+  timeToSeen: number;
+  decisionToArrival: number;
+  onSaved: () => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const [seen, setSeen] = useState(String(timeToSeen));
+  const [arrival, setArrival] = useState(String(decisionToArrival));
+  const [saving, setSaving] = useState(false);
+
+  // Re-sync inputs when the dialog opens or upstream targets change.
+  const openDialog = (next: boolean) => {
+    if (next) {
+      setSeen(String(timeToSeen));
+      setArrival(String(decisionToArrival));
+    }
+    setOpen(next);
+  };
+
+  const handleSave = async () => {
+    const seenMin = Number(seen);
+    const arrivalMin = Number(arrival);
+    if (!Number.isFinite(seenMin) || seenMin <= 0 || seenMin > 100000) {
+      toast.error("Referral → first seen must be between 1 and 100000 minutes.");
+      return;
+    }
+    if (!Number.isFinite(arrivalMin) || arrivalMin <= 0 || arrivalMin > 100000) {
+      toast.error("Decision → on unit must be between 1 and 100000 minutes.");
+      return;
+    }
+    setSaving(true);
+    const { data: { user } } = await supabase.auth.getUser();
+    const { error } = await supabase
+      .from("icnarc_targets")
+      .update({
+        time_to_seen_target_min: Math.round(seenMin),
+        decision_to_arrival_target_min: Math.round(arrivalMin),
+        updated_by: user?.id ?? null,
+      })
+      .eq("id", true);
+    setSaving(false);
+    if (error) {
+      toast.error(error.message || "Could not save thresholds.");
+      return;
+    }
+    toast.success("ICNARC thresholds updated.");
+    onSaved();
+    setOpen(false);
+  };
+
+  return (
+    <Dialog open={open} onOpenChange={openDialog}>
+      <DialogTrigger asChild>
+        <Button size="sm" variant="outline">
+          <Settings2 className="mr-2 h-4 w-4" />
+          Edit targets
+        </Button>
+      </DialogTrigger>
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>ICNARC timing targets</DialogTitle>
+          <DialogDescription>
+            Thresholds are shared across all clinicians and used to compute % within target
+            on this page.
+          </DialogDescription>
+        </DialogHeader>
+        <div className="grid gap-4 py-2">
+          <div className="grid gap-2">
+            <Label htmlFor="icnarc-seen">Referral → first seen (minutes)</Label>
+            <Input
+              id="icnarc-seen"
+              type="number"
+              min={1}
+              max={100000}
+              step={1}
+              value={seen}
+              onChange={(e) => setSeen(e.target.value)}
+            />
+            <p className="text-xs text-muted-foreground">
+              Default 30 min. Currently {timeToSeen} min.
+            </p>
+          </div>
+          <div className="grid gap-2">
+            <Label htmlFor="icnarc-arrival">Decision → on unit (minutes)</Label>
+            <Input
+              id="icnarc-arrival"
+              type="number"
+              min={1}
+              max={100000}
+              step={1}
+              value={arrival}
+              onChange={(e) => setArrival(e.target.value)}
+            />
+            <p className="text-xs text-muted-foreground">
+              Default 240 min (4 h). Currently {decisionToArrival} min
+              {" "}(≈ {(decisionToArrival / 60).toFixed(1)} h).
+            </p>
+          </div>
+        </div>
+        <DialogFooter>
+          <DialogClose asChild>
+            <Button variant="ghost" disabled={saving}>Cancel</Button>
+          </DialogClose>
+          <Button onClick={handleSave} disabled={saving}>
+            {saving ? "Saving…" : "Save thresholds"}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   );
 }
