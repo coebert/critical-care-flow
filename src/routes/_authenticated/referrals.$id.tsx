@@ -28,7 +28,8 @@ import type { Tables } from "@/integrations/supabase/types";
 import { ComboboxAdd } from "@/components/combobox-add";
 import { useReferralOptions } from "@/hooks/use-referral-options";
 import { NoteRecipientPicker } from "@/components/note-recipient-picker";
-import { ArrowLeft, History, Pencil, Save, Trash2, X, ChevronDown, AlertCircle, Lock, LockOpen, ShieldAlert, ShieldCheck, ShieldOff } from "lucide-react";
+import { ArrowLeft, History, Pencil, Save, Trash2, X, ChevronDown, AlertCircle, Lock, LockOpen, ShieldAlert, ShieldCheck, ShieldOff, Users } from "lucide-react";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { format, formatDistanceToNow } from "date-fns";
 import { toast } from "sonner";
 import { validateReferralTimings } from "@/lib/referral-validation";
@@ -1201,14 +1202,16 @@ function NoteItem({
       ) : (
         <div className="whitespace-pre-wrap">{note.body}</div>
       )}
-      {isE2E && !editing && recipientList.length > 0 && (
-        <div className="mt-1 text-[10px] text-muted-foreground">
-          Encrypted for {recipientList.length} recipient{recipientList.length === 1 ? "" : "s"}
-          {recipientList.length <= 6 && (
-            <>: {recipientList.map((uid) => authorMap[uid] ?? "Clinician").join(", ")}</>
-          )}
-        </div>
+      {isE2E && !editing && (
+        <NoteAudienceInfo
+          recipientIds={recipientList}
+          directory={directory}
+          authorId={note.author_id}
+          currentUserId={currentUserId}
+          authorMap={authorMap}
+        />
       )}
+
 
       <div className="mt-1 flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
         <NoteHistoryButton noteId={note.id} />
@@ -1261,6 +1264,119 @@ function E2EBadge({ status }: { status?: Note["_e2eStatus"] }) {
     <span title={title} className={`inline-flex items-center gap-1 text-[10px] leading-none px-1.5 py-0.5 rounded border ${className}`}>
       <Icon className="w-3 h-3" /> {label}
     </span>
+  );
+}
+
+function NoteAudienceInfo({
+  recipientIds,
+  directory,
+  authorId,
+  currentUserId,
+  authorMap,
+}: {
+  recipientIds: string[];
+  directory: Array<{ user_id: string; full_name: string; public_key: string | null }>;
+  authorId: string;
+  currentUserId?: string;
+  authorMap: Record<string, string>;
+}) {
+  const recipientSet = new Set(recipientIds);
+  const nameFor = (uid: string) =>
+    directory.find((r) => r.user_id === uid)?.full_name ?? authorMap[uid] ?? "Clinician";
+
+  const canDecrypt = recipientIds.map((uid) => ({ user_id: uid, full_name: nameFor(uid) }));
+  // Everyone in the directory who wasn't a recipient of this note.
+  const excluded = directory.filter((r) => !recipientSet.has(r.user_id) && r.user_id !== authorId);
+  const excludedMissingKey = excluded.filter((r) => !r.public_key);
+  const excludedWithKey = excluded.filter((r) => !!r.public_key);
+  const youAreExcluded =
+    !!currentUserId && currentUserId !== authorId && !recipientSet.has(currentUserId);
+
+  return (
+    <div className="mt-1 flex items-center gap-2 text-[10px] text-muted-foreground">
+      <Popover>
+        <PopoverTrigger asChild>
+          <button
+            type="button"
+            className="inline-flex items-center gap-1 hover:text-foreground hover:underline"
+          >
+            <Users className="w-3 h-3" />
+            {canDecrypt.length} can read
+            {excluded.length > 0 && ` · ${excluded.length} cannot`}
+          </button>
+        </PopoverTrigger>
+        <PopoverContent className="w-80 p-0" align="start">
+          <div className="p-3 border-b">
+            <div className="text-sm font-medium">Who can read this note</div>
+            <div className="text-xs text-muted-foreground mt-0.5">
+              Based on the recipient set at post time and the current key directory.
+            </div>
+          </div>
+          <div className="max-h-72 overflow-auto p-3 space-y-3 text-xs">
+            <section>
+              <div className="flex items-center gap-1 font-medium text-emerald-700 dark:text-emerald-400 mb-1">
+                <ShieldCheck className="w-3.5 h-3.5" /> Can decrypt ({canDecrypt.length})
+              </div>
+              {canDecrypt.length === 0 ? (
+                <div className="text-muted-foreground italic">No recipients recorded.</div>
+              ) : (
+                <ul className="space-y-0.5 pl-4 list-disc">
+                  {canDecrypt.map((r) => (
+                    <li key={r.user_id}>
+                      {r.full_name}
+                      {r.user_id === currentUserId && <span className="text-muted-foreground"> (you)</span>}
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </section>
+
+            {excludedMissingKey.length > 0 && (
+              <section>
+                <div className="flex items-center gap-1 font-medium text-destructive mb-1">
+                  <ShieldAlert className="w-3.5 h-3.5" /> Cannot decrypt — no public key
+                  ({excludedMissingKey.length})
+                </div>
+                <ul className="space-y-0.5 pl-4 list-disc">
+                  {excludedMissingKey.map((r) => (
+                    <li key={r.user_id} className="flex items-center justify-between gap-2">
+                      <span>{r.full_name}</span>
+                      <span className="text-[10px] text-muted-foreground">no key</span>
+                    </li>
+                  ))}
+                </ul>
+                <div className="mt-2 text-muted-foreground">
+                  Ask them to open the noteboard on any referral and choose{" "}
+                  <span className="italic">Enable encryption</span>. Once they publish a
+                  key, edit and re-save this note to include them.
+                </div>
+              </section>
+            )}
+
+            {excludedWithKey.length > 0 && (
+              <section>
+                <div className="flex items-center gap-1 font-medium text-amber-700 dark:text-amber-400 mb-1">
+                  <ShieldOff className="w-3.5 h-3.5" /> Not selected as a recipient
+                  ({excludedWithKey.length})
+                </div>
+                <ul className="space-y-0.5 pl-4 list-disc">
+                  {excludedWithKey.map((r) => (
+                    <li key={r.user_id}>{r.full_name}</li>
+                  ))}
+                </ul>
+                <div className="mt-2 text-muted-foreground">
+                  These teammates are enrolled but weren't chosen at post time.
+                  Edit the note to add them.
+                </div>
+              </section>
+            )}
+          </div>
+        </PopoverContent>
+      </Popover>
+      {youAreExcluded && (
+        <span className="text-destructive/80">You are not a recipient.</span>
+      )}
+    </div>
   );
 }
 
