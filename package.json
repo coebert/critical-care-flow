@@ -55,6 +55,7 @@
     "date-fns": "^4.1.0",
     "embla-carousel-react": "^8.6.0",
     "input-otp": "^1.4.2",
+    "libsodium-wrappers": "^0.8.4",
     "lucide-react": "^0.575.0",
     "react": "^19.2.0",
     "react-day-picker": "^9.14.0",
@@ -69,12 +70,14 @@
     "vaul": "^1.1.2",
     "vite-tsconfig-paths": "^6.0.2",
     "web-push": "^3.6.7",
-    "zod": "^3.24.2"
+    "zod": "^3.24.2",
+    "zustand": "^5.0.14"
   },
   "devDependencies": {
     "@eslint/js": "^9.32.0",
     "@lovable.dev/vite-tanstack-config": "2.7.0",
     "@playwright/test": "^1.61.0",
+    "@types/libsodium-wrappers": "^0.8.2",
     "@types/node": "^22.16.5",
     "@types/react": "^19.2.0",
     "@types/react-dom": "^19.2.0",

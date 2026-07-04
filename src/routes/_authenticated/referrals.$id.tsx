@@ -2,7 +2,12 @@ import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useEffect, useRef, useState } from "react";
 import { useServerFn } from "@tanstack/react-start";
 import { supabase } from "@/integrations/supabase/client";
-import { addNote, deleteNote, deleteReferral, findReferralsByHospitalNumber, getNoteHistory, getReferralDetail, getReferralHistory, listReferralNotesDecrypted, logReferralView, updateNote, updateReferral, type ReferralAuditEntry, type DecryptedReferral, type DecryptedReferralNote } from "@/lib/referrals.functions";
+import { addNote, deleteNote, deleteReferral, findReferralsByHospitalNumber, getNoteHistory, getReferralDetail, getReferralHistory, logReferralView, updateNote, updateReferral, type ReferralAuditEntry, type DecryptedReferral, type DecryptedReferralNote } from "@/lib/referrals.functions";
+import { addEncryptedNote, listEncryptedNotes, updateEncryptedNote } from "@/lib/encrypted-notes.functions";
+import { getMyPrivateKeyMaterial, getPublicKeyDirectory } from "@/lib/e2e-keys.functions";
+import { decryptNote as e2eDecryptNote, encryptNote as e2eEncryptNote } from "@/lib/e2e-crypto";
+import { useE2ESession } from "@/hooks/use-e2e-session";
+import { E2EUnlockModal } from "@/components/e2e-unlock-modal";
 import { useAuth, useRole } from "@/hooks/use-auth";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -21,7 +26,7 @@ import { Collapsible, CollapsibleTrigger, CollapsibleContent } from "@/component
 import type { Tables } from "@/integrations/supabase/types";
 import { ComboboxAdd } from "@/components/combobox-add";
 import { useReferralOptions } from "@/hooks/use-referral-options";
-import { ArrowLeft, History, Pencil, Save, Trash2, X, ChevronDown, AlertCircle } from "lucide-react";
+import { ArrowLeft, History, Pencil, Save, Trash2, X, ChevronDown, AlertCircle, Lock, LockOpen, ShieldAlert } from "lucide-react";
 import { format, formatDistanceToNow } from "date-fns";
 import { toast } from "sonner";
 import { validateReferralTimings } from "@/lib/referral-validation";
@@ -31,7 +36,13 @@ import { cn } from "@/lib/utils";
 
 
 type Referral = Tables<"referrals"> & DecryptedReferral;
-type Note = Tables<"referral_notes"> & DecryptedReferralNote;
+type Note = Tables<"referral_notes"> & DecryptedReferralNote & {
+  wrapped_key?: string | null;
+  body_ciphertext?: string | null;
+  body_nonce?: string | null;
+  enc_version?: number | null;
+  _e2eStatus?: "plaintext" | "legacy-server-enc" | "e2e-decrypted" | "e2e-locked" | "e2e-no-key" | "e2e-failed";
+};
 
 export const Route = createFileRoute("/_authenticated/referrals/$id")({
   validateSearch: (search: Record<string, unknown>) => ({
@@ -136,8 +147,15 @@ function ReferralDetail() {
   };
 
   const fetchDetail = useServerFn(getReferralDetail);
-  const fetchNotes = useServerFn(listReferralNotesDecrypted);
+  const fetchNotes = useServerFn(listEncryptedNotes);
   const fetchPriors = useServerFn(findReferralsByHospitalNumber);
+  const fetchKeyMaterial = useServerFn(getMyPrivateKeyMaterial);
+  const fetchKeyDir = useServerFn(getPublicKeyDirectory);
+  const submitEncNote = useServerFn(addEncryptedNote);
+  const editEncNote = useServerFn(updateEncryptedNote);
+
+  const e2e = useE2ESession();
+  const [unlockOpen, setUnlockOpen] = useState(false);
 
   const loadRef = async () => {
     try {
@@ -148,14 +166,46 @@ function ReferralDetail() {
     }
   };
 
+  // Bootstrap E2E session: load stored key material once per session.
+  useEffect(() => {
+    if (!user) return;
+    if (e2e.material || e2e.needsBootstrap) return;
+    fetchKeyMaterial({ data: undefined as any })
+      .then((res: any) => {
+        e2e.setMaterial(res?.material ?? null, res?.public_key ?? null);
+      })
+      .catch(() => {});
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user?.id]);
+
+  const decryptNoteRow = async (n: any): Promise<Note> => {
+    if (n.body_ciphertext && n.body_nonce) {
+      if (!n.wrapped_key) return { ...n, body: null, _e2eStatus: "e2e-no-key" };
+      if (!e2e.isUnlocked || !e2e.privateKey || !e2e.publicKey) {
+        return { ...n, body: null, _e2eStatus: "e2e-locked" };
+      }
+      try {
+        const body = await e2eDecryptNote(
+          { body_ciphertext: n.body_ciphertext, body_nonce: n.body_nonce, wrapped_key: n.wrapped_key },
+          { publicKey: e2e.publicKey, privateKey: e2e.privateKey },
+        );
+        return { ...n, body, _e2eStatus: "e2e-decrypted" };
+      } catch {
+        return { ...n, body: null, _e2eStatus: "e2e-failed" };
+      }
+    }
+    if (n.body_enc) return { ...n, _e2eStatus: "legacy-server-enc" };
+    return { ...n, _e2eStatus: "plaintext" };
+  };
+
   const loadNotes = async () => {
     try {
       const data = await fetchNotes({ data: { referral_id: id } });
-      // Show newest first to match prior UI.
       const sorted = [...(data ?? [])].sort(
         (a: any, b: any) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime(),
       );
-      setNotes(sorted as Note[]);
+      const decrypted = await Promise.all(sorted.map((n) => decryptNoteRow(n)));
+      setNotes(decrypted);
       const ids = Array.from(new Set(sorted.map((n: any) => n.author_id)));
       if (ids.length) {
         const { data: ps } = await supabase
@@ -272,11 +322,26 @@ function ReferralDetail() {
     }
   };
 
+  const encryptForRecipients = async (body: string) => {
+    const dir = await fetchKeyDir({ data: undefined as any });
+    const recipients = (dir ?? [])
+      .filter((r: any) => !!r.public_key)
+      .map((r: any) => ({ user_id: r.user_id, public_key: r.public_key as string }));
+    // Ensure the author can decrypt their own note too.
+    if (e2e.publicKey && user && !recipients.some((r) => r.user_id === user.id)) {
+      recipients.push({ user_id: user.id, public_key: e2e.publicKey });
+    }
+    if (!recipients.length) throw new Error("No teammates have enabled end-to-end encryption yet.");
+    return e2eEncryptNote(body, recipients);
+  };
+
   const postNote = async () => {
     if (!noteBody.trim()) return;
+    if (!e2e.isUnlocked) { setUnlockOpen(true); return; }
     setPosting(true);
     try {
-      await addNoteFn({ data: { referral_id: id, body: noteBody.trim() } });
+      const enc = await encryptForRecipients(noteBody.trim());
+      await submitEncNote({ data: { referral_id: id, ...enc } });
       setNoteBody("");
     } catch (err: any) {
       toast.error(err.message ?? "Failed to post note");
@@ -564,13 +629,33 @@ function ReferralDetail() {
         </div>
 
         <Card className="p-5">
-          <h2 className="font-semibold mb-1">Noteboard</h2>
-          <p className="text-xs text-muted-foreground mb-3">Messages for the team. Each note is tagged with the author and time.</p>
+          <div className="flex items-center justify-between gap-2 mb-1">
+            <h2 className="font-semibold flex items-center gap-2">
+              Noteboard
+              {e2e.isUnlocked ? (
+                <Badge variant="outline" className="text-[10px] gap-1">
+                  <LockOpen className="w-3 h-3" /> E2E unlocked
+                </Badge>
+              ) : (
+                <Badge variant="outline" className="text-[10px] gap-1">
+                  <Lock className="w-3 h-3" /> E2E locked
+                </Badge>
+              )}
+            </h2>
+            {!e2e.isUnlocked && (
+              <Button size="sm" variant="outline" onClick={() => setUnlockOpen(true)}>
+                {e2e.needsBootstrap ? "Enable encryption" : "Unlock notes"}
+              </Button>
+            )}
+          </div>
+          <p className="text-xs text-muted-foreground mb-3">
+            Messages are end-to-end encrypted in your browser — the server only stores ciphertext.
+          </p>
           <div className="space-y-2 mb-4">
             <Textarea rows={3} value={noteBody} onChange={(e) => setNoteBody(e.target.value)} placeholder="e.g. seen in ED resus, awaiting bloods, for re-review at 6pm" />
             <div className="flex justify-end">
               <Button size="sm" onClick={postNote} disabled={posting || !noteBody.trim()}>
-                {posting ? "Posting…" : "Post note"}
+                {posting ? "Posting…" : e2e.isUnlocked ? "Post encrypted note" : "Unlock & post"}
               </Button>
             </div>
           </div>
@@ -581,10 +666,17 @@ function ReferralDetail() {
                 key={n.id}
                 note={n}
                 authorName={authors[n.author_id] ?? "Clinician"}
-                canEdit={!!user && (user.id === n.author_id || isAdmin)}
+                canEdit={!!user && (user.id === n.author_id || isAdmin) && n._e2eStatus !== "e2e-locked" && n._e2eStatus !== "e2e-no-key" && n._e2eStatus !== "e2e-failed" && n._e2eStatus !== "legacy-server-enc"}
                 onSave={async (body) => {
-                  const updated = await updateNoteFn({ data: { id: n.id, body } });
-                  setNotes((cur) => cur.map((x) => (x.id === n.id ? (updated as Note) : x)));
+                  if (n.body_ciphertext) {
+                    if (!e2e.isUnlocked) { setUnlockOpen(true); return; }
+                    const enc = await encryptForRecipients(body);
+                    await editEncNote({ data: { id: n.id, ...enc } });
+                    await loadNotes();
+                  } else {
+                    const updated = await updateNoteFn({ data: { id: n.id, body } });
+                    setNotes((cur) => cur.map((x) => (x.id === n.id ? { ...x, ...(updated as Note) } : x)));
+                  }
                   toast.success("Note updated");
                 }}
                 onDelete={async () => {
@@ -596,6 +688,13 @@ function ReferralDetail() {
             ))}
           </div>
         </Card>
+
+        <E2EUnlockModal
+          open={unlockOpen}
+          onOpenChange={setUnlockOpen}
+          onUnlocked={() => { loadNotes(); }}
+        />
+
 
         <Card className="p-5">
           <Collapsible
@@ -814,6 +913,17 @@ function NoteItem({
             </Button>
           </div>
         </div>
+      ) : note._e2eStatus === "e2e-locked" ? (
+        <div className="text-xs italic text-muted-foreground flex items-center gap-1"><Lock className="w-3 h-3" /> Encrypted — unlock the noteboard to read.</div>
+      ) : note._e2eStatus === "e2e-no-key" ? (
+        <div className="text-xs italic text-muted-foreground flex items-center gap-1"><ShieldAlert className="w-3 h-3" /> Encrypted — you were not a recipient of this note.</div>
+      ) : note._e2eStatus === "e2e-failed" ? (
+        <div className="text-xs italic text-destructive flex items-center gap-1"><ShieldAlert className="w-3 h-3" /> Could not decrypt this note.</div>
+      ) : note._e2eStatus === "legacy-server-enc" || note._e2eStatus === "plaintext" ? (
+        <>
+          <div className="whitespace-pre-wrap">{note.body}</div>
+          <div className="mt-1 text-[10px] italic text-muted-foreground">Legacy note — not end-to-end encrypted.</div>
+        </>
       ) : (
         <div className="whitespace-pre-wrap">{note.body}</div>
       )}
