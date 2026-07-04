@@ -167,6 +167,10 @@ function ReferralDetail() {
   const pendingActionRef = useRef<null | (() => Promise<void>)>(null);
   const [selectedRecipients, setSelectedRecipients] = useState<Set<string>>(new Set());
   const [recipientsTouched, setRecipientsTouched] = useState(false);
+  // Teammates who published/rotated a key since this session loaded the
+  // directory — highlighted in the compose chip row so the author immediately
+  // sees who just became eligible.
+  const [newlyEligibleIds, setNewlyEligibleIds] = useState<Set<string>>(new Set());
 
   const loadDirectory = async () => {
     try {
