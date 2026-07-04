@@ -102,6 +102,7 @@ const rowBgStyles: Record<string, string> = {
 
 function ReferralsList() {
   const navigate = useNavigate();
+  const search = Route.useSearch();
   const [rows, setRows] = useState<Referral[]>([]);
   const [loading, setLoading] = useState(true);
   const [hospSearch, setHospSearch] = useState("");
