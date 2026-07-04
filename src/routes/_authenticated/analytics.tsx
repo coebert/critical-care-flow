@@ -301,6 +301,49 @@ function AnalyticsPage() {
     },
   };
 
+  const complianceTrend = useMemo(() => {
+    const bucketStart = (d: Date) =>
+      complianceBucket === "day" ? startOfDay(d)
+      : complianceBucket === "week" ? startOfISOWeek(d)
+      : startOfMonth(d);
+    const starts =
+      complianceBucket === "day" ? eachDayOfInterval({ start: from, end: to })
+      : complianceBucket === "week" ? eachWeekOfInterval({ start: from, end: to }, { weekStartsOn: 1 })
+      : eachMonthOfInterval({ start: from, end: to });
+    const labelFmt =
+      complianceBucket === "day" ? "dd MMM"
+      : complianceBucket === "week" ? "'W'II · dd MMM"
+      : "MMM yyyy";
+    type Bucket = { seen: number[]; arrival: number[] };
+    const map = new Map<string, Bucket>();
+    starts.forEach((d) => map.set(bucketStart(d).toISOString(), { seen: [], arrival: [] }));
+    filtered.forEach((r) => {
+      const k = bucketStart(new Date(r.referral_received_at)).toISOString();
+      const b = map.get(k);
+      if (!b) return;
+      if (r.referral_received_at && r.first_seen_at) {
+        const m = differenceInMinutes(new Date(r.first_seen_at), new Date(r.referral_received_at));
+        if (m >= 0) b.seen.push(m);
+      }
+      if (r.decision_at && r.arrived_on_unit_at) {
+        const m = differenceInMinutes(new Date(r.arrived_on_unit_at), new Date(r.decision_at));
+        if (m >= 0) b.arrival.push(m);
+      }
+    });
+    return starts.map((d) => {
+      const b = map.get(bucketStart(d).toISOString())!;
+      return {
+        date: format(d, labelFmt),
+        seenPct: b.seen.length ? pctWithin(b.seen, ICNARC_TIME_TO_SEEN_TARGET_MIN) : null,
+        arrivalPct: b.arrival.length ? pctWithin(b.arrival, ICNARC_DECISION_TO_ARRIVAL_TARGET_MIN) : null,
+        seenN: b.seen.length,
+        arrivalN: b.arrival.length,
+      };
+    });
+  }, [filtered, from, to, complianceBucket, ICNARC_TIME_TO_SEEN_TARGET_MIN, ICNARC_DECISION_TO_ARRIVAL_TARGET_MIN]);
+
+
+
   const search = Route.useSearch();
   const navigate = Route.useNavigate();
   const tab: "referrals" | "postop" = search.view === "postop" ? "postop" : "referrals";
