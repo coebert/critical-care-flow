@@ -76,6 +76,8 @@ function SetupPage() {
       await bootstrap({ data: f });
       const { error } = await supabase.auth.signInWithPassword({ email: f.email, password: f.password });
       if (error) throw error;
+      const { ensureRecipientKey } = await import("@/lib/e2e-auto-bootstrap");
+      await ensureRecipientKey(f.password);
       toast.success("Admin account created");
       navigate({ to: "/", replace: true });
     } catch (err: any) {
