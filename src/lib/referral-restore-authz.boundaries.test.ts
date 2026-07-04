@@ -8,8 +8,8 @@ import {
 // These complement referral-restore-authz.test.ts by exercising the corners
 // around "who counts as the creator" and how the admin escape hatch behaves.
 
-const CREATOR = "11111111-1111-1111-1111-111111111111";
-const CREATOR_UPPER = "11111111-1111-1111-1111-111111111111".toUpperCase();
+const CREATOR = "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee";
+const CREATOR_UPPER = CREATOR.toUpperCase();
 const OTHER = "22222222-2222-2222-2222-222222222222";
 const ADMIN = "33333333-3333-3333-3333-333333333333";
 const NOW = new Date("2026-07-10T12:00:00Z").getTime();
