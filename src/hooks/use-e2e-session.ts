@@ -1,5 +1,6 @@
 import { create } from "zustand";
 import { sodium, unwrapPrivateKey, generateAndWrapKeypair, type PrivateKeyMaterial } from "@/lib/e2e-crypto";
+import { logRecipientKeyUnlock } from "@/lib/e2e-keys.functions";
 
 // Persistence policy:
 // The unwrapped private key is cached in sessionStorage so a page refresh
