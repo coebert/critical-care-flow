@@ -171,7 +171,20 @@ function ReferralDetail() {
     try {
       const d = (await fetchKeyDir({ data: undefined as any })) as any[];
       const list = (d ?? []) as Array<{ user_id: string; full_name: string; public_key: string | null }>;
-      setDirectory(list);
+      setDirectory((prev) => {
+        // Detect teammates who newly published a key since the last snapshot
+        // and surface it — helps the author know the block might now lift.
+        const wasMissing = new Map(prev.map((r) => [r.user_id, !r.public_key] as const));
+        const newlyEnrolled = list.filter(
+          (r) => r.public_key && wasMissing.get(r.user_id) === true && r.user_id !== user?.id,
+        );
+        if (newlyEnrolled.length > 0 && prev.length > 0) {
+          const names = newlyEnrolled.map((r) => r.full_name).slice(0, 3).join(", ");
+          const extra = newlyEnrolled.length > 3 ? ` and ${newlyEnrolled.length - 3} more` : "";
+          toast.success(`${names}${extra} enabled encryption — recipients updated.`);
+        }
+        return list;
+      });
       return list;
     } catch { return null; }
   };
