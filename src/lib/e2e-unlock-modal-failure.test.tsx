@@ -184,7 +184,8 @@ describe("E2EUnlockModal — failed unlock/enable keeps status locked and surfac
 
     await userEvent.clear(screen.getByLabelText(/^password$/i));
     await userEvent.type(screen.getByLabelText(/^password$/i), "still-nope");
-    await userEvent.click(screen.getByRole("button", { name: /try again/i }));
+    // Typing clears the error and reverts the label from "Try again" back to "Unlock".
+    await userEvent.click(screen.getByRole("button", { name: /^unlock$/i }));
 
     await waitFor(() => {
       const alertText = screen.getByRole("alert").textContent ?? "";
