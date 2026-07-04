@@ -251,15 +251,44 @@ function AnalyticsPage() {
     [admittedConsultants, admittedWithConsultant]
   );
 
-  const meanMinutes = (sel: (r: Referral) => [string | null, string | null]) => {
-    const ds = filtered
+  const minutesSamples = (sel: (r: Referral) => [string | null, string | null]) =>
+    filtered
       .map(sel)
       .map(([a, b]) => (a && b ? differenceInMinutes(new Date(b), new Date(a)) : null))
       .filter((x): x is number => x != null && x >= 0);
-    return ds.length ? ds.reduce((a, b) => a + b, 0) / ds.length : 0;
+  const mean = (xs: number[]) => (xs.length ? xs.reduce((a, b) => a + b, 0) / xs.length : 0);
+  const median = (xs: number[]) => {
+    if (!xs.length) return 0;
+    const s = [...xs].sort((a, b) => a - b);
+    const m = Math.floor(s.length / 2);
+    return s.length % 2 ? s[m] : (s[m - 1] + s[m]) / 2;
   };
-  const meanTimeToSeen = meanMinutes((r) => [r.referral_received_at, r.first_seen_at]);
-  const meanDecisionToArrival = meanMinutes((r) => [r.decision_at, r.arrived_on_unit_at]);
+  const pctWithin = (xs: number[], threshold: number) =>
+    xs.length ? (xs.filter((x) => x <= threshold).length / xs.length) * 100 : 0;
+
+  const timeToSeenSamples = minutesSamples((r) => [r.referral_received_at, r.first_seen_at]);
+  const decisionToArrivalSamples = minutesSamples((r) => [r.decision_at, r.arrived_on_unit_at]);
+  const meanTimeToSeen = mean(timeToSeenSamples);
+  const meanDecisionToArrival = mean(decisionToArrivalSamples);
+
+  // ICNARC / GPICS-aligned targets for critical-care referral workflow.
+  // Values are in minutes and can be tuned to local standards.
+  const ICNARC_TIME_TO_SEEN_TARGET_MIN = 30;   // review within 30 min of referral
+  const ICNARC_DECISION_TO_ARRIVAL_TARGET_MIN = 240; // on unit within 4 h of decision
+  const icnarc = {
+    seen: {
+      n: timeToSeenSamples.length,
+      pct: pctWithin(timeToSeenSamples, ICNARC_TIME_TO_SEEN_TARGET_MIN),
+      median: median(timeToSeenSamples),
+      target: ICNARC_TIME_TO_SEEN_TARGET_MIN,
+    },
+    arrival: {
+      n: decisionToArrivalSamples.length,
+      pct: pctWithin(decisionToArrivalSamples, ICNARC_DECISION_TO_ARRIVAL_TARGET_MIN),
+      median: median(decisionToArrivalSamples),
+      target: ICNARC_DECISION_TO_ARRIVAL_TARGET_MIN,
+    },
+  };
 
   const search = Route.useSearch();
   const navigate = Route.useNavigate();
