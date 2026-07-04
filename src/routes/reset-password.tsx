@@ -92,8 +92,16 @@ function ResetPage() {
     if (password.length < 8) return toast.error("Password must be at least 8 characters");
     setLoading(true);
     const { error } = await supabase.auth.updateUser({ password });
+    if (error) {
+      setLoading(false);
+      return toast.error(error.message);
+    }
+    // The new password becomes the wrapping key for the recipient keypair.
+    // If none has been issued yet, issue it now so the user is immediately
+    // reachable as an E2E recipient.
+    const { ensureRecipientKey } = await import("@/lib/e2e-auto-bootstrap");
+    await ensureRecipientKey(password);
     setLoading(false);
-    if (error) return toast.error(error.message);
     toast.success("Password updated");
     navigate({ to: "/", replace: true });
   };
