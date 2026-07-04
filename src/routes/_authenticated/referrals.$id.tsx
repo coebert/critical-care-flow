@@ -460,6 +460,26 @@ function ReferralDetail() {
     return e2eEncryptNote(body, recipients);
   };
 
+  /**
+   * Gate for referral encryption actions. If the recipient key isn't Ready
+   * (unlocked in this tab), queue the action, prompt the user to unlock/enable
+   * encryption, and return false. The queued action re-runs automatically
+   * after a successful unlock via the E2EUnlockModal's onUnlocked callback,
+   * so the user doesn't have to click Post/Save a second time.
+   */
+  const ensureUnlocked = (action: () => Promise<void>): boolean => {
+    if (e2e.isUnlocked) return true;
+    pendingActionRef.current = action;
+    setUnlockOpen(true);
+    toast.info(
+      e2e.needsBootstrap
+        ? "Enable end-to-end encryption to post this note."
+        : "Unlock your recipient key to continue — we'll finish this action for you.",
+    );
+    return false;
+  };
+
+
   const doPostNote = async () => {
     setPosting(true);
     try {
@@ -532,7 +552,7 @@ function ReferralDetail() {
 
   const postNote = async () => {
     if (!noteBody.trim()) return;
-    if (!e2e.isUnlocked) { setUnlockOpen(true); return; }
+    if (!ensureUnlocked(postNote)) return;
     if (selectedRecipients.size === 0) {
       toast.error("Pick at least one recipient for this note.");
       return;
@@ -1051,7 +1071,14 @@ function ReferralDetail() {
                 canEdit={!!user && (user.id === n.author_id || isAdmin) && n._e2eStatus !== "e2e-locked" && n._e2eStatus !== "e2e-no-key" && n._e2eStatus !== "e2e-failed" && n._e2eStatus !== "legacy-server-enc"}
                 onSave={async (body, recipients) => {
                   if (n.body_ciphertext) {
-                    if (!e2e.isUnlocked) { setUnlockOpen(true); return; }
+                    const retry = () => (async () => {
+                      // Re-run this exact edit (same body/recipients) after unlock.
+                      const enc2 = await encryptForRecipients(body, recipients ?? new Set());
+                      await editEncNote({ data: { id: n.id, ...enc2 } });
+                      await loadNotes();
+                      toast.success("Note updated");
+                    })();
+                    if (!ensureUnlocked(() => retry())) return;
                     if (!recipients || recipients.size === 0) {
                       toast.error("Pick at least one recipient before saving.");
                       return;
@@ -1078,8 +1105,27 @@ function ReferralDetail() {
 
         <E2EUnlockModal
           open={unlockOpen}
-          onOpenChange={setUnlockOpen}
-          onUnlocked={async () => { await Promise.all([loadNotes(), loadDirectory()]); }}
+          onOpenChange={(o) => {
+            setUnlockOpen(o);
+            // Cancelling the unlock modal drops any queued encryption action
+            // so a later confirm-missing-recipients flow can't accidentally
+            // run it.
+            if (!o && !e2e.isUnlocked) pendingActionRef.current = null;
+          }}
+          onUnlocked={async () => {
+            await Promise.all([loadNotes(), loadDirectory()]);
+            // If an encryption action prompted the unlock, run it now so the
+            // user doesn't have to click Post/Save a second time.
+            const queued = pendingActionRef.current;
+            if (queued) {
+              pendingActionRef.current = null;
+              try {
+                await queued();
+              } catch (err: any) {
+                toast.error(err?.message ?? "Action failed after unlock");
+              }
+            }
+          }}
         />
 
         <AlertDialog
