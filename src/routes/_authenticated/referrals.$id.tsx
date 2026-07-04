@@ -913,6 +913,17 @@ function NoteItem({
             </Button>
           </div>
         </div>
+      ) : note._e2eStatus === "e2e-locked" ? (
+        <div className="text-xs italic text-muted-foreground flex items-center gap-1"><Lock className="w-3 h-3" /> Encrypted — unlock the noteboard to read.</div>
+      ) : note._e2eStatus === "e2e-no-key" ? (
+        <div className="text-xs italic text-muted-foreground flex items-center gap-1"><ShieldAlert className="w-3 h-3" /> Encrypted — you were not a recipient of this note.</div>
+      ) : note._e2eStatus === "e2e-failed" ? (
+        <div className="text-xs italic text-destructive flex items-center gap-1"><ShieldAlert className="w-3 h-3" /> Could not decrypt this note.</div>
+      ) : note._e2eStatus === "legacy-server-enc" || note._e2eStatus === "plaintext" ? (
+        <>
+          <div className="whitespace-pre-wrap">{note.body}</div>
+          <div className="mt-1 text-[10px] italic text-muted-foreground">Legacy note — not end-to-end encrypted.</div>
+        </>
       ) : (
         <div className="whitespace-pre-wrap">{note.body}</div>
       )}
