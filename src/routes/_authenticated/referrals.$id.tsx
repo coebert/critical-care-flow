@@ -667,14 +667,6 @@ function ReferralDetail() {
           <Button onClick={save} disabled={saving || acceptingConsultantMissing || declineConsultantMissing}><Save className="w-4 h-4 mr-1" />{saving ? "Saving…" : "Save changes"}</Button>
         </div>
 
-  const filteredNotes = notes.filter((n) => {
-    if (noteFilter === "all") return true;
-    if (noteFilter === "e2e") return n._e2eStatus === "e2e-decrypted" || n._e2eStatus === "e2e-locked" || n._e2eStatus === "e2e-no-key" || n._e2eStatus === "e2e-failed";
-    if (noteFilter === "legacy") return n._e2eStatus === "legacy-server-enc" || n._e2eStatus === "plaintext";
-    if (noteFilter === "failed") return n._e2eStatus === "e2e-failed";
-    return true;
-  });
-
         <Card className="p-5">
           <div className="flex items-center justify-between gap-2 mb-1 flex-wrap">
             <div className="flex items-center gap-3 flex-wrap">
