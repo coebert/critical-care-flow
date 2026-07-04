@@ -109,6 +109,7 @@ function AnalyticsPage() {
       if (bookMap.has(k)) bookMap.set(k, (bookMap.get(k) ?? 0) + 1);
     });
     return dayKeys.map((k) => ({
+      key: k,
       date: format(new Date(k), "dd MMM"),
       referrals: refMap.get(k) ?? 0,
       bookings: bookMap.get(k) ?? 0,
