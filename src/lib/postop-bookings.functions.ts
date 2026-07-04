@@ -415,8 +415,26 @@ export const restorePostopBooking = createServerFn({ method: "POST" })
         .eq("id", data.id)
         .maybeSingle();
       if (fetchErr) throw fetchErr;
-      if (!existing) throw new Error("Booking not found");
-      if (!existing.deleted_at) return { id: data.id };
+
+      const { data: isAdmin } = await context.supabase.rpc("has_role", {
+        _user_id: context.userId,
+        _role: "admin",
+      });
+
+      const decision = decidePostopRestore(
+        existing as PostopRestoreRow,
+        context.userId,
+        !!isAdmin,
+      );
+      if (decision.kind === "not_found") throw new Error("Booking not found");
+      if (decision.kind === "not_deleted") return { id: data.id };
+      if (decision.kind === "forbidden") {
+        throw safeError(
+          "restorePostopBooking",
+          new Error("forbidden"),
+          "Only the creator or an admin can restore this booking",
+        );
+      }
 
       const { error } = await context.supabase
         .from("postop_bookings")
