@@ -170,8 +170,147 @@ function ProfilePage() {
         </div>
       </Card>
 
+      <Card className="p-5 space-y-3 border-destructive/30">
+        <div className="flex items-start justify-between gap-3">
+          <div>
+            <h2 className="text-sm font-medium text-muted-foreground uppercase tracking-wide flex items-center gap-2">
+              <RefreshCw className="w-4 h-4" /> Re-issue keypair
+            </h2>
+            <p className="text-xs text-muted-foreground mt-1 max-w-md">
+              Use this if key issuance failed, if you've lost access to your
+              previous key (e.g. forgot the password used to wrap it), or if
+              you suspect the key was compromised.
+            </p>
+          </div>
+        </div>
+        <div className="rounded-md border border-destructive/40 bg-destructive/5 p-3 text-xs text-destructive flex gap-2">
+          <AlertTriangle className="w-4 h-4 shrink-0 mt-0.5" />
+          <span>
+            Re-issuing replaces your current keypair. Any encrypted notes sent
+            to your old key before now will become permanently unreadable to
+            you. Teammates can still read notes you wrote to them.
+          </span>
+        </div>
+        <Button
+          variant="destructive"
+          size="sm"
+          onClick={() => setReissueOpen(true)}
+          disabled={status === "loading"}
+        >
+          <RefreshCw className="w-4 h-4 mr-2" /> Re-issue my keypair
+        </Button>
+      </Card>
+
       <E2EUnlockModal open={unlockOpen} onOpenChange={setUnlockOpen} />
+      <ReissueDialog
+        open={reissueOpen}
+        onOpenChange={setReissueOpen}
+        onConfirm={async (password) => {
+          const { keypair, material } = await generateAndWrapKeypair(password);
+          await reissue({
+            data: {
+              password,
+              public_key: keypair.publicKey,
+              encrypted_private_key: material.encrypted_private_key,
+              kdf_salt: material.kdf_salt,
+              kdf_ops: material.kdf_ops,
+              kdf_mem: material.kdf_mem,
+              nonce: material.nonce,
+            },
+          });
+          // Unlock immediately so the user sees "Ready" without another prompt.
+          const priv = await unwrapPrivateKey(password, material);
+          useE2ESession.setState({
+            publicKey: keypair.publicKey,
+            privateKey: priv,
+            material,
+            isUnlocked: true,
+            needsBootstrap: false,
+          });
+          toast.success("New keypair issued");
+        }}
+      />
     </div>
+  );
+}
+
+function ReissueDialog({
+  open,
+  onOpenChange,
+  onConfirm,
+}: {
+  open: boolean;
+  onOpenChange: (v: boolean) => void;
+  onConfirm: (password: string) => Promise<void>;
+}) {
+  const [password, setPassword] = useState("");
+  const [confirmText, setConfirmText] = useState("");
+  const [busy, setBusy] = useState(false);
+  const canSubmit = password.length >= 8 && confirmText.trim().toUpperCase() === "REISSUE" && !busy;
+
+  const submit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!canSubmit) return;
+    setBusy(true);
+    try {
+      await onConfirm(password);
+      onOpenChange(false);
+      setPassword("");
+      setConfirmText("");
+    } catch (err: any) {
+      toast.error(err?.message ?? "Re-issue failed");
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <Dialog open={open} onOpenChange={(v) => { if (!busy) onOpenChange(v); }}>
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>Re-issue recipient keypair</DialogTitle>
+          <DialogDescription>
+            Confirm your account password to prove it's you. Your new password
+            (same value, unless you also reset it) becomes the wrapping key
+            for the new private key.
+          </DialogDescription>
+        </DialogHeader>
+        <form onSubmit={submit} className="space-y-4">
+          <div className="space-y-1.5">
+            <Label htmlFor="reissue-pw">Current password</Label>
+            <Input
+              id="reissue-pw"
+              type="password"
+              autoComplete="current-password"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              required
+              minLength={8}
+            />
+          </div>
+          <div className="space-y-1.5">
+            <Label htmlFor="reissue-confirm">
+              Type <span className="font-mono">REISSUE</span> to confirm
+            </Label>
+            <Input
+              id="reissue-confirm"
+              value={confirmText}
+              onChange={(e) => setConfirmText(e.target.value)}
+              placeholder="REISSUE"
+              required
+            />
+          </div>
+          <DialogFooter>
+            <Button type="button" variant="ghost" onClick={() => onOpenChange(false)} disabled={busy}>
+              Cancel
+            </Button>
+            <Button type="submit" variant="destructive" disabled={!canSubmit}>
+              {busy ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" /> Issuing…</> : "Re-issue keypair"}
+            </Button>
+          </DialogFooter>
+        </form>
+      </DialogContent>
+    </Dialog>
   );
 }
 
