@@ -1,6 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
-import { useCallback, useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -16,8 +16,8 @@ import {
 } from "@/components/ui/dialog";
 import { KeyRound, ShieldCheck, ShieldAlert, Lock, Loader2, RefreshCw, AlertTriangle } from "lucide-react";
 import { useAuth } from "@/hooks/use-auth";
-import { useE2ESession } from "@/hooks/use-e2e-session";
-import { getMyPrivateKeyMaterial, reissueRecipientKeypair } from "@/lib/e2e-keys.functions";
+import { useE2ESession, useKeyStatus, type KeyStatus } from "@/hooks/use-e2e-session";
+import { reissueRecipientKeypair } from "@/lib/e2e-keys.functions";
 import { generateAndWrapKeypair, unwrapPrivateKey } from "@/lib/e2e-crypto";
 import { E2EUnlockModal } from "@/components/e2e-unlock-modal";
 import { toast } from "sonner";
@@ -33,58 +33,22 @@ export const Route = createFileRoute("/_authenticated/profile")({
   component: ProfilePage,
 });
 
-type Status = "loading" | "ready" | "locked" | "not_issued";
+type Status = KeyStatus;
 
 function ProfilePage() {
   const { user } = useAuth();
   const e2e = useE2ESession();
-  const fetchKeyMaterial = useServerFn(getMyPrivateKeyMaterial);
+  const status = useKeyStatus();
   const reissue = useServerFn(reissueRecipientKeypair);
-  const [status, setStatus] = useState<Status>("loading");
   const [unlockOpen, setUnlockOpen] = useState(false);
   const [reissueOpen, setReissueOpen] = useState(false);
 
-  // Fetch the latest server-side key material and reconcile local status.
-  // Extracted so unlock / enable / re-issue flows can trigger a real-time
-  // refresh instead of waiting for the next mount or reactive nudge.
-  const refreshKeyStatus = useCallback(async (): Promise<void> => {
-    try {
-      if (!useE2ESession.getState().hydrated) {
-        await useE2ESession.getState().hydrateFromSession();
-      }
-      const res: any = await fetchKeyMaterial({ data: undefined as any });
-      useE2ESession.getState().setMaterial(res?.material ?? null, res?.public_key ?? null);
-      if (!res?.material || !res?.public_key) setStatus("not_issued");
-      else if (useE2ESession.getState().isUnlocked) setStatus("ready");
-      else setStatus("locked");
-    } catch {
-      setStatus("not_issued");
-    }
-  }, [fetchKeyMaterial]);
-
+  // The authenticated shell kicks off the initial refresh; re-run whenever
+  // the signed-in user changes (e.g. sign-out + sign-in in the same tab).
   useEffect(() => {
-    let cancelled = false;
-    (async () => {
-      await refreshKeyStatus();
-      if (cancelled) return;
-    })();
-    return () => {
-      cancelled = true;
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    if (!user?.id) return;
+    useE2ESession.getState().refreshStatus().catch(() => { /* non-fatal */ });
   }, [user?.id]);
-
-  // Reflect live unlock changes (e.g. after using the unlock modal).
-  useEffect(() => {
-    if (status === "loading") return;
-    if (e2e.needsBootstrap || (!e2e.material && !e2e.publicKey)) {
-      setStatus("not_issued");
-    } else if (e2e.isUnlocked) {
-      setStatus("ready");
-    } else {
-      setStatus("locked");
-    }
-  }, [e2e.isUnlocked, e2e.material, e2e.publicKey, e2e.needsBootstrap, status]);
 
   const publicKey = e2e.publicKey;
   const fingerprint = publicKey ? shortFingerprint(publicKey) : null;
@@ -213,7 +177,7 @@ function ProfilePage() {
       <E2EUnlockModal
         open={unlockOpen}
         onOpenChange={setUnlockOpen}
-        onUnlocked={refreshKeyStatus}
+        onUnlocked={async () => { await useE2ESession.getState().refreshStatus(); }}
       />
       <ReissueDialog
         open={reissueOpen}
@@ -243,7 +207,7 @@ function ProfilePage() {
           toast.success("New keypair issued");
           // Re-sync from the server so status/fingerprint reflect the new key
           // immediately, not on the next mount.
-          await refreshKeyStatus();
+          await useE2ESession.getState().refreshStatus();
         }}
       />
     </div>

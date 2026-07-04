@@ -3,6 +3,7 @@ import { usePush } from "@/hooks/use-push";
 import { useShiftStatus } from "@/hooks/use-shift-status";
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
+import { useE2ESession } from "@/hooks/use-e2e-session";
 import { Activity, BarChart3, ListChecks, Shield, LogOut, Plus, Menu, Bell, BellRing, Inbox, PanelLeftClose, PanelLeftOpen, CalendarClock, UserCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useAuth, useRole } from "@/hooks/use-auth";
@@ -54,6 +55,14 @@ function AuthedShell() {
   const pathname = useRouterState({ select: (s) => s.location.pathname });
   const { supported, permission, subscribed } = usePush();
   const { atWork } = useShiftStatus();
+
+  // Kick off a single global key-status fetch as soon as the user is
+  // authenticated. Every page then reads from useE2ESession without
+  // duplicating this network round-trip.
+  useEffect(() => {
+    if (!user?.id) return;
+    useE2ESession.getState().refreshStatus().catch(() => { /* non-fatal */ });
+  }, [user?.id]);
 
   // Close the mobile drawer on route change
   useEffect(() => {
