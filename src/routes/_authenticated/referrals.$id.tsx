@@ -367,23 +367,25 @@ function ReferralDetail() {
     }
   };
 
-  const encryptForRecipients = async (body: string) => {
+  const encryptForRecipients = async (body: string, recipientIds: Set<string>) => {
     const dir = await fetchKeyDir({ data: undefined as any });
-    const recipients = (dir ?? [])
-      .filter((r: any) => !!r.public_key)
-      .map((r: any) => ({ user_id: r.user_id, public_key: r.public_key as string }));
-    // Ensure the author can decrypt their own note too.
-    if (e2e.publicKey && user && !recipients.some((r) => r.user_id === user.id)) {
-      recipients.push({ user_id: user.id, public_key: e2e.publicKey });
+    const byId = new Map<string, string>();
+    for (const r of (dir ?? []) as any[]) {
+      if (r.public_key) byId.set(r.user_id, r.public_key as string);
     }
-    if (!recipients.length) throw new Error("No teammates have enabled end-to-end encryption yet.");
+    // Ensure the author can decrypt their own note if selected.
+    if (e2e.publicKey && user && !byId.has(user.id)) byId.set(user.id, e2e.publicKey);
+    const recipients = Array.from(recipientIds)
+      .filter((id) => byId.has(id))
+      .map((id) => ({ user_id: id, public_key: byId.get(id)! }));
+    if (!recipients.length) throw new Error("Pick at least one enrolled recipient before posting.");
     return e2eEncryptNote(body, recipients);
   };
 
   const doPostNote = async () => {
     setPosting(true);
     try {
-      const enc = await encryptForRecipients(noteBody.trim());
+      const enc = await encryptForRecipients(noteBody.trim(), selectedRecipients);
       await submitEncNote({ data: { referral_id: id, ...enc } });
       setNoteBody("");
     } catch (err: any) {
@@ -396,9 +398,15 @@ function ReferralDetail() {
   const postNote = async () => {
     if (!noteBody.trim()) return;
     if (!e2e.isUnlocked) { setUnlockOpen(true); return; }
+    if (selectedRecipients.size === 0) {
+      toast.error("Pick at least one recipient for this note.");
+      return;
+    }
     // Refresh directory just before posting so the warning reflects reality.
     const list = await loadDirectory();
-    const missing = (list ?? directory).filter((r) => !r.public_key && r.user_id !== user?.id);
+    const missing = (list ?? directory).filter(
+      (r) => !r.public_key && r.user_id !== user?.id && selectedRecipients.has(r.user_id),
+    );
     if (missing.length > 0) {
       pendingActionRef.current = doPostNote;
       setConfirmMissingOpen(true);
@@ -406,6 +414,7 @@ function ReferralDetail() {
     }
     await doPostNote();
   };
+
 
   const onDelete = async () => {
     setDeleting(true);
