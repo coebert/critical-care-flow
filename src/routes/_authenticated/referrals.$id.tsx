@@ -1105,7 +1105,13 @@ function ReferralDetail() {
 
         <E2EUnlockModal
           open={unlockOpen}
-          onOpenChange={setUnlockOpen}
+          onOpenChange={(o) => {
+            setUnlockOpen(o);
+            // Cancelling the unlock modal drops any queued encryption action
+            // so a later confirm-missing-recipients flow can't accidentally
+            // run it.
+            if (!o && !e2e.isUnlocked) pendingActionRef.current = null;
+          }}
           onUnlocked={async () => {
             await Promise.all([loadNotes(), loadDirectory()]);
             // If an encryption action prompted the unlock, run it now so the
