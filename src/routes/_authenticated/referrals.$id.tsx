@@ -1071,7 +1071,14 @@ function ReferralDetail() {
                 canEdit={!!user && (user.id === n.author_id || isAdmin) && n._e2eStatus !== "e2e-locked" && n._e2eStatus !== "e2e-no-key" && n._e2eStatus !== "e2e-failed" && n._e2eStatus !== "legacy-server-enc"}
                 onSave={async (body, recipients) => {
                   if (n.body_ciphertext) {
-                    if (!e2e.isUnlocked) { setUnlockOpen(true); return; }
+                    const retry = () => (async () => {
+                      // Re-run this exact edit (same body/recipients) after unlock.
+                      const enc2 = await encryptForRecipients(body, recipients ?? new Set());
+                      await editEncNote({ data: { id: n.id, ...enc2 } });
+                      await loadNotes();
+                      toast.success("Note updated");
+                    })();
+                    if (!ensureUnlocked(() => retry())) return;
                     if (!recipients || recipients.size === 0) {
                       toast.error("Pick at least one recipient before saving.");
                       return;
