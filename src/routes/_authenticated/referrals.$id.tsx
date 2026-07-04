@@ -828,19 +828,21 @@ function ReferralDetail() {
           onUnlocked={async () => { await Promise.all([loadNotes(), loadDirectory()]); }}
         />
 
-        <AlertDialog open={confirmMissingOpen} onOpenChange={setConfirmMissingOpen}>
+        <AlertDialog
+          open={confirmMissingOpen}
+          onOpenChange={(o) => { setConfirmMissingOpen(o); if (!o) setAckReducedSet(false); }}
+        >
           <AlertDialogContent>
             <AlertDialogHeader>
               <AlertDialogTitle className="flex items-center gap-2">
                 <ShieldAlert className="w-4 h-4 text-destructive" />
-                Some teammates won't be able to read this note
+                Posting blocked — {missingRecipients.length} teammate{missingRecipients.length === 1 ? "" : "s"} can't read this note
               </AlertDialogTitle>
               <AlertDialogDescription asChild>
                 <div className="space-y-2 text-sm">
                   <div>
-                    The following {missingRecipients.length} teammate{missingRecipients.length === 1 ? "" : "s"} haven't enabled
-                    end-to-end encryption yet. If you post now, they won't be able to decrypt this note —
-                    even later, after they enroll.
+                    These teammates haven't enrolled in end-to-end encryption, so this note
+                    <strong> cannot be encrypted for them</strong> — even later, after they enroll.
                   </div>
                   <ul className="list-disc pl-5 text-xs max-h-32 overflow-auto">
                     {missingRecipients.map((r) => (
@@ -848,29 +850,48 @@ function ReferralDetail() {
                     ))}
                   </ul>
                   <div>
-                    It will still be readable by {eligibleRecipientCount} enrolled teammate{eligibleRecipientCount === 1 ? "" : "s"}.
-                    You can cancel and ask the missing teammates to enable encryption first.
+                    To continue, explicitly opt into posting to a reduced recipient set
+                    ({eligibleRecipientCount} enrolled teammate{eligibleRecipientCount === 1 ? "" : "s"}).
+                    Otherwise, cancel and ask them to enable encryption first.
                   </div>
                 </div>
               </AlertDialogDescription>
             </AlertDialogHeader>
+            <label className="flex items-start gap-2 rounded-md border border-destructive/30 bg-destructive/5 p-3 text-sm cursor-pointer">
+              <Checkbox
+                checked={ackReducedSet}
+                onCheckedChange={(v) => setAckReducedSet(v === true)}
+                className="mt-0.5"
+              />
+              <span>
+                I understand the excluded teammates will never be able to read this note,
+                and I want to post it to the reduced recipient set anyway.
+              </span>
+            </label>
             <AlertDialogFooter>
-              <AlertDialogCancel onClick={() => { pendingActionRef.current = null; }}>
+              <AlertDialogCancel onClick={() => { pendingActionRef.current = null; setAckReducedSet(false); }}>
                 Cancel
               </AlertDialogCancel>
               <AlertDialogAction
+                disabled={!ackReducedSet}
                 onClick={async () => {
+                  if (!ackReducedSet) return;
                   const fn = pendingActionRef.current;
                   pendingActionRef.current = null;
+                  // Record the explicit opt-in so future posts don't re-prompt
+                  // until the missing set changes.
+                  setRecipientsTouched(true);
                   setConfirmMissingOpen(false);
+                  setAckReducedSet(false);
                   if (fn) await fn();
                 }}
               >
-                Post to enrolled teammates only
+                Post to reduced recipient set
               </AlertDialogAction>
             </AlertDialogFooter>
           </AlertDialogContent>
         </AlertDialog>
+
 
 
         <Card className="p-5">
