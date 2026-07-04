@@ -1154,7 +1154,7 @@ function NoteItem({
         <NoteHistoryButton noteId={note.id} />
         {canEdit && !editing && (
           <>
-            <Button size="sm" variant="ghost" className="h-7 px-2 text-xs" onClick={() => { setDraft(note.body ?? ""); setEditing(true); }} disabled={busy}>
+            <Button size="sm" variant="ghost" className="h-7 px-2 text-xs" onClick={beginEdit} disabled={busy}>
               <Pencil className="w-3.5 h-3.5 mr-1" /> Edit
             </Button>
             <AlertDialog>
