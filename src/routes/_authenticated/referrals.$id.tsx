@@ -1106,7 +1106,20 @@ function ReferralDetail() {
         <E2EUnlockModal
           open={unlockOpen}
           onOpenChange={setUnlockOpen}
-          onUnlocked={async () => { await Promise.all([loadNotes(), loadDirectory()]); }}
+          onUnlocked={async () => {
+            await Promise.all([loadNotes(), loadDirectory()]);
+            // If an encryption action prompted the unlock, run it now so the
+            // user doesn't have to click Post/Save a second time.
+            const queued = pendingActionRef.current;
+            if (queued) {
+              pendingActionRef.current = null;
+              try {
+                await queued();
+              } catch (err: any) {
+                toast.error(err?.message ?? "Action failed after unlock");
+              }
+            }
+          }}
         />
 
         <AlertDialog
