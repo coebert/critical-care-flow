@@ -1,4 +1,4 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useMemo, useState } from "react";
 import { z } from "zod";
 import { useQuery } from "@tanstack/react-query";
@@ -61,6 +61,14 @@ function AnalyticsPage() {
   const to = range.to ? endOfDay(range.to) : endOfDay(range.from ?? new Date());
   const days = Math.max(1, differenceInCalendarDays(to, from) + 1);
 
+  const nav = useNavigate();
+  const fromKey = format(from, "yyyy-MM-dd");
+  const toKey = format(to, "yyyy-MM-dd");
+  const openDay = (dayKey: string) =>
+    nav({ to: "/", search: { from: dayKey, to: dayKey } });
+  const openSpecialty = (specialty: string) =>
+    nav({ to: "/", search: { specialty, from: fromKey, to: toKey } });
+
   const referralsFn = useServerFn(getReferralsAnalytics);
   const postopFn = useServerFn(getPostopAnalytics);
 
@@ -94,7 +102,7 @@ function AnalyticsPage() {
       const k = format(startOfDay(new Date(r.referral_received_at)), "yyyy-MM-dd");
       if (map.has(k)) map.set(k, (map.get(k) ?? 0) + 1);
     });
-    return Array.from(map.entries()).map(([date, count]) => ({ date: format(new Date(date), "dd MMM"), count }));
+    return Array.from(map.entries()).map(([date, count]) => ({ key: date, date: format(new Date(date), "dd MMM"), count }));
   }, [filtered, dayKeys]);
 
   const combinedPerDay = useMemo(() => {
@@ -109,6 +117,7 @@ function AnalyticsPage() {
       if (bookMap.has(k)) bookMap.set(k, (bookMap.get(k) ?? 0) + 1);
     });
     return dayKeys.map((k) => ({
+      key: k,
       date: format(new Date(k), "dd MMM"),
       referrals: refMap.get(k) ?? 0,
       bookings: bookMap.get(k) ?? 0,
@@ -414,9 +423,17 @@ function AnalyticsPage() {
       <div className="grid md:grid-cols-2 gap-6">
         <Card className="p-5 md:col-span-2">
           <h2 className="font-semibold mb-3">Referrals &amp; post-op bookings trend</h2>
+          <p className="text-xs text-muted-foreground mb-2">Click a day to view referrals from that day.</p>
           <div className="h-72">
             <ResponsiveContainer width="100%" height="100%">
-              <LineChart data={combinedPerDay}>
+              <LineChart
+                data={combinedPerDay}
+                style={{ cursor: "pointer" }}
+                onClick={(e: any) => {
+                  const p = e?.activePayload?.[0]?.payload;
+                  if (p?.key) openDay(p.key);
+                }}
+              >
                 <CartesianGrid strokeDasharray="3 3" opacity={0.3} />
                 <XAxis dataKey="date" fontSize={11} />
                 <YAxis allowDecimals={false} fontSize={11} />
@@ -431,9 +448,17 @@ function AnalyticsPage() {
 
         <Card className="p-5">
           <h2 className="font-semibold mb-3">Referrals over time</h2>
+          <p className="text-xs text-muted-foreground mb-2">Click a day to view its referrals.</p>
           <div className="h-64">
             <ResponsiveContainer width="100%" height="100%">
-              <LineChart data={perDay}>
+              <LineChart
+                data={perDay}
+                style={{ cursor: "pointer" }}
+                onClick={(e: any) => {
+                  const p = e?.activePayload?.[0]?.payload;
+                  if (p?.key) openDay(p.key);
+                }}
+              >
                 <CartesianGrid strokeDasharray="3 3" opacity={0.3} />
                 <XAxis dataKey="date" fontSize={11} />
                 <YAxis allowDecimals={false} fontSize={11} />
@@ -443,6 +468,7 @@ function AnalyticsPage() {
             </ResponsiveContainer>
           </div>
         </Card>
+
 
         <Card className="p-5">
           <h2 className="font-semibold mb-3">Outcome breakdown</h2>
@@ -521,6 +547,7 @@ function AnalyticsPage() {
             <h2 className="font-semibold">Referrals by specialty (top 10)</h2>
             <span className="text-xs text-muted-foreground">{bySpecialty.length} total specialties</span>
           </div>
+          <p className="text-xs text-muted-foreground mb-2">Click a bar to view referrals for that specialty.</p>
           <div className="h-72">
             <ResponsiveContainer width="100%" height="100%">
               <BarChart data={bySpecialtyTop}>
@@ -528,7 +555,13 @@ function AnalyticsPage() {
                 <XAxis dataKey="specialty" fontSize={11} angle={-15} textAnchor="end" height={70} />
                 <YAxis allowDecimals={false} fontSize={11} />
                 <Tooltip />
-                <Bar dataKey="count" fill="var(--chart-2)" radius={[4, 4, 0, 0]} />
+                <Bar
+                  dataKey="count"
+                  fill="var(--chart-2)"
+                  radius={[4, 4, 0, 0]}
+                  style={{ cursor: "pointer" }}
+                  onClick={(d: any) => d?.specialty && openSpecialty(d.specialty)}
+                />
               </BarChart>
             </ResponsiveContainer>
           </div>
@@ -562,7 +595,12 @@ function AnalyticsPage() {
                   {bySpecialty.map((s) => {
                     const bmi = lookupBmi(s.specialty);
                     return (
-                      <tr key={s.specialty} className="border-b last:border-0 hover:bg-muted/40">
+                      <tr
+                        key={s.specialty}
+                        className="border-b last:border-0 hover:bg-muted/40 cursor-pointer"
+                        onClick={() => openSpecialty(s.specialty)}
+                        title={`View referrals for ${s.specialty}`}
+                      >
                         <td className="py-2 pr-3 font-medium">{s.specialty}</td>
                         <td className="py-2 pr-3 text-right">{s.count}</td>
                         <td className="py-2 pr-3 text-right">

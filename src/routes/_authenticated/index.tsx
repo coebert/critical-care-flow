@@ -78,6 +78,11 @@ export const Route = createFileRoute("/_authenticated/")({
       { name: "description", content: "Live list of critical care referrals at Salisbury District Hospital." },
     ],
   }),
+  validateSearch: (search: Record<string, unknown>) => ({
+    specialty: typeof search.specialty === "string" ? search.specialty : undefined,
+    from: typeof search.from === "string" ? search.from : undefined, // yyyy-MM-dd inclusive
+    to: typeof search.to === "string" ? search.to : undefined,       // yyyy-MM-dd inclusive
+  }),
   component: ReferralsList,
 });
 
@@ -97,6 +102,7 @@ const rowBgStyles: Record<string, string> = {
 
 function ReferralsList() {
   const navigate = useNavigate();
+  const search = Route.useSearch();
   const [rows, setRows] = useState<Referral[]>([]);
   const [loading, setLoading] = useState(true);
   const [hospSearch, setHospSearch] = useState("");
@@ -241,10 +247,24 @@ function ReferralsList() {
     else if (dateFilter === "7d") fromTs = now.getTime() - 7 * 86400000;
     else if (dateFilter === "30d") fromTs = now.getTime() - 30 * 86400000;
 
+    // Drill-down date range from search params (yyyy-MM-dd, inclusive on both ends).
+    // Overrides the quick date buttons above so a chart-click narrows precisely.
+    if (search.from) {
+      const t = Date.parse(`${search.from}T00:00:00`);
+      if (!Number.isNaN(t)) fromTs = t;
+    }
+    if (search.to) {
+      const t = Date.parse(`${search.to}T00:00:00`);
+      if (!Number.isNaN(t)) toTs = t + 86400000; // exclusive upper bound
+    }
+
+    const specialtyNeedle = search.specialty?.trim().toLowerCase() ?? "";
+
     return rows.filter((r) => {
       if (statusFilter !== "all" && r.status !== statusFilter) return false;
       if (urgencyFilter !== "all" && r.admission_urgency !== urgencyFilter) return false;
       if (locFilter !== "all" && r.current_ward !== locFilter) return false;
+      if (specialtyNeedle && (r.referring_specialty ?? "").trim().toLowerCase() !== specialtyNeedle) return false;
       if (fromTs !== null) {
         const t = new Date(r.referral_received_at).getTime();
         if (t < fromTs) return false;
@@ -259,7 +279,7 @@ function ReferralsList() {
         .filter(Boolean)
         .some((v) => v!.toString().toLowerCase().includes(needle));
     });
-  }, [rows, q, hospSearch, statusFilter, urgencyFilter, locFilter, dateFilter]);
+  }, [rows, q, hospSearch, statusFilter, urgencyFilter, locFilter, dateFilter, search.specialty, search.from, search.to]);
 
   const displayed = useMemo(() => {
     if (timerSort === "none") return filtered;
@@ -299,6 +319,44 @@ function ReferralsList() {
           </Button>
         </div>
       </div>
+
+      {(search.specialty || search.from || search.to) && (
+        <div className="mb-4 flex flex-wrap items-center gap-2 rounded-md border bg-muted/30 px-3 py-2 text-sm">
+          <span className="text-xs uppercase text-muted-foreground">Drill-down</span>
+          {search.specialty && (
+            <Badge variant="secondary" className="gap-1">
+              Specialty: {search.specialty}
+              <button
+                type="button"
+                aria-label="Clear specialty filter"
+                className="ml-1 opacity-70 hover:opacity-100"
+                onClick={() => navigate({ to: "/", search: (p: Record<string, unknown>) => ({ ...p, specialty: undefined }) })}
+              >×</button>
+            </Badge>
+          )}
+          {(search.from || search.to) && (
+            <Badge variant="secondary" className="gap-1">
+              Date: {search.from ?? "…"}{search.to && search.to !== search.from ? ` → ${search.to}` : ""}
+              <button
+                type="button"
+                aria-label="Clear date filter"
+                className="ml-1 opacity-70 hover:opacity-100"
+                onClick={() => navigate({ to: "/", search: (p: Record<string, unknown>) => ({ ...p, from: undefined, to: undefined }) })}
+              >×</button>
+            </Badge>
+          )}
+          <Button
+            variant="ghost"
+            size="sm"
+            className="ml-auto h-7"
+            onClick={() => navigate({ to: "/", search: {} })}
+          >
+            Clear all
+          </Button>
+        </div>
+      )}
+
+
 
       {showDeleted && (
         <div className="border rounded-md bg-card overflow-hidden mb-6">
