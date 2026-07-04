@@ -681,9 +681,35 @@ function ReferralDetail() {
           <p className="text-xs text-muted-foreground mb-3">
             Messages are end-to-end encrypted in your browser — the server only stores ciphertext.
           </p>
+          {e2e.isUnlocked && missingRecipients.length > 0 && (
+            <Alert variant="destructive" className="mb-3">
+              <ShieldAlert className="w-4 h-4" />
+              <AlertTitle>
+                {missingRecipients.length} teammate{missingRecipients.length === 1 ? "" : "s"} can't read encrypted notes yet
+              </AlertTitle>
+              <AlertDescription>
+                <div className="mb-2">
+                  They haven't enabled end-to-end encryption on their account, so anything you post now will be
+                  <strong> undecryptable for them</strong> until they enroll and you re-post. Ask them to open the
+                  noteboard and choose <em>Enable encryption</em>.
+                </div>
+                <ul className="list-disc pl-5 text-xs max-h-24 overflow-auto">
+                  {missingRecipients.slice(0, 8).map((r) => (
+                    <li key={r.user_id}>{r.full_name}</li>
+                  ))}
+                  {missingRecipients.length > 8 && <li>and {missingRecipients.length - 8} more…</li>}
+                </ul>
+              </AlertDescription>
+            </Alert>
+          )}
           <div className="space-y-2 mb-4">
             <Textarea rows={3} value={noteBody} onChange={(e) => setNoteBody(e.target.value)} placeholder="e.g. seen in ED resus, awaiting bloods, for re-review at 6pm" />
-            <div className="flex justify-end">
+            <div className="flex items-center justify-between gap-2">
+              <span className="text-[11px] text-muted-foreground">
+                {e2e.isUnlocked
+                  ? `Will be readable by ${eligibleRecipientCount} teammate${eligibleRecipientCount === 1 ? "" : "s"}.`
+                  : ""}
+              </span>
               <Button size="sm" onClick={postNote} disabled={posting || !noteBody.trim()}>
                 {posting ? "Posting…" : e2e.isUnlocked ? "Post encrypted note" : "Unlock & post"}
               </Button>
