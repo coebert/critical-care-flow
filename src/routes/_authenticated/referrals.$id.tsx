@@ -738,8 +738,12 @@ function ReferralDetail() {
             </div>
           </div>
           <div className="space-y-3 max-h-[520px] overflow-auto">
-            {notes.length === 0 && <p className="text-xs text-muted-foreground">No notes yet.</p>}
-            {notes.map((n) => (
+            {filteredNotes.length === 0 && (
+              <p className="text-xs text-muted-foreground">
+                {notes.length === 0 ? "No notes yet." : "No notes match the selected filter."}
+              </p>
+            )}
+            {filteredNotes.map((n) => (
               <NoteItem
                 key={n.id}
                 note={n}
