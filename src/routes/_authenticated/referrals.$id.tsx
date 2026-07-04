@@ -219,17 +219,31 @@ function ReferralDetail() {
     }
   };
 
-  // Bootstrap E2E session: load stored key material once per session.
+  // Bootstrap E2E session: rehydrate a persisted unlock (sessionStorage)
+  // before falling back to fetching the stored key material.
   useEffect(() => {
     if (!user) return;
     if (e2e.material || e2e.needsBootstrap) return;
-    fetchKeyMaterial({ data: undefined as any })
-      .then((res: any) => {
+    (async () => {
+      // Restore an unlocked session if one is cached for this tab.
+      if (!e2e.hydrated) await e2e.hydrateFromSession();
+      try {
+        const res: any = await fetchKeyMaterial({ data: undefined as any });
         e2e.setMaterial(res?.material ?? null, res?.public_key ?? null);
-      })
-      .catch(() => {});
+      } catch { /* non-fatal */ }
+    })();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user?.id]);
+
+  // Once we're unlocked (fresh or rehydrated), re-run the note decryption
+  // and directory fetch so the UI reflects it without another click.
+  useEffect(() => {
+    if (!e2e.isUnlocked) return;
+    loadNotes();
+    loadDirectory();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [e2e.isUnlocked]);
+
 
   const decryptNoteRow = async (n: any): Promise<Note> => {
     if (n.body_ciphertext && n.body_nonce) {
