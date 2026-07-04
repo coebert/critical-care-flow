@@ -61,6 +61,14 @@ function AnalyticsPage() {
   const to = range.to ? endOfDay(range.to) : endOfDay(range.from ?? new Date());
   const days = Math.max(1, differenceInCalendarDays(to, from) + 1);
 
+  const nav = useNavigate();
+  const fromKey = format(from, "yyyy-MM-dd");
+  const toKey = format(to, "yyyy-MM-dd");
+  const openDay = (dayKey: string) =>
+    nav({ to: "/", search: { from: dayKey, to: dayKey } });
+  const openSpecialty = (specialty: string) =>
+    nav({ to: "/", search: { specialty, from: fromKey, to: toKey } });
+
   const referralsFn = useServerFn(getReferralsAnalytics);
   const postopFn = useServerFn(getPostopAnalytics);
 
