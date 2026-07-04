@@ -94,7 +94,7 @@ function AnalyticsPage() {
       const k = format(startOfDay(new Date(r.referral_received_at)), "yyyy-MM-dd");
       if (map.has(k)) map.set(k, (map.get(k) ?? 0) + 1);
     });
-    return Array.from(map.entries()).map(([date, count]) => ({ date: format(new Date(date), "dd MMM"), count }));
+    return Array.from(map.entries()).map(([date, count]) => ({ key: date, date: format(new Date(date), "dd MMM"), count }));
   }, [filtered, dayKeys]);
 
   const combinedPerDay = useMemo(() => {
