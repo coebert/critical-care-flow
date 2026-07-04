@@ -162,9 +162,11 @@ function ReferralDetail() {
 
   const loadDirectory = async () => {
     try {
-      const d = await fetchKeyDir({ data: undefined as any });
-      setDirectory((d ?? []) as any);
-    } catch { /* non-fatal — warning banner just won't show */ }
+      const d = (await fetchKeyDir({ data: undefined as any })) as any[];
+      const list = (d ?? []) as Array<{ user_id: string; full_name: string; public_key: string | null }>;
+      setDirectory(list);
+      return list;
+    } catch { return null; }
   };
   useEffect(() => { if (user) loadDirectory(); /* eslint-disable-next-line */ }, [user?.id, e2e.isUnlocked]);
 
