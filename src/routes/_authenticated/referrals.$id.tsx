@@ -1267,6 +1267,119 @@ function E2EBadge({ status }: { status?: Note["_e2eStatus"] }) {
   );
 }
 
+function NoteAudienceInfo({
+  recipientIds,
+  directory,
+  authorId,
+  currentUserId,
+  authorMap,
+}: {
+  recipientIds: string[];
+  directory: Array<{ user_id: string; full_name: string; public_key: string | null }>;
+  authorId: string;
+  currentUserId?: string;
+  authorMap: Record<string, string>;
+}) {
+  const recipientSet = new Set(recipientIds);
+  const nameFor = (uid: string) =>
+    directory.find((r) => r.user_id === uid)?.full_name ?? authorMap[uid] ?? "Clinician";
+
+  const canDecrypt = recipientIds.map((uid) => ({ user_id: uid, full_name: nameFor(uid) }));
+  // Everyone in the directory who wasn't a recipient of this note.
+  const excluded = directory.filter((r) => !recipientSet.has(r.user_id) && r.user_id !== authorId);
+  const excludedMissingKey = excluded.filter((r) => !r.public_key);
+  const excludedWithKey = excluded.filter((r) => !!r.public_key);
+  const youAreExcluded =
+    !!currentUserId && currentUserId !== authorId && !recipientSet.has(currentUserId);
+
+  return (
+    <div className="mt-1 flex items-center gap-2 text-[10px] text-muted-foreground">
+      <Popover>
+        <PopoverTrigger asChild>
+          <button
+            type="button"
+            className="inline-flex items-center gap-1 hover:text-foreground hover:underline"
+          >
+            <Users className="w-3 h-3" />
+            {canDecrypt.length} can read
+            {excluded.length > 0 && ` · ${excluded.length} cannot`}
+          </button>
+        </PopoverTrigger>
+        <PopoverContent className="w-80 p-0" align="start">
+          <div className="p-3 border-b">
+            <div className="text-sm font-medium">Who can read this note</div>
+            <div className="text-xs text-muted-foreground mt-0.5">
+              Based on the recipient set at post time and the current key directory.
+            </div>
+          </div>
+          <div className="max-h-72 overflow-auto p-3 space-y-3 text-xs">
+            <section>
+              <div className="flex items-center gap-1 font-medium text-emerald-700 dark:text-emerald-400 mb-1">
+                <ShieldCheck className="w-3.5 h-3.5" /> Can decrypt ({canDecrypt.length})
+              </div>
+              {canDecrypt.length === 0 ? (
+                <div className="text-muted-foreground italic">No recipients recorded.</div>
+              ) : (
+                <ul className="space-y-0.5 pl-4 list-disc">
+                  {canDecrypt.map((r) => (
+                    <li key={r.user_id}>
+                      {r.full_name}
+                      {r.user_id === currentUserId && <span className="text-muted-foreground"> (you)</span>}
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </section>
+
+            {excludedMissingKey.length > 0 && (
+              <section>
+                <div className="flex items-center gap-1 font-medium text-destructive mb-1">
+                  <ShieldAlert className="w-3.5 h-3.5" /> Cannot decrypt — no public key
+                  ({excludedMissingKey.length})
+                </div>
+                <ul className="space-y-0.5 pl-4 list-disc">
+                  {excludedMissingKey.map((r) => (
+                    <li key={r.user_id} className="flex items-center justify-between gap-2">
+                      <span>{r.full_name}</span>
+                      <span className="text-[10px] text-muted-foreground">no key</span>
+                    </li>
+                  ))}
+                </ul>
+                <div className="mt-2 text-muted-foreground">
+                  Ask them to open the noteboard on any referral and choose{" "}
+                  <span className="italic">Enable encryption</span>. Once they publish a
+                  key, edit and re-save this note to include them.
+                </div>
+              </section>
+            )}
+
+            {excludedWithKey.length > 0 && (
+              <section>
+                <div className="flex items-center gap-1 font-medium text-amber-700 dark:text-amber-400 mb-1">
+                  <ShieldOff className="w-3.5 h-3.5" /> Not selected as a recipient
+                  ({excludedWithKey.length})
+                </div>
+                <ul className="space-y-0.5 pl-4 list-disc">
+                  {excludedWithKey.map((r) => (
+                    <li key={r.user_id}>{r.full_name}</li>
+                  ))}
+                </ul>
+                <div className="mt-2 text-muted-foreground">
+                  These teammates are enrolled but weren't chosen at post time.
+                  Edit the note to add them.
+                </div>
+              </section>
+            )}
+          </div>
+        </PopoverContent>
+      </Popover>
+      {youAreExcluded && (
+        <span className="text-destructive/80">You are not a recipient.</span>
+      )}
+    </div>
+  );
+}
+
 function NoteHistoryButton({ noteId }: { noteId: string }) {
   const fetchHistory = useServerFn(getNoteHistory);
   const [open, setOpen] = useState(false);
