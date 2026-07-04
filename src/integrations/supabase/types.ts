@@ -595,7 +595,15 @@ export type Database = {
         | "within_1_2_hours"
         | "not_admitting"
       app_role: "admin" | "clinician"
-      audit_action: "view" | "create" | "update" | "delete"
+      audit_action:
+        | "view"
+        | "create"
+        | "update"
+        | "delete"
+        | "issue"
+        | "enable"
+        | "unlock"
+        | "reissue"
       patient_sex: "male" | "female" | "other" | "unknown"
       postop_level: "level_1" | "level_2" | "level_3"
       referral_status: "pending" | "declined" | "admitted" | "accepted"
@@ -734,7 +742,16 @@ export const Constants = {
         "not_admitting",
       ],
       app_role: ["admin", "clinician"],
-      audit_action: ["view", "create", "update", "delete"],
+      audit_action: [
+        "view",
+        "create",
+        "update",
+        "delete",
+        "issue",
+        "enable",
+        "unlock",
+        "reissue",
+      ],
       patient_sex: ["male", "female", "other", "unknown"],
       postop_level: ["level_1", "level_2", "level_3"],
       referral_status: ["pending", "declined", "admitted", "accepted"],
