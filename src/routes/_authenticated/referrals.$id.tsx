@@ -187,6 +187,20 @@ function ReferralDetail() {
           const names = newlyEnrolled.map((r) => r.full_name).slice(0, 3).join(", ");
           const extra = newlyEnrolled.length > 3 ? ` and ${newlyEnrolled.length - 3} more` : "";
           toast.success(`${names}${extra} enabled encryption — recipients updated.`);
+          const freshIds = newlyEnrolled.map((r) => r.user_id);
+          setNewlyEligibleIds((cur) => {
+            const next = new Set(cur);
+            freshIds.forEach((id) => next.add(id));
+            return next;
+          });
+          // Auto-fade the "new" highlight after 45s so it stays informative.
+          window.setTimeout(() => {
+            setNewlyEligibleIds((cur) => {
+              const next = new Set(cur);
+              freshIds.forEach((id) => next.delete(id));
+              return next;
+            });
+          }, 45_000);
         }
         return list;
       });
