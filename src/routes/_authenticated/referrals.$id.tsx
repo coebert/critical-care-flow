@@ -26,7 +26,7 @@ import { Collapsible, CollapsibleTrigger, CollapsibleContent } from "@/component
 import type { Tables } from "@/integrations/supabase/types";
 import { ComboboxAdd } from "@/components/combobox-add";
 import { useReferralOptions } from "@/hooks/use-referral-options";
-import { ArrowLeft, History, Pencil, Save, Trash2, X, ChevronDown, AlertCircle, Lock, LockOpen, ShieldAlert } from "lucide-react";
+import { ArrowLeft, History, Pencil, Save, Trash2, X, ChevronDown, AlertCircle, Lock, LockOpen, ShieldAlert, ShieldCheck, ShieldOff } from "lucide-react";
 import { format, formatDistanceToNow } from "date-fns";
 import { toast } from "sonner";
 import { validateReferralTimings } from "@/lib/referral-validation";
@@ -893,7 +893,10 @@ function NoteItem({
   return (
     <div className="text-sm border-l-2 border-primary/40 pl-3 py-1 group">
       <div className="flex items-baseline justify-between gap-3 mb-1">
-        <span className="text-xs font-medium">{authorName}</span>
+        <span className="text-xs font-medium flex items-center gap-2">
+          {authorName}
+          <E2EBadge status={note._e2eStatus} />
+        </span>
         <span className="text-[11px] text-muted-foreground" title={format(new Date(note.created_at), "PPpp")}>
           {format(new Date(note.created_at), "d MMM yyyy, HH:mm")} · {formatDistanceToNow(new Date(note.created_at), { addSuffix: true })}
           {edited && (
@@ -959,6 +962,25 @@ function NoteItem({
         )}
       </div>
     </div>
+  );
+}
+
+function E2EBadge({ status }: { status?: Note["_e2eStatus"] }) {
+  const map: Record<NonNullable<Note["_e2eStatus"]>, { label: string; title: string; className: string; Icon: typeof ShieldCheck }> = {
+    "e2e-decrypted":     { label: "E2E encrypted", title: "End-to-end encrypted. Decrypted in your browser with your private key.", className: "bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border-emerald-500/30", Icon: ShieldCheck },
+    "e2e-locked":        { label: "E2E encrypted", title: "End-to-end encrypted. Unlock the noteboard to decrypt.", className: "bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border-emerald-500/30", Icon: Lock },
+    "e2e-no-key":        { label: "E2E encrypted", title: "End-to-end encrypted, but you were not a recipient of this note.", className: "bg-amber-500/10 text-amber-700 dark:text-amber-400 border-amber-500/30", Icon: ShieldAlert },
+    "e2e-failed":        { label: "Decrypt failed", title: "End-to-end encrypted, but decryption failed.", className: "bg-destructive/10 text-destructive border-destructive/30", Icon: ShieldAlert },
+    "legacy-server-enc": { label: "Not E2E encrypted", title: "Legacy note — stored server-side, not end-to-end encrypted.", className: "bg-muted text-muted-foreground border-border", Icon: ShieldOff },
+    "plaintext":         { label: "Not E2E encrypted", title: "Legacy plaintext note — not end-to-end encrypted.", className: "bg-muted text-muted-foreground border-border", Icon: ShieldOff },
+  };
+  const entry = status ? map[status] : undefined;
+  if (!entry) return null;
+  const { label, title, className, Icon } = entry;
+  return (
+    <span title={title} className={`inline-flex items-center gap-1 text-[10px] leading-none px-1.5 py-0.5 rounded border ${className}`}>
+      <Icon className="w-3 h-3" /> {label}
+    </span>
   );
 }
 
