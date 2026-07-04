@@ -319,6 +319,35 @@ export function decidePostopUpdate(
   return { kind: "allow" };
 }
 
+export type PostopRestoreRow = {
+  created_by: string | null;
+  deleted_at: string | null;
+} | null;
+
+export type PostopRestoreDecision =
+  | { kind: "not_found" }
+  | { kind: "not_deleted" }
+  | { kind: "forbidden" }
+  | { kind: "allow" };
+
+/**
+ * Pure authorization helper used by `restorePostopBooking`. A soft-deleted
+ * booking may only be restored by its original creator or by an admin. This
+ * mirrors the `postop_bookings_guard_soft_delete` trigger so the server can
+ * return a clear error rather than surfacing a Postgres 42501. Exposed so
+ * unit tests can exercise every branch without a live Supabase context.
+ */
+export function decidePostopRestore(
+  row: PostopRestoreRow,
+  userId: string,
+  isAdmin: boolean,
+): PostopRestoreDecision {
+  if (!row) return { kind: "not_found" };
+  if (!row.deleted_at) return { kind: "not_deleted" };
+  if (row.created_by !== userId && !isAdmin) return { kind: "forbidden" };
+  return { kind: "allow" };
+}
+
 export const deletePostopBooking = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((d) => z.object({ id: z.string().uuid() }).parse(d))
