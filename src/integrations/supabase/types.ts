@@ -68,6 +68,30 @@ export type Database = {
         }
         Relationships: []
       }
+      icnarc_targets: {
+        Row: {
+          decision_to_arrival_target_min: number
+          id: boolean
+          time_to_seen_target_min: number
+          updated_at: string
+          updated_by: string | null
+        }
+        Insert: {
+          decision_to_arrival_target_min?: number
+          id?: boolean
+          time_to_seen_target_min?: number
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Update: {
+          decision_to_arrival_target_min?: number
+          id?: boolean
+          time_to_seen_target_min?: number
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Relationships: []
+      }
       notification_deliveries: {
         Row: {
           actor_id: string | null
