@@ -99,6 +99,7 @@ function AuthedShell() {
         <NavItem to="/inbox" icon={<Inbox className="w-4 h-4" />} collapsed={collapsed}>Inbox</NavItem>
         <NavItem to="/notifications" icon={<Bell className="w-4 h-4" />} collapsed={collapsed}>Notifications</NavItem>
         <NavItem to="/push-test" icon={<BellRing className="w-4 h-4" />} collapsed={collapsed}>Push test</NavItem>
+        <NavItem to="/profile" icon={<UserCircle className="w-4 h-4" />} collapsed={collapsed}>Profile</NavItem>
         {isAdmin && (
           <NavItem to="/admin" icon={<Shield className="w-4 h-4" />} collapsed={collapsed}>Admin</NavItem>
         )}
