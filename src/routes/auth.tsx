@@ -10,6 +10,7 @@ import { toast } from "sonner";
 import { Toaster } from "@/components/ui/sonner";
 import { Checkbox } from "@/components/ui/checkbox";
 import { retrySupabaseCall, retryWithBackoff } from "@/lib/retry";
+import { ensureRecipientKey } from "@/lib/e2e-auto-bootstrap";
 
 // When "Keep me signed in" is unchecked, move the persisted Supabase auth token
 // from localStorage to sessionStorage so the session ends when the browser closes.
