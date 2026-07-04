@@ -225,9 +225,22 @@ export const updatePostopBooking = createServerFn({ method: "POST" })
         .from("postop_bookings")
         .select("*")
         .eq("id", id)
-        .is("deleted_at", null)
         .maybeSingle();
-      if (!prev) throw new Error("Booking not found");
+      const { data: isAdmin } = await context.supabase.rpc("has_role", {
+        _user_id: context.userId,
+        _role: "admin",
+      });
+      const gate = decidePostopUpdate(
+        prev ? { created_by: (prev as any).created_by ?? null, deleted_at: (prev as any).deleted_at ?? null } : null,
+        context.userId,
+        !!isAdmin,
+      );
+      if (gate.kind === "not_found" || gate.kind === "already_deleted") {
+        throw new Error("Booking not found");
+      }
+      if (gate.kind === "forbidden") {
+        throw new Error("Only the booking creator or an admin can update this booking");
+      }
       const { decryptRow, encryptPayload } = await loadCrypto();
       const decryptedPrev = decryptRow(prev as Record<string, any>);
       const diff = buildUpdateDiff(decryptedPrev, rest);
@@ -272,6 +285,34 @@ export function decidePostopSoftDelete(
   userId: string,
   isAdmin: boolean,
 ): PostopSoftDeleteDecision {
+  if (!row) return { kind: "not_found" };
+  if (row.deleted_at) return { kind: "already_deleted", deleted_at: row.deleted_at };
+  if (row.created_by !== userId && !isAdmin) return { kind: "forbidden" };
+  return { kind: "allow" };
+}
+
+export type PostopUpdateRow = {
+  created_by: string | null;
+  deleted_at: string | null;
+} | null;
+
+export type PostopUpdateDecision =
+  | { kind: "not_found" }
+  | { kind: "already_deleted"; deleted_at: string }
+  | { kind: "forbidden" }
+  | { kind: "allow" };
+
+/**
+ * Pure authorization helper used by `updatePostopBooking`. A booking may only
+ * be updated by its original creator or by an admin. Mirrors the RLS policy
+ * on `postop_bookings` so the server returns a clear error instead of a
+ * silent no-op update. Exposed so unit tests can exercise every branch.
+ */
+export function decidePostopUpdate(
+  row: PostopUpdateRow,
+  userId: string,
+  isAdmin: boolean,
+): PostopUpdateDecision {
   if (!row) return { kind: "not_found" };
   if (row.deleted_at) return { kind: "already_deleted", deleted_at: row.deleted_at };
   if (row.created_by !== userId && !isAdmin) return { kind: "forbidden" };
