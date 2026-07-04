@@ -346,7 +346,7 @@ function AnalyticsPage() {
     type Bucket = { seen: number[]; arrival: number[] };
     const map = new Map<string, Bucket>();
     starts.forEach((d) => map.set(bucketStart(d).toISOString(), { seen: [], arrival: [] }));
-    filtered.forEach((r) => {
+    complianceFiltered.forEach((r) => {
       const k = bucketStart(new Date(r.referral_received_at)).toISOString();
       const b = map.get(k);
       if (!b) return;
