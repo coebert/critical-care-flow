@@ -17,7 +17,10 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { CalendarIcon, Settings2 } from "lucide-react";
+import { CalendarIcon, Settings2, X } from "lucide-react";
+import {
+  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
+} from "@/components/ui/select";
 import { cn } from "@/lib/utils";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
@@ -66,6 +69,7 @@ function AnalyticsPage() {
     to: endOfDay(new Date()),
   }));
   const [complianceBucket, setComplianceBucket] = useState<"day" | "week" | "month">("day");
+  const [complianceSpecialty, setComplianceSpecialty] = useState<string | null>(null);
 
   const from = range.from ? startOfDay(range.from) : startOfDay(subDays(new Date(), 29));
   const to = range.to ? endOfDay(range.to) : endOfDay(range.from ?? new Date());
@@ -116,6 +120,11 @@ function AnalyticsPage() {
       return t >= from.getTime() && t <= to.getTime();
     });
   }, [rows, from, to]);
+
+  const complianceFiltered = useMemo(() => {
+    if (!complianceSpecialty) return filtered;
+    return filtered.filter((r) => (r.referring_specialty || "Unknown") === complianceSpecialty);
+  }, [filtered, complianceSpecialty]);
 
   const dayKeys = useMemo(
     () => eachDayOfInterval({ start: from, end: to }).map((d) => format(d, "yyyy-MM-dd")),
@@ -337,7 +346,7 @@ function AnalyticsPage() {
     type Bucket = { seen: number[]; arrival: number[] };
     const map = new Map<string, Bucket>();
     starts.forEach((d) => map.set(bucketStart(d).toISOString(), { seen: [], arrival: [] }));
-    filtered.forEach((r) => {
+    complianceFiltered.forEach((r) => {
       const k = bucketStart(new Date(r.referral_received_at)).toISOString();
       const b = map.get(k);
       if (!b) return;
@@ -364,7 +373,7 @@ function AnalyticsPage() {
         arrivalN: b.arrival.length,
       };
     });
-  }, [filtered, from, to, complianceBucket, ICNARC_TIME_TO_SEEN_TARGET_MIN, ICNARC_DECISION_TO_ARRIVAL_TARGET_MIN]);
+  }, [complianceFiltered, from, to, complianceBucket, complianceSpecialty, ICNARC_TIME_TO_SEEN_TARGET_MIN, ICNARC_DECISION_TO_ARRIVAL_TARGET_MIN]);
 
 
 
@@ -480,20 +489,41 @@ function AnalyticsPage() {
           <div>
             <h2 className="font-semibold">ICNARC compliance trend</h2>
             <p className="text-xs text-muted-foreground">
+              {complianceSpecialty
+                ? `Showing ${complianceSpecialty} only · `
+                : "All specialties · "}
               % within target for referral → first seen (≤{ICNARC_TIME_TO_SEEN_TARGET_MIN} min) and decision → on unit (≤{Math.round(ICNARC_DECISION_TO_ARRIVAL_TARGET_MIN / 60)} h).
             </p>
           </div>
-          <div className="flex gap-1">
-            {(["day", "week", "month"] as const).map((g) => (
-              <Button
-                key={g}
-                size="sm"
-                variant={complianceBucket === g ? "default" : "outline"}
-                onClick={() => setComplianceBucket(g)}
-              >
-                {g[0].toUpperCase() + g.slice(1)}
-              </Button>
-            ))}
+          <div className="flex items-center gap-2 flex-wrap">
+            <Select
+              value={complianceSpecialty ?? "__all__"}
+              onValueChange={(v) => setComplianceSpecialty(v === "__all__" ? null : v)}
+            >
+              <SelectTrigger className="w-[220px] h-8 text-xs">
+                <SelectValue placeholder="All specialties" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="__all__">All specialties</SelectItem>
+                {bySpecialty.map((s) => (
+                  <SelectItem key={s.specialty} value={s.specialty}>
+                    {s.specialty} ({s.count})
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <div className="flex gap-1">
+              {(["day", "week", "month"] as const).map((g) => (
+                <Button
+                  key={g}
+                  size="sm"
+                  variant={complianceBucket === g ? "default" : "outline"}
+                  onClick={() => setComplianceBucket(g)}
+                >
+                  {g[0].toUpperCase() + g.slice(1)}
+                </Button>
+              ))}
+            </div>
           </div>
         </div>
         <div className="h-72">
