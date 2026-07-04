@@ -229,6 +229,7 @@ export const listEncryptedNotes = createServerFn({ method: "POST" })
     // Pull the current user's wrapped keys for the encrypted notes in this list.
     const noteIds = (rows ?? []).map((n: any) => n.id);
     let wrappedByNote: Record<string, string> = {};
+    let recipientsByNote: Record<string, string[]> = {};
     if (noteIds.length) {
       const { data: keys } = await supabase
         .from("referral_note_keys")
@@ -238,6 +239,18 @@ export const listEncryptedNotes = createServerFn({ method: "POST" })
       wrappedByNote = Object.fromEntries(
         (keys ?? []).map((k: any) => [k.note_id, k.wrapped_key]),
       );
+
+      // Fetch full recipient list per note via admin so authors and other
+      // recipients can see who a note was addressed to. Recipient identity
+      // is not more sensitive than the notification fanout already implies.
+      const admin = await getAdmin();
+      const { data: allKeys } = await admin
+        .from("referral_note_keys")
+        .select("note_id, recipient_user_id")
+        .in("note_id", noteIds);
+      for (const k of (allKeys ?? []) as any[]) {
+        (recipientsByNote[k.note_id] ??= []).push(k.recipient_user_id);
+      }
     }
 
     // Legacy plaintext / body_enc notes are still relayed for backward
@@ -254,6 +267,7 @@ export const listEncryptedNotes = createServerFn({ method: "POST" })
         }
       }
       out.wrapped_key = wrappedByNote[n.id] ?? null;
+      out.recipient_user_ids = recipientsByNote[n.id] ?? [];
       return out;
     });
   });
