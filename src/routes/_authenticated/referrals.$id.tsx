@@ -460,6 +460,26 @@ function ReferralDetail() {
     return e2eEncryptNote(body, recipients);
   };
 
+  /**
+   * Gate for referral encryption actions. If the recipient key isn't Ready
+   * (unlocked in this tab), queue the action, prompt the user to unlock/enable
+   * encryption, and return false. The queued action re-runs automatically
+   * after a successful unlock via the E2EUnlockModal's onUnlocked callback,
+   * so the user doesn't have to click Post/Save a second time.
+   */
+  const ensureUnlocked = (action: () => Promise<void>): boolean => {
+    if (e2e.isUnlocked) return true;
+    pendingActionRef.current = action;
+    setUnlockOpen(true);
+    toast.info(
+      e2e.needsBootstrap
+        ? "Enable end-to-end encryption to post this note."
+        : "Unlock your recipient key to continue — we'll finish this action for you.",
+    );
+    return false;
+  };
+
+
   const doPostNote = async () => {
     setPosting(true);
     try {
