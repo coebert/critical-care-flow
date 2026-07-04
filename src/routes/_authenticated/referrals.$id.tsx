@@ -751,6 +751,50 @@ function ReferralDetail() {
           onUnlocked={() => { loadNotes(); }}
         />
 
+        <AlertDialog open={confirmMissingOpen} onOpenChange={setConfirmMissingOpen}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle className="flex items-center gap-2">
+                <ShieldAlert className="w-4 h-4 text-destructive" />
+                Some teammates won't be able to read this note
+              </AlertDialogTitle>
+              <AlertDialogDescription asChild>
+                <div className="space-y-2 text-sm">
+                  <div>
+                    The following {missingRecipients.length} teammate{missingRecipients.length === 1 ? "" : "s"} haven't enabled
+                    end-to-end encryption yet. If you post now, they won't be able to decrypt this note —
+                    even later, after they enroll.
+                  </div>
+                  <ul className="list-disc pl-5 text-xs max-h-32 overflow-auto">
+                    {missingRecipients.map((r) => (
+                      <li key={r.user_id}>{r.full_name}</li>
+                    ))}
+                  </ul>
+                  <div>
+                    It will still be readable by {eligibleRecipientCount} enrolled teammate{eligibleRecipientCount === 1 ? "" : "s"}.
+                    You can cancel and ask the missing teammates to enable encryption first.
+                  </div>
+                </div>
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel onClick={() => { pendingActionRef.current = null; }}>
+                Cancel
+              </AlertDialogCancel>
+              <AlertDialogAction
+                onClick={async () => {
+                  const fn = pendingActionRef.current;
+                  pendingActionRef.current = null;
+                  setConfirmMissingOpen(false);
+                  if (fn) await fn();
+                }}
+              >
+                Post to enrolled teammates only
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
+
 
         <Card className="p-5">
           <Collapsible
