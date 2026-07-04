@@ -110,6 +110,7 @@ function ReferralDetail() {
   const [saving, setSaving] = useState(false);
   const [posting, setPosting] = useState(false);
   const [priorDeclined, setPriorDeclined] = useState<Referral[]>([]);
+  const [noteFilter, setNoteFilter] = useState<"all" | "e2e" | "legacy" | "failed">("all");
   const outcomeRef = useRef<HTMLDivElement>(null);
 
   // Auto-load the next page of audit history when the sentinel scrolls into view.
@@ -275,6 +276,14 @@ function ReferralDetail() {
   }, [ref?.hospital_number, id, fetchPriors]);
 
 
+
+  const filteredNotes = notes.filter((n) => {
+    if (noteFilter === "all") return true;
+    if (noteFilter === "e2e") return n._e2eStatus === "e2e-decrypted" || n._e2eStatus === "e2e-locked" || n._e2eStatus === "e2e-no-key" || n._e2eStatus === "e2e-failed";
+    if (noteFilter === "legacy") return n._e2eStatus === "legacy-server-enc" || n._e2eStatus === "plaintext";
+    if (noteFilter === "failed") return n._e2eStatus === "e2e-failed";
+    return true;
+  });
 
   if (!ref) return <div className="p-6 text-muted-foreground">Loading…</div>;
 
@@ -659,19 +668,32 @@ function ReferralDetail() {
         </div>
 
         <Card className="p-5">
-          <div className="flex items-center justify-between gap-2 mb-1">
-            <h2 className="font-semibold flex items-center gap-2">
-              Noteboard
-              {e2e.isUnlocked ? (
-                <Badge variant="outline" className="text-[10px] gap-1">
-                  <LockOpen className="w-3 h-3" /> E2E unlocked
-                </Badge>
-              ) : (
-                <Badge variant="outline" className="text-[10px] gap-1">
-                  <Lock className="w-3 h-3" /> E2E locked
-                </Badge>
-              )}
-            </h2>
+          <div className="flex items-center justify-between gap-2 mb-1 flex-wrap">
+            <div className="flex items-center gap-3 flex-wrap">
+              <h2 className="font-semibold flex items-center gap-2">
+                Noteboard
+                {e2e.isUnlocked ? (
+                  <Badge variant="outline" className="text-[10px] gap-1">
+                    <LockOpen className="w-3 h-3" /> E2E unlocked
+                  </Badge>
+                ) : (
+                  <Badge variant="outline" className="text-[10px] gap-1">
+                    <Lock className="w-3 h-3" /> E2E locked
+                  </Badge>
+                )}
+              </h2>
+              <Select value={noteFilter} onValueChange={(v) => setNoteFilter(v as typeof noteFilter)}>
+                <SelectTrigger className="h-7 text-xs w-auto min-w-[140px]">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All notes ({notes.length})</SelectItem>
+                  <SelectItem value="e2e">E2E encrypted ({notes.filter((n) => n._e2eStatus === "e2e-decrypted" || n._e2eStatus === "e2e-locked" || n._e2eStatus === "e2e-no-key" || n._e2eStatus === "e2e-failed").length})</SelectItem>
+                  <SelectItem value="legacy">Legacy plaintext ({notes.filter((n) => n._e2eStatus === "legacy-server-enc" || n._e2eStatus === "plaintext").length})</SelectItem>
+                  <SelectItem value="failed">Failed to decrypt ({notes.filter((n) => n._e2eStatus === "e2e-failed").length})</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
             {!e2e.isUnlocked && (
               <Button size="sm" variant="outline" onClick={() => setUnlockOpen(true)}>
                 {e2e.needsBootstrap ? "Enable encryption" : "Unlock notes"}
@@ -716,8 +738,12 @@ function ReferralDetail() {
             </div>
           </div>
           <div className="space-y-3 max-h-[520px] overflow-auto">
-            {notes.length === 0 && <p className="text-xs text-muted-foreground">No notes yet.</p>}
-            {notes.map((n) => (
+            {filteredNotes.length === 0 && (
+              <p className="text-xs text-muted-foreground">
+                {notes.length === 0 ? "No notes yet." : "No notes match the selected filter."}
+              </p>
+            )}
+            {filteredNotes.map((n) => (
               <NoteItem
                 key={n.id}
                 note={n}
