@@ -402,18 +402,22 @@ function ReferralDetail() {
       toast.error("Pick at least one recipient for this note.");
       return;
     }
-    // Refresh directory just before posting so the warning reflects reality.
+    // Refresh directory just before posting so the check reflects reality.
     const list = await loadDirectory();
     const missing = (list ?? directory).filter(
-      (r) => !r.public_key && r.user_id !== user?.id && selectedRecipients.has(r.user_id),
+      (r) => !r.public_key && r.user_id !== user?.id,
     );
-    if (missing.length > 0) {
+    // Hard block: if any teammate is missing a public key and the author
+    // has NOT explicitly changed the recipient set, force them to open the
+    // picker and opt into a reduced set first.
+    if (missing.length > 0 && !recipientsTouched) {
       pendingActionRef.current = doPostNote;
       setConfirmMissingOpen(true);
       return;
     }
     await doPostNote();
   };
+
 
 
   const onDelete = async () => {
