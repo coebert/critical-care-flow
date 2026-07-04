@@ -39,10 +39,16 @@ vi.mock("@tanstack/react-start", () => ({
   useServerFn: (fn: unknown) => fn,
 }));
 
-// Bypass createFileRoute — we render the page component directly.
-vi.mock("@tanstack/react-router", () => ({
-  createFileRoute: () => (cfg: any) => ({ ...cfg, options: cfg }),
-}));
+// Preserve @tanstack/react-router's real exports (lazyRouteComponent etc.)
+// but stub createFileRoute so we can grab the component without setting up
+// a real router tree.
+vi.mock("@tanstack/react-router", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@tanstack/react-router")>();
+  return {
+    ...actual,
+    createFileRoute: () => (cfg: any) => ({ ...cfg, options: cfg }),
+  };
+});
 
 vi.mock("sonner", () => ({
   toast: { success: vi.fn(), error: vi.fn() },
