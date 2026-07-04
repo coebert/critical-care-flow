@@ -351,9 +351,7 @@ function ReferralDetail() {
     return e2eEncryptNote(body, recipients);
   };
 
-  const postNote = async () => {
-    if (!noteBody.trim()) return;
-    if (!e2e.isUnlocked) { setUnlockOpen(true); return; }
+  const doPostNote = async () => {
     setPosting(true);
     try {
       const enc = await encryptForRecipients(noteBody.trim());
@@ -364,6 +362,19 @@ function ReferralDetail() {
     } finally {
       setPosting(false);
     }
+  };
+
+  const postNote = async () => {
+    if (!noteBody.trim()) return;
+    if (!e2e.isUnlocked) { setUnlockOpen(true); return; }
+    // Refresh directory just before posting so the warning reflects reality.
+    await loadDirectory();
+    if (missingRecipients.length > 0) {
+      pendingActionRef.current = doPostNote;
+      setConfirmMissingOpen(true);
+      return;
+    }
+    await doPostNote();
   };
 
   const onDelete = async () => {
