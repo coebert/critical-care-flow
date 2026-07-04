@@ -893,7 +893,10 @@ function NoteItem({
   return (
     <div className="text-sm border-l-2 border-primary/40 pl-3 py-1 group">
       <div className="flex items-baseline justify-between gap-3 mb-1">
-        <span className="text-xs font-medium">{authorName}</span>
+        <span className="text-xs font-medium flex items-center gap-2">
+          {authorName}
+          <E2EBadge status={note._e2eStatus} />
+        </span>
         <span className="text-[11px] text-muted-foreground" title={format(new Date(note.created_at), "PPpp")}>
           {format(new Date(note.created_at), "d MMM yyyy, HH:mm")} · {formatDistanceToNow(new Date(note.created_at), { addSuffix: true })}
           {edited && (
