@@ -423,9 +423,17 @@ function AnalyticsPage() {
       <div className="grid md:grid-cols-2 gap-6">
         <Card className="p-5 md:col-span-2">
           <h2 className="font-semibold mb-3">Referrals &amp; post-op bookings trend</h2>
+          <p className="text-xs text-muted-foreground mb-2">Click a day to view referrals from that day.</p>
           <div className="h-72">
             <ResponsiveContainer width="100%" height="100%">
-              <LineChart data={combinedPerDay}>
+              <LineChart
+                data={combinedPerDay}
+                style={{ cursor: "pointer" }}
+                onClick={(e: any) => {
+                  const p = e?.activePayload?.[0]?.payload;
+                  if (p?.key) openDay(p.key);
+                }}
+              >
                 <CartesianGrid strokeDasharray="3 3" opacity={0.3} />
                 <XAxis dataKey="date" fontSize={11} />
                 <YAxis allowDecimals={false} fontSize={11} />
@@ -440,9 +448,17 @@ function AnalyticsPage() {
 
         <Card className="p-5">
           <h2 className="font-semibold mb-3">Referrals over time</h2>
+          <p className="text-xs text-muted-foreground mb-2">Click a day to view its referrals.</p>
           <div className="h-64">
             <ResponsiveContainer width="100%" height="100%">
-              <LineChart data={perDay}>
+              <LineChart
+                data={perDay}
+                style={{ cursor: "pointer" }}
+                onClick={(e: any) => {
+                  const p = e?.activePayload?.[0]?.payload;
+                  if (p?.key) openDay(p.key);
+                }}
+              >
                 <CartesianGrid strokeDasharray="3 3" opacity={0.3} />
                 <XAxis dataKey="date" fontSize={11} />
                 <YAxis allowDecimals={false} fontSize={11} />
@@ -452,6 +468,7 @@ function AnalyticsPage() {
             </ResponsiveContainer>
           </div>
         </Card>
+
 
         <Card className="p-5">
           <h2 className="font-semibold mb-3">Outcome breakdown</h2>
