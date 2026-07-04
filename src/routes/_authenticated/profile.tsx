@@ -44,20 +44,29 @@ function ProfilePage() {
   const [unlockOpen, setUnlockOpen] = useState(false);
   const [reissueOpen, setReissueOpen] = useState(false);
 
+  // Fetch the latest server-side key material and reconcile local status.
+  // Extracted so unlock / enable / re-issue flows can trigger a real-time
+  // refresh instead of waiting for the next mount or reactive nudge.
+  const refreshKeyStatus = useCallback(async (): Promise<void> => {
+    try {
+      if (!useE2ESession.getState().hydrated) {
+        await useE2ESession.getState().hydrateFromSession();
+      }
+      const res: any = await fetchKeyMaterial({ data: undefined as any });
+      useE2ESession.getState().setMaterial(res?.material ?? null, res?.public_key ?? null);
+      if (!res?.material || !res?.public_key) setStatus("not_issued");
+      else if (useE2ESession.getState().isUnlocked) setStatus("ready");
+      else setStatus("locked");
+    } catch {
+      setStatus("not_issued");
+    }
+  }, [fetchKeyMaterial]);
+
   useEffect(() => {
     let cancelled = false;
     (async () => {
-      try {
-        if (!e2e.hydrated) await e2e.hydrateFromSession();
-        const res: any = await fetchKeyMaterial({ data: undefined as any });
-        if (cancelled) return;
-        e2e.setMaterial(res?.material ?? null, res?.public_key ?? null);
-        if (!res?.material || !res?.public_key) setStatus("not_issued");
-        else if (useE2ESession.getState().isUnlocked) setStatus("ready");
-        else setStatus("locked");
-      } catch {
-        if (!cancelled) setStatus("not_issued");
-      }
+      await refreshKeyStatus();
+      if (cancelled) return;
     })();
     return () => {
       cancelled = true;
