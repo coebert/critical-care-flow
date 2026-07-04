@@ -54,6 +54,7 @@ import {
   __setKeyStatusTransport,
 } from "@/hooks/use-e2e-session";
 import { Route as ProfileRoute } from "@/routes/_authenticated/profile";
+const ProfileComponent = (ProfileRoute as any).options.component as React.ComponentType;
 
 const MATERIAL = {
   encrypted_private_key: "epk",
@@ -110,7 +111,7 @@ describe("cross-tab key-status propagation — an already-open profile page upda
     useE2ESession.getState().setMaterial(null, null);
     expect(useE2ESession.getState().status).toBe("not_issued");
 
-    render(<ProfileRoute.options.component />);
+    render(<ProfileComponent />);
     // Initial UI reflects "not_issued".
     expect(await screen.findByText(/not issued/i)).toBeTruthy();
     expect(screen.getByRole("button", { name: /enable encryption/i })).toBeTruthy();
@@ -153,7 +154,7 @@ describe("cross-tab key-status propagation — an already-open profile page upda
       status: "ready",
     });
 
-    render(<ProfileRoute.options.component />);
+    render(<ProfileComponent />);
     expect(await screen.findByText(/^ready$/i)).toBeTruthy();
 
     teardownSync = initKeyStatusCrossTabSync();
