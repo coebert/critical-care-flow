@@ -352,11 +352,15 @@ function AnalyticsPage() {
     });
     return starts.map((d) => {
       const b = map.get(bucketStart(d).toISOString())!;
+      const seenNum = b.seen.filter((m) => m <= ICNARC_TIME_TO_SEEN_TARGET_MIN).length;
+      const arrivalNum = b.arrival.filter((m) => m <= ICNARC_DECISION_TO_ARRIVAL_TARGET_MIN).length;
       return {
         date: format(d, labelFmt),
         seenPct: b.seen.length ? pctWithin(b.seen, ICNARC_TIME_TO_SEEN_TARGET_MIN) : null,
         arrivalPct: b.arrival.length ? pctWithin(b.arrival, ICNARC_DECISION_TO_ARRIVAL_TARGET_MIN) : null,
+        seenNum,
         seenN: b.seen.length,
+        arrivalNum,
         arrivalN: b.arrival.length,
       };
     });
