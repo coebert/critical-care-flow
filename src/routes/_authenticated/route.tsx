@@ -3,7 +3,7 @@ import { usePush } from "@/hooks/use-push";
 import { useShiftStatus } from "@/hooks/use-shift-status";
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
-import { useE2ESession } from "@/hooks/use-e2e-session";
+import { useE2ESession, initKeyStatusCrossTabSync } from "@/hooks/use-e2e-session";
 import { Activity, BarChart3, ListChecks, Shield, LogOut, Plus, Menu, Bell, BellRing, Inbox, PanelLeftClose, PanelLeftOpen, CalendarClock, UserCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useAuth, useRole } from "@/hooks/use-auth";
@@ -63,6 +63,12 @@ function AuthedShell() {
     if (!user?.id) return;
     useE2ESession.getState().refreshStatus().catch(() => { /* non-fatal */ });
   }, [user?.id]);
+
+  // Subscribe to sibling tabs so a bootstrap / refresh / sign-out in one
+  // tab propagates to this tab's badges and buttons without a reload.
+  useEffect(() => {
+    return initKeyStatusCrossTabSync();
+  }, []);
 
   // Close the mobile drawer on route change
   useEffect(() => {
