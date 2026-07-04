@@ -42,7 +42,7 @@ vi.mock("@tanstack/react-start", () => ({
   useServerFn: (fn: unknown) => fn,
 }));
 
-const toastSuccess = vi.fn();
+const { toastSuccess } = vi.hoisted(() => ({ toastSuccess: vi.fn() }));
 vi.mock("sonner", () => ({
   toast: { success: toastSuccess, error: vi.fn() },
 }));
