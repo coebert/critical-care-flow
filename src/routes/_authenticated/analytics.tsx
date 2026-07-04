@@ -547,6 +547,7 @@ function AnalyticsPage() {
             <h2 className="font-semibold">Referrals by specialty (top 10)</h2>
             <span className="text-xs text-muted-foreground">{bySpecialty.length} total specialties</span>
           </div>
+          <p className="text-xs text-muted-foreground mb-2">Click a bar to view referrals for that specialty.</p>
           <div className="h-72">
             <ResponsiveContainer width="100%" height="100%">
               <BarChart data={bySpecialtyTop}>
@@ -554,7 +555,13 @@ function AnalyticsPage() {
                 <XAxis dataKey="specialty" fontSize={11} angle={-15} textAnchor="end" height={70} />
                 <YAxis allowDecimals={false} fontSize={11} />
                 <Tooltip />
-                <Bar dataKey="count" fill="var(--chart-2)" radius={[4, 4, 0, 0]} />
+                <Bar
+                  dataKey="count"
+                  fill="var(--chart-2)"
+                  radius={[4, 4, 0, 0]}
+                  style={{ cursor: "pointer" }}
+                  onClick={(d: any) => d?.specialty && openSpecialty(d.specialty)}
+                />
               </BarChart>
             </ResponsiveContainer>
           </div>
