@@ -595,7 +595,12 @@ function AnalyticsPage() {
                   {bySpecialty.map((s) => {
                     const bmi = lookupBmi(s.specialty);
                     return (
-                      <tr key={s.specialty} className="border-b last:border-0 hover:bg-muted/40">
+                      <tr
+                        key={s.specialty}
+                        className="border-b last:border-0 hover:bg-muted/40 cursor-pointer"
+                        onClick={() => openSpecialty(s.specialty)}
+                        title={`View referrals for ${s.specialty}`}
+                      >
                         <td className="py-2 pr-3 font-medium">{s.specialty}</td>
                         <td className="py-2 pr-3 text-right">{s.count}</td>
                         <td className="py-2 pr-3 text-right">
