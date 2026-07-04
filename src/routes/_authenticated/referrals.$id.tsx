@@ -26,6 +26,7 @@ import { Collapsible, CollapsibleTrigger, CollapsibleContent } from "@/component
 import type { Tables } from "@/integrations/supabase/types";
 import { ComboboxAdd } from "@/components/combobox-add";
 import { useReferralOptions } from "@/hooks/use-referral-options";
+import { NoteRecipientPicker } from "@/components/note-recipient-picker";
 import { ArrowLeft, History, Pencil, Save, Trash2, X, ChevronDown, AlertCircle, Lock, LockOpen, ShieldAlert, ShieldCheck, ShieldOff } from "lucide-react";
 import { format, formatDistanceToNow } from "date-fns";
 import { toast } from "sonner";
@@ -41,6 +42,7 @@ type Note = Tables<"referral_notes"> & DecryptedReferralNote & {
   body_ciphertext?: string | null;
   body_nonce?: string | null;
   enc_version?: number | null;
+  recipient_user_ids?: string[];
   _e2eStatus?: "plaintext" | "legacy-server-enc" | "e2e-decrypted" | "e2e-locked" | "e2e-no-key" | "e2e-failed";
 };
 
@@ -160,6 +162,8 @@ function ReferralDetail() {
   const [directory, setDirectory] = useState<Array<{ user_id: string; full_name: string; public_key: string | null }>>([]);
   const [confirmMissingOpen, setConfirmMissingOpen] = useState(false);
   const pendingActionRef = useRef<null | (() => Promise<void>)>(null);
+  const [selectedRecipients, setSelectedRecipients] = useState<Set<string>>(new Set());
+  const [recipientsTouched, setRecipientsTouched] = useState(false);
 
   const loadDirectory = async () => {
     try {
@@ -171,10 +175,24 @@ function ReferralDetail() {
   };
   useEffect(() => { if (user) loadDirectory(); /* eslint-disable-next-line */ }, [user?.id, e2e.isUnlocked]);
 
+  // Default the recipient selection to every enrolled teammate (plus self)
+  // until the author manually changes it.
+  useEffect(() => {
+    if (recipientsTouched) return;
+    const ids = new Set<string>(directory.filter((r) => !!r.public_key).map((r) => r.user_id));
+    if (user?.id && e2e.publicKey) ids.add(user.id);
+    setSelectedRecipients(ids);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [directory, user?.id, e2e.publicKey]);
+
+  const directoryWithSelf = (() => {
+    if (!user?.id || !e2e.publicKey) return directory;
+    if (directory.some((r) => r.user_id === user.id)) return directory;
+    return [...directory, { user_id: user.id, full_name: "You", public_key: e2e.publicKey }];
+  })();
+
   const missingRecipients = directory.filter((r) => !r.public_key && r.user_id !== user?.id);
-  const eligibleRecipientCount =
-    directory.filter((r) => !!r.public_key).length +
-    (e2e.publicKey && !directory.some((r) => r.user_id === user?.id && !!r.public_key) ? 1 : 0);
+  const eligibleRecipientCount = Array.from(selectedRecipients).length;
 
   const loadRef = async () => {
     try {
@@ -349,23 +367,25 @@ function ReferralDetail() {
     }
   };
 
-  const encryptForRecipients = async (body: string) => {
+  const encryptForRecipients = async (body: string, recipientIds: Set<string>) => {
     const dir = await fetchKeyDir({ data: undefined as any });
-    const recipients = (dir ?? [])
-      .filter((r: any) => !!r.public_key)
-      .map((r: any) => ({ user_id: r.user_id, public_key: r.public_key as string }));
-    // Ensure the author can decrypt their own note too.
-    if (e2e.publicKey && user && !recipients.some((r) => r.user_id === user.id)) {
-      recipients.push({ user_id: user.id, public_key: e2e.publicKey });
+    const byId = new Map<string, string>();
+    for (const r of (dir ?? []) as any[]) {
+      if (r.public_key) byId.set(r.user_id, r.public_key as string);
     }
-    if (!recipients.length) throw new Error("No teammates have enabled end-to-end encryption yet.");
+    // Ensure the author can decrypt their own note if selected.
+    if (e2e.publicKey && user && !byId.has(user.id)) byId.set(user.id, e2e.publicKey);
+    const recipients = Array.from(recipientIds)
+      .filter((id) => byId.has(id))
+      .map((id) => ({ user_id: id, public_key: byId.get(id)! }));
+    if (!recipients.length) throw new Error("Pick at least one enrolled recipient before posting.");
     return e2eEncryptNote(body, recipients);
   };
 
   const doPostNote = async () => {
     setPosting(true);
     try {
-      const enc = await encryptForRecipients(noteBody.trim());
+      const enc = await encryptForRecipients(noteBody.trim(), selectedRecipients);
       await submitEncNote({ data: { referral_id: id, ...enc } });
       setNoteBody("");
     } catch (err: any) {
@@ -378,9 +398,15 @@ function ReferralDetail() {
   const postNote = async () => {
     if (!noteBody.trim()) return;
     if (!e2e.isUnlocked) { setUnlockOpen(true); return; }
+    if (selectedRecipients.size === 0) {
+      toast.error("Pick at least one recipient for this note.");
+      return;
+    }
     // Refresh directory just before posting so the warning reflects reality.
     const list = await loadDirectory();
-    const missing = (list ?? directory).filter((r) => !r.public_key && r.user_id !== user?.id);
+    const missing = (list ?? directory).filter(
+      (r) => !r.public_key && r.user_id !== user?.id && selectedRecipients.has(r.user_id),
+    );
     if (missing.length > 0) {
       pendingActionRef.current = doPostNote;
       setConfirmMissingOpen(true);
@@ -388,6 +414,7 @@ function ReferralDetail() {
     }
     await doPostNote();
   };
+
 
   const onDelete = async () => {
     setDeleting(true);
@@ -726,15 +753,26 @@ function ReferralDetail() {
           )}
           <div className="space-y-2 mb-4">
             <Textarea rows={3} value={noteBody} onChange={(e) => setNoteBody(e.target.value)} placeholder="e.g. seen in ED resus, awaiting bloods, for re-review at 6pm" />
-            <div className="flex items-center justify-between gap-2">
+            <div className="flex items-center justify-between gap-2 flex-wrap">
               <span className="text-[11px] text-muted-foreground">
                 {e2e.isUnlocked
                   ? `Will be readable by ${eligibleRecipientCount} teammate${eligibleRecipientCount === 1 ? "" : "s"}.`
                   : ""}
               </span>
-              <Button size="sm" onClick={postNote} disabled={posting || !noteBody.trim()}>
-                {posting ? "Posting…" : e2e.isUnlocked ? "Post encrypted note" : "Unlock & post"}
-              </Button>
+              <div className="flex items-center gap-2">
+                {e2e.isUnlocked && (
+                  <NoteRecipientPicker
+                    directory={directoryWithSelf}
+                    selected={selectedRecipients}
+                    onChange={(next) => { setRecipientsTouched(true); setSelectedRecipients(next); }}
+                    currentUserId={user?.id}
+                    compact
+                  />
+                )}
+                <Button size="sm" onClick={postNote} disabled={posting || !noteBody.trim()}>
+                  {posting ? "Posting…" : e2e.isUnlocked ? "Post encrypted note" : "Unlock & post"}
+                </Button>
+              </div>
             </div>
           </div>
           <div className="space-y-3 max-h-[520px] overflow-auto">
@@ -748,11 +786,18 @@ function ReferralDetail() {
                 key={n.id}
                 note={n}
                 authorName={authors[n.author_id] ?? "Clinician"}
+                authorMap={authors}
+                directory={directoryWithSelf}
+                currentUserId={user?.id}
                 canEdit={!!user && (user.id === n.author_id || isAdmin) && n._e2eStatus !== "e2e-locked" && n._e2eStatus !== "e2e-no-key" && n._e2eStatus !== "e2e-failed" && n._e2eStatus !== "legacy-server-enc"}
-                onSave={async (body) => {
+                onSave={async (body, recipients) => {
                   if (n.body_ciphertext) {
                     if (!e2e.isUnlocked) { setUnlockOpen(true); return; }
-                    const enc = await encryptForRecipients(body);
+                    if (!recipients || recipients.size === 0) {
+                      toast.error("Pick at least one recipient before saving.");
+                      return;
+                    }
+                    const enc = await encryptForRecipients(body, recipients);
                     await editEncNote({ data: { id: n.id, ...enc } });
                     await loadNotes();
                   } else {
@@ -769,6 +814,7 @@ function ReferralDetail() {
               />
             ))}
           </div>
+
         </Card>
 
         <E2EUnlockModal
@@ -987,25 +1033,48 @@ function DTNow({ value, onChange, disabled, invalid }: { value: string; onChange
 function NoteItem({
   note,
   authorName,
+  authorMap,
+  directory,
+  currentUserId,
   canEdit,
   onSave,
   onDelete,
 }: {
   note: Note;
   authorName: string;
+  authorMap: Record<string, string>;
+  directory: Array<{ user_id: string; full_name: string; public_key: string | null }>;
+  currentUserId?: string;
   canEdit: boolean;
-  onSave: (body: string) => Promise<void>;
+  onSave: (body: string, recipients?: Set<string>) => Promise<void>;
   onDelete: () => Promise<void>;
 }) {
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState(note.body ?? "");
   const [busy, setBusy] = useState(false);
+  const [editRecipients, setEditRecipients] = useState<Set<string>>(
+    () => new Set(note.recipient_user_ids ?? []),
+  );
   const edited = (note as any).edited_at as string | null | undefined;
+  const isE2E = !!note.body_ciphertext;
+  const recipientList = note.recipient_user_ids ?? [];
+
+  const beginEdit = () => {
+    setDraft(note.body ?? "");
+    setEditRecipients(new Set(note.recipient_user_ids ?? []));
+    setEditing(true);
+  };
 
   const save = async () => {
-    if (!draft.trim() || draft.trim() === note.body) { setEditing(false); return; }
+    if (!draft.trim()) { setEditing(false); return; }
+    const bodyUnchanged = draft.trim() === note.body;
+    const currentSet = new Set(note.recipient_user_ids ?? []);
+    const recipientsUnchanged =
+      currentSet.size === editRecipients.size &&
+      [...currentSet].every((id) => editRecipients.has(id));
+    if (bodyUnchanged && recipientsUnchanged) { setEditing(false); return; }
     setBusy(true);
-    try { await onSave(draft.trim()); setEditing(false); }
+    try { await onSave(draft.trim(), isE2E ? editRecipients : undefined); setEditing(false); }
     catch (e: any) { toast.error(e.message ?? "Failed to update note"); }
     finally { setBusy(false); }
   };
@@ -1033,13 +1102,29 @@ function NoteItem({
       {editing ? (
         <div className="space-y-2">
           <Textarea rows={3} value={draft} onChange={(e) => setDraft(e.target.value)} disabled={busy} />
-          <div className="flex justify-end gap-2">
-            <Button size="sm" variant="ghost" onClick={() => { setDraft(note.body ?? ""); setEditing(false); }} disabled={busy}>
-              <X className="w-3.5 h-3.5 mr-1" /> Cancel
-            </Button>
-            <Button size="sm" onClick={save} disabled={busy || !draft.trim()}>
-              <Save className="w-3.5 h-3.5 mr-1" /> {busy ? "Saving…" : "Save"}
-            </Button>
+          <div className="flex items-center justify-between gap-2 flex-wrap">
+            <span className="text-[11px] text-muted-foreground">
+              {isE2E
+                ? `${editRecipients.size} recipient${editRecipients.size === 1 ? "" : "s"} — re-encrypted on save.`
+                : "Legacy note — recipients not applicable."}
+            </span>
+            <div className="flex justify-end gap-2">
+              {isE2E && (
+                <NoteRecipientPicker
+                  directory={directory}
+                  selected={editRecipients}
+                  onChange={setEditRecipients}
+                  currentUserId={currentUserId}
+                  compact
+                />
+              )}
+              <Button size="sm" variant="ghost" onClick={() => { setDraft(note.body ?? ""); setEditing(false); }} disabled={busy}>
+                <X className="w-3.5 h-3.5 mr-1" /> Cancel
+              </Button>
+              <Button size="sm" onClick={save} disabled={busy || !draft.trim() || (isE2E && editRecipients.size === 0)}>
+                <Save className="w-3.5 h-3.5 mr-1" /> {busy ? "Saving…" : "Save"}
+              </Button>
+            </div>
           </div>
         </div>
       ) : note._e2eStatus === "e2e-locked" ? (
@@ -1056,11 +1141,20 @@ function NoteItem({
       ) : (
         <div className="whitespace-pre-wrap">{note.body}</div>
       )}
+      {isE2E && !editing && recipientList.length > 0 && (
+        <div className="mt-1 text-[10px] text-muted-foreground">
+          Encrypted for {recipientList.length} recipient{recipientList.length === 1 ? "" : "s"}
+          {recipientList.length <= 6 && (
+            <>: {recipientList.map((uid) => authorMap[uid] ?? "Clinician").join(", ")}</>
+          )}
+        </div>
+      )}
+
       <div className="mt-1 flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
         <NoteHistoryButton noteId={note.id} />
         {canEdit && !editing && (
           <>
-            <Button size="sm" variant="ghost" className="h-7 px-2 text-xs" onClick={() => { setDraft(note.body ?? ""); setEditing(true); }} disabled={busy}>
+            <Button size="sm" variant="ghost" className="h-7 px-2 text-xs" onClick={beginEdit} disabled={busy}>
               <Pencil className="w-3.5 h-3.5 mr-1" /> Edit
             </Button>
             <AlertDialog>
