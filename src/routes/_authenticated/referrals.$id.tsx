@@ -110,6 +110,7 @@ function ReferralDetail() {
   const [saving, setSaving] = useState(false);
   const [posting, setPosting] = useState(false);
   const [priorDeclined, setPriorDeclined] = useState<Referral[]>([]);
+  const [noteFilter, setNoteFilter] = useState<"all" | "e2e" | "legacy" | "failed">("all");
   const outcomeRef = useRef<HTMLDivElement>(null);
 
   // Auto-load the next page of audit history when the sentinel scrolls into view.
