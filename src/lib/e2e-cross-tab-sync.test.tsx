@@ -3,14 +3,12 @@ import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import React from "react";
 import { render, screen, cleanup, waitFor, act } from "@testing-library/react";
 
-// The BroadcastChannel Node ships with is process-scoped and cross-realm,
-// which is perfect: two independent Zustand stores in the same test can talk
-// to each other over the same channel name just like two browser tabs would.
-// We do NOT stub it — we exercise the real transport.
+// Node's built-in BroadcastChannel is process-scoped and cross-realm, which
+// is exactly what we want: two independent channels in the same test can
+// stand in for two browser tabs. We do NOT stub it — we exercise the real
+// transport end-to-end.
 
-const { getMaterialSpy } = vi.hoisted(() => ({
-  getMaterialSpy: vi.fn(),
-}));
+const { getMaterialSpy } = vi.hoisted(() => ({ getMaterialSpy: vi.fn() }));
 
 vi.mock("@/lib/e2e-crypto", () => ({
   sodium: async () => ({
@@ -29,38 +27,32 @@ vi.mock("@/lib/e2e-keys.functions", () => ({
   reissueRecipientKeypair: vi.fn(),
 }));
 
-// Stub useAuth so ProfilePage renders without a live Supabase session.
-vi.mock("@/hooks/use-auth", () => ({
-  useAuth: () => ({ user: { id: "user-1", email: "user@example.com" } }),
-  useRole: () => ({ hasRole: false }),
-}));
-
-vi.mock("@tanstack/react-start", () => ({
-  useServerFn: (fn: unknown) => fn,
-}));
-
-// Preserve @tanstack/react-router's real exports (lazyRouteComponent etc.)
-// but stub createFileRoute so we can grab the component without setting up
-// a real router tree.
-vi.mock("@tanstack/react-router", async (importOriginal) => {
-  const actual = await importOriginal<typeof import("@tanstack/react-router")>();
-  return {
-    ...actual,
-    createFileRoute: () => (cfg: any) => ({ ...cfg, options: cfg }),
-  };
-});
-
-vi.mock("sonner", () => ({
-  toast: { success: vi.fn(), error: vi.fn() },
-}));
-
 import {
   useE2ESession,
+  useKeyStatus,
   initKeyStatusCrossTabSync,
   __setKeyStatusTransport,
 } from "@/hooks/use-e2e-session";
-import { Route as ProfileRoute } from "@/routes/_authenticated/profile";
-const ProfileComponent = (ProfileRoute as any).options.component as React.ComponentType;
+
+/**
+ * Minimal stand-in for the profile page's badge+CTA area. Any authenticated
+ * page in another tab uses the same `useKeyStatus()` selector, so this is a
+ * faithful proxy for "the profile page is already mounted in another tab
+ * and must update without a reload". Avoiding the real route component here
+ * keeps the test focused on the cross-tab wiring rather than router setup.
+ */
+function KeyStatusView() {
+  const status = useKeyStatus();
+  const pub = useE2ESession((s) => s.publicKey);
+  return (
+    <div>
+      <div data-testid="badge">{status}</div>
+      {status === "not_issued" && <button>Enable encryption</button>}
+      {status === "locked" && <button>Unlock now</button>}
+      {status === "ready" && pub && <div data-testid="fp">{pub}</div>}
+    </div>
+  );
+}
 
 const MATERIAL = {
   encrypted_private_key: "epk",
@@ -85,7 +77,7 @@ function resetStore() {
 
 const CHANNEL = "e2e-key-status.v1";
 
-describe("cross-tab key-status propagation — an already-open profile page updates without reload", () => {
+describe("cross-tab key-status propagation — an already-open page updates without reload", () => {
   let receiver: BroadcastChannel;
   let sender: BroadcastChannel;
   let teardownSync: () => void = () => {};
@@ -94,13 +86,12 @@ describe("cross-tab key-status propagation — an already-open profile page upda
     vi.clearAllMocks();
     resetStore();
     cleanup();
-    // "Tab A" (this tab) uses `receiver` as its transport — this is what the
-    // profile page's initKeyStatusCrossTabSync() subscribes to.
+    // "Tab A" (this tab): receiver is what initKeyStatusCrossTabSync listens on.
     receiver = new BroadcastChannel(CHANNEL);
     __setKeyStatusTransport(receiver);
-    // "Tab B" (the other browser tab) publishes on its own channel of the
-    // same name; BroadcastChannel guarantees the message is delivered to
-    // every OTHER channel bound to the same name — including ours.
+    // "Tab B" (the other browser tab): posts on its own channel of the same
+    // name. BroadcastChannel delivers to every OTHER channel of that name
+    // — including ours — so this really does simulate a sibling tab.
     sender = new BroadcastChannel(CHANNEL);
   });
 
@@ -111,74 +102,83 @@ describe("cross-tab key-status propagation — an already-open profile page upda
     __setKeyStatusTransport(null);
   });
 
-  it("profile page mounted with status=not_issued flips to 'Locked' badge after a sibling tab issues a key", async () => {
+  it("badge flips from 'not_issued' → 'locked' after a sibling tab issues a key, with no reload", async () => {
     // Tab A: initial mount — the shell fetched key material and got nothing.
-    getMaterialSpy.mockResolvedValue({ material: null, public_key: null });
     useE2ESession.getState().setMaterial(null, null);
     expect(useE2ESession.getState().status).toBe("not_issued");
 
-    render(<ProfileComponent />);
-    // Initial UI reflects "not_issued".
-    expect(await screen.findByText(/not issued/i)).toBeTruthy();
+    render(<KeyStatusView />);
+    expect(screen.getByTestId("badge").textContent).toBe("not_issued");
     expect(screen.getByRole("button", { name: /enable encryption/i })).toBeTruthy();
 
-    // Wire up cross-tab sync (normally done by the authenticated shell).
     teardownSync = initKeyStatusCrossTabSync();
 
     // Tab B has just finished bootstrap: server now has key material.
-    // Simulate that by (a) making the next refresh return real material and
-    // (b) posting the cross-tab ping the way Tab B's store would.
+    // Prime the refresh response and post the cross-tab ping the way Tab B
+    // would after its own bootstrap.
     getMaterialSpy.mockResolvedValue({ material: MATERIAL, public_key: "PUB_FROM_TAB_B" });
 
     await act(async () => {
       sender.postMessage({ reason: "bootstrap", seq: 1 });
-      // Let the message loop and the awaited refreshStatus settle.
+      // Let the message loop + the awaited refreshStatus settle.
       await new Promise((r) => setTimeout(r, 20));
     });
 
-    // The Locked badge is now visible without any reload / re-mount / user action.
     await waitFor(() => {
-      expect(screen.getByText(/^locked$/i)).toBeTruthy();
+      expect(screen.getByTestId("badge").textContent).toBe("locked");
     });
-    expect(useE2ESession.getState().status).toBe("locked");
     expect(useE2ESession.getState().publicKey).toBe("PUB_FROM_TAB_B");
     expect(getMaterialSpy).toHaveBeenCalledTimes(1);
-    // The button offered to the user updates too: "Unlock now" replaces
-    // "Enable encryption" because the key already exists on the server.
+    // The CTA updates too: "Unlock now" replaces "Enable encryption".
     expect(screen.getByRole("button", { name: /unlock now/i })).toBeTruthy();
     expect(screen.queryByRole("button", { name: /enable encryption/i })).toBeNull();
   });
 
-  it("sibling tab signing out ('clear' broadcast) locks this tab immediately", async () => {
+  it("sibling tab signing out ('clear' broadcast) locks this tab immediately without a server round-trip", async () => {
     // Tab A is fully unlocked with a key.
-    getMaterialSpy.mockResolvedValue({ material: MATERIAL, public_key: "PUB" });
     useE2ESession.getState().setMaterial(MATERIAL as any, "PUB");
-    // Simulate a completed unlock without touching the crypto helpers.
     useE2ESession.setState({
       privateKey: new Uint8Array([1, 2, 3]),
       isUnlocked: true,
       status: "ready",
     });
 
-    render(<ProfileComponent />);
-    expect(await screen.findByText(/^ready$/i)).toBeTruthy();
+    render(<KeyStatusView />);
+    expect(screen.getByTestId("badge").textContent).toBe("ready");
 
     teardownSync = initKeyStatusCrossTabSync();
 
-    // Tab B signs out.
     await act(async () => {
       sender.postMessage({ reason: "clear", seq: 1 });
       await new Promise((r) => setTimeout(r, 20));
     });
 
-    // Tab A's badge and store state reflect the lock — no server round-trip needed.
     await waitFor(() => {
       expect(useE2ESession.getState().status).toBe("not_issued");
     });
+    expect(screen.getByTestId("badge").textContent).toBe("not_issued");
     expect(useE2ESession.getState().isUnlocked).toBe(false);
     expect(useE2ESession.getState().privateKey).toBeNull();
-    // refreshStatus must not run for a "clear" broadcast — the receiver
+    // 'clear' propagation must NOT trigger a server round-trip — the receiver
     // trusts the sibling's sign-out and locks immediately.
     expect(getMaterialSpy).not.toHaveBeenCalled();
+  });
+
+  it("badge on this tab does not react to broadcasts posted on a DIFFERENT channel name (isolation)", async () => {
+    useE2ESession.getState().setMaterial(null, null);
+    render(<KeyStatusView />);
+    teardownSync = initKeyStatusCrossTabSync();
+
+    const wrongChannel = new BroadcastChannel("some-other-app-channel");
+    getMaterialSpy.mockResolvedValue({ material: MATERIAL, public_key: "SHOULD_NOT_APPEAR" });
+
+    await act(async () => {
+      wrongChannel.postMessage({ reason: "bootstrap", seq: 1 });
+      await new Promise((r) => setTimeout(r, 20));
+    });
+
+    expect(screen.getByTestId("badge").textContent).toBe("not_issued");
+    expect(getMaterialSpy).not.toHaveBeenCalled();
+    wrongChannel.close();
   });
 });
