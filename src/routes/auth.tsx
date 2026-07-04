@@ -129,6 +129,8 @@ function AuthPage() {
         }
         attemptId = null;
         if (!rememberMe) downgradeSessionToTabOnly();
+        // Automatically issue a recipient keypair on first successful sign-in.
+        await ensureRecipientKey(password);
         toast.success("Signed in");
         navigate({ to: postAuthTarget, replace: true });
       } else {
