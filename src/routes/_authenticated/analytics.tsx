@@ -472,8 +472,8 @@ function AnalyticsPage() {
               <XAxis dataKey="date" fontSize={11} />
               <YAxis domain={[0, 100]} tickFormatter={(v) => `${v}%`} fontSize={11} />
               <Tooltip
-                formatter={(v: number | null, name: string) =>
-                  v == null ? ["—", name] : [`${v.toFixed(0)}%`, name]
+                formatter={(v: any, name: any) =>
+                  [v == null ? "—" : `${Number(v).toFixed(0)}%`, name as string]
                 }
               />
               <Legend wrapperStyle={{ fontSize: 11 }} />
