@@ -629,13 +629,33 @@ function ReferralDetail() {
         </div>
 
         <Card className="p-5">
-          <h2 className="font-semibold mb-1">Noteboard</h2>
-          <p className="text-xs text-muted-foreground mb-3">Messages for the team. Each note is tagged with the author and time.</p>
+          <div className="flex items-center justify-between gap-2 mb-1">
+            <h2 className="font-semibold flex items-center gap-2">
+              Noteboard
+              {e2e.isUnlocked ? (
+                <Badge variant="outline" className="text-[10px] gap-1">
+                  <LockOpen className="w-3 h-3" /> E2E unlocked
+                </Badge>
+              ) : (
+                <Badge variant="outline" className="text-[10px] gap-1">
+                  <Lock className="w-3 h-3" /> E2E locked
+                </Badge>
+              )}
+            </h2>
+            {!e2e.isUnlocked && (
+              <Button size="sm" variant="outline" onClick={() => setUnlockOpen(true)}>
+                {e2e.needsBootstrap ? "Enable encryption" : "Unlock notes"}
+              </Button>
+            )}
+          </div>
+          <p className="text-xs text-muted-foreground mb-3">
+            Messages are end-to-end encrypted in your browser — the server only stores ciphertext.
+          </p>
           <div className="space-y-2 mb-4">
             <Textarea rows={3} value={noteBody} onChange={(e) => setNoteBody(e.target.value)} placeholder="e.g. seen in ED resus, awaiting bloods, for re-review at 6pm" />
             <div className="flex justify-end">
               <Button size="sm" onClick={postNote} disabled={posting || !noteBody.trim()}>
-                {posting ? "Posting…" : "Post note"}
+                {posting ? "Posting…" : e2e.isUnlocked ? "Post encrypted note" : "Unlock & post"}
               </Button>
             </div>
           </div>
@@ -646,10 +666,17 @@ function ReferralDetail() {
                 key={n.id}
                 note={n}
                 authorName={authors[n.author_id] ?? "Clinician"}
-                canEdit={!!user && (user.id === n.author_id || isAdmin)}
+                canEdit={!!user && (user.id === n.author_id || isAdmin) && n._e2eStatus !== "e2e-locked" && n._e2eStatus !== "e2e-no-key" && n._e2eStatus !== "e2e-failed" && n._e2eStatus !== "legacy-server-enc"}
                 onSave={async (body) => {
-                  const updated = await updateNoteFn({ data: { id: n.id, body } });
-                  setNotes((cur) => cur.map((x) => (x.id === n.id ? (updated as Note) : x)));
+                  if (n.body_ciphertext) {
+                    if (!e2e.isUnlocked) { setUnlockOpen(true); return; }
+                    const enc = await encryptForRecipients(body);
+                    await editEncNote({ data: { id: n.id, ...enc } });
+                    await loadNotes();
+                  } else {
+                    const updated = await updateNoteFn({ data: { id: n.id, body } });
+                    setNotes((cur) => cur.map((x) => (x.id === n.id ? { ...x, ...(updated as Note) } : x)));
+                  }
                   toast.success("Note updated");
                 }}
                 onDelete={async () => {
@@ -661,6 +688,13 @@ function ReferralDetail() {
             ))}
           </div>
         </Card>
+
+        <E2EUnlockModal
+          open={unlockOpen}
+          onOpenChange={setUnlockOpen}
+          onUnlocked={() => { loadNotes(); }}
+        />
+
 
         <Card className="p-5">
           <Collapsible
