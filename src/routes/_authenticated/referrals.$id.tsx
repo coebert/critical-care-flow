@@ -322,11 +322,26 @@ function ReferralDetail() {
     }
   };
 
+  const encryptForRecipients = async (body: string) => {
+    const dir = await fetchKeyDir({ data: undefined as any });
+    const recipients = (dir ?? [])
+      .filter((r: any) => !!r.public_key)
+      .map((r: any) => ({ user_id: r.user_id, public_key: r.public_key as string }));
+    // Ensure the author can decrypt their own note too.
+    if (e2e.publicKey && user && !recipients.some((r) => r.user_id === user.id)) {
+      recipients.push({ user_id: user.id, public_key: e2e.publicKey });
+    }
+    if (!recipients.length) throw new Error("No teammates have enabled end-to-end encryption yet.");
+    return e2eEncryptNote(body, recipients);
+  };
+
   const postNote = async () => {
     if (!noteBody.trim()) return;
+    if (!e2e.isUnlocked) { setUnlockOpen(true); return; }
     setPosting(true);
     try {
-      await addNoteFn({ data: { referral_id: id, body: noteBody.trim() } });
+      const enc = await encryptForRecipients(noteBody.trim());
+      await submitEncNote({ data: { referral_id: id, ...enc } });
       setNoteBody("");
     } catch (err: any) {
       toast.error(err.message ?? "Failed to post note");
