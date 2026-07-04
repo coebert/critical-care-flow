@@ -147,8 +147,15 @@ function ReferralDetail() {
   };
 
   const fetchDetail = useServerFn(getReferralDetail);
-  const fetchNotes = useServerFn(listReferralNotesDecrypted);
+  const fetchNotes = useServerFn(listEncryptedNotes);
   const fetchPriors = useServerFn(findReferralsByHospitalNumber);
+  const fetchKeyMaterial = useServerFn(getMyPrivateKeyMaterial);
+  const fetchKeyDir = useServerFn(getPublicKeyDirectory);
+  const submitEncNote = useServerFn(addEncryptedNote);
+  const editEncNote = useServerFn(updateEncryptedNote);
+
+  const e2e = useE2ESession();
+  const [unlockOpen, setUnlockOpen] = useState(false);
 
   const loadRef = async () => {
     try {
@@ -159,14 +166,46 @@ function ReferralDetail() {
     }
   };
 
+  // Bootstrap E2E session: load stored key material once per session.
+  useEffect(() => {
+    if (!user) return;
+    if (e2e.material || e2e.needsBootstrap) return;
+    fetchKeyMaterial({ data: undefined as any })
+      .then((res: any) => {
+        e2e.setMaterial(res?.material ?? null, res?.public_key ?? null);
+      })
+      .catch(() => {});
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user?.id]);
+
+  const decryptNoteRow = async (n: any): Promise<Note> => {
+    if (n.body_ciphertext && n.body_nonce) {
+      if (!n.wrapped_key) return { ...n, body: null, _e2eStatus: "e2e-no-key" };
+      if (!e2e.isUnlocked || !e2e.privateKey || !e2e.publicKey) {
+        return { ...n, body: null, _e2eStatus: "e2e-locked" };
+      }
+      try {
+        const body = await e2eDecryptNote(
+          { body_ciphertext: n.body_ciphertext, body_nonce: n.body_nonce, wrapped_key: n.wrapped_key },
+          { publicKey: e2e.publicKey, privateKey: e2e.privateKey },
+        );
+        return { ...n, body, _e2eStatus: "e2e-decrypted" };
+      } catch {
+        return { ...n, body: null, _e2eStatus: "e2e-failed" };
+      }
+    }
+    if (n.body_enc) return { ...n, _e2eStatus: "legacy-server-enc" };
+    return { ...n, _e2eStatus: "plaintext" };
+  };
+
   const loadNotes = async () => {
     try {
       const data = await fetchNotes({ data: { referral_id: id } });
-      // Show newest first to match prior UI.
       const sorted = [...(data ?? [])].sort(
         (a: any, b: any) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime(),
       );
-      setNotes(sorted as Note[]);
+      const decrypted = await Promise.all(sorted.map((n) => decryptNoteRow(n)));
+      setNotes(decrypted);
       const ids = Array.from(new Set(sorted.map((n: any) => n.author_id)));
       if (ids.length) {
         const { data: ps } = await supabase
