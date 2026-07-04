@@ -41,6 +41,7 @@ type Note = Tables<"referral_notes"> & DecryptedReferralNote & {
   body_ciphertext?: string | null;
   body_nonce?: string | null;
   enc_version?: number | null;
+  recipient_user_ids?: string[];
   _e2eStatus?: "plaintext" | "legacy-server-enc" | "e2e-decrypted" | "e2e-locked" | "e2e-no-key" | "e2e-failed";
 };
 
