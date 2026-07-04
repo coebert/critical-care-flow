@@ -156,6 +156,22 @@ function ReferralDetail() {
 
   const e2e = useE2ESession();
   const [unlockOpen, setUnlockOpen] = useState(false);
+  const [directory, setDirectory] = useState<Array<{ user_id: string; full_name: string; public_key: string | null }>>([]);
+  const [confirmMissingOpen, setConfirmMissingOpen] = useState(false);
+  const pendingActionRef = useRef<null | (() => Promise<void>)>(null);
+
+  const loadDirectory = async () => {
+    try {
+      const d = await fetchKeyDir({ data: undefined as any });
+      setDirectory((d ?? []) as any);
+    } catch { /* non-fatal — warning banner just won't show */ }
+  };
+  useEffect(() => { if (user) loadDirectory(); /* eslint-disable-next-line */ }, [user?.id, e2e.isUnlocked]);
+
+  const missingRecipients = directory.filter((r) => !r.public_key && r.user_id !== user?.id);
+  const eligibleRecipientCount =
+    directory.filter((r) => !!r.public_key).length +
+    (e2e.publicKey && !directory.some((r) => r.user_id === user?.id && !!r.public_key) ? 1 : 0);
 
   const loadRef = async () => {
     try {
