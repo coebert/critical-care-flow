@@ -11,6 +11,30 @@ import { safeError } from "./safe-error";
 
 const b64 = z.string().min(1).max(20000);
 
+// Recipient-key lifecycle events written to public.audit_log. The enum was
+// extended in the accompanying migration so admins can review when each
+// user's keypair was created, replaced, or unlocked in a browser session.
+export type KeyLifecycleSource = "issue" | "enable" | "reissue";
+
+async function writeKeyLifecycleAudit(
+  userId: string,
+  action: "issue" | "enable" | "unlock" | "reissue",
+  publicKey: string | null,
+) {
+  const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+  // Never store the raw public key — a short fingerprint is enough to tell
+  // two keys apart in the audit trail without giving an audit-log reader a
+  // pointer to correlate against note ciphertext.
+  const fingerprint = publicKey ? publicKey.slice(0, 16) : null;
+  await supabaseAdmin.from("audit_log").insert({
+    user_id: userId,
+    action,
+    entity: "user_keypair",
+    entity_id: userId,
+    diff: { source: action, public_key_fingerprint: fingerprint },
+  } as any);
+}
+
 export const publishUserKeys = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((d: unknown) =>
@@ -22,6 +46,10 @@ export const publishUserKeys = createServerFn({ method: "POST" })
         kdf_ops: z.number().int().min(1).max(20),
         kdf_mem: z.number().int().min(1024).max(2_147_483_647),
         nonce: b64,
+        // Distinguishes an automatic sign-in bootstrap ("issue") from a
+        // user-driven bootstrap in the UI ("enable"). Defaults to "issue"
+        // for backwards compatibility with older callers.
+        source: z.enum(["issue", "enable"]).optional(),
       })
       .parse(d),
   )
@@ -48,6 +76,32 @@ export const publishUserKeys = createServerFn({ method: "POST" })
         { onConflict: "user_id" },
       );
     if (e2) throw safeError("e2e.publishPrivate", e2, "Failed to store encrypted key.");
+    // Best-effort audit — a broken audit must not block the user from having
+    // a working recipient key, so we log-and-swallow.
+    try {
+      await writeKeyLifecycleAudit(userId, data.source ?? "issue", data.public_key);
+    } catch (auditErr) {
+      console.error("e2e.publish.audit failed", auditErr);
+    }
+    return { ok: true };
+  });
+
+// Called from the client whenever the recipient key transitions from
+// locked → unlocked in a browser session (fresh password unwrap only —
+// sessionStorage rehydration does NOT re-log, because that key was
+// already audited when it was first unlocked).
+export const logRecipientKeyUnlock = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d: unknown) =>
+    z.object({ public_key: b64.optional() }).parse(d),
+  )
+  .handler(async ({ data, context }) => {
+    try {
+      await writeKeyLifecycleAudit(context.userId, "unlock", data.public_key ?? null);
+    } catch (auditErr) {
+      // Do not fail the unlock UX if the audit write fails.
+      console.error("e2e.unlock.audit failed", auditErr);
+    }
     return { ok: true };
   });
 
