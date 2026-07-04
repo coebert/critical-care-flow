@@ -7,17 +7,21 @@ import userEvent from "@testing-library/user-event";
 // Stub crypto + audit + server fns so the modal can render without hitting
 // the real Worker runtime. Cancelling the modal should touch NONE of these
 // mocks — that's the whole invariant this file guards.
-const publishSpy = vi.fn(async () => ({ ok: true }));
-const unwrapSpy = vi.fn(async () => new Uint8Array([1, 2, 3]));
-const generateSpy = vi.fn(async () => ({
-  keypair: { publicKey: "NEW_PUB" },
-  material: {
-    encrypted_private_key: "epk",
-    kdf_salt: "salt",
-    kdf_ops: 3,
-    kdf_mem: 67108864,
-    nonce: "n",
-  },
+const { publishSpy, unwrapSpy, generateSpy, logUnlockSpy, getMaterialSpy } = vi.hoisted(() => ({
+  publishSpy: vi.fn(async () => ({ ok: true })),
+  unwrapSpy: vi.fn(async () => new Uint8Array([1, 2, 3])),
+  generateSpy: vi.fn(async () => ({
+    keypair: { publicKey: "NEW_PUB" },
+    material: {
+      encrypted_private_key: "epk",
+      kdf_salt: "salt",
+      kdf_ops: 3,
+      kdf_mem: 67108864,
+      nonce: "n",
+    },
+  })),
+  logUnlockSpy: vi.fn(async () => ({ ok: true })),
+  getMaterialSpy: vi.fn(async () => ({ material: null, public_key: null })),
 }));
 
 vi.mock("@/lib/e2e-crypto", () => ({
@@ -30,8 +34,6 @@ vi.mock("@/lib/e2e-crypto", () => ({
   generateAndWrapKeypair: generateSpy,
 }));
 
-const logUnlockSpy = vi.fn(async () => ({ ok: true }));
-const getMaterialSpy = vi.fn(async () => ({ material: null, public_key: null }));
 vi.mock("@/lib/e2e-keys.functions", () => ({
   logRecipientKeyUnlock: logUnlockSpy,
   getMyPrivateKeyMaterial: getMaterialSpy,
