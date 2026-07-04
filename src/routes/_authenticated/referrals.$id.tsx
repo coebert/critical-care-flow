@@ -1202,14 +1202,16 @@ function NoteItem({
       ) : (
         <div className="whitespace-pre-wrap">{note.body}</div>
       )}
-      {isE2E && !editing && recipientList.length > 0 && (
-        <div className="mt-1 text-[10px] text-muted-foreground">
-          Encrypted for {recipientList.length} recipient{recipientList.length === 1 ? "" : "s"}
-          {recipientList.length <= 6 && (
-            <>: {recipientList.map((uid) => authorMap[uid] ?? "Clinician").join(", ")}</>
-          )}
-        </div>
+      {isE2E && !editing && (
+        <NoteAudienceInfo
+          recipientIds={recipientList}
+          directory={directory}
+          authorId={note.author_id}
+          currentUserId={currentUserId}
+          authorMap={authorMap}
+        />
       )}
+
 
       <div className="mt-1 flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
         <NoteHistoryButton noteId={note.id} />
