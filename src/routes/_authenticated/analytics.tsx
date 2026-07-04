@@ -373,7 +373,7 @@ function AnalyticsPage() {
         arrivalN: b.arrival.length,
       };
     });
-  }, [filtered, from, to, complianceBucket, ICNARC_TIME_TO_SEEN_TARGET_MIN, ICNARC_DECISION_TO_ARRIVAL_TARGET_MIN]);
+  }, [complianceFiltered, from, to, complianceBucket, complianceSpecialty, ICNARC_TIME_TO_SEEN_TARGET_MIN, ICNARC_DECISION_TO_ARRIVAL_TARGET_MIN]);
 
 
 
