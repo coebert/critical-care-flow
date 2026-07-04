@@ -441,10 +441,17 @@ function AnalyticsPage() {
 
       <Card className="p-5 mb-6">
         <div className="flex items-baseline justify-between gap-3 mb-4 flex-wrap">
-          <h2 className="font-semibold">ICNARC timing KPIs</h2>
-          <span className="text-xs text-muted-foreground">
-            Referral-workflow targets aligned to ICNARC / GPICS timing standards.
-          </span>
+          <div className="flex items-baseline gap-3 flex-wrap">
+            <h2 className="font-semibold">ICNARC timing KPIs</h2>
+            <span className="text-xs text-muted-foreground">
+              Referral-workflow targets aligned to ICNARC / GPICS timing standards.
+            </span>
+          </div>
+          <IcnarcTargetsDialog
+            timeToSeen={ICNARC_TIME_TO_SEEN_TARGET_MIN}
+            decisionToArrival={ICNARC_DECISION_TO_ARRIVAL_TARGET_MIN}
+            onSaved={() => queryClient.invalidateQueries({ queryKey: ["icnarc-targets"] })}
+          />
         </div>
         <div className="grid md:grid-cols-2 gap-4">
           <IcnarcKpi
