@@ -128,74 +128,38 @@ export const addEncryptedNote = createServerFn({ method: "POST" })
         .in("role", ["admin", "clinician"]),
       admin.from("user_public_keys").select("user_id"),
     ]);
-    const clinicianIds = new Set(
-      (clinicianRows ?? [])
-        .map((r: any) => r.user_id as string)
-        .filter((id) => id !== userId),
-    );
-    const enrolledIds = new Set(
-      (keyRows ?? []).map((r: any) => r.user_id as string),
-    );
-    const requestedRecipients = new Set(
-      data.wrapped_keys.map((w) => w.recipient_user_id),
-    );
 
-    // Teammates who should be able to read this note but aren't recipients.
-    const missingNoKey: string[] = [];
-    const enrolledButExcluded: string[] = [];
-    for (const cid of clinicianIds) {
-      if (requestedRecipients.has(cid)) continue;
-      if (enrolledIds.has(cid)) enrolledButExcluded.push(cid);
-      else missingNoKey.push(cid);
-    }
 
-    // Helper: resolve display names for a set of user IDs so the client
-    // toast can show teammates by name (the client directory may be stale).
-    const resolveNames = async (ids: string[]) => {
-      if (ids.length === 0) return [] as Array<{ user_id: string; full_name: string }>;
-      const { data: profs } = await admin
-        .from("profiles")
-        .select("id, full_name")
-        .in("id", ids);
-      const byId = new Map<string, string>((profs ?? []).map((p: any) => [p.id, p.full_name]));
-      return ids.map((id) => ({ user_id: id, full_name: byId.get(id) ?? "Unknown teammate" }));
-    };
 
-    // Any wrapped_keys addressed to a user without a published key (never
-    // enrolled, rotated, or removed) → these are guaranteed unreadable and
-    // deserve their own explicit list in the toast.
-    const strayRecipients = Array.from(requestedRecipients).filter(
-      (rid) => rid !== userId && !enrolledIds.has(rid),
-    );
+    // Delegate the rules to the pure evaluator so they can be exercised in
+    // isolation by unit tests (see e2e-recipient-coverage.test.ts).
+    const { evaluateRecipientCoverage } = await import("./e2e-recipient-coverage");
+    const verdict = evaluateRecipientCoverage({
+      authorId: userId,
+      clinicianIds: (clinicianRows ?? []).map((r: any) => r.user_id as string),
+      enrolledIds: (keyRows ?? []).map((r: any) => r.user_id as string),
+      requestedRecipientIds: data.wrapped_keys.map((w) => w.recipient_user_id),
+      allowReducedRecipients: !!data.allow_reduced_recipients,
+    });
 
-    if (
-      !data.allow_reduced_recipients &&
-      (missingNoKey.length > 0 || enrolledButExcluded.length > 0 || strayRecipients.length > 0)
-    ) {
-      const [missingNames, excludedNames, strayNames] = await Promise.all([
-        resolveNames(missingNoKey),
-        resolveNames(enrolledButExcluded),
-        resolveNames(strayRecipients),
-      ]);
-      // Encode structured details in the message with a stable prefix so the
-      // client can parse and render names. TanStack serializes thrown errors
-      // as message + stack, so custom props like .details do not survive.
+    if (!verdict.ok) {
+      // Resolve names so the client toast can list teammates by name.
+      const allIds = [
+        ...verdict.missingNoKey,
+        ...verdict.enrolledButExcluded,
+        ...verdict.strayRecipients,
+      ];
+      const { data: profs } = allIds.length
+        ? await admin.from("profiles").select("id, full_name").in("id", allIds)
+        : { data: [] as Array<{ id: string; full_name: string }> };
+      const nameFor = new Map<string, string>((profs ?? []).map((p: any) => [p.id, p.full_name]));
+      const decorate = (ids: string[]) =>
+        ids.map((id) => ({ user_id: id, full_name: nameFor.get(id) ?? "Unknown teammate" }));
       const payload = {
-        code: "recipient_coverage_changed",
-        missing_no_key: missingNames,
-        enrolled_but_excluded: excludedNames,
-        stray_recipients: strayNames,
-      };
-      throw new Error(`RECIPIENT_COVERAGE_CHANGED::${JSON.stringify(payload)}`);
-    }
-
-    if (strayRecipients.length > 0) {
-      const strayNames = await resolveNames(strayRecipients);
-      const payload = {
-        code: "recipient_coverage_changed",
-        missing_no_key: [],
-        enrolled_but_excluded: [],
-        stray_recipients: strayNames,
+        code: verdict.reason,
+        missing_no_key: decorate(verdict.missingNoKey),
+        enrolled_but_excluded: decorate(verdict.enrolledButExcluded),
+        stray_recipients: decorate(verdict.strayRecipients),
       };
       throw new Error(`RECIPIENT_COVERAGE_CHANGED::${JSON.stringify(payload)}`);
     }
