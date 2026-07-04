@@ -78,6 +78,11 @@ export const Route = createFileRoute("/_authenticated/")({
       { name: "description", content: "Live list of critical care referrals at Salisbury District Hospital." },
     ],
   }),
+  validateSearch: (search: Record<string, unknown>) => ({
+    specialty: typeof search.specialty === "string" ? search.specialty : undefined,
+    from: typeof search.from === "string" ? search.from : undefined, // yyyy-MM-dd inclusive
+    to: typeof search.to === "string" ? search.to : undefined,       // yyyy-MM-dd inclusive
+  }),
   component: ReferralsList,
 });
 
