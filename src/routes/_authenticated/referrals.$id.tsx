@@ -753,15 +753,26 @@ function ReferralDetail() {
           )}
           <div className="space-y-2 mb-4">
             <Textarea rows={3} value={noteBody} onChange={(e) => setNoteBody(e.target.value)} placeholder="e.g. seen in ED resus, awaiting bloods, for re-review at 6pm" />
-            <div className="flex items-center justify-between gap-2">
+            <div className="flex items-center justify-between gap-2 flex-wrap">
               <span className="text-[11px] text-muted-foreground">
                 {e2e.isUnlocked
                   ? `Will be readable by ${eligibleRecipientCount} teammate${eligibleRecipientCount === 1 ? "" : "s"}.`
                   : ""}
               </span>
-              <Button size="sm" onClick={postNote} disabled={posting || !noteBody.trim()}>
-                {posting ? "Posting…" : e2e.isUnlocked ? "Post encrypted note" : "Unlock & post"}
-              </Button>
+              <div className="flex items-center gap-2">
+                {e2e.isUnlocked && (
+                  <NoteRecipientPicker
+                    directory={directoryWithSelf}
+                    selected={selectedRecipients}
+                    onChange={(next) => { setRecipientsTouched(true); setSelectedRecipients(next); }}
+                    currentUserId={user?.id}
+                    compact
+                  />
+                )}
+                <Button size="sm" onClick={postNote} disabled={posting || !noteBody.trim()}>
+                  {posting ? "Posting…" : e2e.isUnlocked ? "Post encrypted note" : "Unlock & post"}
+                </Button>
+              </div>
             </div>
           </div>
           <div className="space-y-3 max-h-[520px] overflow-auto">
@@ -775,11 +786,18 @@ function ReferralDetail() {
                 key={n.id}
                 note={n}
                 authorName={authors[n.author_id] ?? "Clinician"}
+                authorMap={authors}
+                directory={directoryWithSelf}
+                currentUserId={user?.id}
                 canEdit={!!user && (user.id === n.author_id || isAdmin) && n._e2eStatus !== "e2e-locked" && n._e2eStatus !== "e2e-no-key" && n._e2eStatus !== "e2e-failed" && n._e2eStatus !== "legacy-server-enc"}
-                onSave={async (body) => {
+                onSave={async (body, recipients) => {
                   if (n.body_ciphertext) {
                     if (!e2e.isUnlocked) { setUnlockOpen(true); return; }
-                    const enc = await encryptForRecipients(body);
+                    if (!recipients || recipients.size === 0) {
+                      toast.error("Pick at least one recipient before saving.");
+                      return;
+                    }
+                    const enc = await encryptForRecipients(body, recipients);
                     await editEncNote({ data: { id: n.id, ...enc } });
                     await loadNotes();
                   } else {
@@ -796,6 +814,7 @@ function ReferralDetail() {
               />
             ))}
           </div>
+
         </Card>
 
         <E2EUnlockModal
