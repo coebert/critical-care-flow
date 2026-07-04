@@ -477,15 +477,51 @@ function ReferralDetail() {
       });
       setNoteBody("");
     } catch (err: any) {
-      // Server-side coverage race: re-sync the directory so the compose UI
-      // reflects the new state, then tell the user what changed.
       const msg = String(err?.message ?? "");
-      if (msg.includes("recipient coverage changed") || msg.includes("no longer have a published")) {
+      const marker = "RECIPIENT_COVERAGE_CHANGED::";
+      const idx = msg.indexOf(marker);
+      if (idx >= 0) {
+        // Structured coverage-change from the server. Parse the JSON payload,
+        // refresh the local directory, and show a detailed toast so the
+        // author knows exactly who to re-review.
+        let payload: {
+          missing_no_key: Array<{ user_id: string; full_name: string }>;
+          enrolled_but_excluded: Array<{ user_id: string; full_name: string }>;
+          stray_recipients: Array<{ user_id: string; full_name: string }>;
+        } | null = null;
+        try {
+          payload = JSON.parse(msg.slice(idx + marker.length));
+        } catch { /* fall through to generic toast */ }
         await loadDirectory();
-        toast.error(
-          "Recipient list changed since you started composing. Review recipients and try again.",
-          { duration: 6000 },
-        );
+        if (payload) {
+          const fmt = (people: Array<{ full_name: string }>) =>
+            people.length <= 3
+              ? people.map((p) => p.full_name).join(", ")
+              : `${people.slice(0, 3).map((p) => p.full_name).join(", ")} and ${people.length - 3} more`;
+          const lines: string[] = [];
+          if (payload.missing_no_key.length > 0) {
+            lines.push(`Lost/never-published keys: ${fmt(payload.missing_no_key)}`);
+          }
+          if (payload.enrolled_but_excluded.length > 0) {
+            lines.push(`Enrolled but not in recipients: ${fmt(payload.enrolled_but_excluded)}`);
+          }
+          if (payload.stray_recipients.length > 0) {
+            lines.push(`Recipients with no current key: ${fmt(payload.stray_recipients)}`);
+          }
+          toast.error("Recipient list changed since you started composing", {
+            description: lines.join(" · "),
+            duration: 12000,
+            action: {
+              label: "Refresh recipients",
+              onClick: () => { loadDirectory(); },
+            },
+          });
+        } else {
+          toast.error(
+            "Recipient list changed since you started composing. Review recipients and try again.",
+            { duration: 6000 },
+          );
+        }
       } else {
         toast.error(msg || "Failed to post note");
       }

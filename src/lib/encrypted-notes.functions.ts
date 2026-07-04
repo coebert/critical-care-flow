@@ -149,31 +149,55 @@ export const addEncryptedNote = createServerFn({ method: "POST" })
       else missingNoKey.push(cid);
     }
 
-    if (!data.allow_reduced_recipients && (missingNoKey.length > 0 || enrolledButExcluded.length > 0)) {
-      const err: any = new Error(
-        "Cannot post: recipient coverage changed. " +
-          `${missingNoKey.length} teammate(s) have no encryption key and ` +
-          `${enrolledButExcluded.length} enrolled teammate(s) are not in the recipient list. ` +
-          "Re-open the note to review recipients or explicitly opt into a reduced recipient set.",
-      );
-      err.code = "recipient_coverage_changed";
-      err.details = {
-        missing_no_key: missingNoKey,
-        enrolled_but_excluded: enrolledButExcluded,
-      };
-      throw err;
-    }
+    // Helper: resolve display names for a set of user IDs so the client
+    // toast can show teammates by name (the client directory may be stale).
+    const resolveNames = async (ids: string[]) => {
+      if (ids.length === 0) return [] as Array<{ user_id: string; full_name: string }>;
+      const { data: profs } = await admin
+        .from("profiles")
+        .select("id, full_name")
+        .in("id", ids);
+      const byId = new Map<string, string>((profs ?? []).map((p: any) => [p.id, p.full_name]));
+      return ids.map((id) => ({ user_id: id, full_name: byId.get(id) ?? "Unknown teammate" }));
+    };
 
-    // Also reject any wrapped_keys addressed to a user without a published
-    // key (either never enrolled, or their key was rotated/removed). Those
-    // rows would either fail FK checks or store a bogus wrapped ciphertext.
+    // Any wrapped_keys addressed to a user without a published key (never
+    // enrolled, rotated, or removed) → these are guaranteed unreadable and
+    // deserve their own explicit list in the toast.
     const strayRecipients = Array.from(requestedRecipients).filter(
       (rid) => rid !== userId && !enrolledIds.has(rid),
     );
+
+    if (
+      !data.allow_reduced_recipients &&
+      (missingNoKey.length > 0 || enrolledButExcluded.length > 0 || strayRecipients.length > 0)
+    ) {
+      const [missingNames, excludedNames, strayNames] = await Promise.all([
+        resolveNames(missingNoKey),
+        resolveNames(enrolledButExcluded),
+        resolveNames(strayRecipients),
+      ]);
+      // Encode structured details in the message with a stable prefix so the
+      // client can parse and render names. TanStack serializes thrown errors
+      // as message + stack, so custom props like .details do not survive.
+      const payload = {
+        code: "recipient_coverage_changed",
+        missing_no_key: missingNames,
+        enrolled_but_excluded: excludedNames,
+        stray_recipients: strayNames,
+      };
+      throw new Error(`RECIPIENT_COVERAGE_CHANGED::${JSON.stringify(payload)}`);
+    }
+
     if (strayRecipients.length > 0) {
-      throw new Error(
-        `Cannot post: ${strayRecipients.length} recipient(s) no longer have a published encryption key.`,
-      );
+      const strayNames = await resolveNames(strayRecipients);
+      const payload = {
+        code: "recipient_coverage_changed",
+        missing_no_key: [],
+        enrolled_but_excluded: [],
+        stray_recipients: strayNames,
+      };
+      throw new Error(`RECIPIENT_COVERAGE_CHANGED::${JSON.stringify(payload)}`);
     }
     // ---------------------------------------------------------------------
 
