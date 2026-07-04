@@ -241,6 +241,9 @@ function ProfilePage() {
             needsBootstrap: false,
           });
           toast.success("New keypair issued");
+          // Re-sync from the server so status/fingerprint reflect the new key
+          // immediately, not on the next mount.
+          await refreshKeyStatus();
         }}
       />
     </div>
