@@ -529,10 +529,6 @@ function ReferralDetail() {
       setPosting(false);
     }
   };
-    } finally {
-      setPosting(false);
-    }
-  };
 
   const postNote = async () => {
     if (!noteBody.trim()) return;
