@@ -489,20 +489,41 @@ function AnalyticsPage() {
           <div>
             <h2 className="font-semibold">ICNARC compliance trend</h2>
             <p className="text-xs text-muted-foreground">
+              {complianceSpecialty
+                ? `Showing ${complianceSpecialty} only · `
+                : "All specialties · "}
               % within target for referral → first seen (≤{ICNARC_TIME_TO_SEEN_TARGET_MIN} min) and decision → on unit (≤{Math.round(ICNARC_DECISION_TO_ARRIVAL_TARGET_MIN / 60)} h).
             </p>
           </div>
-          <div className="flex gap-1">
-            {(["day", "week", "month"] as const).map((g) => (
-              <Button
-                key={g}
-                size="sm"
-                variant={complianceBucket === g ? "default" : "outline"}
-                onClick={() => setComplianceBucket(g)}
-              >
-                {g[0].toUpperCase() + g.slice(1)}
-              </Button>
-            ))}
+          <div className="flex items-center gap-2 flex-wrap">
+            <Select
+              value={complianceSpecialty ?? "__all__"}
+              onValueChange={(v) => setComplianceSpecialty(v === "__all__" ? null : v)}
+            >
+              <SelectTrigger className="w-[220px] h-8 text-xs">
+                <SelectValue placeholder="All specialties" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="__all__">All specialties</SelectItem>
+                {bySpecialty.map((s) => (
+                  <SelectItem key={s.specialty} value={s.specialty}>
+                    {s.specialty} ({s.count})
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <div className="flex gap-1">
+              {(["day", "week", "month"] as const).map((g) => (
+                <Button
+                  key={g}
+                  size="sm"
+                  variant={complianceBucket === g ? "default" : "outline"}
+                  onClick={() => setComplianceBucket(g)}
+                >
+                  {g[0].toUpperCase() + g.slice(1)}
+                </Button>
+              ))}
+            </div>
           </div>
         </div>
         <div className="h-72">
