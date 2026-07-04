@@ -1033,25 +1033,48 @@ function DTNow({ value, onChange, disabled, invalid }: { value: string; onChange
 function NoteItem({
   note,
   authorName,
+  authorMap,
+  directory,
+  currentUserId,
   canEdit,
   onSave,
   onDelete,
 }: {
   note: Note;
   authorName: string;
+  authorMap: Record<string, string>;
+  directory: Array<{ user_id: string; full_name: string; public_key: string | null }>;
+  currentUserId?: string;
   canEdit: boolean;
-  onSave: (body: string) => Promise<void>;
+  onSave: (body: string, recipients?: Set<string>) => Promise<void>;
   onDelete: () => Promise<void>;
 }) {
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState(note.body ?? "");
   const [busy, setBusy] = useState(false);
+  const [editRecipients, setEditRecipients] = useState<Set<string>>(
+    () => new Set(note.recipient_user_ids ?? []),
+  );
   const edited = (note as any).edited_at as string | null | undefined;
+  const isE2E = !!note.body_ciphertext;
+  const recipientList = note.recipient_user_ids ?? [];
+
+  const beginEdit = () => {
+    setDraft(note.body ?? "");
+    setEditRecipients(new Set(note.recipient_user_ids ?? []));
+    setEditing(true);
+  };
 
   const save = async () => {
-    if (!draft.trim() || draft.trim() === note.body) { setEditing(false); return; }
+    if (!draft.trim()) { setEditing(false); return; }
+    const bodyUnchanged = draft.trim() === note.body;
+    const currentSet = new Set(note.recipient_user_ids ?? []);
+    const recipientsUnchanged =
+      currentSet.size === editRecipients.size &&
+      [...currentSet].every((id) => editRecipients.has(id));
+    if (bodyUnchanged && recipientsUnchanged) { setEditing(false); return; }
     setBusy(true);
-    try { await onSave(draft.trim()); setEditing(false); }
+    try { await onSave(draft.trim(), isE2E ? editRecipients : undefined); setEditing(false); }
     catch (e: any) { toast.error(e.message ?? "Failed to update note"); }
     finally { setBusy(false); }
   };
@@ -1079,13 +1102,29 @@ function NoteItem({
       {editing ? (
         <div className="space-y-2">
           <Textarea rows={3} value={draft} onChange={(e) => setDraft(e.target.value)} disabled={busy} />
-          <div className="flex justify-end gap-2">
-            <Button size="sm" variant="ghost" onClick={() => { setDraft(note.body ?? ""); setEditing(false); }} disabled={busy}>
-              <X className="w-3.5 h-3.5 mr-1" /> Cancel
-            </Button>
-            <Button size="sm" onClick={save} disabled={busy || !draft.trim()}>
-              <Save className="w-3.5 h-3.5 mr-1" /> {busy ? "Saving…" : "Save"}
-            </Button>
+          <div className="flex items-center justify-between gap-2 flex-wrap">
+            <span className="text-[11px] text-muted-foreground">
+              {isE2E
+                ? `${editRecipients.size} recipient${editRecipients.size === 1 ? "" : "s"} — re-encrypted on save.`
+                : "Legacy note — recipients not applicable."}
+            </span>
+            <div className="flex justify-end gap-2">
+              {isE2E && (
+                <NoteRecipientPicker
+                  directory={directory}
+                  selected={editRecipients}
+                  onChange={setEditRecipients}
+                  currentUserId={currentUserId}
+                  compact
+                />
+              )}
+              <Button size="sm" variant="ghost" onClick={() => { setDraft(note.body ?? ""); setEditing(false); }} disabled={busy}>
+                <X className="w-3.5 h-3.5 mr-1" /> Cancel
+              </Button>
+              <Button size="sm" onClick={save} disabled={busy || !draft.trim() || (isE2E && editRecipients.size === 0)}>
+                <Save className="w-3.5 h-3.5 mr-1" /> {busy ? "Saving…" : "Save"}
+              </Button>
+            </div>
           </div>
         </div>
       ) : note._e2eStatus === "e2e-locked" ? (
@@ -1102,6 +1141,15 @@ function NoteItem({
       ) : (
         <div className="whitespace-pre-wrap">{note.body}</div>
       )}
+      {isE2E && !editing && recipientList.length > 0 && (
+        <div className="mt-1 text-[10px] text-muted-foreground">
+          Encrypted for {recipientList.length} recipient{recipientList.length === 1 ? "" : "s"}
+          {recipientList.length <= 6 && (
+            <>: {recipientList.map((uid) => authorMap[uid] ?? "Clinician").join(", ")}</>
+          )}
+        </div>
+      )}
+
       <div className="mt-1 flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
         <NoteHistoryButton noteId={note.id} />
         {canEdit && !editing && (
