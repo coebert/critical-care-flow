@@ -39,8 +39,10 @@ function ProfilePage() {
   const { user } = useAuth();
   const e2e = useE2ESession();
   const fetchKeyMaterial = useServerFn(getMyPrivateKeyMaterial);
+  const reissue = useServerFn(reissueRecipientKeypair);
   const [status, setStatus] = useState<Status>("loading");
   const [unlockOpen, setUnlockOpen] = useState(false);
+  const [reissueOpen, setReissueOpen] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
