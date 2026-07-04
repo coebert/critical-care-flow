@@ -352,11 +352,15 @@ function AnalyticsPage() {
     });
     return starts.map((d) => {
       const b = map.get(bucketStart(d).toISOString())!;
+      const seenNum = b.seen.filter((m) => m <= ICNARC_TIME_TO_SEEN_TARGET_MIN).length;
+      const arrivalNum = b.arrival.filter((m) => m <= ICNARC_DECISION_TO_ARRIVAL_TARGET_MIN).length;
       return {
         date: format(d, labelFmt),
         seenPct: b.seen.length ? pctWithin(b.seen, ICNARC_TIME_TO_SEEN_TARGET_MIN) : null,
         arrivalPct: b.arrival.length ? pctWithin(b.arrival, ICNARC_DECISION_TO_ARRIVAL_TARGET_MIN) : null,
+        seenNum,
         seenN: b.seen.length,
+        arrivalNum,
         arrivalN: b.arrival.length,
       };
     });
@@ -498,11 +502,35 @@ function AnalyticsPage() {
               <CartesianGrid strokeDasharray="3 3" opacity={0.3} />
               <XAxis dataKey="date" fontSize={11} />
               <YAxis domain={[0, 100]} tickFormatter={(v) => `${v}%`} fontSize={11} />
-              <Tooltip
-                formatter={(v: any, name: any) =>
-                  [v == null ? "—" : `${Number(v).toFixed(0)}%`, name as string]
-                }
-              />
+              <Tooltip content={({ active, payload, label }) => {
+                if (!active || !payload || payload.length === 0) return null;
+                const p = payload[0]?.payload as any;
+                return (
+                  <div className="rounded-md border bg-popover p-2 text-xs shadow-sm">
+                    <div className="font-medium mb-1">{label}</div>
+                    {payload.map((item: any, i: number) => {
+                      const name = item.name as string;
+                      const val = item.value;
+                      const isSeen = name === "Referral → first seen";
+                      const num = isSeen ? p?.seenNum : p?.arrivalNum;
+                      const den = isSeen ? p?.seenN : p?.arrivalN;
+                      return (
+                        <div key={i} className="flex items-center gap-2 py-0.5">
+                          <span
+                            className="inline-block h-2 w-2 rounded-full"
+                            style={{ background: item.color }}
+                          />
+                          <span className="text-muted-foreground">{name}:</span>
+                          <span className="font-medium tabular-nums">
+                            {val == null ? "—" : `${Number(val).toFixed(0)}%`}
+                            {val != null && den > 0 ? ` (${num}/${den})` : ""}
+                          </span>
+                        </div>
+                      );
+                    })}
+                  </div>
+                );
+              }} />
               <Legend wrapperStyle={{ fontSize: 11 }} />
               <Line
                 type="monotone"
