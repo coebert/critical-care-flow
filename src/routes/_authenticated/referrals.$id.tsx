@@ -748,7 +748,7 @@ function ReferralDetail() {
         <E2EUnlockModal
           open={unlockOpen}
           onOpenChange={setUnlockOpen}
-          onUnlocked={() => { loadNotes(); }}
+          onUnlocked={async () => { await Promise.all([loadNotes(), loadDirectory()]); }}
         />
 
         <AlertDialog open={confirmMissingOpen} onOpenChange={setConfirmMissingOpen}>

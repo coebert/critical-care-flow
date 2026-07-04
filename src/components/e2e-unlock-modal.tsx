@@ -1,4 +1,4 @@
-import { useState, type ReactNode } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import { useServerFn } from "@tanstack/react-start";
 import {
   Dialog,
@@ -11,9 +11,32 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { useE2ESession } from "@/hooks/use-e2e-session";
 import { publishUserKeys } from "@/lib/e2e-keys.functions";
 import { toast } from "sonner";
+import { AlertCircle, Loader2, ShieldCheck } from "lucide-react";
+
+const MIN_PASSWORD = 8;
+
+/** Map raw crypto/network errors to something a user can act on. */
+function friendlyUnlockError(err: unknown, isBootstrap: boolean): string {
+  const msg = (err instanceof Error ? err.message : String(err ?? "")).toLowerCase();
+  if (!msg) return "Something went wrong. Please try again.";
+  if (msg.includes("incorrect password") || msg.includes("wrong secret key") || msg.includes("crypto_secretbox")) {
+    return "Incorrect password. Please try again — this password unlocks the key stored in your browser, not your login.";
+  }
+  if (msg.includes("networkerror") || msg.includes("failed to fetch") || msg.includes("network")) {
+    return "Couldn't reach the server. Check your connection and try again.";
+  }
+  if (msg.includes("no encrypted key")) {
+    return "No encrypted key was found for your account. Try refreshing the page.";
+  }
+  if (isBootstrap && msg.includes("publish")) {
+    return "Couldn't save your new encryption key. Please try again.";
+  }
+  return err instanceof Error && err.message ? err.message : "Could not unlock notes. Please try again.";
+}
 
 export function E2EUnlockModal({
   open,
@@ -23,7 +46,7 @@ export function E2EUnlockModal({
 }: {
   open: boolean;
   onOpenChange: (v: boolean) => void;
-  onUnlocked?: () => void;
+  onUnlocked?: () => void | Promise<void>;
   children?: ReactNode;
 }) {
   const { unlock, bootstrap, needsBootstrap, material } = useE2ESession();
@@ -31,41 +54,82 @@ export function E2EUnlockModal({
   const [password, setPassword] = useState("");
   const [confirm, setConfirm] = useState("");
   const [busy, setBusy] = useState(false);
+  const [status, setStatus] = useState<"idle" | "deriving" | "finalizing">("idle");
+  const [error, setError] = useState<string | null>(null);
+  const [attempts, setAttempts] = useState(0);
 
   const isBootstrap = needsBootstrap && !material;
 
+  // Reset transient UI whenever the modal opens or the mode changes.
+  useEffect(() => {
+    if (open) {
+      setError(null);
+      setStatus("idle");
+    } else {
+      setPassword("");
+      setConfirm("");
+      setAttempts(0);
+      setError(null);
+      setStatus("idle");
+    }
+  }, [open, isBootstrap]);
+
+  const clearErrorOnEdit = () => {
+    if (error) setError(null);
+  };
+
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!password) return;
+    if (!password || busy) return;
+    if (isBootstrap && password.length < MIN_PASSWORD) {
+      setError(`Please choose a password with at least ${MIN_PASSWORD} characters.`);
+      return;
+    }
     if (isBootstrap && password !== confirm) {
-      toast.error("Passwords do not match.");
+      setError("The two passwords don't match.");
       return;
     }
     setBusy(true);
+    setError(null);
+    setStatus("deriving");
     try {
       if (isBootstrap) {
-        await bootstrap(password, (m) => publish({ data: m }));
+        await bootstrap(password, async (m) => {
+          setStatus("finalizing");
+          return publish({ data: m });
+        });
         toast.success("End-to-end encryption enabled.");
       } else {
         await unlock(password);
+        setStatus("finalizing");
         toast.success("Notes unlocked.");
+      }
+      // Await the caller so the modal only closes after notes actually refresh.
+      try {
+        await onUnlocked?.();
+      } catch {
+        /* the caller surfaces its own errors; unlock itself succeeded */
       }
       setPassword("");
       setConfirm("");
+      setAttempts(0);
       onOpenChange(false);
-      onUnlocked?.();
-    } catch (err: any) {
-      toast.error(err?.message ?? "Could not unlock notes.");
+    } catch (err) {
+      setAttempts((a) => a + 1);
+      setError(friendlyUnlockError(err, isBootstrap));
+      // Keep the modal open and the password field populated for a quick retry.
     } finally {
       setBusy(false);
+      setStatus("idle");
     }
   };
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
+    <Dialog open={open} onOpenChange={(v) => (busy ? null : onOpenChange(v))}>
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>
+          <DialogTitle className="flex items-center gap-2">
+            <ShieldCheck className="w-4 h-4 text-primary" />
             {isBootstrap ? "Enable end-to-end encryption" : "Unlock encrypted notes"}
           </DialogTitle>
           <DialogDescription>
@@ -82,6 +146,16 @@ export function E2EUnlockModal({
             become unreadable.
           </p>
         )}
+        {error && (
+          <Alert variant="destructive">
+            <AlertCircle className="w-4 h-4" />
+            <AlertTitle>
+              {isBootstrap ? "Couldn't enable encryption" : "Couldn't unlock"}
+              {attempts > 1 ? ` (attempt ${attempts})` : ""}
+            </AlertTitle>
+            <AlertDescription>{error}</AlertDescription>
+          </Alert>
+        )}
         <form onSubmit={submit} className="space-y-3">
           <div className="space-y-1.5">
             <Label htmlFor="e2e-pw">Password</Label>
@@ -90,9 +164,10 @@ export function E2EUnlockModal({
               type="password"
               autoComplete="current-password"
               value={password}
-              onChange={(e) => setPassword(e.target.value)}
+              onChange={(e) => { setPassword(e.target.value); clearErrorOnEdit(); }}
               required
               autoFocus
+              disabled={busy}
             />
           </div>
           {isBootstrap && (
@@ -103,24 +178,35 @@ export function E2EUnlockModal({
                 type="password"
                 autoComplete="current-password"
                 value={confirm}
-                onChange={(e) => setConfirm(e.target.value)}
+                onChange={(e) => { setConfirm(e.target.value); clearErrorOnEdit(); }}
                 required
+                disabled={busy}
               />
             </div>
           )}
           {children}
+          {busy && (
+            <p className="flex items-center gap-2 text-xs text-muted-foreground">
+              <Loader2 className="w-3.5 h-3.5 animate-spin" />
+              {status === "deriving"
+                ? "Deriving key from your password (this can take a moment)…"
+                : "Refreshing your notes…"}
+            </p>
+          )}
           <DialogFooter>
             <Button type="button" variant="ghost" onClick={() => onOpenChange(false)} disabled={busy}>
               Cancel
             </Button>
-            <Button type="submit" disabled={busy || !password}>
+            <Button type="submit" disabled={busy || !password || (isBootstrap && !confirm)}>
               {busy
                 ? isBootstrap
                   ? "Enabling…"
                   : "Unlocking…"
-                : isBootstrap
-                  ? "Enable encryption"
-                  : "Unlock"}
+                : error
+                  ? "Try again"
+                  : isBootstrap
+                    ? "Enable encryption"
+                    : "Unlock"}
             </Button>
           </DialogFooter>
         </form>
