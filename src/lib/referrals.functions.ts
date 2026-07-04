@@ -3,6 +3,7 @@ import { safeError } from "./safe-error";
 import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { encryptString, decryptString, hashHospitalNumber } from "./crypto.server";
+import { decideReferralRestore, decideReferralUpdate } from "./referral-restore-authz";
 
 const refSchema = z.object({
   age: z.number().int().min(0).max(130).nullable().optional(),
@@ -295,9 +296,26 @@ export const updateReferral = createServerFn({ method: "POST" })
     const { supabase, userId } = context;
     const { data: prior } = await supabase
       .from("referrals")
-      .select("status, decline_reason, accepting_consultant, discussed_with_consultant")
+      .select("status, decline_reason, accepting_consultant, discussed_with_consultant, created_by, deleted_at")
       .eq("id", data.id)
       .maybeSingle();
+
+    // Defence-in-depth: RLS already blocks non-creator/non-admin writes to
+    // soft-deleted rows, but we mirror the rule here so the server returns a
+    // clear error instead of a silent no-op update.
+    const { data: isAdmin } = await supabase.rpc("has_role", {
+      _user_id: userId,
+      _role: "admin",
+    });
+    const gate = decideReferralUpdate({
+      row: prior ? { created_by: (prior as any).created_by ?? null, deleted_at: (prior as any).deleted_at ?? null } : null,
+      userId,
+      isAdmin: !!isAdmin,
+    });
+    if (gate.kind === "forbidden_soft_deleted") {
+      throw new Error("Only the creator or an admin can restore this referral");
+    }
+
 
     const finalStatus = data.patch.status ?? prior?.status;
     const finalReason =
@@ -821,21 +839,25 @@ export const restoreReferral = createServerFn({ method: "POST" })
       .select("*, created_by, deleted_at")
       .eq("id", data.id)
       .maybeSingle();
-    if (!row) throw new Error("Referral not found");
-    if (!row.deleted_at) throw new Error("Referral is not deleted");
-
     const { data: isAdmin } = await supabase.rpc("has_role", {
       _user_id: userId,
       _role: "admin",
     });
-    if (row.created_by !== userId && !isAdmin) {
+    const decision = decideReferralRestore({
+      row: row ? { created_by: (row as any).created_by ?? null, deleted_at: (row as any).deleted_at ?? null } : null,
+      userId,
+      isAdmin: !!isAdmin,
+      restoreWindowDays: RESTORE_WINDOW_DAYS,
+    });
+    if (decision.kind === "not_found") throw new Error("Referral not found");
+    if (decision.kind === "not_deleted") throw new Error("Referral is not deleted");
+    if (decision.kind === "forbidden") {
       throw new Error("Only the creator or an admin can restore this referral");
     }
-
-    const cutoff = Date.now() - RESTORE_WINDOW_DAYS * 86400000;
-    if (new Date(row.deleted_at).getTime() < cutoff) {
+    if (decision.kind === "window_expired") {
       throw new Error(`Restore window of ${RESTORE_WINDOW_DAYS} days has expired`);
     }
+
 
     const { error } = await supabase
       .from("referrals")
