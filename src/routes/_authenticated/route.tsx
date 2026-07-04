@@ -63,6 +63,12 @@ function AuthedShell() {
 
   const handleSignOut = async () => {
     setSigningOut(true);
+    // Wipe the persisted E2E session so the next user on this device can't
+    // resume the previous user's unlocked private key.
+    try {
+      const { useE2ESession } = await import("@/hooks/use-e2e-session");
+      useE2ESession.getState().clear();
+    } catch { /* non-fatal */ }
     await supabase.auth.signOut();
     router.invalidate();
     navigate({ to: "/auth", replace: true });
