@@ -94,6 +94,11 @@ export const useE2ESession = create<E2EState>((set, get) => ({
     const priv = await unwrapPrivateKey(password, material);
     set({ privateKey: priv, isUnlocked: true });
     await writePersisted(publicKey, priv);
+    // Fire-and-forget audit: a fresh password unwrap in this tab. Rehydrating
+    // an already-unlocked session (hydrateFromSession) does NOT audit again.
+    logRecipientKeyUnlock({ data: { public_key: publicKey } }).catch(() => {
+      /* audit failure must not block the unlock UX */
+    });
   },
   bootstrap: async (password, publish) => {
     const { keypair, material } = await generateAndWrapKeypair(password);
