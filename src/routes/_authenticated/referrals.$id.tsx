@@ -162,6 +162,8 @@ function ReferralDetail() {
   const [directory, setDirectory] = useState<Array<{ user_id: string; full_name: string; public_key: string | null }>>([]);
   const [confirmMissingOpen, setConfirmMissingOpen] = useState(false);
   const pendingActionRef = useRef<null | (() => Promise<void>)>(null);
+  const [selectedRecipients, setSelectedRecipients] = useState<Set<string>>(new Set());
+  const [recipientsTouched, setRecipientsTouched] = useState(false);
 
   const loadDirectory = async () => {
     try {
@@ -173,10 +175,24 @@ function ReferralDetail() {
   };
   useEffect(() => { if (user) loadDirectory(); /* eslint-disable-next-line */ }, [user?.id, e2e.isUnlocked]);
 
+  // Default the recipient selection to every enrolled teammate (plus self)
+  // until the author manually changes it.
+  useEffect(() => {
+    if (recipientsTouched) return;
+    const ids = new Set<string>(directory.filter((r) => !!r.public_key).map((r) => r.user_id));
+    if (user?.id && e2e.publicKey) ids.add(user.id);
+    setSelectedRecipients(ids);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [directory, user?.id, e2e.publicKey]);
+
+  const directoryWithSelf = (() => {
+    if (!user?.id || !e2e.publicKey) return directory;
+    if (directory.some((r) => r.user_id === user.id)) return directory;
+    return [...directory, { user_id: user.id, full_name: "You", public_key: e2e.publicKey }];
+  })();
+
   const missingRecipients = directory.filter((r) => !r.public_key && r.user_id !== user?.id);
-  const eligibleRecipientCount =
-    directory.filter((r) => !!r.public_key).length +
-    (e2e.publicKey && !directory.some((r) => r.user_id === user?.id && !!r.public_key) ? 1 : 0);
+  const eligibleRecipientCount = Array.from(selectedRecipients).length;
 
   const loadRef = async () => {
     try {
