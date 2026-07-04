@@ -94,6 +94,22 @@ function AnalyticsPage() {
     queryFn: () => postopFn({ data: { from: fromIso, to: toIso } }),
   });
 
+  const queryClient = useQueryClient();
+  const { data: icnarcTargets } = useQuery({
+    queryKey: ["icnarc-targets"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("icnarc_targets")
+        .select("time_to_seen_target_min, decision_to_arrival_target_min")
+        .maybeSingle();
+      if (error) throw error;
+      return data;
+    },
+  });
+  // ICNARC / GPICS-aligned targets, configurable via the dialog below.
+  const ICNARC_TIME_TO_SEEN_TARGET_MIN = icnarcTargets?.time_to_seen_target_min ?? 30;
+  const ICNARC_DECISION_TO_ARRIVAL_TARGET_MIN = icnarcTargets?.decision_to_arrival_target_min ?? 240;
+
   const filtered = useMemo(() => {
     return rows.filter((r) => {
       const t = new Date(r.referral_received_at).getTime();
