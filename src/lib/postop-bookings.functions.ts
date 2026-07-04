@@ -225,9 +225,22 @@ export const updatePostopBooking = createServerFn({ method: "POST" })
         .from("postop_bookings")
         .select("*")
         .eq("id", id)
-        .is("deleted_at", null)
         .maybeSingle();
-      if (!prev) throw new Error("Booking not found");
+      const { data: isAdmin } = await context.supabase.rpc("has_role", {
+        _user_id: context.userId,
+        _role: "admin",
+      });
+      const gate = decidePostopUpdate(
+        prev ? { created_by: (prev as any).created_by ?? null, deleted_at: (prev as any).deleted_at ?? null } : null,
+        context.userId,
+        !!isAdmin,
+      );
+      if (gate.kind === "not_found" || gate.kind === "already_deleted") {
+        throw new Error("Booking not found");
+      }
+      if (gate.kind === "forbidden") {
+        throw new Error("Only the booking creator or an admin can update this booking");
+      }
       const { decryptRow, encryptPayload } = await loadCrypto();
       const decryptedPrev = decryptRow(prev as Record<string, any>);
       const diff = buildUpdateDiff(decryptedPrev, rest);
