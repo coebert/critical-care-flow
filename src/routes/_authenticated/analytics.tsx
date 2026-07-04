@@ -251,15 +251,44 @@ function AnalyticsPage() {
     [admittedConsultants, admittedWithConsultant]
   );
 
-  const meanMinutes = (sel: (r: Referral) => [string | null, string | null]) => {
-    const ds = filtered
+  const minutesSamples = (sel: (r: Referral) => [string | null, string | null]) =>
+    filtered
       .map(sel)
       .map(([a, b]) => (a && b ? differenceInMinutes(new Date(b), new Date(a)) : null))
       .filter((x): x is number => x != null && x >= 0);
-    return ds.length ? ds.reduce((a, b) => a + b, 0) / ds.length : 0;
+  const mean = (xs: number[]) => (xs.length ? xs.reduce((a, b) => a + b, 0) / xs.length : 0);
+  const median = (xs: number[]) => {
+    if (!xs.length) return 0;
+    const s = [...xs].sort((a, b) => a - b);
+    const m = Math.floor(s.length / 2);
+    return s.length % 2 ? s[m] : (s[m - 1] + s[m]) / 2;
   };
-  const meanTimeToSeen = meanMinutes((r) => [r.referral_received_at, r.first_seen_at]);
-  const meanDecisionToArrival = meanMinutes((r) => [r.decision_at, r.arrived_on_unit_at]);
+  const pctWithin = (xs: number[], threshold: number) =>
+    xs.length ? (xs.filter((x) => x <= threshold).length / xs.length) * 100 : 0;
+
+  const timeToSeenSamples = minutesSamples((r) => [r.referral_received_at, r.first_seen_at]);
+  const decisionToArrivalSamples = minutesSamples((r) => [r.decision_at, r.arrived_on_unit_at]);
+  const meanTimeToSeen = mean(timeToSeenSamples);
+  const meanDecisionToArrival = mean(decisionToArrivalSamples);
+
+  // ICNARC / GPICS-aligned targets for critical-care referral workflow.
+  // Values are in minutes and can be tuned to local standards.
+  const ICNARC_TIME_TO_SEEN_TARGET_MIN = 30;   // review within 30 min of referral
+  const ICNARC_DECISION_TO_ARRIVAL_TARGET_MIN = 240; // on unit within 4 h of decision
+  const icnarc = {
+    seen: {
+      n: timeToSeenSamples.length,
+      pct: pctWithin(timeToSeenSamples, ICNARC_TIME_TO_SEEN_TARGET_MIN),
+      median: median(timeToSeenSamples),
+      target: ICNARC_TIME_TO_SEEN_TARGET_MIN,
+    },
+    arrival: {
+      n: decisionToArrivalSamples.length,
+      pct: pctWithin(decisionToArrivalSamples, ICNARC_DECISION_TO_ARRIVAL_TARGET_MIN),
+      median: median(decisionToArrivalSamples),
+      target: ICNARC_DECISION_TO_ARRIVAL_TARGET_MIN,
+    },
+  };
 
   const search = Route.useSearch();
   const navigate = Route.useNavigate();
@@ -335,6 +364,33 @@ function AnalyticsPage() {
         <Kpi label="Mean age (yrs)" value={meanAge ? meanAge.toFixed(1) : "—"} />
         <Kpi label="Mean time-to-first-seen" value={meanTimeToSeen ? `${Math.round(meanTimeToSeen)} min` : "—"} />
       </div>
+
+      <Card className="p-5 mb-6">
+        <div className="flex items-baseline justify-between gap-3 mb-4 flex-wrap">
+          <h2 className="font-semibold">ICNARC timing KPIs</h2>
+          <span className="text-xs text-muted-foreground">
+            Referral-workflow targets aligned to ICNARC / GPICS timing standards.
+          </span>
+        </div>
+        <div className="grid md:grid-cols-2 gap-4">
+          <IcnarcKpi
+            label="Referral → first seen"
+            targetLabel={`≤ ${icnarc.seen.target} min`}
+            pct={icnarc.seen.pct}
+            median={icnarc.seen.median}
+            n={icnarc.seen.n}
+          />
+          <IcnarcKpi
+            label="Decision → on unit"
+            targetLabel={`≤ ${Math.round(icnarc.arrival.target / 60)} h`}
+            pct={icnarc.arrival.pct}
+            median={icnarc.arrival.median}
+            n={icnarc.arrival.n}
+          />
+        </div>
+      </Card>
+
+
 
       {admittedMissingConsultant > 0 && (
         <Card className="mb-6 p-4 border-amber-200 bg-amber-50 dark:bg-amber-950 dark:border-amber-800">
@@ -622,5 +678,44 @@ function Kpi({ label, value }: { label: string; value: string }) {
       <div className="text-xs text-muted-foreground uppercase tracking-wide">{label}</div>
       <div className="text-2xl font-semibold mt-1">{value}</div>
     </Card>
+  );
+}
+
+function IcnarcKpi({
+  label, targetLabel, pct, median, n,
+}: { label: string; targetLabel: string; pct: number; median: number; n: number }) {
+  const tone =
+    n === 0 ? "text-muted-foreground"
+    : pct >= 90 ? "text-success"
+    : pct >= 70 ? "text-warning-foreground"
+    : "text-destructive";
+  const barTone =
+    pct >= 90 ? "bg-success"
+    : pct >= 70 ? "bg-warning"
+    : "bg-destructive";
+  const fmtMedian = median >= 60 ? `${(median / 60).toFixed(1)} h` : `${Math.round(median)} min`;
+  return (
+    <div className="rounded-lg border p-4">
+      <div className="flex items-baseline justify-between gap-2">
+        <div className="text-sm font-medium">{label}</div>
+        <Badge variant="outline" className="shrink-0">Target {targetLabel}</Badge>
+      </div>
+      <div className="mt-2 flex items-baseline gap-2">
+        <span className={cn("text-3xl font-semibold tabular-nums", tone)}>
+          {n ? `${pct.toFixed(0)}%` : "—"}
+        </span>
+        <span className="text-xs text-muted-foreground">within target</span>
+      </div>
+      <div className="mt-3 h-2 w-full rounded-full bg-muted overflow-hidden">
+        <div
+          className={cn("h-full transition-all", barTone)}
+          style={{ width: `${Math.min(100, Math.max(0, pct))}%` }}
+        />
+      </div>
+      <div className="mt-3 flex justify-between text-xs text-muted-foreground">
+        <span>Median {n ? fmtMedian : "—"}</span>
+        <span>n = {n}</span>
+      </div>
+    </div>
   );
 }
