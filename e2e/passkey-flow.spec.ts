@@ -437,7 +437,7 @@ test.describe("passkey enrolment and sign-in", () => {
 
   test("biometric sign-in with no registered passkey routes into enrolment", async ({
     browser,
-  }) => {
+  }, testInfo) => {
     const env = await setup(browser);
     try {
       // Precondition: the cleanup step in the previous test leaves the
@@ -465,6 +465,7 @@ test.describe("passkey enrolment and sign-in", () => {
       // And the authenticator was never asked to write anything.
       expect(await env.credentialCount()).toBe(0);
     } finally {
+      await attachDiagnosticsIfFailed(testInfo, env);
       await env.detach();
     }
   });
