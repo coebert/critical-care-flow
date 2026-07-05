@@ -510,6 +510,7 @@ export const updateNote = createServerFn({ method: "POST" })
       .parse(d),
   )
   .handler(async ({ data, context }) => {
+    assertNonE2EWritesAllowed("update");
     const { supabase, userId } = context;
     const { data: existing } = await supabase
       .from("referral_notes")
