@@ -1,6 +1,7 @@
 import { generateAndWrapKeypair } from "@/lib/e2e-crypto";
 import { getMyPrivateKeyMaterial, publishUserKeys } from "@/lib/e2e-keys.functions";
 import { retryWithBackoff, isTransientAuthError } from "@/lib/retry";
+import { useE2ESession } from "@/hooks/use-e2e-session";
 
 export interface EnsureKeyDeps {
   fetchMaterial: () => Promise<{
@@ -109,7 +110,7 @@ export async function ensureRecipientKeyImpl(
  * (password sign-in, first-admin setup, password reset).
  */
 export async function ensureRecipientKey(password: string): Promise<EnsureKeyOutcome> {
-  return ensureRecipientKeyImpl(password, {
+  const outcome = await ensureRecipientKeyImpl(password, {
     fetchMaterial: async () => {
       const res: any = await getMyPrivateKeyMaterial({ data: undefined as any });
       return { material: res?.material ?? null, public_key: res?.public_key ?? null };
@@ -118,4 +119,22 @@ export async function ensureRecipientKey(password: string): Promise<EnsureKeyOut
     publish: (m) => publishUserKeys({ data: m }),
     onWarn: (err) => console.warn("[e2e] auto-bootstrap skipped:", err),
   });
+
+  // Also unlock the in-memory session so the user doesn't have to re-enter
+  // their password on the next protected page. Any failure is non-fatal:
+  // the unlock modal is still available as a fallback.
+  if (outcome.kind === "already_issued" || outcome.kind === "issued") {
+    try {
+      const store = useE2ESession.getState();
+      await store.refreshStatus();
+      const { material, publicKey, isUnlocked } = useE2ESession.getState();
+      if (material && publicKey && !isUnlocked) {
+        await store.unlock(password);
+      }
+    } catch (err) {
+      console.warn("[e2e] auto-unlock skipped:", err);
+    }
+  }
+
+  return outcome;
 }
