@@ -198,7 +198,20 @@ function AuthPage() {
       toast.success("Signed in with passkey");
       navigate({ to: postAuthTarget, replace: true });
     } catch (err: unknown) {
-      if (err instanceof Error && err.name === "NotAllowedError") {
+      const code = (err as { code?: string } | null)?.code;
+      if (code === NO_PASSKEY_REGISTERED) {
+        // No passkey on file for this email — flip into password mode and
+        // auto-open the enrolment modal after a successful password sign-in.
+        setEnrollAfterSignIn(true);
+        setMode("signin");
+        toast.message(
+          "No passkey found — sign in with your password and we'll set one up.",
+        );
+        // Give the user a clear next step by focusing the password field.
+        setTimeout(() => {
+          document.getElementById("password")?.focus();
+        }, 0);
+      } else if (err instanceof Error && err.name === "NotAllowedError") {
         toast.message("Passkey sign-in cancelled");
       } else {
         toast.error(err instanceof Error ? err.message : "Passkey sign-in failed");
