@@ -16,27 +16,9 @@ import { useE2ESession } from "@/hooks/use-e2e-session";
 import { publishUserKeys } from "@/lib/e2e-keys.functions";
 import { toast } from "sonner";
 import { AlertCircle, Loader2, ShieldCheck } from "lucide-react";
+import { friendlyE2EError, type FriendlyE2EError } from "@/lib/friendly-e2e-error";
 
 const MIN_PASSWORD = 8;
-
-/** Map raw crypto/network errors to something a user can act on. */
-function friendlyUnlockError(err: unknown, isBootstrap: boolean): string {
-  const msg = (err instanceof Error ? err.message : String(err ?? "")).toLowerCase();
-  if (!msg) return "Something went wrong. Please try again.";
-  if (msg.includes("incorrect password") || msg.includes("wrong secret key") || msg.includes("crypto_secretbox")) {
-    return "Incorrect password. Please try again — this password unlocks the key stored in your browser, not your login.";
-  }
-  if (msg.includes("networkerror") || msg.includes("failed to fetch") || msg.includes("network")) {
-    return "Couldn't reach the server. Check your connection and try again.";
-  }
-  if (msg.includes("no encrypted key")) {
-    return "No encrypted key was found for your account. Try refreshing the page.";
-  }
-  if (isBootstrap && msg.includes("publish")) {
-    return "Couldn't save your new encryption key. Please try again.";
-  }
-  return err instanceof Error && err.message ? err.message : "Could not unlock notes. Please try again.";
-}
 
 export function E2EUnlockModal({
   open,
