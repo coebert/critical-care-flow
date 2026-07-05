@@ -1404,14 +1404,21 @@ function NoteItem({
     if (bodyUnchanged && recipientsUnchanged) { setEditing(false); return; }
     setBusy(true);
     try { await onSave(draft.trim(), isE2E ? editRecipients : undefined); setEditing(false); }
-    catch (e: any) { toast.error(e.message ?? "Failed to update note"); }
+    catch (e: any) {
+      const f = friendlyE2EError(e, "edit-note");
+      toast.error(f.title, { description: f.description, duration: 8000 });
+    }
     finally { setBusy(false); }
   };
 
   const remove = async () => {
     setBusy(true);
     try { await onDelete(); }
-    catch (e: any) { toast.error(e.message ?? "Failed to delete note"); setBusy(false); }
+    catch (e: any) {
+      const f = friendlyE2EError(e, "edit-note");
+      toast.error(f.title, { description: f.description, duration: 8000 });
+      setBusy(false);
+    }
   };
 
   return (
