@@ -166,6 +166,7 @@ export const useE2ESession = create<E2EState>((set, get) => ({
       needsBootstrap: false,
       material,
       status: deriveStatus(keypair.publicKey, material, true),
+      unlockError: null,
     });
     await writePersisted(keypair.publicKey, priv);
     // Server-side key material just changed → tell sibling tabs so their
