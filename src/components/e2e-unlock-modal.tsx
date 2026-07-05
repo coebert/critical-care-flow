@@ -37,7 +37,7 @@ export function E2EUnlockModal({
   const [confirm, setConfirm] = useState("");
   const [busy, setBusy] = useState(false);
   const [status, setStatus] = useState<"idle" | "deriving" | "finalizing">("idle");
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<FriendlyE2EError | null>(null);
   const [attempts, setAttempts] = useState(0);
 
   const isBootstrap = needsBootstrap && !material;
