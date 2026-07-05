@@ -62,6 +62,14 @@ export async function signInWithPasskey(email: string): Promise<void> {
   if (!trimmed) throw new Error("Please enter your email address");
 
   const options = await startPasskeyAuthentication({ data: { email: trimmed } });
+  // If the server returned no allowed credentials, no passkey is registered
+  // for this email on the server (or, at minimum, none we can offer). Surface
+  // a clear message instead of letting the browser silently cancel the prompt.
+  if (!options.allowCredentials || options.allowCredentials.length === 0) {
+    throw new Error(
+      "No passkey is registered for this email yet. Sign in with your password once, then enrol a passkey when prompted.",
+    );
+  }
   const response = await startAuthentication({ optionsJSON: options });
 
   const { email: verifiedEmail, token_hash } = await verifyPasskeyAuthentication({
