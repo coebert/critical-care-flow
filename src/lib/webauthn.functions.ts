@@ -28,25 +28,11 @@ function getRpAndOrigin(): { rpID: string; origin: string } {
   return { rpID: url.hostname, origin };
 }
 
-function b64uToBytes(b64u: string): Uint8Array {
-  const b64 = b64u.replace(/-/g, "+").replace(/_/g, "/");
-  const pad = b64.length % 4 === 0 ? "" : "=".repeat(4 - (b64.length % 4));
-  const bin = atob(b64 + pad);
-  const out = new Uint8Array(bin.length);
-  for (let i = 0; i < bin.length; i++) out[i] = bin.charCodeAt(i);
-  return out;
-}
-
-function bytesToB64u(bytes: Uint8Array): string {
-  let bin = "";
-  for (let i = 0; i < bytes.length; i++) bin += String.fromCharCode(bytes[i]);
-  return btoa(bin).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
-}
-
-// bytea → base64url. Postgres returns bytea as `\x<hex>` via PostgREST JSON;
-// convert to bytes then to base64url.
+// bytea → Uint8Array. PostgREST returns bytea as `\x<hex>`.
 function pgByteaToBytes(v: string | Uint8Array): Uint8Array {
-  if (v instanceof Uint8Array) return v;
+  if (v instanceof Uint8Array) {
+    return new Uint8Array(v);
+  }
   if (typeof v === "string" && v.startsWith("\\x")) {
     const hex = v.slice(2);
     const out = new Uint8Array(hex.length / 2);
@@ -55,8 +41,23 @@ function pgByteaToBytes(v: string | Uint8Array): Uint8Array {
     }
     return out;
   }
-  // Fallback: assume already base64
-  return b64uToBytes(String(v));
+  return new Uint8Array(Buffer.from(String(v), "base64"));
+}
+
+async function lookupUserIdByEmail(
+  supabaseAdmin: Awaited<
+    ReturnType<
+      typeof import("@/integrations/supabase/client.server")
+    >["supabaseAdmin"] extends infer T ? T : never
+  >,
+  email: string,
+): Promise<string | null> {
+  // @ts-expect-error — RPC not in generated types until regen after migration.
+  const { data, error } = await supabaseAdmin.rpc("lookup_user_id_by_email", {
+    _email: email,
+  });
+  if (error) return null;
+  return (data as string | null) ?? null;
 }
 
 // ---------- Registration (authenticated) ----------
@@ -96,7 +97,6 @@ export const startPasskeyRegistration = createServerFn({ method: "POST" })
       },
     });
 
-    // Clean up stale challenges for this user before inserting a new one.
     await supabaseAdmin
       .from("webauthn_challenges")
       .delete()
@@ -179,50 +179,17 @@ export const startPasskeyAuthentication = createServerFn({ method: "POST" })
     const { rpID } = getRpAndOrigin();
     const email = normalizeEmail(data.email);
 
-    // Look up the user (privately). If not found, still return options with
-    // an empty allowCredentials list to avoid account enumeration.
     let allowCredentials: { id: string; transports?: AuthenticatorTransport[] }[] = [];
-    try {
-      // Find user id by email via admin auth API; we don't expose whether it exists.
-      const { data: page } = await supabaseAdmin.auth.admin.listUsers({
-        page: 1,
-        perPage: 1,
-      });
-      // listUsers doesn't filter server-side by email in older SDKs; use a query on profiles/auth.users via SQL.
-      // Fall back to explicit lookup:
-      void page;
-      const { data: userRow } = await supabaseAdmin
-        .rpc("has_role", { _user_id: "00000000-0000-0000-0000-000000000000", _role: "admin" })
-        .then(() => ({ data: null }))
-        .catch(() => ({ data: null }));
-      void userRow;
-
-      // Look up credentials by joining email → user_id. Use a raw select on auth.users via admin.
-      const { data: users } = await supabaseAdmin
-        .from("profiles")
-        .select("id")
-        .limit(1000); // profiles has id = auth user id
-      const ids = (users ?? []).map((u) => u.id);
-      // Fetch the auth user by email using generateLink probe would send email; instead use admin.getUserById is per-id.
-      // Simplest: query webauthn_credentials joined via a view — but we don't have one.
-      // Use SQL: find auth user id by email.
-      const { data: authUser } = await supabaseAdmin
-        .rpc("lookup_user_id_by_email", { _email: email })
-        .then((r) => ({ data: r.data as string | null }))
-        .catch(() => ({ data: null }));
-
-      if (authUser && ids.includes(authUser)) {
-        const { data: creds } = await supabaseAdmin
-          .from("webauthn_credentials")
-          .select("credential_id, transports")
-          .eq("user_id", authUser);
-        allowCredentials = (creds ?? []).map((c) => ({
-          id: c.credential_id,
-          transports: (c.transports ?? []) as AuthenticatorTransport[],
-        }));
-      }
-    } catch {
-      // ignore; return empty allowCredentials
+    const userId = await lookupUserIdByEmail(supabaseAdmin, email);
+    if (userId) {
+      const { data: creds } = await supabaseAdmin
+        .from("webauthn_credentials")
+        .select("credential_id, transports")
+        .eq("user_id", userId);
+      allowCredentials = (creds ?? []).map((c) => ({
+        id: c.credential_id,
+        transports: (c.transports ?? []) as AuthenticatorTransport[],
+      }));
     }
 
     const options = await generateAuthenticationOptions({
@@ -231,7 +198,6 @@ export const startPasskeyAuthentication = createServerFn({ method: "POST" })
       allowCredentials,
     });
 
-    // Store challenge keyed to email (single-use).
     await supabaseAdmin
       .from("webauthn_challenges")
       .delete()
@@ -256,13 +222,12 @@ export const verifyPasskeyAuthentication = createServerFn({ method: "POST" })
     const { rpID, origin } = getRpAndOrigin();
     const email = normalizeEmail(data.email);
 
-    // Throttle: reserve an attempt slot.
     const { data: beginData, error: beginErr } = await supabaseAdmin.rpc(
       "begin_auth_attempt",
       { _email: email, _attempt_type: "signin" },
     );
     if (beginErr) throw new Error(beginErr.message);
-    const begin = beginData as {
+    const begin = beginData as unknown as {
       locked: boolean;
       attempt_id: number | null;
       retry_after_seconds?: number;
@@ -314,16 +279,14 @@ export const verifyPasskeyAuthentication = createServerFn({ method: "POST" })
 
       if (!credRow) throw new Error("Passkey not recognised for this account");
 
-      // Confirm this credential belongs to the claimed email
-      const { data: emailOwnerId } = await supabaseAdmin
-        .rpc("lookup_user_id_by_email", { _email: email })
-        .then((r) => ({ data: r.data as string | null }))
-        .catch(() => ({ data: null }));
+      const emailOwnerId = await lookupUserIdByEmail(supabaseAdmin, email);
       if (!emailOwnerId || emailOwnerId !== credRow.user_id) {
         throw new Error("Passkey does not belong to this account");
       }
 
-      const publicKeyBytes = pgByteaToBytes(credRow.public_key as unknown as string);
+      const publicKeyBytes = pgByteaToBytes(
+        credRow.public_key as unknown as string,
+      );
 
       const verification = await verifyAuthenticationResponse({
         response: data.response,
@@ -343,7 +306,6 @@ export const verifyPasskeyAuthentication = createServerFn({ method: "POST" })
         throw new Error("Passkey verification failed");
       }
 
-      // Update counter + last_used
       await supabaseAdmin
         .from("webauthn_credentials")
         .update({
@@ -357,7 +319,6 @@ export const verifyPasskeyAuthentication = createServerFn({ method: "POST" })
         .delete()
         .eq("id", challengeRow.id);
 
-      // Mint a session via magiclink. Client redeems with verifyOtp.
       const { data: linkData, error: linkErr } =
         await supabaseAdmin.auth.admin.generateLink({
           type: "magiclink",
