@@ -143,13 +143,69 @@ async function attachVirtualAuthenticator(
 async function setup(browser: Browser): Promise<VirtualAuthenticator> {
   const context = await browser.newContext({ storageState: undefined });
   const page = await context.newPage();
+
+  const logs: DiagnosticLogs = { console: [], network: [], cdp: [] };
+  const ts = () => new Date().toISOString();
+
+  // Browser console + uncaught errors.
+  page.on("console", (msg) => {
+    logs.console.push(`[${ts()}] ${msg.type().toUpperCase()} ${msg.text()}`);
+  });
+  page.on("pageerror", (err) => {
+    logs.console.push(`[${ts()}] PAGEERROR ${err.stack ?? err.message}`);
+  });
+  page.on("requestfailed", (req) => {
+    logs.network.push(
+      `[${ts()}] REQUEST_FAILED ${req.method()} ${req.url()} — ${req.failure()?.errorText ?? "unknown"}`,
+    );
+  });
+  page.on("response", (res) => {
+    logs.network.push(
+      `[${ts()}] ${res.status()} ${res.request().method()} ${res.url()}`,
+    );
+  });
+
   const { client, authenticatorId } = await attachVirtualAuthenticator(page);
+
+  // Wrap CDP send so every command we issue is logged with args + result.
+  // WebAuthn is the domain most likely to be the source of a flake here.
+  const rawSend = client.send.bind(client) as CDPSession["send"];
+  (client as unknown as { send: CDPSession["send"] }).send = (async (
+    method: any,
+    params?: any,
+  ) => {
+    const argSummary = params ? ` ${safeJson(params)}` : "";
+    logs.cdp.push(`[${ts()}] SEND ${method}${argSummary}`);
+    try {
+      const result = await rawSend(method, params);
+      logs.cdp.push(`[${ts()}] RESULT ${method} ${safeJson(result)}`);
+      return result as any;
+    } catch (err) {
+      logs.cdp.push(
+        `[${ts()}] ERROR ${method} ${err instanceof Error ? err.message : String(err)}`,
+      );
+      throw err;
+    }
+  }) as CDPSession["send"];
+
+  // WebAuthn events fired by the browser (credentialAdded, assertion, etc).
+  for (const evt of [
+    "WebAuthn.credentialAdded",
+    "WebAuthn.credentialAsserted",
+    "WebAuthn.credentialUpdated",
+    "WebAuthn.credentialDeleted",
+  ] as const) {
+    client.on(evt as any, (payload: unknown) => {
+      logs.cdp.push(`[${ts()}] EVENT ${evt} ${safeJson(payload)}`);
+    });
+  }
 
   return {
     context,
     page,
     client,
     authenticatorId,
+    logs,
     credentialCount: async () =>
       withRetry("WebAuthn.getCredentials", async () => {
         const { credentials } = await client.send("WebAuthn.getCredentials", {
@@ -175,6 +231,63 @@ async function setup(browser: Browser): Promise<VirtualAuthenticator> {
     },
   };
 }
+
+function safeJson(v: unknown): string {
+  try {
+    const s = JSON.stringify(v);
+    return s.length > 2000 ? `${s.slice(0, 2000)}…(truncated)` : s;
+  } catch {
+    return "[unserialisable]";
+  }
+}
+
+/**
+ * On failure, attach the collected console/network/CDP logs plus a final
+ * screenshot and DOM snapshot to the test report. Safe to call from a
+ * `finally` block — every attach is wrapped so a torn-down page can't hide
+ * the underlying test failure.
+ */
+async function attachDiagnosticsIfFailed(
+  testInfo: TestInfo,
+  env: VirtualAuthenticator,
+) {
+  if (testInfo.status === testInfo.expectedStatus) return;
+  const attach = async (
+    name: string,
+    body: string | Buffer,
+    contentType: string,
+  ) => {
+    try {
+      await testInfo.attach(name, { body, contentType });
+    } catch {
+      /* attaching must never mask the real failure */
+    }
+  };
+
+  await attach("browser-console.log", env.logs.console.join("\n"), "text/plain");
+  await attach("network.log", env.logs.network.join("\n"), "text/plain");
+  await attach("cdp.log", env.logs.cdp.join("\n"), "text/plain");
+
+  try {
+    const png = await env.page.screenshot({ fullPage: true });
+    await attach("final-screenshot.png", png, "image/png");
+  } catch {
+    /* page may already be gone */
+  }
+  try {
+    const html = await env.page.content();
+    await attach("final-dom.html", html, "text/html");
+  } catch {
+    /* page may already be gone */
+  }
+  try {
+    const url = env.page.url();
+    await attach("final-url.txt", url, "text/plain");
+  } catch {
+    /* ignore */
+  }
+}
+
 
 /** Wait until the auth page is interactive (email field mounted). */
 async function waitForAuthPageReady(page: Page) {
