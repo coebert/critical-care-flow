@@ -14,6 +14,7 @@ import { ensureRecipientKey } from "@/lib/e2e-auto-bootstrap";
 import {
   isPasskeySupported,
   isPlatformAuthenticatorAvailable,
+  NO_PASSKEY_REGISTERED,
   passkeyEnrollDismissed,
   signInWithPasskey,
 } from "@/lib/passkeys";
@@ -72,6 +73,10 @@ function AuthPage() {
   const [rememberMe, setRememberMe] = useState(true);
   const [passkeySupported, setPasskeySupported] = useState(false);
   const [enrollPromptOpen, setEnrollPromptOpen] = useState(false);
+  // Set when the user tried biometric sign-in but no passkey is registered yet.
+  // After they complete password sign-in we force-open the enrolment modal so
+  // they can set one up in the same flow.
+  const [enrollAfterSignIn, setEnrollAfterSignIn] = useState(false);
 
   useEffect(() => {
     setPasskeySupported(isPasskeySupported());
@@ -149,8 +154,9 @@ function AuthPage() {
         // Automatically issue a recipient keypair on first successful sign-in.
         await ensureRecipientKey(password);
         toast.success("Signed in");
-        // Decide whether to offer passkey enrolment before navigating away.
-        const shouldPrompt = await shouldPromptForPasskey();
+        // If the user just tried biometric sign-in and had no passkey, always
+        // offer enrolment now regardless of the "don't ask again" preference.
+        const shouldPrompt = enrollAfterSignIn || (await shouldPromptForPasskey());
         if (shouldPrompt) {
           setEnrollPromptOpen(true);
           return; // navigation deferred until the modal closes
@@ -192,7 +198,20 @@ function AuthPage() {
       toast.success("Signed in with passkey");
       navigate({ to: postAuthTarget, replace: true });
     } catch (err: unknown) {
-      if (err instanceof Error && err.name === "NotAllowedError") {
+      const code = (err as { code?: string } | null)?.code;
+      if (code === NO_PASSKEY_REGISTERED) {
+        // No passkey on file for this email — flip into password mode and
+        // auto-open the enrolment modal after a successful password sign-in.
+        setEnrollAfterSignIn(true);
+        setMode("signin");
+        toast.message(
+          "No passkey found — sign in with your password and we'll set one up.",
+        );
+        // Give the user a clear next step by focusing the password field.
+        setTimeout(() => {
+          document.getElementById("password")?.focus();
+        }, 0);
+      } else if (err instanceof Error && err.name === "NotAllowedError") {
         toast.message("Passkey sign-in cancelled");
       } else {
         toast.error(err instanceof Error ? err.message : "Passkey sign-in failed");
