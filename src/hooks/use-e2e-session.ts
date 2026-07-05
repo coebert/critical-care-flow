@@ -67,6 +67,15 @@ interface E2EState {
   hydrated: boolean; // sessionStorage rehydration attempted
   status: KeyStatus;
   refreshing: boolean;
+  /**
+   * Last unlock failure surfaced to the user. Set by the auto-unlock flow
+   * after sign-in (and by any surface that wants to persist a friendly
+   * error for the top-of-app banner). Cleared on successful unlock /
+   * bootstrap / sign-out. Keeps the recovery UI visible even after the
+   * originating toast disappears, so the user never gets stuck.
+   */
+  unlockError: E2EUnlockError | null;
+  setUnlockError: (err: E2EUnlockError | null) => void;
   setMaterial: (material: PrivateKeyMaterial | null, publicKey: string | null) => void;
   unlock: (password: string) => Promise<void>;
   bootstrap: (
@@ -90,6 +99,16 @@ interface E2EState {
   clear: () => void;
 }
 
+export interface E2EUnlockError {
+  title: string;
+  description: string;
+  reason: string;
+  /** ms since epoch — used by the banner to show "just now" vs a stale error. */
+  at: number;
+}
+
+
+
 let inFlightRefresh: Promise<KeyStatus> | null = null;
 
 export const useE2ESession = create<E2EState>((set, get) => ({
@@ -101,6 +120,8 @@ export const useE2ESession = create<E2EState>((set, get) => ({
   hydrated: false,
   status: "loading",
   refreshing: false,
+  unlockError: null,
+  setUnlockError: (err) => set({ unlockError: err }),
   setMaterial: (material, publicKey) => {
     // If the stored public key still matches what we already unlocked in
     // this tab, keep the unlocked session alive across refresh.
@@ -125,6 +146,7 @@ export const useE2ESession = create<E2EState>((set, get) => ({
       privateKey: priv,
       isUnlocked: true,
       status: deriveStatus(publicKey, material, true),
+      unlockError: null,
     });
     await writePersisted(publicKey, priv);
     // Fire-and-forget audit: a fresh password unwrap in this tab. Rehydrating
@@ -144,6 +166,7 @@ export const useE2ESession = create<E2EState>((set, get) => ({
       needsBootstrap: false,
       material,
       status: deriveStatus(keypair.publicKey, material, true),
+      unlockError: null,
     });
     await writePersisted(keypair.publicKey, priv);
     // Server-side key material just changed → tell sibling tabs so their
@@ -215,6 +238,7 @@ export const useE2ESession = create<E2EState>((set, get) => ({
       needsBootstrap: false,
       material: null,
       status: "not_issued",
+      unlockError: null,
     });
     // Sign-out in one tab must lock every other tab too.
     broadcastKeyChange("clear");

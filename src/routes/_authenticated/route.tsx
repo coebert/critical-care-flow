@@ -10,6 +10,7 @@ import { useAuth, useRole } from "@/hooks/use-auth";
 import { NotificationBell } from "@/components/notification-bell";
 import { ShiftToggle } from "@/components/shift-toggle";
 import { PushPermissionPrompt } from "@/components/push-permission-prompt";
+import { E2EUnlockBanner } from "@/components/e2e-unlock-banner";
 import { TestPushButton } from "@/components/test-push-button";
 import { Toaster } from "@/components/ui/sonner";
 import { Sheet, SheetContent, SheetTrigger, SheetTitle, SheetHeader } from "@/components/ui/sheet";
@@ -195,6 +196,7 @@ function AuthedShell() {
           </div>
         </header>
         <PushPermissionPrompt visible={supported && permission !== "granted" && atWork === true} />
+        <E2EUnlockBanner />
         <main className="flex-1 overflow-auto">
           <Outlet />
         </main>
