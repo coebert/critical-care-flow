@@ -53,6 +53,8 @@ export async function registerPasskey(deviceLabel?: string): Promise<void> {
   });
 }
 
+export const NO_PASSKEY_REGISTERED = "NO_PASSKEY_REGISTERED";
+
 /** Sign in with a passkey for the given email. Hydrates the Supabase session. */
 export async function signInWithPasskey(email: string): Promise<void> {
   if (!isPasskeySupported()) {
