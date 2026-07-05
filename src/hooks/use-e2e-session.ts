@@ -120,6 +120,8 @@ export const useE2ESession = create<E2EState>((set, get) => ({
   hydrated: false,
   status: "loading",
   refreshing: false,
+  unlockError: null,
+  setUnlockError: (err) => set({ unlockError: err }),
   setMaterial: (material, publicKey) => {
     // If the stored public key still matches what we already unlocked in
     // this tab, keep the unlocked session alive across refresh.
