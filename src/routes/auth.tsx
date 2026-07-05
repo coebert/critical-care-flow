@@ -14,6 +14,7 @@ import { ensureRecipientKey } from "@/lib/e2e-auto-bootstrap";
 import {
   isPasskeySupported,
   isPlatformAuthenticatorAvailable,
+  NO_PASSKEY_REGISTERED,
   passkeyEnrollDismissed,
   signInWithPasskey,
 } from "@/lib/passkeys";
