@@ -18,7 +18,6 @@ export function isPasskeySupported(): boolean {
 export async function isPlatformAuthenticatorAvailable(): Promise<boolean> {
   if (!isPasskeySupported()) return false;
   try {
-    // @ts-expect-error — not in all lib.dom versions
     if (!window.PublicKeyCredential?.isUserVerifyingPlatformAuthenticatorAvailable) {
       return false;
     }
