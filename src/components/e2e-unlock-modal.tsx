@@ -64,11 +64,19 @@ export function E2EUnlockModal({
     e.preventDefault();
     if (!password || busy) return;
     if (isBootstrap && password.length < MIN_PASSWORD) {
-      setError(`Please choose a password with at least ${MIN_PASSWORD} characters.`);
+      setError({
+        reason: "unknown",
+        title: "Password too short",
+        description: `Please choose a password with at least ${MIN_PASSWORD} characters so it's hard to guess.`,
+      });
       return;
     }
     if (isBootstrap && password !== confirm) {
-      setError("The two passwords don't match.");
+      setError({
+        reason: "unknown",
+        title: "Passwords don't match",
+        description: "The two passwords you entered are different. Retype them and try again.",
+      });
       return;
     }
     setBusy(true);
