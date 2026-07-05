@@ -68,7 +68,16 @@ function AuthPage() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
+  const [passkeyBusy, setPasskeyBusy] = useState(false);
   const [rememberMe, setRememberMe] = useState(true);
+  const [passkeySupported, setPasskeySupported] = useState(false);
+  const [enrollPromptOpen, setEnrollPromptOpen] = useState(false);
+
+  useEffect(() => {
+    setPasskeySupported(isPasskeySupported());
+  }, []);
+
+
 
 
   useEffect(() => {
