@@ -1124,7 +1124,8 @@ function ReferralDetail() {
               try {
                 await queued();
               } catch (err: any) {
-                toast.error(err?.message ?? "Action failed after unlock");
+                const friendly = friendlyE2EError(err, "post-note");
+                toast.error(friendly.title, { description: friendly.description, duration: 8000 });
               }
             }
           }}
