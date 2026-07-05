@@ -430,6 +430,7 @@ test.describe("passkey enrolment and sign-in", () => {
         env.page.getByText(/no passkeys registered/i),
       ).toBeVisible({ timeout: DEFAULT_TIMEOUT_MS });
     } finally {
+      await attachDiagnosticsIfFailed(testInfo, env);
       await env.detach();
     }
   });
