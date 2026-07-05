@@ -48,15 +48,11 @@ function pgByteaToBytes(v: string | Uint8Array): Uint8Array<ArrayBuffer> {
   return copy;
 }
 
-async function lookupUserIdByEmail(
-  supabaseAdmin: import("@/integrations/supabase/client.server")["supabaseAdmin"] extends infer T ? T : never,
-  email: string,
-): Promise<string | null> {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const { data, error } = await (supabaseAdmin as any).rpc(
-    "lookup_user_id_by_email",
-    { _email: email },
-  );
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+async function lookupUserIdByEmail(supabaseAdmin: any, email: string): Promise<string | null> {
+  const { data, error } = await supabaseAdmin.rpc("lookup_user_id_by_email", {
+    _email: email,
+  });
   if (error) return null;
   return (data as string | null) ?? null;
 }
