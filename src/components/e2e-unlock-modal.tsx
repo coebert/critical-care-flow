@@ -106,10 +106,26 @@ export function E2EUnlockModal({
       setPassword("");
       setConfirm("");
       setAttempts(0);
+      // Successful unlock/bootstrap in this modal clears any persistent
+      // banner produced by an earlier auto-unlock failure.
+      setUnlockError(null);
       onOpenChange(false);
     } catch (err) {
-      setAttempts((a) => a + 1);
-      setError(friendlyE2EError(err, isBootstrap ? "bootstrap" : "unlock"));
+      const next = attempts + 1;
+      setAttempts(next);
+      const friendly = friendlyE2EError(err, isBootstrap ? "bootstrap" : "unlock");
+      setError(friendly);
+      // After repeated in-modal failures, also surface via the top-of-app
+      // banner so the user has an unlock/re-issue path even if they close
+      // the dialog to think about it.
+      if (next >= 2 && !isBootstrap) {
+        setUnlockError({
+          title: friendly.title,
+          description: friendly.description,
+          reason: friendly.reason,
+          at: Date.now(),
+        });
+      }
       // Keep the modal open and the password field populated for a quick retry.
     } finally {
       setBusy(false);
