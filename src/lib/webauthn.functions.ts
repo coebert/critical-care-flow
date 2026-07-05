@@ -170,24 +170,44 @@ export const verifyPasskeyRegistration = createServerFn({ method: "POST" })
 
 // ---------- Authentication (public) ----------
 
+/**
+ * Discriminated result so the client can distinguish "no passkey registered
+ * for this account" from a successful challenge without inspecting message
+ * strings. We intentionally accept the account-enumeration trade-off here —
+ * the product spec requires routing users straight into enrolment.
+ */
+export type StartPasskeyAuthResult =
+  | { status: "ok"; options: Awaited<ReturnType<typeof generateAuthenticationOptions>> }
+  | { status: "no_credentials"; code: "NO_PASSKEY_REGISTERED"; message: string };
+
 export const startPasskeyAuthentication = createServerFn({ method: "POST" })
   .inputValidator((input: { email: string }) => input)
-  .handler(async ({ data }) => {
+  .handler(async ({ data }): Promise<StartPasskeyAuthResult> => {
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const { rpID } = getRpAndOrigin();
     const email = normalizeEmail(data.email);
 
-    let allowCredentials: { id: string; transports?: AuthenticatorTransport[] }[] = [];
     const userId = await lookupUserIdByEmail(supabaseAdmin, email);
+    const allowCredentials: { id: string; transports?: AuthenticatorTransport[] }[] = [];
     if (userId) {
       const { data: creds } = await supabaseAdmin
         .from("webauthn_credentials")
         .select("credential_id, transports")
         .eq("user_id", userId);
-      allowCredentials = (creds ?? []).map((c) => ({
-        id: c.credential_id,
-        transports: (c.transports ?? []) as AuthenticatorTransport[],
-      }));
+      for (const c of creds ?? []) {
+        allowCredentials.push({
+          id: c.credential_id,
+          transports: (c.transports ?? []) as AuthenticatorTransport[],
+        });
+      }
+    }
+
+    if (allowCredentials.length === 0) {
+      return {
+        status: "no_credentials",
+        code: "NO_PASSKEY_REGISTERED",
+        message: "No passkey is registered for this account.",
+      };
     }
 
     const options = await generateAuthenticationOptions({
@@ -208,7 +228,7 @@ export const startPasskeyAuthentication = createServerFn({ method: "POST" })
       kind: "authentication",
     });
 
-    return options;
+    return { status: "ok", options };
   });
 
 export const verifyPasskeyAuthentication = createServerFn({ method: "POST" })
