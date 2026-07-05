@@ -73,6 +73,10 @@ function AuthPage() {
   const [rememberMe, setRememberMe] = useState(true);
   const [passkeySupported, setPasskeySupported] = useState(false);
   const [enrollPromptOpen, setEnrollPromptOpen] = useState(false);
+  // Set when the user tried biometric sign-in but no passkey is registered yet.
+  // After they complete password sign-in we force-open the enrolment modal so
+  // they can set one up in the same flow.
+  const [enrollAfterSignIn, setEnrollAfterSignIn] = useState(false);
 
   useEffect(() => {
     setPasskeySupported(isPasskeySupported());
