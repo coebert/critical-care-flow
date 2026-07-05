@@ -1,6 +1,7 @@
 import { generateAndWrapKeypair } from "@/lib/e2e-crypto";
 import { getMyPrivateKeyMaterial, publishUserKeys } from "@/lib/e2e-keys.functions";
 import { retryWithBackoff, isTransientAuthError } from "@/lib/retry";
+import { useE2ESession } from "@/hooks/use-e2e-session";
 
 export interface EnsureKeyDeps {
   fetchMaterial: () => Promise<{
