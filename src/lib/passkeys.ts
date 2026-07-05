@@ -78,20 +78,66 @@ export async function signInWithPasskey(email: string): Promise<void> {
 
 export const PASSKEY_DISMISS_KEY = "passkey:enroll-dismissed";
 
-export function passkeyEnrollDismissed(): boolean {
-  if (typeof window === "undefined") return false;
+// How long each dismissal suppresses the prompt. After the window elapses,
+// a capable device without any enrolled passkeys will be re-prompted on the
+// next successful password sign-in.
+const SNOOZE_MS: Record<"later" | "never", number> = {
+  later: 7 * 24 * 60 * 60 * 1000, // "Not now" — one week
+  never: 60 * 24 * 60 * 60 * 1000, // "Don't ask again" — two months
+};
+
+type DismissRecord = { mode: "later" | "never"; at: number };
+
+function readDismissRecord(): DismissRecord | null {
+  if (typeof window === "undefined") return null;
   try {
-    return window.localStorage.getItem(PASSKEY_DISMISS_KEY) === "1";
+    const raw = window.localStorage.getItem(PASSKEY_DISMISS_KEY);
+    if (!raw) return null;
+    // Back-compat: older builds stored "1" for "don't ask again" with no timestamp.
+    if (raw === "1") return { mode: "never", at: Date.now() };
+    const parsed = JSON.parse(raw) as Partial<DismissRecord>;
+    if (
+      (parsed.mode === "later" || parsed.mode === "never") &&
+      typeof parsed.at === "number"
+    ) {
+      return { mode: parsed.mode, at: parsed.at };
+    }
+    return null;
   } catch {
-    return false;
+    return null;
   }
 }
 
-export function setPasskeyEnrollDismissed(value: boolean): void {
+export function passkeyEnrollDismissed(): boolean {
+  const rec = readDismissRecord();
+  if (!rec) return false;
+  return Date.now() - rec.at < SNOOZE_MS[rec.mode];
+}
+
+function writeDismiss(mode: "later" | "never"): void {
   if (typeof window === "undefined") return;
   try {
-    if (value) window.localStorage.setItem(PASSKEY_DISMISS_KEY, "1");
-    else window.localStorage.removeItem(PASSKEY_DISMISS_KEY);
+    const rec: DismissRecord = { mode, at: Date.now() };
+    window.localStorage.setItem(PASSKEY_DISMISS_KEY, JSON.stringify(rec));
+  } catch {
+    /* storage unavailable */
+  }
+}
+
+/** "Not now" — short snooze; we'll offer again after a week. */
+export function snoozePasskeyEnroll(): void {
+  writeDismiss("later");
+}
+
+/** "Don't ask again" — long snooze; we'll offer again after ~two months. */
+export function setPasskeyEnrollDismissed(value: boolean): void {
+  if (typeof window === "undefined") return;
+  if (value) {
+    writeDismiss("never");
+    return;
+  }
+  try {
+    window.localStorage.removeItem(PASSKEY_DISMISS_KEY);
   } catch {
     /* storage unavailable */
   }
