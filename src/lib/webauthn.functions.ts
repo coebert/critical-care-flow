@@ -28,31 +28,34 @@ function getRpAndOrigin(): { rpID: string; origin: string } {
   return { rpID: url.hostname, origin };
 }
 
-// bytea → Uint8Array. PostgREST returns bytea as `\x<hex>`.
+// bytea → Uint8Array (backed by a fresh ArrayBuffer).
 function pgByteaToBytes(v: string | Uint8Array): Uint8Array {
+  let src: Uint8Array;
   if (v instanceof Uint8Array) {
-    return new Uint8Array(v);
-  }
-  if (typeof v === "string" && v.startsWith("\\x")) {
+    src = v;
+  } else if (typeof v === "string" && v.startsWith("\\x")) {
     const hex = v.slice(2);
-    const out = new Uint8Array(hex.length / 2);
-    for (let i = 0; i < out.length; i++) {
-      out[i] = parseInt(hex.substr(i * 2, 2), 16);
+    src = new Uint8Array(hex.length / 2);
+    for (let i = 0; i < src.length; i++) {
+      src[i] = parseInt(hex.substr(i * 2, 2), 16);
     }
-    return out;
+  } else {
+    src = new Uint8Array(Buffer.from(String(v), "base64"));
   }
-  return new Uint8Array(Buffer.from(String(v), "base64"));
+  const copy = new Uint8Array(new ArrayBuffer(src.byteLength));
+  copy.set(src);
+  return copy;
 }
 
 async function lookupUserIdByEmail(
-  supabaseAdmin: Awaited<
-    ReturnType<
-      typeof import("@/integrations/supabase/client.server")
-    >["supabaseAdmin"] extends infer T ? T : never
-  >,
+  supabaseAdmin: {
+    rpc: (
+      name: string,
+      args: Record<string, unknown>,
+    ) => Promise<{ data: unknown; error: unknown }>;
+  },
   email: string,
 ): Promise<string | null> {
-  // @ts-expect-error — RPC not in generated types until regen after migration.
   const { data, error } = await supabaseAdmin.rpc("lookup_user_id_by_email", {
     _email: email,
   });
