@@ -32,6 +32,7 @@ export function E2EUnlockModal({
   children?: ReactNode;
 }) {
   const { unlock, bootstrap, needsBootstrap, material } = useE2ESession();
+  const setUnlockError = useE2ESession((s) => s.setUnlockError);
   const publish = useServerFn(publishUserKeys);
   const [password, setPassword] = useState("");
   const [confirm, setConfirm] = useState("");
