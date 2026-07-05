@@ -28,7 +28,7 @@ export function E2EUnlockBanner() {
   // Reset the dismissal whenever the state that produced the banner changes,
   // so a fresh failure after a successful unlock re-shows the recovery UI.
   const key = `${status}:${unlockError?.at ?? "none"}`;
-  useMemo(() => {
+  useEffect(() => {
     setDismissed(false);
   }, [key]);
 
