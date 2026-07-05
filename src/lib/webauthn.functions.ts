@@ -224,7 +224,7 @@ export const verifyPasskeyAuthentication = createServerFn({ method: "POST" })
       "begin_auth_attempt",
       { _email: email, _attempt_type: "signin" },
     );
-    if (beginErr) throw new Error(beginErr.message);
+    if (beginErr) throw safeError("webauthn.auth", beginErr, "Sign-in check failed.");
     const begin = beginData as unknown as {
       locked: boolean;
       attempt_id: number | null;
