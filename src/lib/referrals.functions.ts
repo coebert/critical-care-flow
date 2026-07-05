@@ -439,6 +439,27 @@ export const listReferralNotesDecrypted = createServerFn({ method: "POST" })
   });
 
 
+/**
+ * E2E-by-default enforcement.
+ *
+ * `addNote` and `updateNote` write server-side-encrypted (`body_enc`) rows
+ * — the pre-E2E note storage path. End-to-end encryption is the default
+ * for every new note in this app, so both server functions are hard-gated
+ * behind `ALLOW_NON_E2E_NOTES=true`. When that env flag is not set (the
+ * default), calling either function throws so no client can silently fall
+ * back to non-E2E storage. Compose flows use the E2E path in
+ * `encrypted-notes.functions.ts` instead.
+ */
+const NON_E2E_NOTES_ENABLED = process.env.ALLOW_NON_E2E_NOTES === "true";
+function assertNonE2EWritesAllowed(op: "add" | "update") {
+  if (NON_E2E_NOTES_ENABLED) return;
+  throw new Error(
+    `End-to-end encryption is required for notes (${op}). ` +
+      "Use the encrypted-notes flow, or set ALLOW_NON_E2E_NOTES=true to " +
+      "explicitly opt out.",
+  );
+}
+
 export const addNote = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((d: unknown) =>
@@ -447,6 +468,7 @@ export const addNote = createServerFn({ method: "POST" })
       .parse(d),
   )
   .handler(async ({ data, context }) => {
+    assertNonE2EWritesAllowed("add");
     const { supabase, userId } = context;
     const { data: row, error } = await supabase
       .from("referral_notes")
@@ -488,6 +510,7 @@ export const updateNote = createServerFn({ method: "POST" })
       .parse(d),
   )
   .handler(async ({ data, context }) => {
+    assertNonE2EWritesAllowed("update");
     const { supabase, userId } = context;
     const { data: existing } = await supabase
       .from("referral_notes")

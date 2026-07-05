@@ -2,7 +2,7 @@ import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useEffect, useRef, useState } from "react";
 import { useServerFn } from "@tanstack/react-start";
 import { supabase } from "@/integrations/supabase/client";
-import { addNote, deleteNote, deleteReferral, findReferralsByHospitalNumber, getNoteHistory, getReferralDetail, getReferralHistory, logReferralView, updateNote, updateReferral, type ReferralAuditEntry, type DecryptedReferral, type DecryptedReferralNote } from "@/lib/referrals.functions";
+import { deleteNote, deleteReferral, findReferralsByHospitalNumber, getNoteHistory, getReferralDetail, getReferralHistory, logReferralView, updateNote, updateReferral, type ReferralAuditEntry, type DecryptedReferral, type DecryptedReferralNote } from "@/lib/referrals.functions";
 import { addEncryptedNote, listEncryptedNotes, updateEncryptedNote } from "@/lib/encrypted-notes.functions";
 import { getMyPrivateKeyMaterial, getPublicKeyDirectory } from "@/lib/e2e-keys.functions";
 import { decryptNote as e2eDecryptNote, encryptNote as e2eEncryptNote } from "@/lib/e2e-crypto";
@@ -69,7 +69,8 @@ function ReferralDetail() {
   const { highlight } = Route.useSearch();
   const navigate = useNavigate();
   const update = useServerFn(updateReferral);
-  const addNoteFn = useServerFn(addNote);
+  // Legacy non-E2E addNote path is intentionally removed — new notes always
+  // go through the end-to-end encrypted `submitEncNote` flow below.
   const updateNoteFn = useServerFn(updateNote);
   const deleteNoteFn = useServerFn(deleteNote);
   const logView = useServerFn(logReferralView);
@@ -1070,7 +1071,7 @@ function ReferralDetail() {
                 authorMap={authors}
                 directory={directoryWithSelf}
                 currentUserId={user?.id}
-                canEdit={!!user && (user.id === n.author_id || isAdmin) && n._e2eStatus !== "e2e-locked" && n._e2eStatus !== "e2e-no-key" && n._e2eStatus !== "e2e-failed" && n._e2eStatus !== "legacy-server-enc"}
+                canEdit={!!user && (user.id === n.author_id || isAdmin) && n._e2eStatus !== "e2e-locked" && n._e2eStatus !== "e2e-no-key" && n._e2eStatus !== "e2e-failed" && n._e2eStatus !== "legacy-server-enc" && n._e2eStatus !== "plaintext"}
                 onSave={async (body, recipients) => {
                   if (n.body_ciphertext) {
                     const retry = () => (async () => {
