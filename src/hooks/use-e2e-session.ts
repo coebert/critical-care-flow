@@ -146,6 +146,7 @@ export const useE2ESession = create<E2EState>((set, get) => ({
       privateKey: priv,
       isUnlocked: true,
       status: deriveStatus(publicKey, material, true),
+      unlockError: null,
     });
     await writePersisted(publicKey, priv);
     // Fire-and-forget audit: a fresh password unwrap in this tab. Rehydrating
