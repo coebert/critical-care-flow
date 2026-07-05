@@ -247,6 +247,7 @@ function ProfilePage() {
           await useE2ESession.getState().refreshStatus();
         }}
       />
+      <VerifyKeysDialog open={verifyOpen} onOpenChange={setVerifyOpen} />
     </div>
   );
 }
