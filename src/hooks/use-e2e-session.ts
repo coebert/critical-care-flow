@@ -238,6 +238,7 @@ export const useE2ESession = create<E2EState>((set, get) => ({
       needsBootstrap: false,
       material: null,
       status: "not_issued",
+      unlockError: null,
     });
     // Sign-out in one tab must lock every other tab too.
     broadcastKeyChange("clear");
