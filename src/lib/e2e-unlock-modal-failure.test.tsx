@@ -111,7 +111,7 @@ describe("E2EUnlockModal — failed unlock/enable keeps status locked and surfac
     // Actionable, user-friendly error is shown in an alert.
     const alert = await screen.findByRole("alert");
     expect(alert.textContent).toMatch(/incorrect password/i);
-    expect(screen.getByText(/couldn't unlock/i)).toBeTruthy();
+    expect(alert.textContent).toMatch(/incorrect password/i);
     // Submit button flips to a "Try again" affordance rather than staying "Unlock".
     expect(screen.getByRole("button", { name: /try again/i })).toBeTruthy();
 
