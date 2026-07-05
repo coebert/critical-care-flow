@@ -196,6 +196,7 @@ function AuthedShell() {
           </div>
         </header>
         <PushPermissionPrompt visible={supported && permission !== "granted" && atWork === true} />
+        <E2EUnlockBanner />
         <main className="flex-1 overflow-auto">
           <Outlet />
         </main>
