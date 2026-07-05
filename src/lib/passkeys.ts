@@ -63,12 +63,15 @@ export async function signInWithPasskey(email: string): Promise<void> {
 
   const options = await startPasskeyAuthentication({ data: { email: trimmed } });
   // If the server returned no allowed credentials, no passkey is registered
-  // for this email on the server (or, at minimum, none we can offer). Surface
-  // a clear message instead of letting the browser silently cancel the prompt.
+  // for this email on the server. Throw a tagged error so the caller can route
+  // the user into enrolment instead of showing a dead-end "cancelled" message.
   if (!options.allowCredentials || options.allowCredentials.length === 0) {
-    throw new Error(
-      "No passkey is registered for this email yet. Sign in with your password once, then enrol a passkey when prompted.",
-    );
+    const err = new Error(
+      "No passkey is registered for this email yet. Sign in with your password to set one up.",
+    ) as Error & { code?: string };
+    err.name = "NoPasskeyRegisteredError";
+    err.code = NO_PASSKEY_REGISTERED;
+    throw err;
   }
   const response = await startAuthentication({ optionsJSON: options });
 
