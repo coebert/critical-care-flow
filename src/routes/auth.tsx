@@ -5,12 +5,20 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card } from "@/components/ui/card";
-import { Activity } from "lucide-react";
+import { Activity, Fingerprint, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import { Toaster } from "@/components/ui/sonner";
 import { Checkbox } from "@/components/ui/checkbox";
 import { retrySupabaseCall, retryWithBackoff } from "@/lib/retry";
 import { ensureRecipientKey } from "@/lib/e2e-auto-bootstrap";
+import {
+  isPasskeySupported,
+  isPlatformAuthenticatorAvailable,
+  passkeyEnrollDismissed,
+  signInWithPasskey,
+} from "@/lib/passkeys";
+import { listMyPasskeys } from "@/lib/webauthn.functions";
+import { PasskeyEnrollPrompt } from "@/components/passkey-enroll-prompt";
 
 // When "Keep me signed in" is unchecked, move the persisted Supabase auth token
 // from localStorage to sessionStorage so the session ends when the browser closes.
@@ -60,7 +68,16 @@ function AuthPage() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
+  const [passkeyBusy, setPasskeyBusy] = useState(false);
   const [rememberMe, setRememberMe] = useState(true);
+  const [passkeySupported, setPasskeySupported] = useState(false);
+  const [enrollPromptOpen, setEnrollPromptOpen] = useState(false);
+
+  useEffect(() => {
+    setPasskeySupported(isPasskeySupported());
+  }, []);
+
+
 
 
   useEffect(() => {
@@ -132,6 +149,12 @@ function AuthPage() {
         // Automatically issue a recipient keypair on first successful sign-in.
         await ensureRecipientKey(password);
         toast.success("Signed in");
+        // Decide whether to offer passkey enrolment before navigating away.
+        const shouldPrompt = await shouldPromptForPasskey();
+        if (shouldPrompt) {
+          setEnrollPromptOpen(true);
+          return; // navigation deferred until the modal closes
+        }
         navigate({ to: postAuthTarget, replace: true });
       } else {
         const { error } = await retrySupabaseCall(() =>
@@ -155,6 +178,36 @@ function AuthPage() {
       setLoading(false);
     }
   };
+
+  const handlePasskeySignIn = async () => {
+    const trimmed = email.trim();
+    if (!trimmed) {
+      toast.error("Enter your email address first");
+      return;
+    }
+    setPasskeyBusy(true);
+    try {
+      await signInWithPasskey(trimmed);
+      if (!rememberMe) downgradeSessionToTabOnly();
+      toast.success("Signed in with passkey");
+      navigate({ to: postAuthTarget, replace: true });
+    } catch (err: unknown) {
+      if (err instanceof Error && err.name === "NotAllowedError") {
+        toast.message("Passkey sign-in cancelled");
+      } else {
+        toast.error(err instanceof Error ? err.message : "Passkey sign-in failed");
+      }
+    } finally {
+      setPasskeyBusy(false);
+    }
+  };
+
+  const finishAfterEnroll = () => {
+    setEnrollPromptOpen(false);
+    navigate({ to: postAuthTarget, replace: true });
+  };
+
+
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-background p-4">
@@ -204,9 +257,38 @@ function AuthPage() {
               </div>
             </div>
           )}
-          <Button type="submit" className="w-full" disabled={loading}>
+          <Button type="submit" className="w-full" disabled={loading || passkeyBusy}>
             {loading ? "Please wait…" : mode === "signin" ? "Sign in" : "Send reset link"}
           </Button>
+          {mode === "signin" && passkeySupported && (
+            <>
+              <div className="relative py-1">
+                <div className="absolute inset-0 flex items-center">
+                  <span className="w-full border-t" />
+                </div>
+                <div className="relative flex justify-center text-[11px] uppercase tracking-wide">
+                  <span className="bg-card px-2 text-muted-foreground">or</span>
+                </div>
+              </div>
+              <Button
+                type="button"
+                variant="outline"
+                className="w-full"
+                onClick={handlePasskeySignIn}
+                disabled={loading || passkeyBusy}
+              >
+                {passkeyBusy ? (
+                  <>
+                    <Loader2 className="w-4 h-4 mr-2 animate-spin" /> Verifying…
+                  </>
+                ) : (
+                  <>
+                    <Fingerprint className="w-4 h-4 mr-2" /> Sign in with a passkey
+                  </>
+                )}
+              </Button>
+            </>
+          )}
           <button
             type="button"
             className="text-xs text-muted-foreground hover:text-foreground underline w-full text-center"
@@ -219,7 +301,29 @@ function AuthPage() {
           Internal NHS use only. Data is encrypted in transit and at rest. Do not use this system with patient-identifiable data until your trust's IG team has approved it.
         </p>
       </Card>
+      <PasskeyEnrollPrompt
+        open={enrollPromptOpen}
+        onOpenChange={(v) => {
+          if (!v) finishAfterEnroll();
+          else setEnrollPromptOpen(v);
+        }}
+        onEnrolled={finishAfterEnroll}
+      />
       <Toaster />
     </div>
   );
 }
+
+async function shouldPromptForPasskey(): Promise<boolean> {
+  if (!isPasskeySupported()) return false;
+  if (passkeyEnrollDismissed()) return false;
+  try {
+    const hasPlatform = await isPlatformAuthenticatorAvailable();
+    if (!hasPlatform) return false;
+    const { passkeys } = await listMyPasskeys();
+    return passkeys.length === 0;
+  } catch {
+    return false;
+  }
+}
+

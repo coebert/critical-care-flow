@@ -21,6 +21,7 @@ import { reissueRecipientKeypair } from "@/lib/e2e-keys.functions";
 import { generateAndWrapKeypair, unwrapPrivateKey } from "@/lib/e2e-crypto";
 import { E2EUnlockModal } from "@/components/e2e-unlock-modal";
 import { toast } from "sonner";
+import { PasskeyList } from "@/components/passkey-list";
 
 export const Route = createFileRoute("/_authenticated/profile")({
   head: () => ({
@@ -142,6 +143,10 @@ function ProfilePage() {
           )}
         </div>
       </Card>
+
+      <PasskeyList />
+
+
 
       <Card className="p-5 space-y-3 border-destructive/30">
         <div className="flex items-start justify-between gap-3">
