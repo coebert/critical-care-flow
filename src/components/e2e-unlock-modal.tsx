@@ -108,7 +108,7 @@ export function E2EUnlockModal({
       onOpenChange(false);
     } catch (err) {
       setAttempts((a) => a + 1);
-      setError(friendlyUnlockError(err, isBootstrap));
+      setError(friendlyE2EError(err, isBootstrap ? "bootstrap" : "unlock"));
       // Keep the modal open and the password field populated for a quick retry.
     } finally {
       setBusy(false);
