@@ -10,7 +10,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Fingerprint, Loader2 } from "lucide-react";
 import { toast } from "sonner";
-import { registerPasskey, setPasskeyEnrollDismissed } from "@/lib/passkeys";
+import { registerPasskey, setPasskeyEnrollDismissed, snoozePasskeyEnroll } from "@/lib/passkeys";
 
 export function PasskeyEnrollPrompt({
   open,
