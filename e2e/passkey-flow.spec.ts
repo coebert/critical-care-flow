@@ -47,11 +47,30 @@ test.describe.configure({ mode: "serial" });
 /** Generous default so a slow CI runner + Argon2 unwrap don't false-fail. */
 const DEFAULT_TIMEOUT_MS = 20_000;
 
+/**
+ * Diagnostic log buffers captured for every test. On failure we flush them
+ * to `testInfo.attach(...)` alongside a final screenshot + DOM snapshot so
+ * the HTML report links every artifact needed to diagnose the run without
+ * re-running:
+ *   - console.log — every browser console entry + page/uncaught errors.
+ *   - network.log — request/response lines with status + timing.
+ *   - cdp.log     — every CDP command we sent and every event we received
+ *                   from WebAuthn (which is the domain most likely to be
+ *                   the culprit in this spec).
+ * Playwright's own trace / video are already captured via playwright.config.
+ */
+type DiagnosticLogs = {
+  console: string[];
+  network: string[];
+  cdp: string[];
+};
+
 type VirtualAuthenticator = {
   context: BrowserContext;
   page: Page;
   client: CDPSession;
   authenticatorId: string;
+  logs: DiagnosticLogs;
   /** How many resident credentials the virtual authenticator currently holds. */
   credentialCount: () => Promise<number>;
   detach: () => Promise<void>;
