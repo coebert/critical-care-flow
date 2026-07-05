@@ -29,7 +29,7 @@ function getRpAndOrigin(): { rpID: string; origin: string } {
 }
 
 // bytea → Uint8Array (backed by a fresh ArrayBuffer).
-function pgByteaToBytes(v: string | Uint8Array): Uint8Array {
+function pgByteaToBytes(v: string | Uint8Array): Uint8Array<ArrayBuffer> {
   let src: Uint8Array;
   if (v instanceof Uint8Array) {
     src = v;
@@ -42,23 +42,21 @@ function pgByteaToBytes(v: string | Uint8Array): Uint8Array {
   } else {
     src = new Uint8Array(Buffer.from(String(v), "base64"));
   }
-  const copy = new Uint8Array(new ArrayBuffer(src.byteLength));
+  const buf = new ArrayBuffer(src.byteLength);
+  const copy = new Uint8Array(buf);
   copy.set(src);
   return copy;
 }
 
 async function lookupUserIdByEmail(
-  supabaseAdmin: {
-    rpc: (
-      name: string,
-      args: Record<string, unknown>,
-    ) => Promise<{ data: unknown; error: unknown }>;
-  },
+  supabaseAdmin: import("@/integrations/supabase/client.server")["supabaseAdmin"] extends infer T ? T : never,
   email: string,
 ): Promise<string | null> {
-  const { data, error } = await supabaseAdmin.rpc("lookup_user_id_by_email", {
-    _email: email,
-  });
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { data, error } = await (supabaseAdmin as any).rpc(
+    "lookup_user_id_by_email",
+    { _email: email },
+  );
   if (error) return null;
   return (data as string | null) ?? null;
 }
