@@ -12,7 +12,12 @@
 //   * Private key at rest: crypto_secretbox with an Argon2id-derived key from the
 //     user's password. Stored server-side but unreadable without the password.
 
-import _sodium from "libsodium-wrappers";
+// The default `libsodium-wrappers` build omits the Argon2 (`crypto_pwhash*`)
+// functions, so calling `crypto_pwhash` there throws "length cannot be null
+// or undefined" (the constants come back undefined). The `-sumo` build is
+// API-compatible and includes password hashing, which we need to wrap the
+// user's private key with their password.
+import _sodium from "libsodium-wrappers-sumo";
 
 let ready: Promise<typeof _sodium> | null = null;
 export async function sodium() {
