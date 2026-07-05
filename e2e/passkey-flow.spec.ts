@@ -5,6 +5,7 @@ import {
   type BrowserContext,
   type CDPSession,
   type Page,
+  type TestInfo,
 } from "@playwright/test";
 
 /**
