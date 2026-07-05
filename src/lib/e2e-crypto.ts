@@ -244,3 +244,115 @@ export async function decryptNote(
   const pt = s.crypto_secretbox_open_easy(ct, nonce, contentKey);
   return s.to_string(pt);
 }
+
+/**
+ * End-to-end verification for stored key material. Confirms that the
+ * password the user just entered can unwrap the private key stored on the
+ * server AND that the resulting private key is genuinely paired with the
+ * published public key (a full encrypt → decrypt round-trip against a
+ * sealed-box addressed to the public key).
+ *
+ * Returns a structured result with per-step outcomes so the settings UI
+ * can show which specific check failed (e.g. "password unwraps, but the
+ * private key doesn't match the published public key").
+ */
+export interface KeypairVerification {
+  ok: boolean;
+  publicKey: string | null;
+  checks: {
+    fetched_material: "ok" | "missing" | "error";
+    unwrap_private_key: "ok" | "wrong_password" | "error" | "skipped";
+    public_key_matches: "ok" | "mismatch" | "error" | "skipped";
+    round_trip_encrypt_decrypt: "ok" | "failed" | "error" | "skipped";
+  };
+  error?: string;
+}
+
+export async function verifyStoredKeypair(
+  password: string,
+  material: PrivateKeyMaterial | null,
+  publicKeyB64: string | null,
+): Promise<KeypairVerification> {
+  const checks: KeypairVerification["checks"] = {
+    fetched_material: "ok",
+    unwrap_private_key: "skipped",
+    public_key_matches: "skipped",
+    round_trip_encrypt_decrypt: "skipped",
+  };
+
+  if (!material || !publicKeyB64) {
+    checks.fetched_material = "missing";
+    return { ok: false, publicKey: publicKeyB64, checks };
+  }
+
+  const s = await sodium();
+
+  // 1. Unwrap the private key.
+  let priv: Uint8Array;
+  try {
+    priv = await unwrapPrivateKey(password, material);
+    checks.unwrap_private_key = "ok";
+  } catch (err) {
+    const msg = err instanceof Error ? err.message.toLowerCase() : "";
+    checks.unwrap_private_key = msg.includes("incorrect password") ? "wrong_password" : "error";
+    return {
+      ok: false,
+      publicKey: publicKeyB64,
+      checks,
+      error: err instanceof Error ? err.message : String(err),
+    };
+  }
+
+  // 2. Derive the public key from the unwrapped private and compare.
+  try {
+    const derivedPub = s.crypto_scalarmult_base(priv);
+    const storedPub = s.from_base64(publicKeyB64, s.base64_variants.ORIGINAL);
+    const equal =
+      derivedPub.length === storedPub.length &&
+      derivedPub.every((b, i) => b === storedPub[i]);
+    checks.public_key_matches = equal ? "ok" : "mismatch";
+    if (!equal) {
+      return { ok: false, publicKey: publicKeyB64, checks };
+    }
+  } catch (err) {
+    checks.public_key_matches = "error";
+    return {
+      ok: false,
+      publicKey: publicKeyB64,
+      checks,
+      error: err instanceof Error ? err.message : String(err),
+    };
+  }
+
+  // 3. Full round-trip: encrypt a probe to yourself and decrypt it back.
+  try {
+    const probe = `verify:${Date.now()}:${s.to_hex(s.randombytes_buf(8))}`;
+    const enc = await encryptNote(probe, [
+      { user_id: "self", public_key: publicKeyB64 },
+    ]);
+    const wrapped = enc.wrapped_keys[0]?.wrapped_key;
+    if (!wrapped) throw new Error("No wrapped key produced");
+    const decrypted = await decryptNote(
+      {
+        body_ciphertext: enc.body_ciphertext,
+        body_nonce: enc.body_nonce,
+        wrapped_key: wrapped,
+      },
+      { publicKey: publicKeyB64, privateKey: priv },
+    );
+    checks.round_trip_encrypt_decrypt = decrypted === probe ? "ok" : "failed";
+    if (decrypted !== probe) {
+      return { ok: false, publicKey: publicKeyB64, checks };
+    }
+  } catch (err) {
+    checks.round_trip_encrypt_decrypt = "error";
+    return {
+      ok: false,
+      publicKey: publicKeyB64,
+      checks,
+      error: err instanceof Error ? err.message : String(err),
+    };
+  }
+
+  return { ok: true, publicKey: publicKeyB64, checks };
+}
