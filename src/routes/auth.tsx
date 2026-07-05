@@ -179,6 +179,36 @@ function AuthPage() {
     }
   };
 
+  const handlePasskeySignIn = async () => {
+    const trimmed = email.trim();
+    if (!trimmed) {
+      toast.error("Enter your email address first");
+      return;
+    }
+    setPasskeyBusy(true);
+    try {
+      await signInWithPasskey(trimmed);
+      if (!rememberMe) downgradeSessionToTabOnly();
+      toast.success("Signed in with passkey");
+      navigate({ to: postAuthTarget, replace: true });
+    } catch (err: unknown) {
+      if (err instanceof Error && err.name === "NotAllowedError") {
+        toast.message("Passkey sign-in cancelled");
+      } else {
+        toast.error(err instanceof Error ? err.message : "Passkey sign-in failed");
+      }
+    } finally {
+      setPasskeyBusy(false);
+    }
+  };
+
+  const finishAfterEnroll = () => {
+    setEnrollPromptOpen(false);
+    navigate({ to: postAuthTarget, replace: true });
+  };
+
+
+
   return (
     <div className="min-h-screen flex items-center justify-center bg-background p-4">
       <Card className="w-full max-w-md p-8">
