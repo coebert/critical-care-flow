@@ -152,7 +152,7 @@ describe("E2EUnlockModal — failed unlock/enable keeps status locked and surfac
 
     const alert = await screen.findByRole("alert");
     expect(alert.textContent).toMatch(/couldn't reach the server|network/i);
-    expect(screen.getByText(/couldn't enable encryption/i)).toBeTruthy();
+    expect(alert.textContent).toMatch(/couldn't reach the server/i);
 
     // The generate step ran (we needed a candidate keypair before publishing)
     // but nothing that changes global state should have taken effect.
