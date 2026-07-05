@@ -120,6 +120,37 @@ function RootShell({ children }: { children: ReactNode }) {
 function RootComponent() {
   const { queryClient } = Route.useRouteContext();
 
+  // Startup sanity check: verify the libsodium build ships Argon2 password
+  // hashing. If a future dep change ever swaps back to the slim build,
+  // every enable/unlock flow would fail cryptically — surface it up front.
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      const [{ verifySodiumPasswordHashing }, { toast }] = await Promise.all([
+        import("@/lib/e2e-crypto"),
+        import("sonner"),
+      ]);
+      const health = await verifySodiumPasswordHashing();
+      if (cancelled || health.ok) return;
+      const detail = health.error ? ` (${health.error})` : "";
+      const missing = health.missing.join(", ");
+      console.error(
+        `[e2e] libsodium password hashing unavailable — missing: ${missing}${detail}`,
+      );
+      toast.error("End-to-end encryption is unavailable in this build", {
+        description:
+          `The libsodium password-hashing functions we need (${missing}) aren't available in your browser. ` +
+          `Encrypted notes can't be enabled, unlocked, or read until this is fixed. ` +
+          `Please refresh the page — if it keeps happening, contact support.`,
+        duration: Infinity,
+        id: "sodium-health",
+      });
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
   return (
     <QueryClientProvider client={queryClient}>
       {/* Required: nested routes render here. Removing <Outlet /> breaks all child routes. */}
