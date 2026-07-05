@@ -347,7 +347,7 @@ export const listMyPasskeys = createServerFn({ method: "GET" })
       .select("id, device_label, created_at, last_used_at, transports")
       .eq("user_id", context.userId)
       .order("created_at", { ascending: false });
-    if (error) throw new Error(error.message);
+    if (error) throw safeError("webauthn.list", error, "Could not load passkeys.");
     return { passkeys: data ?? [] };
   });
 
