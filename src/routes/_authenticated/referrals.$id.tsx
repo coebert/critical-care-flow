@@ -69,7 +69,8 @@ function ReferralDetail() {
   const { highlight } = Route.useSearch();
   const navigate = useNavigate();
   const update = useServerFn(updateReferral);
-  const addNoteFn = useServerFn(addNote);
+  // Legacy non-E2E addNote path is intentionally removed — new notes always
+  // go through the end-to-end encrypted `submitEncNote` flow below.
   const updateNoteFn = useServerFn(updateNote);
   const deleteNoteFn = useServerFn(deleteNote);
   const logView = useServerFn(logReferralView);
