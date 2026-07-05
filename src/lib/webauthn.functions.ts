@@ -1,6 +1,7 @@
 import { createServerFn } from "@tanstack/react-start";
 import { getRequest } from "@tanstack/react-start/server";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
+import { safeError } from "@/lib/safe-error";
 import {
   generateRegistrationOptions,
   verifyRegistrationResponse,
@@ -160,7 +161,7 @@ export const verifyPasskeyRegistration = createServerFn({ method: "POST" })
         aaguid: aaguid ?? null,
       });
 
-    if (insertError) throw new Error(insertError.message);
+    if (insertError) throw safeError("webauthn.register", insertError, "Could not save passkey.");
 
     await supabaseAdmin.from("webauthn_challenges").delete().eq("id", challengeRow.id);
 
@@ -223,7 +224,7 @@ export const verifyPasskeyAuthentication = createServerFn({ method: "POST" })
       "begin_auth_attempt",
       { _email: email, _attempt_type: "signin" },
     );
-    if (beginErr) throw new Error(beginErr.message);
+    if (beginErr) throw safeError("webauthn.auth", beginErr, "Sign-in check failed.");
     const begin = beginData as unknown as {
       locked: boolean;
       attempt_id: number | null;
@@ -346,7 +347,7 @@ export const listMyPasskeys = createServerFn({ method: "GET" })
       .select("id, device_label, created_at, last_used_at, transports")
       .eq("user_id", context.userId)
       .order("created_at", { ascending: false });
-    if (error) throw new Error(error.message);
+    if (error) throw safeError("webauthn.list", error, "Could not load passkeys.");
     return { passkeys: data ?? [] };
   });
 
@@ -359,6 +360,6 @@ export const deleteMyPasskey = createServerFn({ method: "POST" })
       .delete()
       .eq("id", data.id)
       .eq("user_id", context.userId);
-    if (error) throw new Error(error.message);
+    if (error) throw safeError("webauthn.delete", error, "Could not remove passkey.");
     return { ok: true };
   });
