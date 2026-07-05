@@ -1071,7 +1071,7 @@ function ReferralDetail() {
                 authorMap={authors}
                 directory={directoryWithSelf}
                 currentUserId={user?.id}
-                canEdit={!!user && (user.id === n.author_id || isAdmin) && n._e2eStatus !== "e2e-locked" && n._e2eStatus !== "e2e-no-key" && n._e2eStatus !== "e2e-failed" && n._e2eStatus !== "legacy-server-enc"}
+                canEdit={!!user && (user.id === n.author_id || isAdmin) && n._e2eStatus !== "e2e-locked" && n._e2eStatus !== "e2e-no-key" && n._e2eStatus !== "e2e-failed" && n._e2eStatus !== "legacy-server-enc" && n._e2eStatus !== "plaintext"}
                 onSave={async (body, recipients) => {
                   if (n.body_ciphertext) {
                     const retry = () => (async () => {
