@@ -142,10 +142,10 @@ export function E2EUnlockModal({
           <Alert variant="destructive">
             <AlertCircle className="w-4 h-4" />
             <AlertTitle>
-              {isBootstrap ? "Couldn't enable encryption" : "Couldn't unlock"}
+              {error.title}
               {attempts > 1 ? ` (attempt ${attempts})` : ""}
             </AlertTitle>
-            <AlertDescription>{error}</AlertDescription>
+            <AlertDescription>{error.description}</AlertDescription>
           </Alert>
         )}
         <form onSubmit={submit} className="space-y-3">
