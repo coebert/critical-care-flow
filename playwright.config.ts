@@ -19,10 +19,22 @@ export default defineConfig({
   fullyParallel: true,
   forbidOnly: !!process.env.CI,
   retries: process.env.CI ? 2 : 0,
-  reporter: "list",
+  // "list" prints per-test progress; "html" writes a browsable report at
+  // playwright-report/ that links every failed test to its trace,
+  // screenshots, video, and any custom attachments (see e2e/passkey-flow).
+  reporter: [["list"], ["html", { open: "never", outputFolder: "playwright-report" }]],
+  outputDir: "test-results",
   use: {
     baseURL: process.env.E2E_BASE_URL ?? "http://localhost:5173",
+    // Capture everything needed to diagnose a failing run without re-running:
+    //   trace       — full DOM+network+source snapshots on failure or retry.
+    //   screenshot  — final screenshot at the point of failure.
+    //   video       — recorded frames from the failing attempt.
+    // "retain-on-failure" keeps artifacts only when a test actually fails,
+    // so green runs don't fill the disk.
     trace: "retain-on-failure",
+    screenshot: "only-on-failure",
+    video: "retain-on-failure",
     storageState: "e2e/.auth/user.json",
   },
   projects: [
