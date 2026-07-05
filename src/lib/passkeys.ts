@@ -63,11 +63,10 @@ export async function signInWithPasskey(email: string): Promise<void> {
   const trimmed = email.trim();
   if (!trimmed) throw new Error("Please enter your email address");
 
-  const options = await startPasskeyAuthentication({ data: { email: trimmed } });
-  // If the server returned no allowed credentials, no passkey is registered
-  // for this email on the server. Throw a tagged error so the caller can route
-  // the user into enrolment instead of showing a dead-end "cancelled" message.
-  if (!options.allowCredentials || options.allowCredentials.length === 0) {
+  const result = await startPasskeyAuthentication({ data: { email: trimmed } });
+  // Server returns a discriminated result so we don't have to sniff the
+  // options shape to detect "no passkey registered for this account".
+  if (result.status === "no_credentials") {
     const err = new Error(
       "No passkey is registered for this email yet. Sign in with your password to set one up.",
     ) as Error & { code?: string };
@@ -75,7 +74,7 @@ export async function signInWithPasskey(email: string): Promise<void> {
     err.code = NO_PASSKEY_REGISTERED;
     throw err;
   }
-  const response = await startAuthentication({ optionsJSON: options });
+  const response = await startAuthentication({ optionsJSON: result.options });
 
   const { email: verifiedEmail, token_hash } = await verifyPasskeyAuthentication({
     data: { email: trimmed, response },
