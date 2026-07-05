@@ -147,6 +147,37 @@ function ProfilePage() {
 
       <PasskeyList />
 
+      <Card className="p-5 space-y-3">
+        <div className="flex items-start justify-between gap-3">
+          <div>
+            <h2 className="text-sm font-medium text-muted-foreground uppercase tracking-wide flex items-center gap-2">
+              <ShieldCheck className="w-4 h-4" /> Verify encryption keys
+            </h2>
+            <p className="text-xs text-muted-foreground mt-1 max-w-md">
+              Confirm the encryption key stored for your account can still be
+              unlocked with your password and that it round-trips a full
+              encrypt/decrypt cycle. Nothing is changed — this is a read-only
+              health check you can run any time.
+            </p>
+          </div>
+        </div>
+        <Button
+          size="sm"
+          variant="outline"
+          onClick={() => setVerifyOpen(true)}
+          disabled={status === "loading" || status === "not_issued"}
+        >
+          <ShieldCheck className="w-4 h-4 mr-2" /> Verify my keys
+        </Button>
+        {status === "not_issued" && (
+          <p className="text-xs text-muted-foreground">
+            You need to enable encryption before there's anything to verify.
+          </p>
+        )}
+      </Card>
+
+
+
 
 
       <Card className="p-5 space-y-3 border-destructive/30">
