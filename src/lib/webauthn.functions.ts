@@ -161,7 +161,7 @@ export const verifyPasskeyRegistration = createServerFn({ method: "POST" })
         aaguid: aaguid ?? null,
       });
 
-    if (insertError) throw new Error(insertError.message);
+    if (insertError) throw safeError("webauthn.register", insertError, "Could not save passkey.");
 
     await supabaseAdmin.from("webauthn_challenges").delete().eq("id", challengeRow.id);
 
