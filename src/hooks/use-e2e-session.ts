@@ -67,6 +67,15 @@ interface E2EState {
   hydrated: boolean; // sessionStorage rehydration attempted
   status: KeyStatus;
   refreshing: boolean;
+  /**
+   * Last unlock failure surfaced to the user. Set by the auto-unlock flow
+   * after sign-in (and by any surface that wants to persist a friendly
+   * error for the top-of-app banner). Cleared on successful unlock /
+   * bootstrap / sign-out. Keeps the recovery UI visible even after the
+   * originating toast disappears, so the user never gets stuck.
+   */
+  unlockError: E2EUnlockError | null;
+  setUnlockError: (err: E2EUnlockError | null) => void;
   setMaterial: (material: PrivateKeyMaterial | null, publicKey: string | null) => void;
   unlock: (password: string) => Promise<void>;
   bootstrap: (
@@ -89,6 +98,16 @@ interface E2EState {
   refreshStatus: () => Promise<KeyStatus>;
   clear: () => void;
 }
+
+export interface E2EUnlockError {
+  title: string;
+  description: string;
+  reason: string;
+  /** ms since epoch — used by the banner to show "just now" vs a stale error. */
+  at: number;
+}
+
+
 
 let inFlightRefresh: Promise<KeyStatus> | null = null;
 
