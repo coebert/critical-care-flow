@@ -30,6 +30,59 @@ export async function sodium() {
   return ready;
 }
 
+/**
+ * Startup sanity check: confirm the libsodium build actually ships the
+ * Argon2 password-hashing primitives we depend on to wrap/unwrap the user's
+ * private key. The default `libsodium-wrappers` build omits these — if
+ * someone ever swaps it back in, every enable/unlock flow would fail with
+ * a cryptic "length cannot be null or undefined". This surfaces the
+ * problem loudly at app boot instead.
+ *
+ * Returns `{ ok: true }` when the build is complete, or a structured error
+ * describing which symbol is missing so the caller can render an
+ * actionable message.
+ */
+export type SodiumHealth =
+  | { ok: true }
+  | { ok: false; missing: string[]; error?: string };
+
+export async function verifySodiumPasswordHashing(): Promise<SodiumHealth> {
+  try {
+    const s = await sodium();
+    const required = [
+      "crypto_pwhash",
+      "crypto_pwhash_SALTBYTES",
+      "crypto_pwhash_ALG_ARGON2ID13",
+      "crypto_secretbox_easy",
+      "crypto_secretbox_open_easy",
+      "crypto_box_keypair",
+      "crypto_box_seal",
+      "crypto_box_seal_open",
+    ] as const;
+    const missing = required.filter((k) => (s as any)[k] === undefined);
+    if (missing.length > 0) return { ok: false, missing: [...missing] };
+
+    // Smoke-test a real derivation with the smallest allowed cost so a
+    // corrupt WASM build (constants present, function broken) still trips.
+    const salt = s.randombytes_buf(s.crypto_pwhash_SALTBYTES);
+    s.crypto_pwhash(
+      32,
+      "startup-check",
+      salt,
+      s.crypto_pwhash_OPSLIMIT_MIN,
+      s.crypto_pwhash_MEMLIMIT_MIN,
+      s.crypto_pwhash_ALG_ARGON2ID13,
+    );
+    return { ok: true };
+  } catch (err) {
+    return {
+      ok: false,
+      missing: ["crypto_pwhash"],
+      error: err instanceof Error ? err.message : String(err),
+    };
+  }
+}
+
 export interface KeyPairB64 {
   publicKey: string;
   privateKey: string; // NEVER sent to server as plaintext
