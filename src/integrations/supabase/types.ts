@@ -679,6 +679,7 @@ export type Database = {
         }
         Returns: boolean
       }
+      lookup_user_id_by_email: { Args: { _email: string }; Returns: string }
     }
     Enums: {
       admission_urgency:
