@@ -154,8 +154,9 @@ function AuthPage() {
         // Automatically issue a recipient keypair on first successful sign-in.
         await ensureRecipientKey(password);
         toast.success("Signed in");
-        // Decide whether to offer passkey enrolment before navigating away.
-        const shouldPrompt = await shouldPromptForPasskey();
+        // If the user just tried biometric sign-in and had no passkey, always
+        // offer enrolment now regardless of the "don't ask again" preference.
+        const shouldPrompt = enrollAfterSignIn || (await shouldPromptForPasskey());
         if (shouldPrompt) {
           setEnrollPromptOpen(true);
           return; // navigation deferred until the modal closes
