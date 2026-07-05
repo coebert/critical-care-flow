@@ -10,7 +10,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Fingerprint, Loader2 } from "lucide-react";
 import { toast } from "sonner";
-import { registerPasskey, setPasskeyEnrollDismissed } from "@/lib/passkeys";
+import { registerPasskey, setPasskeyEnrollDismissed, snoozePasskeyEnroll } from "@/lib/passkeys";
 
 export function PasskeyEnrollPrompt({
   open,
@@ -76,7 +76,7 @@ export function PasskeyEnrollPrompt({
             Don't ask again on this device
           </Button>
           <div className="flex gap-2 justify-end">
-            <Button variant="outline" onClick={() => onOpenChange(false)} disabled={busy}>
+            <Button variant="outline" onClick={() => { snoozePasskeyEnroll(); onOpenChange(false); }} disabled={busy}>
               Not now
             </Button>
             <Button onClick={enable} disabled={busy}>
