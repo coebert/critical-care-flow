@@ -257,9 +257,38 @@ function AuthPage() {
               </div>
             </div>
           )}
-          <Button type="submit" className="w-full" disabled={loading}>
+          <Button type="submit" className="w-full" disabled={loading || passkeyBusy}>
             {loading ? "Please wait…" : mode === "signin" ? "Sign in" : "Send reset link"}
           </Button>
+          {mode === "signin" && passkeySupported && (
+            <>
+              <div className="relative py-1">
+                <div className="absolute inset-0 flex items-center">
+                  <span className="w-full border-t" />
+                </div>
+                <div className="relative flex justify-center text-[11px] uppercase tracking-wide">
+                  <span className="bg-card px-2 text-muted-foreground">or</span>
+                </div>
+              </div>
+              <Button
+                type="button"
+                variant="outline"
+                className="w-full"
+                onClick={handlePasskeySignIn}
+                disabled={loading || passkeyBusy}
+              >
+                {passkeyBusy ? (
+                  <>
+                    <Loader2 className="w-4 h-4 mr-2 animate-spin" /> Verifying…
+                  </>
+                ) : (
+                  <>
+                    <Fingerprint className="w-4 h-4 mr-2" /> Sign in with a passkey
+                  </>
+                )}
+              </Button>
+            </>
+          )}
           <button
             type="button"
             className="text-xs text-muted-foreground hover:text-foreground underline w-full text-center"
@@ -272,7 +301,29 @@ function AuthPage() {
           Internal NHS use only. Data is encrypted in transit and at rest. Do not use this system with patient-identifiable data until your trust's IG team has approved it.
         </p>
       </Card>
+      <PasskeyEnrollPrompt
+        open={enrollPromptOpen}
+        onOpenChange={(v) => {
+          if (!v) finishAfterEnroll();
+          else setEnrollPromptOpen(v);
+        }}
+        onEnrolled={finishAfterEnroll}
+      />
       <Toaster />
     </div>
   );
 }
+
+async function shouldPromptForPasskey(): Promise<boolean> {
+  if (!isPasskeySupported()) return false;
+  if (passkeyEnrollDismissed()) return false;
+  try {
+    const hasPlatform = await isPlatformAuthenticatorAvailable();
+    if (!hasPlatform) return false;
+    const { passkeys } = await listMyPasskeys();
+    return passkeys.length === 0;
+  } catch {
+    return false;
+  }
+}
+
