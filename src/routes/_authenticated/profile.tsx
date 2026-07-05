@@ -21,6 +21,7 @@ import { reissueRecipientKeypair } from "@/lib/e2e-keys.functions";
 import { generateAndWrapKeypair, unwrapPrivateKey } from "@/lib/e2e-crypto";
 import { E2EUnlockModal } from "@/components/e2e-unlock-modal";
 import { toast } from "sonner";
+import { PasskeyList } from "@/components/passkey-list";
 
 export const Route = createFileRoute("/_authenticated/profile")({
   head: () => ({
