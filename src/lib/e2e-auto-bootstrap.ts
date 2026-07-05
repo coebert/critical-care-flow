@@ -2,6 +2,8 @@ import { generateAndWrapKeypair } from "@/lib/e2e-crypto";
 import { getMyPrivateKeyMaterial, publishUserKeys } from "@/lib/e2e-keys.functions";
 import { retryWithBackoff, isTransientAuthError } from "@/lib/retry";
 import { useE2ESession } from "@/hooks/use-e2e-session";
+import { friendlyE2EError } from "@/lib/friendly-e2e-error";
+import { toast } from "sonner";
 
 export interface EnsureKeyDeps {
   fetchMaterial: () => Promise<{
@@ -122,7 +124,8 @@ export async function ensureRecipientKey(password: string): Promise<EnsureKeyOut
 
   // Also unlock the in-memory session so the user doesn't have to re-enter
   // their password on the next protected page. Any failure is non-fatal:
-  // the unlock modal is still available as a fallback.
+  // the unlock modal is still available as a fallback, but we surface a
+  // specific, actionable toast so the user knows why encryption isn't ready.
   if (outcome.kind === "already_issued" || outcome.kind === "issued") {
     try {
       const store = useE2ESession.getState();
@@ -133,7 +136,12 @@ export async function ensureRecipientKey(password: string): Promise<EnsureKeyOut
       }
     } catch (err) {
       console.warn("[e2e] auto-unlock skipped:", err);
+      const f = friendlyE2EError(err, "auto-bootstrap");
+      toast.warning(f.title, { description: f.description, duration: 8000 });
     }
+  } else if (outcome.kind === "skipped") {
+    const f = friendlyE2EError(outcome.error, "auto-bootstrap");
+    toast.warning(f.title, { description: f.description, duration: 8000 });
   }
 
   return outcome;

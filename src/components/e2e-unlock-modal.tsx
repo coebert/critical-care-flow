@@ -16,27 +16,9 @@ import { useE2ESession } from "@/hooks/use-e2e-session";
 import { publishUserKeys } from "@/lib/e2e-keys.functions";
 import { toast } from "sonner";
 import { AlertCircle, Loader2, ShieldCheck } from "lucide-react";
+import { friendlyE2EError, type FriendlyE2EError } from "@/lib/friendly-e2e-error";
 
 const MIN_PASSWORD = 8;
-
-/** Map raw crypto/network errors to something a user can act on. */
-function friendlyUnlockError(err: unknown, isBootstrap: boolean): string {
-  const msg = (err instanceof Error ? err.message : String(err ?? "")).toLowerCase();
-  if (!msg) return "Something went wrong. Please try again.";
-  if (msg.includes("incorrect password") || msg.includes("wrong secret key") || msg.includes("crypto_secretbox")) {
-    return "Incorrect password. Please try again — this password unlocks the key stored in your browser, not your login.";
-  }
-  if (msg.includes("networkerror") || msg.includes("failed to fetch") || msg.includes("network")) {
-    return "Couldn't reach the server. Check your connection and try again.";
-  }
-  if (msg.includes("no encrypted key")) {
-    return "No encrypted key was found for your account. Try refreshing the page.";
-  }
-  if (isBootstrap && msg.includes("publish")) {
-    return "Couldn't save your new encryption key. Please try again.";
-  }
-  return err instanceof Error && err.message ? err.message : "Could not unlock notes. Please try again.";
-}
 
 export function E2EUnlockModal({
   open,
@@ -55,7 +37,7 @@ export function E2EUnlockModal({
   const [confirm, setConfirm] = useState("");
   const [busy, setBusy] = useState(false);
   const [status, setStatus] = useState<"idle" | "deriving" | "finalizing">("idle");
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<FriendlyE2EError | null>(null);
   const [attempts, setAttempts] = useState(0);
 
   const isBootstrap = needsBootstrap && !material;
@@ -82,11 +64,19 @@ export function E2EUnlockModal({
     e.preventDefault();
     if (!password || busy) return;
     if (isBootstrap && password.length < MIN_PASSWORD) {
-      setError(`Please choose a password with at least ${MIN_PASSWORD} characters.`);
+      setError({
+        reason: "unknown",
+        title: "Password too short",
+        description: `Please choose a password with at least ${MIN_PASSWORD} characters so it's hard to guess.`,
+      });
       return;
     }
     if (isBootstrap && password !== confirm) {
-      setError("The two passwords don't match.");
+      setError({
+        reason: "unknown",
+        title: "Passwords don't match",
+        description: "The two passwords you entered are different. Retype them and try again.",
+      });
       return;
     }
     setBusy(true);
@@ -118,7 +108,7 @@ export function E2EUnlockModal({
       onOpenChange(false);
     } catch (err) {
       setAttempts((a) => a + 1);
-      setError(friendlyUnlockError(err, isBootstrap));
+      setError(friendlyE2EError(err, isBootstrap ? "bootstrap" : "unlock"));
       // Keep the modal open and the password field populated for a quick retry.
     } finally {
       setBusy(false);
@@ -152,10 +142,10 @@ export function E2EUnlockModal({
           <Alert variant="destructive">
             <AlertCircle className="w-4 h-4" />
             <AlertTitle>
-              {isBootstrap ? "Couldn't enable encryption" : "Couldn't unlock"}
+              {error.title}
               {attempts > 1 ? ` (attempt ${attempts})` : ""}
             </AlertTitle>
-            <AlertDescription>{error}</AlertDescription>
+            <AlertDescription>{error.description}</AlertDescription>
           </Alert>
         )}
         <form onSubmit={submit} className="space-y-3">

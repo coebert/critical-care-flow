@@ -32,6 +32,7 @@ import { ArrowLeft, History, Pencil, Save, Trash2, X, ChevronDown, AlertCircle, 
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { format, formatDistanceToNow } from "date-fns";
 import { toast } from "sonner";
+import { friendlyE2EError } from "@/lib/friendly-e2e-error";
 import { validateReferralTimings } from "@/lib/referral-validation";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { ADMISSION_URGENCY_OPTIONS, type AdmissionUrgency } from "@/lib/admission-urgency";
@@ -543,7 +544,8 @@ function ReferralDetail() {
           );
         }
       } else {
-        toast.error(msg || "Failed to post note");
+        const friendly = friendlyE2EError(err, "post-note");
+        toast.error(friendly.title, { description: friendly.description, duration: 8000 });
       }
     } finally {
       setPosting(false);
@@ -1122,7 +1124,8 @@ function ReferralDetail() {
               try {
                 await queued();
               } catch (err: any) {
-                toast.error(err?.message ?? "Action failed after unlock");
+                const friendly = friendlyE2EError(err, "post-note");
+                toast.error(friendly.title, { description: friendly.description, duration: 8000 });
               }
             }
           }}
@@ -1401,14 +1404,21 @@ function NoteItem({
     if (bodyUnchanged && recipientsUnchanged) { setEditing(false); return; }
     setBusy(true);
     try { await onSave(draft.trim(), isE2E ? editRecipients : undefined); setEditing(false); }
-    catch (e: any) { toast.error(e.message ?? "Failed to update note"); }
+    catch (e: any) {
+      const f = friendlyE2EError(e, "edit-note");
+      toast.error(f.title, { description: f.description, duration: 8000 });
+    }
     finally { setBusy(false); }
   };
 
   const remove = async () => {
     setBusy(true);
     try { await onDelete(); }
-    catch (e: any) { toast.error(e.message ?? "Failed to delete note"); setBusy(false); }
+    catch (e: any) {
+      const f = friendlyE2EError(e, "edit-note");
+      toast.error(f.title, { description: f.description, duration: 8000 });
+      setBusy(false);
+    }
   };
 
   return (
