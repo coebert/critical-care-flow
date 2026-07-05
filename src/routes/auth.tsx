@@ -5,12 +5,20 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card } from "@/components/ui/card";
-import { Activity } from "lucide-react";
+import { Activity, Fingerprint, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import { Toaster } from "@/components/ui/sonner";
 import { Checkbox } from "@/components/ui/checkbox";
 import { retrySupabaseCall, retryWithBackoff } from "@/lib/retry";
 import { ensureRecipientKey } from "@/lib/e2e-auto-bootstrap";
+import {
+  isPasskeySupported,
+  isPlatformAuthenticatorAvailable,
+  passkeyEnrollDismissed,
+  signInWithPasskey,
+} from "@/lib/passkeys";
+import { listMyPasskeys } from "@/lib/webauthn.functions";
+import { PasskeyEnrollPrompt } from "@/components/passkey-enroll-prompt";
 
 // When "Keep me signed in" is unchecked, move the persisted Supabase auth token
 // from localStorage to sessionStorage so the session ends when the browser closes.
