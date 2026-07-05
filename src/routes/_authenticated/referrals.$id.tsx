@@ -32,6 +32,7 @@ import { ArrowLeft, History, Pencil, Save, Trash2, X, ChevronDown, AlertCircle, 
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { format, formatDistanceToNow } from "date-fns";
 import { toast } from "sonner";
+import { friendlyE2EError } from "@/lib/friendly-e2e-error";
 import { validateReferralTimings } from "@/lib/referral-validation";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { ADMISSION_URGENCY_OPTIONS, type AdmissionUrgency } from "@/lib/admission-urgency";
