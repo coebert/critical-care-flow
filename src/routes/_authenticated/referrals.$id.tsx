@@ -544,7 +544,8 @@ function ReferralDetail() {
           );
         }
       } else {
-        toast.error(msg || "Failed to post note");
+        const friendly = friendlyE2EError(err, "post-note");
+        toast.error(friendly.title, { description: friendly.description, duration: 8000 });
       }
     } finally {
       setPosting(false);
