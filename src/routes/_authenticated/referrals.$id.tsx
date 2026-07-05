@@ -2,7 +2,7 @@ import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useEffect, useRef, useState } from "react";
 import { useServerFn } from "@tanstack/react-start";
 import { supabase } from "@/integrations/supabase/client";
-import { addNote, deleteNote, deleteReferral, findReferralsByHospitalNumber, getNoteHistory, getReferralDetail, getReferralHistory, logReferralView, updateNote, updateReferral, type ReferralAuditEntry, type DecryptedReferral, type DecryptedReferralNote } from "@/lib/referrals.functions";
+import { deleteNote, deleteReferral, findReferralsByHospitalNumber, getNoteHistory, getReferralDetail, getReferralHistory, logReferralView, updateNote, updateReferral, type ReferralAuditEntry, type DecryptedReferral, type DecryptedReferralNote } from "@/lib/referrals.functions";
 import { addEncryptedNote, listEncryptedNotes, updateEncryptedNote } from "@/lib/encrypted-notes.functions";
 import { getMyPrivateKeyMaterial, getPublicKeyDirectory } from "@/lib/e2e-keys.functions";
 import { decryptNote as e2eDecryptNote, encryptNote as e2eEncryptNote } from "@/lib/e2e-crypto";
