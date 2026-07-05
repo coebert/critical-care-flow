@@ -14,11 +14,11 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { KeyRound, ShieldCheck, ShieldAlert, Lock, Loader2, RefreshCw, AlertTriangle } from "lucide-react";
+import { KeyRound, ShieldCheck, ShieldAlert, Lock, Loader2, RefreshCw, AlertTriangle, CheckCircle2, XCircle, MinusCircle } from "lucide-react";
 import { useAuth } from "@/hooks/use-auth";
 import { useE2ESession, useKeyStatus, type KeyStatus } from "@/hooks/use-e2e-session";
-import { reissueRecipientKeypair } from "@/lib/e2e-keys.functions";
-import { generateAndWrapKeypair, unwrapPrivateKey } from "@/lib/e2e-crypto";
+import { getMyPrivateKeyMaterial, reissueRecipientKeypair } from "@/lib/e2e-keys.functions";
+import { generateAndWrapKeypair, unwrapPrivateKey, verifyStoredKeypair, type KeypairVerification } from "@/lib/e2e-crypto";
 import { E2EUnlockModal } from "@/components/e2e-unlock-modal";
 import { toast } from "sonner";
 import { PasskeyList } from "@/components/passkey-list";
