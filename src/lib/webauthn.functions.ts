@@ -360,6 +360,6 @@ export const deleteMyPasskey = createServerFn({ method: "POST" })
       .delete()
       .eq("id", data.id)
       .eq("user_id", context.userId);
-    if (error) throw new Error(error.message);
+    if (error) throw safeError("webauthn.delete", error, "Could not remove passkey.");
     return { ok: true };
   });
