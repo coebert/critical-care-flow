@@ -43,6 +43,7 @@ function ProfilePage() {
   const reissue = useServerFn(reissueRecipientKeypair);
   const [unlockOpen, setUnlockOpen] = useState(false);
   const [reissueOpen, setReissueOpen] = useState(false);
+  const [verifyOpen, setVerifyOpen] = useState(false);
 
   // The authenticated shell kicks off the initial refresh; re-run whenever
   // the signed-in user changes (e.g. sign-out + sign-in in the same tab).
