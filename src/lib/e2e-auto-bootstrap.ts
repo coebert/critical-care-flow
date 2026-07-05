@@ -129,20 +129,51 @@ export async function ensureRecipientKey(password: string): Promise<EnsureKeyOut
   if (outcome.kind === "already_issued" || outcome.kind === "issued") {
     try {
       const store = useE2ESession.getState();
-      await store.refreshStatus();
+      await retryWithBackoff(() => store.refreshStatus(), {
+        retries: 2,
+        baseDelayMs: 150,
+        shouldRetry: isTransientAuthError,
+      });
       const { material, publicKey, isUnlocked } = useE2ESession.getState();
       if (material && publicKey && !isUnlocked) {
-        await store.unlock(password);
+        // Retry the actual unwrap once for transient sodium/init races; a
+        // wrong-password error is not transient and will surface immediately.
+        await retryWithBackoff(() => store.unlock(password), {
+          retries: 1,
+          baseDelayMs: 100,
+          shouldRetry: (err) =>
+            isTransientAuthError(err) ||
+            /sodium|not ready|not initialized/i.test(
+              err instanceof Error ? err.message : String(err ?? ""),
+            ),
+        });
       }
+      // Success — make sure any stale banner from a previous attempt clears.
+      useE2ESession.getState().setUnlockError(null);
     } catch (err) {
       console.warn("[e2e] auto-unlock skipped:", err);
       const f = friendlyE2EError(err, "auto-bootstrap");
+      // Persist the failure so the top-of-app unlock banner can offer a
+      // retry / re-issue path even after the toast disappears.
+      useE2ESession.getState().setUnlockError({
+        title: f.title,
+        description: f.description,
+        reason: f.reason,
+        at: Date.now(),
+      });
       toast.warning(f.title, { description: f.description, duration: 8000 });
     }
   } else if (outcome.kind === "skipped") {
     const f = friendlyE2EError(outcome.error, "auto-bootstrap");
+    useE2ESession.getState().setUnlockError({
+      title: f.title,
+      description: f.description,
+      reason: f.reason,
+      at: Date.now(),
+    });
     toast.warning(f.title, { description: f.description, duration: 8000 });
   }
+
 
   return outcome;
 }
