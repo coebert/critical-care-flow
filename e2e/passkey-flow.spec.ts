@@ -355,7 +355,7 @@ test.describe("passkey enrolment and sign-in", () => {
 
   test("enrol a passkey after password sign-in, then sign in biometrically", async ({
     browser,
-  }) => {
+  }, testInfo) => {
     const env = await setup(browser);
     try {
       // Starting state — the virtual authenticator holds nothing.
