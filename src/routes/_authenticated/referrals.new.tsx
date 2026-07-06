@@ -91,6 +91,7 @@ type DraftForm = {
   discussed_with_consultant: string;
   accepting_consultant: string;
   admission_urgency: AdmissionUrgency | "";
+  is_test: boolean;
 };
 
 // PHI / patient-identifying free-text fields are NEVER persisted to
