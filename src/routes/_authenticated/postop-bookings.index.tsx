@@ -44,6 +44,7 @@ type Booking = {
   created_at: string;
   created_by_name?: string | null;
   deleted_at?: string | null;
+  is_test?: boolean | null;
 };
 
 const LEVEL_LABEL = {
