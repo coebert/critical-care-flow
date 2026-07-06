@@ -637,7 +637,7 @@ function ReferralsList() {
                     {(r as any).is_test && (
                       <Badge
                         variant="outline"
-                        className="border-amber-500/60 text-amber-700 dark:text-amber-300 bg-amber-100/60 dark:bg-amber-900/30 text-[10px] px-1.5 py-0"
+                        className="border-warning/50 bg-warning/10 text-warning-text text-[10px] px-1.5 py-0"
                         title="Test/demonstration entry — excluded from analytics"
                       >
                         Test
@@ -655,7 +655,7 @@ function ReferralsList() {
                     {r.age === null && (
                       <span
                         title="Age not recorded — cannot be classified as pediatric"
-                        className="inline-flex items-center gap-1 rounded border border-amber-500/60 bg-amber-100/60 dark:bg-amber-900/30 text-amber-800 dark:text-amber-200 px-1.5 py-0 text-[10px] font-medium"
+                        className="inline-flex items-center gap-1 rounded border border-warning/50 bg-warning/10 text-warning-text px-1.5 py-0 text-[10px] font-medium"
                       >
                         <HelpCircle className="w-3 h-3" />
                         Age unknown
@@ -720,7 +720,7 @@ function ReferralsList() {
                   {(r as any).is_test && (
                     <Badge
                       variant="outline"
-                      className="border-amber-500/60 text-amber-700 dark:text-amber-300 bg-amber-100/60 dark:bg-amber-900/30 text-[10px] px-1.5 py-0"
+                      className="border-warning/50 bg-warning/10 text-warning-text text-[10px] px-1.5 py-0"
                       title="Test/demonstration entry — excluded from analytics"
                     >
                       Test
@@ -757,7 +757,7 @@ function ReferralsList() {
                   {r.age === null && (
                     <span
                       title="Age not recorded — cannot be classified as pediatric"
-                      className="inline-flex items-center gap-1 rounded border border-amber-500/60 bg-amber-100/60 dark:bg-amber-900/30 text-amber-800 dark:text-amber-200 px-1.5 py-0 text-[10px] font-medium"
+                      className="inline-flex items-center gap-1 rounded border border-warning/50 bg-warning/10 text-warning-text px-1.5 py-0 text-[10px] font-medium"
                     >
                       <HelpCircle className="w-3 h-3" />
                       Age unknown

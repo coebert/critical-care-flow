@@ -205,9 +205,9 @@ export function NoteItem({
 
 function E2EBadge({ status }: { status?: Note["_e2eStatus"] }) {
   const map: Record<NonNullable<Note["_e2eStatus"]>, { label: string; title: string; className: string; Icon: typeof ShieldCheck }> = {
-    "e2e-decrypted":     { label: "E2E encrypted", title: "End-to-end encrypted. Decrypted in your browser with your private key.", className: "bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border-emerald-500/30", Icon: ShieldCheck },
-    "e2e-locked":        { label: "E2E encrypted", title: "End-to-end encrypted. Unlock the noteboard to decrypt.", className: "bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border-emerald-500/30", Icon: Lock },
-    "e2e-no-key":        { label: "E2E encrypted", title: "End-to-end encrypted, but you were not a recipient of this note.", className: "bg-amber-500/10 text-amber-700 dark:text-amber-400 border-amber-500/30", Icon: ShieldAlert },
+    "e2e-decrypted":     { label: "E2E encrypted", title: "End-to-end encrypted. Decrypted in your browser with your private key.", className: "bg-success/10 text-success-text border-success/40", Icon: ShieldCheck },
+    "e2e-locked":        { label: "E2E encrypted", title: "End-to-end encrypted. Unlock the noteboard to decrypt.", className: "bg-success/10 text-success-text border-success/40", Icon: Lock },
+    "e2e-no-key":        { label: "E2E encrypted", title: "End-to-end encrypted, but you were not a recipient of this note.", className: "bg-warning/10 text-warning-text border-warning/40", Icon: ShieldAlert },
     "e2e-failed":        { label: "Decrypt failed", title: "End-to-end encrypted, but decryption failed.", className: "bg-destructive/10 text-destructive border-destructive/30", Icon: ShieldAlert },
     "legacy-server-enc": { label: "Not E2E encrypted", title: "Legacy note — stored server-side, not end-to-end encrypted.", className: "bg-muted text-muted-foreground border-border", Icon: ShieldOff },
     "plaintext":         { label: "Not E2E encrypted", title: "Legacy plaintext note — not end-to-end encrypted.", className: "bg-muted text-muted-foreground border-border", Icon: ShieldOff },
@@ -269,7 +269,7 @@ function NoteAudienceInfo({
           </div>
           <div className="max-h-72 overflow-auto p-3 space-y-3 text-xs">
             <section>
-              <div className="flex items-center gap-1 font-medium text-emerald-700 dark:text-emerald-400 mb-1">
+              <div className="flex items-center gap-1 font-medium text-success-text mb-1">
                 <ShieldCheck className="w-3.5 h-3.5" /> Can decrypt ({canDecrypt.length})
               </div>
               {canDecrypt.length === 0 ? (
@@ -310,7 +310,7 @@ function NoteAudienceInfo({
 
             {excludedWithKey.length > 0 && (
               <section>
-                <div className="flex items-center gap-1 font-medium text-amber-700 dark:text-amber-400 mb-1">
+                <div className="flex items-center gap-1 font-medium text-warning-text mb-1">
                   <ShieldOff className="w-3.5 h-3.5" /> Not selected as a recipient
                   ({excludedWithKey.length})
                 </div>
