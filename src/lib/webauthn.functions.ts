@@ -2,16 +2,23 @@ import { createServerFn } from "@tanstack/react-start";
 import { getRequest } from "@tanstack/react-start/server";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { safeError } from "@/lib/safe-error";
-import {
-  generateRegistrationOptions,
-  verifyRegistrationResponse,
-  generateAuthenticationOptions,
-  verifyAuthenticationResponse,
-} from "@simplewebauthn/server";
+// NOTE: @simplewebauthn/server transitively pulls in @peculiar/x509 →
+// tsyringe → tslib decorator helpers. Evaluating that graph at module
+// scope crashes on Cloudflare Workers with
+//   TypeError: Cannot destructure property '__extends' of
+//   '__toESM(...).default' as it is undefined
+// during the SSR of any route whose bundle imports this file (auth page,
+// passkey list, etc.), which takes down every request with a 500. We only
+// need the runtime functions inside handler bodies, so lazy-load them
+// there and keep only the erased `type` imports at module scope.
 import type {
   AuthenticationResponseJSON,
   RegistrationResponseJSON,
 } from "@simplewebauthn/server";
+
+async function loadWebauthnServer() {
+  return await import("@simplewebauthn/server");
+}
 
 const RP_NAME = "SDH Critical Care";
 
