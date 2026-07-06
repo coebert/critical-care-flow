@@ -15,6 +15,42 @@ export function isPasskeySupported(): boolean {
   return typeof window !== "undefined" && browserSupportsWebAuthn();
 }
 
+/**
+ * WebAuthn is gated by the `publickey-credentials-create` / `-get`
+ * Permissions Policy. In a cross-origin iframe (e.g. the Lovable preview
+ * frame) the parent must delegate that policy or the browser rejects
+ * navigator.credentials.create() immediately with NotAllowedError — with
+ * no user prompt shown. Detect that up-front so we can surface a useful
+ * message instead of "setup cancelled".
+ */
+export function isInCrossOriginIframe(): boolean {
+  if (typeof window === "undefined") return false;
+  try {
+    return window.self !== window.top;
+  } catch {
+    return true;
+  }
+}
+
+export function passkeyCreateAllowed(): boolean {
+  if (typeof document === "undefined") return true;
+  const doc = document as unknown as {
+    featurePolicy?: { allowsFeature: (name: string) => boolean };
+    permissionsPolicy?: { allowsFeature: (name: string) => boolean };
+  };
+  const fp = doc.featurePolicy ?? doc.permissionsPolicy;
+  if (fp && typeof fp.allowsFeature === "function") {
+    try {
+      return fp.allowsFeature("publickey-credentials-create");
+    } catch {
+      /* fall through */
+    }
+  }
+  return !isInCrossOriginIframe();
+}
+
+export const PASSKEY_BLOCKED_BY_FRAME = "PASSKEY_BLOCKED_BY_FRAME";
+
 export async function isPlatformAuthenticatorAvailable(): Promise<boolean> {
   if (!isPasskeySupported()) return false;
   try {
@@ -43,8 +79,37 @@ export async function registerPasskey(deviceLabel?: string): Promise<void> {
   if (!isPasskeySupported()) {
     throw new Error("Passkeys are not supported in this browser");
   }
+  if (!passkeyCreateAllowed()) {
+    const err = new Error(
+      "Your browser is blocking passkey setup inside this preview window. Open the app in its own tab to continue.",
+    ) as Error & { code?: string };
+    err.code = PASSKEY_BLOCKED_BY_FRAME;
+    throw err;
+  }
   const options = await startPasskeyRegistration();
-  const response = await startRegistration({ optionsJSON: options });
+  const startedAt = Date.now();
+  let response;
+  try {
+    response = await startRegistration({ optionsJSON: options });
+  } catch (err) {
+    // Chrome/Safari throw NotAllowedError both for "user cancelled the
+    // prompt" and for "Permissions Policy blocked this call". A real
+    // cancellation takes at least the time to render the OS prompt
+    // (~hundreds of ms). If we get NotAllowedError back in <150 ms, no
+    // prompt was ever shown — treat it as a permissions-policy block.
+    if (
+      err instanceof Error &&
+      err.name === "NotAllowedError" &&
+      Date.now() - startedAt < 150
+    ) {
+      const wrapped = new Error(
+        "Your browser blocked the passkey prompt. This usually means the app is running inside a preview frame that doesn't allow WebAuthn. Open the app in its own tab and try again.",
+      ) as Error & { code?: string };
+      wrapped.code = PASSKEY_BLOCKED_BY_FRAME;
+      throw wrapped;
+    }
+    throw err;
+  }
   await verifyPasskeyRegistration({
     data: {
       response,
@@ -52,6 +117,7 @@ export async function registerPasskey(deviceLabel?: string): Promise<void> {
     },
   });
 }
+
 
 export const NO_PASSKEY_REGISTERED = "NO_PASSKEY_REGISTERED";
 

@@ -15,7 +15,7 @@ import {
 import { Fingerprint, Loader2, Plus, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { listMyPasskeys, deleteMyPasskey } from "@/lib/webauthn.functions";
-import { isPasskeySupported, registerPasskey } from "@/lib/passkeys";
+import { isPasskeySupported, registerPasskey, PASSKEY_BLOCKED_BY_FRAME } from "@/lib/passkeys";
 
 type Passkey = {
   id: string;
@@ -58,7 +58,16 @@ export function PasskeyList() {
       toast.success("Passkey added");
       await refresh();
     } catch (err) {
-      if (err instanceof Error && err.name === "NotAllowedError") {
+      const code = (err as { code?: string } | null)?.code;
+      if (code === PASSKEY_BLOCKED_BY_FRAME) {
+        toast.error("Passkey setup blocked in preview", {
+          description: err instanceof Error ? err.message : undefined,
+          duration: 10000,
+          action: typeof window !== "undefined"
+            ? { label: "Open in new tab", onClick: () => window.open(window.location.href, "_blank", "noopener") }
+            : undefined,
+        });
+      } else if (err instanceof Error && err.name === "NotAllowedError") {
         toast.message("Passkey setup cancelled");
       } else {
         toast.error(err instanceof Error ? err.message : "Could not add passkey");

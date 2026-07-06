@@ -10,7 +10,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Fingerprint, Loader2 } from "lucide-react";
 import { toast } from "sonner";
-import { registerPasskey, setPasskeyEnrollDismissed, snoozePasskeyEnroll } from "@/lib/passkeys";
+import { registerPasskey, setPasskeyEnrollDismissed, snoozePasskeyEnroll, PASSKEY_BLOCKED_BY_FRAME } from "@/lib/passkeys";
 
 export function PasskeyEnrollPrompt({
   open,
@@ -31,9 +31,18 @@ export function PasskeyEnrollPrompt({
       onEnrolled?.();
       onOpenChange(false);
     } catch (err) {
+      const code = (err as { code?: string } | null)?.code;
       const msg = err instanceof Error ? err.message : "Could not set up passkey";
-      // NotAllowedError = user cancelled the prompt; don't yell.
-      if (err instanceof Error && err.name === "NotAllowedError") {
+      if (code === PASSKEY_BLOCKED_BY_FRAME) {
+        toast.error("Passkey setup blocked in preview", {
+          description: msg,
+          duration: 10000,
+          action: typeof window !== "undefined"
+            ? { label: "Open in new tab", onClick: () => window.open(window.location.href, "_blank", "noopener") }
+            : undefined,
+        });
+      } else if (err instanceof Error && err.name === "NotAllowedError") {
+        // Genuine user cancel (took long enough to render the OS prompt).
         toast.message("Passkey setup cancelled");
       } else {
         toast.error(msg);
@@ -42,6 +51,7 @@ export function PasskeyEnrollPrompt({
       setBusy(false);
     }
   };
+
 
   const dontAskAgain = () => {
     setPasskeyEnrollDismissed(true);
