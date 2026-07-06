@@ -232,7 +232,11 @@ export function Noteboard({ referralId: id }: NoteboardProps) {
   };
 
   const postNote = async () => {
-    if (!noteBody.trim()) return;
+    const validation = validateNoteBody(noteBody);
+    if (!validation.ok) {
+      if (validation.reason === "too-long") toast.error("Note is too long — trim it before posting.");
+      return;
+    }
     if (!ensureUnlocked(postNote)) return;
     if (selectedRecipients.size === 0) {
       toast.error("Pick at least one recipient for this note.");
