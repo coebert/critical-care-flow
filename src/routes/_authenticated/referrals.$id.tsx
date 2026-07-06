@@ -266,15 +266,18 @@ function ReferralDetail() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user?.id]);
 
-  // Once we're unlocked (fresh or rehydrated), re-run the note decryption
-  // and directory fetch so the UI reflects it without another click.
+  // Once we're unlocked (fresh or rehydrated), refresh the directory so the
+  // compose UI shows enrolled teammates. Note decryption is handled by the
+  // effect below, which re-runs on `e2e.isUnlocked` automatically.
   useEffect(() => {
     if (!e2e.isUnlocked) return;
-    loadNotes();
     loadDirectory();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [e2e.isUnlocked]);
 
+
+  const refetchNotes = () =>
+    queryClient.invalidateQueries({ queryKey: referralNotesQueryOptions(id).queryKey });
 
   const decryptNoteRow = async (n: any): Promise<Note> => {
     if (n.body_ciphertext && n.body_nonce) {
@@ -296,33 +299,40 @@ function ReferralDetail() {
     return { ...n, _e2eStatus: "plaintext" };
   };
 
-  const loadNotes = async () => {
-    try {
-      const data = await fetchNotes({ data: { referral_id: id } });
-      const sorted = [...(data ?? [])].sort(
-        (a: any, b: any) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime(),
-      );
+  // Decrypt whenever the ciphertext rows or the E2E session change. Cancel
+  // stale runs so a fast succession of updates (post → realtime → unlock)
+  // can't have an earlier decryption overwrite a newer one.
+  useEffect(() => {
+    if (!rawNotes) return;
+    let cancelled = false;
+    const sorted = [...rawNotes].sort(
+      (a: any, b: any) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime(),
+    );
+    (async () => {
       const decrypted = await Promise.all(sorted.map((n) => decryptNoteRow(n)));
-      setNotes(decrypted);
-      const ids = Array.from(new Set(sorted.map((n: any) => n.author_id)));
-      if (ids.length) {
-        const { data: ps } = await supabase
-          .from("profiles")
-          .select("id,full_name")
-          .in("id", ids as string[]);
-        const map: Record<string, string> = {};
-        ps?.forEach((p) => { map[p.id] = p.full_name ?? "Clinician"; });
-        setAuthors(map);
-      }
-    } catch (e: any) {
-      toast.error(e?.message ?? "Failed to load notes");
+      if (!cancelled) setNotes(decrypted);
+    })();
+    // Batch-fetch author display names for the current row set.
+    const ids = Array.from(new Set(sorted.map((n: any) => n.author_id))) as string[];
+    if (ids.length) {
+      supabase
+        .from("profiles")
+        .select("id,full_name")
+        .in("id", ids)
+        .then(({ data: ps }) => {
+          if (cancelled || !ps) return;
+          const map: Record<string, string> = {};
+          ps.forEach((p) => { map[p.id] = p.full_name ?? "Clinician"; });
+          setAuthors((cur) => ({ ...cur, ...map }));
+        });
     }
-  };
+    return () => { cancelled = true; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [rawNotes, e2e.isUnlocked, e2e.privateKey, e2e.publicKey]);
 
   useEffect(() => {
     logView({ data: { referral_id: id } }).catch(() => {});
     loadRef();
-    loadNotes();
 
     // Realtime payloads contain ciphertext, so we use them only as a
     // signal to refetch via the decrypting server fn.
@@ -331,7 +341,7 @@ function ReferralDetail() {
       .on("postgres_changes", { event: "UPDATE", schema: "public", table: "referrals", filter: `id=eq.${id}` },
         () => { loadRef(); })
       .on("postgres_changes", { event: "*", schema: "public", table: "referral_notes", filter: `referral_id=eq.${id}` },
-        () => { loadNotes(); })
+        () => { refetchNotes(); })
       // A teammate publishing / rotating / removing their public key changes
       // who this note can be encrypted for. Refresh the directory live so the
       // compose UI and the missing-recipients block reflect reality.
