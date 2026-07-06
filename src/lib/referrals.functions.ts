@@ -4,6 +4,7 @@ import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { encryptString, decryptString, hashHospitalNumber } from "./crypto.server";
 import { decideReferralRestore, decideReferralUpdate } from "./referral-restore-authz";
+import type { Tables } from "@/integrations/supabase/types";
 
 const refSchema = z.object({
   age: z.number().int().min(0).max(130).nullable().optional(),
