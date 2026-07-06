@@ -687,8 +687,8 @@ function ReferralsList() {
                   )}
                 </td>
                 <td className="px-3 py-2 whitespace-nowrap">
-                  {r.created_by && clinicianNames[r.created_by]
-                    ? clinicianNames[r.created_by]
+                  {r.creator_name
+                    ? r.creator_name
                     : <span className="text-xs text-muted-foreground">—</span>}
                 </td>
               </tr>
