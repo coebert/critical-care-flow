@@ -120,7 +120,7 @@ function ProfilePage() {
                 </div>
               )}
               <Button size="sm" onClick={() => setUnlockOpen(true)}>
-                <Lock className="w-4 h-4 mr-2" aria-hidden="true" /> Unlock now
+                <Lock className="w-4 h-4 mr-2" aria-hidden="true" /> Unlock encryption
               </Button>
             </div>
           )}

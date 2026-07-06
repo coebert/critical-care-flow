@@ -63,7 +63,7 @@ export function NotePartialCoverageAlert({
   const total = eligibleRecipientCount + excludedMissingKey.length + excludedDeselected.length;
 
   return (
-    <Alert className="mb-3 border-warning/40 bg-warning/10 text-warning-text [&>svg]:text-warning relative pr-10">
+    <Alert className="mb-3 border-warning/40 bg-warning/10 text-warning-text [&>svg]:text-warning relative pr-10 animate-fade-in">
       <ShieldAlert className="w-4 h-4" aria-hidden="true" />
       <AlertTitle>
         Only {eligibleRecipientCount} of {total} teammates will be able to read this note

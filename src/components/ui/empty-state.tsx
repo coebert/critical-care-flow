@@ -27,7 +27,7 @@ export function EmptyState({
     <div
       role="status"
       className={cn(
-        "flex flex-col items-center justify-center text-center gap-2",
+        "flex flex-col items-center justify-center text-center gap-2 animate-fade-in",
         compact ? "py-6 px-4" : "py-10 px-4",
         className,
       )}
