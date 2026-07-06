@@ -1,7 +1,30 @@
 import { createServerFn } from "@tanstack/react-start";
 import { getRequest } from "@tanstack/react-start/server";
+import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { safeError } from "@/lib/safe-error";
+
+const emailInputSchema = z.object({
+  email: z.string().trim().toLowerCase().email().max(255),
+});
+const authVerifyInputSchema = z.object({
+  email: z.string().trim().toLowerCase().email().max(255),
+  // AuthenticationResponseJSON structure is validated by @simplewebauthn/server
+  // during verifyAuthenticationResponse; we only guard the shape at this layer.
+  response: z.object({
+    id: z.string().min(1).max(1024),
+    rawId: z.string().min(1).max(1024),
+    type: z.literal("public-key"),
+    clientExtensionResults: z.record(z.any()).optional().default({}),
+    authenticatorAttachment: z.enum(["platform", "cross-platform"]).optional(),
+    response: z.object({
+      clientDataJSON: z.string().min(1),
+      authenticatorData: z.string().min(1),
+      signature: z.string().min(1),
+      userHandle: z.string().optional(),
+    }).passthrough(),
+  }).passthrough(),
+});
 // NOTE: @simplewebauthn/server transitively pulls in @peculiar/x509 →
 // tsyringe → tslib decorator helpers. Evaluating that graph at module
 // scope crashes on Cloudflare Workers with
@@ -204,7 +227,7 @@ export type StartPasskeyAuthResult =
   | { status: "no_credentials"; code: "NO_PASSKEY_REGISTERED"; message: string };
 
 export const startPasskeyAuthentication = createServerFn({ method: "POST" })
-  .inputValidator((input: { email: string }) => input)
+  .inputValidator((input: unknown) => emailInputSchema.parse(input))
   .handler(async ({ data }): Promise<StartPasskeyAuthResult> => {
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const { rpID } = getRpAndOrigin();
@@ -255,9 +278,7 @@ export const startPasskeyAuthentication = createServerFn({ method: "POST" })
   });
 
 export const verifyPasskeyAuthentication = createServerFn({ method: "POST" })
-  .inputValidator(
-    (input: { email: string; response: AuthenticationResponseJSON }) => input,
-  )
+  .inputValidator((input: unknown) => authVerifyInputSchema.parse(input))
   .handler(async ({ data }) => {
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const { rpID, origin } = getRpAndOrigin();
