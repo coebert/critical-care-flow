@@ -110,11 +110,9 @@ function ReferralDetail() {
     }
   }, [highlight, ref?.status]);
 
-  const upsertAuthorName = async (uid: string) => {
-    if (authors[uid]) return;
-    const { data } = await supabase.from("profiles").select("id,full_name").eq("id", uid).maybeSingle();
-    if (data) setAuthors((cur) => ({ ...cur, [data.id]: data.full_name ?? "Clinician" }));
-  };
+  // Author names are batch-fetched inside `loadNotes` in a single query
+  // over all note author ids; no per-author fetch on realtime updates —
+  // any new note triggers a refetch that re-batches names too.
 
   const fetchDetail = useServerFn(getReferralDetail);
   const fetchNotes = useServerFn(listEncryptedNotes);
