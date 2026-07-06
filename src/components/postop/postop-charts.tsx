@@ -70,7 +70,8 @@ export function PostopCharts({
         <h2 className="font-semibold mb-1">Referral-to-arrival delay distribution</h2>
         <p className="text-xs text-muted-foreground mb-3">
           Time from booking creation to the patient arriving at HDU/ICU.
-          {arrivalStats.count > 0 && ` Range: ${fmtH(arrivalStats.min)} – ${fmtH(arrivalStats.max)}.`}
+          {arrivalStats.count > 0 &&
+            ` Range: ${fmtH(arrivalStats.min)} – ${fmtH(arrivalStats.max)}.`}
         </p>
         <div className="h-64">
           {arrivalStats.count === 0 ? (

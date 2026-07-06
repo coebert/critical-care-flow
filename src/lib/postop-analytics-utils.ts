@@ -86,9 +86,7 @@ export function buildPerDayByLevel(
   return Array.from(map.values());
 }
 
-export function buildByLevel(
-  bookings: PostopBookingRow[],
-): Array<{ name: string; value: number }> {
+export function buildByLevel(bookings: PostopBookingRow[]): Array<{ name: string; value: number }> {
   const map = new Map<string, number>();
   bookings.forEach((b) => {
     const key = (b.predicted_level && LEVEL_LABELS[b.predicted_level]) ?? "Unknown";
@@ -97,9 +95,7 @@ export function buildByLevel(
   return Array.from(map.entries()).map(([name, value]) => ({ name, value }));
 }
 
-export function buildBySex(
-  bookings: PostopBookingRow[],
-): Array<{ name: string; value: number }> {
+export function buildBySex(bookings: PostopBookingRow[]): Array<{ name: string; value: number }> {
   const map = new Map<string, number>();
   bookings.forEach((b) => {
     const k = b.sex ?? "unknown";
@@ -109,9 +105,7 @@ export function buildBySex(
 }
 
 export function collectArrivalDelays(bookings: PostopBookingRow[]): number[] {
-  return bookings
-    .map((b) => arrivalHoursOf(b))
-    .filter((v): v is number => v != null);
+  return bookings.map((b) => arrivalHoursOf(b)).filter((v): v is number => v != null);
 }
 
 export interface ArrivalStats {
