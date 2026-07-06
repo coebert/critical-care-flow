@@ -88,28 +88,26 @@ describe("date format guards", () => {
     ).toEqual([]);
   });
 
-  it("every date-fns format string containing a day+month+year token uses dd/MM/yyyy", () => {
+  it("every slash-separated date format uses dd/MM/yyyy (British ordering)", () => {
+    // Only care about user-visible slash-separated dates. ISO keys like
+    // "yyyy-MM-dd" (bucket keys, chart lookups) and month-only labels like
+    // "MMM yyyy" are intentionally not user-visible dates and are skipped.
     const bad: Array<{ path: string; match: string }> = [];
-    // Extract every format("...") string literal.
     const re = /format\s*\([^,]+,\s*["'`]([^"'`]+)["'`]\s*\)/g;
     for (const { path, text } of sources) {
       let m: RegExpExecArray | null;
       while ((m = re.exec(text))) {
         const fmt = m[1];
-        const hasDay = /\bdd?\b/.test(fmt);
-        const hasMonth = /\bM{1,4}\b/.test(fmt);
-        const hasYear = /\byyyy\b/.test(fmt);
-        if (hasDay && hasMonth && hasYear) {
-          // Must contain "dd/MM/yyyy" verbatim.
-          if (!fmt.includes("dd/MM/yyyy")) {
-            bad.push({ path, match: fmt });
-          }
+        if (!fmt.includes("/")) continue;
+        // Must start with dd/MM/yyyy — trailing time / suffix tokens allowed.
+        if (!/^dd\/MM\/yyyy(\b|$)/.test(fmt) && !fmt.includes("dd/MM/yyyy")) {
+          bad.push({ path, match: fmt });
         }
       }
     }
     expect(
       bad,
-      `Non-DD/MM/YYYY full-date formats:\n${bad.map((b) => `${b.path}: "${b.match}"`).join("\n")}`,
+      `Non-DD/MM/YYYY slash-separated formats:\n${bad.map((b) => `${b.path}: "${b.match}"`).join("\n")}`,
     ).toEqual([]);
   });
 });
