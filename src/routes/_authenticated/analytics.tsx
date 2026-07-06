@@ -17,7 +17,7 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { CalendarIcon, Settings2, X } from "lucide-react";
+import { CalendarIcon, Settings2, X, Baby } from "lucide-react";
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
@@ -70,6 +70,7 @@ function AnalyticsPage() {
   }));
   const [complianceBucket, setComplianceBucket] = useState<"day" | "week" | "month">("day");
   const [complianceSpecialty, setComplianceSpecialty] = useState<string | null>(null);
+  const [pediatricFilter, setPediatricFilter] = useState<"all" | "pediatric">("all");
 
   const from = range.from ? startOfDay(range.from) : startOfDay(subDays(new Date(), 29));
   const to = range.to ? endOfDay(range.to) : endOfDay(range.from ?? new Date());
@@ -117,9 +118,13 @@ function AnalyticsPage() {
   const filtered = useMemo(() => {
     return rows.filter((r) => {
       const t = new Date(r.referral_received_at).getTime();
-      return t >= from.getTime() && t <= to.getTime();
+      if (t < from.getTime() || t > to.getTime()) return false;
+      if (pediatricFilter === "pediatric") {
+        if (r.age === null || r.age === undefined || r.age > 16) return false;
+      }
+      return true;
     });
-  }, [rows, from, to]);
+  }, [rows, from, to, pediatricFilter]);
 
   const complianceFiltered = useMemo(() => {
     if (!complianceSpecialty) return filtered;
@@ -483,6 +488,25 @@ function AnalyticsPage() {
             </PopoverContent>
           </Popover>
         </div>
+      </div>
+
+      <div className="flex flex-wrap gap-2 mb-4 items-center">
+        <span className="text-xs uppercase text-muted-foreground mr-1">Age group</span>
+        <Button
+          size="sm"
+          variant={pediatricFilter === "all" ? "default" : "outline"}
+          onClick={() => setPediatricFilter("all")}
+        >
+          All ages
+        </Button>
+        <Button
+          size="sm"
+          variant={pediatricFilter === "pediatric" ? "default" : "outline"}
+          onClick={() => setPediatricFilter("pediatric")}
+        >
+          <Baby className="w-4 h-4 mr-1" />
+          Pediatric (≤16)
+        </Button>
       </div>
 
       <div className="grid md:grid-cols-3 lg:grid-cols-5 gap-4 mb-6">
