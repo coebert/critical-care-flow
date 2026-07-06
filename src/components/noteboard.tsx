@@ -15,7 +15,8 @@ import { NoteItem } from "@/components/note-item";
 import { NoteRecipientPicker } from "@/components/note-recipient-picker";
 import { NoteRecipientChipRow } from "@/components/note-recipient-chip-row";
 import { ConfirmReducedRecipientsDialog } from "@/components/confirm-reduced-recipients-dialog";
-import { NoteRecipientCoverageAlerts } from "@/components/note-recipient-coverage-alerts";
+import { NoteMissingRecipientsAlert } from "@/components/note-missing-recipients-alert";
+import { NotePartialCoverageAlert } from "@/components/note-partial-coverage-alert";
 import { E2EUnlockModal } from "@/components/e2e-unlock-modal";
 
 import { supabase } from "@/integrations/supabase/client";
@@ -306,11 +307,12 @@ export function Noteboard({ referralId: id }: NoteboardProps) {
         <p className="text-xs text-muted-foreground mb-3">
           Messages are end-to-end encrypted in your browser — the server only stores ciphertext.
         </p>
-        <NoteRecipientCoverageAlerts
-          isUnlocked={e2e.isUnlocked}
-          coverage={coverage}
-          recipientsTouched={recipientsTouched}
-        />
+        {e2e.isUnlocked && (
+          <>
+            <NoteMissingRecipientsAlert missingRecipients={coverage.missingRecipients} />
+            <NotePartialCoverageAlert coverage={coverage} recipientsTouched={recipientsTouched} />
+          </>
+        )}
         <div className="space-y-2 mb-4">
           {e2e.isUnlocked && directoryWithSelf.length > 0 && (
             <NoteRecipientChipRow
