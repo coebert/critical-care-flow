@@ -170,10 +170,13 @@ export const startPasskeyRegistration = createServerFn({ method: "POST" })
 
 export const verifyPasskeyRegistration = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator(
-    (input: { response: RegistrationResponseJSON; deviceLabel?: string }) =>
-      input,
-  )
+  .inputValidator((input: unknown) => {
+    const parsed = verifyRegistrationInputSchema.parse(input);
+    return parsed as unknown as {
+      response: RegistrationResponseJSON;
+      deviceLabel?: string;
+    };
+  })
   .handler(async ({ data, context }) => {
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const { rpID, origin } = getRpAndOrigin();
