@@ -251,6 +251,12 @@ export const listEncryptedNotes = createServerFn({ method: "POST" })
   .inputValidator((d: unknown) => z.object({ referral_id: z.string().uuid() }).parse(d))
   .handler(async ({ data, context }) => {
     const { supabase, userId } = context;
+    // Cap the number of notes we hydrate wrapped keys for. Each note can
+    // have up to ~500 recipient rows, so an unbounded `IN (...)` on
+    // referral_note_keys could scan tens of thousands of rows for a busy
+    // referral. Show the most recent NOTE_HYDRATE_CAP notes and log if we
+    // hit the cap so we know to add windowed paging.
+    const NOTE_HYDRATE_CAP = 50;
     const { data: rows, error } = await supabase
       .from("referral_notes")
       .select("*")
@@ -258,8 +264,20 @@ export const listEncryptedNotes = createServerFn({ method: "POST" })
       .order("created_at", { ascending: true });
     if (error) throw safeError("e2e.listNotes", error, "Failed to load notes.");
 
-    // Pull the current user's wrapped keys for the encrypted notes in this list.
-    const noteIds = (rows ?? []).map((n: any) => n.id);
+    const allRows = rows ?? [];
+    // Keep the most recent N; if we hit the cap, warn once per call.
+    const hydrateRows =
+      allRows.length > NOTE_HYDRATE_CAP
+        ? allRows.slice(allRows.length - NOTE_HYDRATE_CAP)
+        : allRows;
+    if (allRows.length > NOTE_HYDRATE_CAP) {
+      console.warn(
+        `[e2e.listNotes] referral ${data.referral_id} has ${allRows.length} notes; hydrating latest ${NOTE_HYDRATE_CAP}`,
+      );
+    }
+
+    const noteIds = hydrateRows.map((n: any) => n.id);
+    const hydratedIds = new Set(noteIds);
     let wrappedByNote: Record<string, string> = {};
     let recipientsByNote: Record<string, string[]> = {};
     if (noteIds.length) {
