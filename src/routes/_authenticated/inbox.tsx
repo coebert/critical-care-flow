@@ -4,6 +4,7 @@ import { Bell, Check, CheckCheck, ExternalLink, Inbox as InboxIcon, Search, X, C
 import { formatDistanceToNow } from "date-fns";
 import { zodValidator, fallback } from "@tanstack/zod-adapter";
 import { z } from "zod";
+import { queryOptions, useQueryClient, useSuspenseQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/use-auth";
 import { Card } from "@/components/ui/card";
@@ -29,6 +30,43 @@ const inboxSearchSchema = z.object({
   page: fallback(z.number().int().min(1), 1).default(1),
 });
 
+interface Notification {
+  id: string;
+  referral_id: string | null;
+  kind: string;
+  message: string;
+  read_at: string | null;
+  created_at: string;
+}
+
+// RLS scopes this to the current user; the queryKey doesn't need the user id.
+// Realtime pushes updates via `queryClient.setQueryData` below.
+export const NOTIFICATIONS_QUERY_KEY = ["notifications", "list"] as const;
+const notificationsQueryOptions = queryOptions({
+  queryKey: NOTIFICATIONS_QUERY_KEY,
+  queryFn: async (): Promise<Notification[]> => {
+    const { data, error } = await supabase
+      .from("notifications")
+      .select("*")
+      .order("created_at", { ascending: false })
+      .limit(500);
+    if (error) throw new Error(error.message);
+    return (data ?? []) as Notification[];
+  },
+  staleTime: 10_000,
+});
+
+function InboxPending() {
+  return <div className="p-6 text-sm text-muted-foreground text-center">Loading…</div>;
+}
+function InboxError({ error }: { error: Error }) {
+  return (
+    <div className="p-6 text-sm text-destructive" role="alert">
+      Could not load notifications: {error.message}
+    </div>
+  );
+}
+
 export const Route = createFileRoute("/_authenticated/inbox")({
   validateSearch: zodValidator(inboxSearchSchema),
   head: () => ({
@@ -38,17 +76,26 @@ export const Route = createFileRoute("/_authenticated/inbox")({
       { name: "robots", content: "noindex,nofollow" },
     ],
   }),
+  // Prime the cache before mount. Runs client-side under the auth-gated
+  // parent, so the RLS-scoped query already sees the signed-in user.
+  loader: ({ context }) =>
+    context.queryClient.ensureQueryData(notificationsQueryOptions),
+  pendingComponent: InboxPending,
+  errorComponent: InboxError,
   component: InboxPage,
 });
 
-interface Notification {
-  id: string;
-  referral_id: string | null;
-  kind: string;
-  message: string;
-  read_at: string | null;
-  created_at: string;
+function kindLabel(kind: string): string {
+  switch (kind) {
+    case "new": return "New referral";
+    case "status": return "Status change";
+    case "note": return "New note";
+    case "updated": return "Referral updated";
+    case "warning": return "Warning";
+    default: return kind;
+  }
 }
+
 
 function kindLabel(kind: string): string {
   switch (kind) {
