@@ -145,7 +145,7 @@ function AuthedShell() {
           variant="ghost"
           size="sm"
           className={collapsed ? "w-full justify-center px-0" : "w-full justify-start"}
-          onClick={handleSignOut}
+          onClick={() => handleSignOut()}
           disabled={signingOut}
           aria-label="Sign out"
           title={collapsed ? "Sign out" : undefined}
