@@ -452,7 +452,7 @@ export const listMyPasskeys = createServerFn({ method: "GET" })
 
 export const deleteMyPasskey = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((input: { id: string }) => input)
+  .inputValidator((input: unknown) => deletePasskeyInputSchema.parse(input))
   .handler(async ({ data, context }) => {
     const { error } = await context.supabase
       .from("webauthn_credentials")
