@@ -29,6 +29,9 @@ const refSchema = z.object({
     .enum(["within_15_min", "within_30_min", "within_1_hour", "within_1_2_hours", "not_admitting"])
     .nullable()
     .optional(),
+  // Flags a referral entered for testing/demonstration only. Rows with
+  // is_test=true are excluded from analytics dashboards.
+  is_test: z.boolean().optional(),
 });
 
 async function getAdmin() {
