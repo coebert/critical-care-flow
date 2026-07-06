@@ -4,7 +4,7 @@
 // object back to the caller. Keep this file server-only — it must never be
 // pulled into the client bundle.
 
-import type { FanoutDeps } from "./notification-fanout";
+import type { FanOutDeps } from "./notification-fanout";
 
 // The service-role Supabase client is only usable server-side. We type it
 // loosely so this helper stays generic and doesn't force every caller to
