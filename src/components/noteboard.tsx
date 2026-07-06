@@ -92,7 +92,7 @@ export function Noteboard({ referralId: id }: NoteboardProps) {
 
   const loadDirectory = async () => {
     try {
-      const d = (await fetchKeyDir({ data: undefined as any })) as any[];
+      const d = (await fetchKeyDir()) as any[];
       const list = (d ?? []) as DirectoryEntry[];
       setDirectory((prev) => {
         const wasMissing = new Map(prev.map((r) => [r.user_id, !r.public_key] as const));
@@ -143,7 +143,7 @@ export function Noteboard({ referralId: id }: NoteboardProps) {
     (async () => {
       if (!e2e.hydrated) await e2e.hydrateFromSession();
       try {
-        const res: any = await fetchKeyMaterial({ data: undefined as any });
+        const res: any = await fetchKeyMaterial();
         e2e.setMaterial(res?.material ?? null, res?.public_key ?? null);
       } catch { /* non-fatal */ }
     })();
@@ -249,7 +249,7 @@ export function Noteboard({ referralId: id }: NoteboardProps) {
     eligibleRecipientCount > 0 && (excludedMissingKey.length + excludedDeselected.length) > 0;
 
   const encryptForRecipients = async (body: string, recipientIds: Set<string>) => {
-    const dir = await fetchKeyDir({ data: undefined as any });
+    const dir = await fetchKeyDir();
     const byId = new Map<string, string>();
     for (const r of (dir ?? []) as any[]) {
       if (r.public_key) byId.set(r.user_id, r.public_key as string);

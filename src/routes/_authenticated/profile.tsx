@@ -396,7 +396,7 @@ function VerifyKeysDialog({
     setBusy(true);
     setResult(null);
     try {
-      const res: any = await fetchMaterial({ data: undefined as any });
+      const res: any = await fetchMaterial();
       const material = (res?.material ?? null) as any;
       const publicKey = (res?.public_key ?? null) as string | null;
       const verification = await verifyStoredKeypair(password, material, publicKey);

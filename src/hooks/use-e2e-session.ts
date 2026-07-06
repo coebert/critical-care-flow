@@ -208,7 +208,7 @@ export const useE2ESession = create<E2EState>((set, get) => ({
     inFlightRefresh = (async () => {
       try {
         if (!get().hydrated) await get().hydrateFromSession();
-        const res: any = await getMyPrivateKeyMaterial({ data: undefined as any });
+        const res: any = await getMyPrivateKeyMaterial();
         get().setMaterial(res?.material ?? null, res?.public_key ?? null);
         return get().status;
       } catch {
