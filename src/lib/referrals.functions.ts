@@ -94,17 +94,28 @@ function applyEncryption(input: Record<string, unknown>): Record<string, unknown
 function decryptReferralRow<T extends Record<string, any>>(row: T): T & DecryptedReferral {
   if (!row) return row as T & DecryptedReferral;
   const out: any = { ...row };
+  const failed: string[] = [];
   for (const k of ENCRYPTED_TEXT_FIELDS) {
     const enc = out[`${k}_enc`] as string | null | undefined;
     if (enc) {
       try {
         out[k] = decryptString(enc);
-      } catch {
+      } catch (err) {
+        // A single poisoned/rotated row must not blank out the whole list,
+        // but silently returning null hides the failure from the UI so
+        // clinicians can't tell "no data" from "we couldn't decrypt".
+        // Signal per-field so callers can render a "decryption failed"
+        // marker, and log once server-side for ops visibility.
         out[k] = null;
+        failed.push(k);
+        console.warn(`[referrals.decrypt] field ${k} failed to decrypt on row ${out.id ?? "?"}:`, (err as Error)?.message);
       }
     } else {
       out[k] = null;
     }
+  }
+  if (failed.length > 0) {
+    out._decryption_failed_fields = failed;
   }
   return out as T & DecryptedReferral;
 }
