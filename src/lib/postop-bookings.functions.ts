@@ -84,10 +84,7 @@ const AUDITED_FIELDS = [
 
 const ENC_SET = new Set<string>([...ENC_FIELDS, "hospital_number"]);
 
-async function getAdmin() {
-  const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-  return supabaseAdmin;
-}
+import { getAdmin } from "./server-utils";
 
 function redactValue(field: string, value: unknown): unknown {
   if (ENC_SET.has(field) && value != null && value !== "") return "[redacted]";
