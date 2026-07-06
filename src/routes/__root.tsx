@@ -80,6 +80,14 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
       { title: "Critical Care Connect" },
       { name: "description", content: "Critical Care Connect streamlines patient referral data capture and analysis for critical care teams." },
       { name: "author", content: "Lovable" },
+      // NHS DTAC / NCSC — client-enforceable security hints. Server-side
+      // HTTP headers (HSTS, X-Frame-Options, CSP) are set by the hosting
+      // platform; these meta equivalents cover what a rendered document
+      // can enforce on its own.
+      { name: "referrer", content: "strict-origin-when-cross-origin" },
+      { httpEquiv: "X-Content-Type-Options", content: "nosniff" },
+      { httpEquiv: "X-UA-Compatible", content: "IE=edge" },
+      { httpEquiv: "Permissions-Policy", content: "camera=(), microphone=(), geolocation=(), payment=()" },
       { property: "og:title", content: "Critical Care Connect" },
       { property: "og:description", content: "Critical Care Connect streamlines patient referral data capture and analysis for critical care teams." },
       { property: "og:type", content: "website" },

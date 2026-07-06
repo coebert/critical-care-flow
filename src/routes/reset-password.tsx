@@ -7,6 +7,7 @@ import { Label } from "@/components/ui/label";
 import { Card } from "@/components/ui/card";
 import { toast } from "sonner";
 import { Toaster } from "@/components/ui/sonner";
+import { checkPassword, PASSWORD_MIN_LENGTH, PASSWORD_RULES_HINT } from "@/lib/password-policy";
 
 export const Route = createFileRoute("/reset-password")({
   ssr: false,
@@ -89,7 +90,8 @@ function ResetPage() {
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (password.length < 8) return toast.error("Password must be at least 8 characters");
+    const check = checkPassword(password);
+    if (!check.ok) return toast.error(check.problems[0]);
     setLoading(true);
     const { error } = await supabase.auth.updateUser({ password });
     if (error) {
@@ -128,11 +130,15 @@ function ResetPage() {
                 id="pw"
                 type="password"
                 required
-                minLength={8}
+                minLength={PASSWORD_MIN_LENGTH}
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 autoComplete="new-password"
+                aria-describedby="pw-help"
               />
+              <p id="pw-help" className="text-[11px] text-muted-foreground leading-snug">
+                {PASSWORD_RULES_HINT}
+              </p>
             </div>
             <Button type="submit" className="w-full" disabled={loading}>
               {loading ? "Updating…" : "Update password"}

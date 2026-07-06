@@ -12,9 +12,12 @@ import { ShiftToggle } from "@/components/shift-toggle";
 import { PushPermissionPrompt } from "@/components/push-permission-prompt";
 import { E2EUnlockBanner } from "@/components/e2e-unlock-banner";
 import { TestPushButton } from "@/components/test-push-button";
+import { IdleTimeoutModal } from "@/components/idle-timeout-modal";
+import { useIdleTimeout } from "@/hooks/use-idle-timeout";
 import { Toaster } from "@/components/ui/sonner";
 import { Sheet, SheetContent, SheetTrigger, SheetTitle, SheetHeader } from "@/components/ui/sheet";
 import { VisuallyHidden } from "@radix-ui/react-visually-hidden";
+import { toast } from "sonner";
 
 export const Route = createFileRoute("/_authenticated")({
   ssr: false,
@@ -77,7 +80,7 @@ function AuthedShell() {
   }, [pathname]);
 
 
-  const handleSignOut = async () => {
+  const handleSignOut = async (reason?: "timeout") => {
     setSigningOut(true);
     // Wipe the persisted E2E session so the next user on this device can't
     // resume the previous user's unlocked private key.
@@ -87,8 +90,20 @@ function AuthedShell() {
     } catch { /* non-fatal */ }
     await supabase.auth.signOut();
     router.invalidate();
+    if (reason === "timeout") {
+      toast.message("Signed out for inactivity", {
+        description: "For patient safety, this session ended after a period of no activity.",
+      });
+    }
     navigate({ to: "/auth", replace: true });
   };
+
+  // NHS DTAC / Technical Assurance — idle session timeout.
+  // 30 min inactivity or 12 h absolute, whichever comes first, with a 60 s warning.
+  const idle = useIdleTimeout({
+    onTimeout: () => handleSignOut("timeout"),
+    disabled: signingOut,
+  });
 
   const renderSidebar = (collapsed: boolean) => (
     <div className="flex h-full flex-col">
@@ -130,7 +145,7 @@ function AuthedShell() {
           variant="ghost"
           size="sm"
           className={collapsed ? "w-full justify-center px-0" : "w-full justify-start"}
-          onClick={handleSignOut}
+          onClick={() => handleSignOut()}
           disabled={signingOut}
           aria-label="Sign out"
           title={collapsed ? "Sign out" : undefined}
@@ -202,6 +217,12 @@ function AuthedShell() {
         </main>
       </div>
       <Toaster />
+      <IdleTimeoutModal
+        open={idle.warning && !signingOut}
+        secondsLeft={idle.secondsLeft}
+        onStayActive={idle.stayActive}
+        onSignOutNow={() => handleSignOut()}
+      />
     </div>
   );
 }
