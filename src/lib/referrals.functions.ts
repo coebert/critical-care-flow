@@ -554,6 +554,19 @@ export const deleteNote = createServerFn({ method: "POST" })
       .maybeSingle();
     if (!existing) throw new Error("Note not found");
 
+    // Only the note author or an admin may delete. RLS should also enforce
+    // this, but the server checks explicitly so we never rely on a single
+    // gate — and so we return a clear error instead of a silent no-op if
+    // the policy is ever loosened.
+    if (existing.author_id !== userId) {
+      const { data: isAdmin, error: roleErr } = await supabase.rpc("has_role", {
+        _user_id: userId,
+        _role: "admin",
+      });
+      if (roleErr) throw safeError("referrals.deleteNote.role", roleErr, "Permission check failed.");
+      if (!isAdmin) throw new Error("Forbidden: only the note author or an admin can delete this note.");
+    }
+
     const { error } = await supabase.from("referral_notes").delete().eq("id", data.id);
     if (error) throw safeError("referrals.deleteNote", error, "Failed to delete note.");
 
