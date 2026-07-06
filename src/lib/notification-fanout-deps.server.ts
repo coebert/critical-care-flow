@@ -4,13 +4,13 @@
 // object back to the caller. Keep this file server-only — it must never be
 // pulled into the client bundle.
 
+import type { SupabaseClient } from "@supabase/supabase-js";
+import type { Database } from "@/integrations/supabase/types";
 import type { FanOutDeps } from "./notification-fanout";
 
-// The service-role Supabase client is only usable server-side. We type it
-// loosely so this helper stays generic and doesn't force every caller to
-// import the admin client's type surface.
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-type AdminClient = any;
+// Typed to the generated Database schema so column typos in this file are
+// caught at build time rather than at runtime by the admin client.
+export type AdminClient = SupabaseClient<Database>;
 
 export function buildNotificationFanoutDeps(admin: AdminClient): FanOutDeps {
   return {
