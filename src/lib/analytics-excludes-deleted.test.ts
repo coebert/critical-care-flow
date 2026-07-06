@@ -27,47 +27,49 @@ function handlerBody(exportName: string): string {
   return SOURCE.slice(start, nextExport === -1 ? SOURCE.length : nextExport);
 }
 
-describe("analytics endpoints exclude soft-deleted rows", () => {
-  it("getReferralsAnalytics filters deleted_at IS NULL on referrals", () => {
+describe("analytics endpoints exclude soft-deleted and test rows", () => {
+  it("getReferralsAnalytics filters deleted_at, deleted_by, and is_test", () => {
     const body = handlerBody("getReferralsAnalytics");
     expect(body).toMatch(/\.from\(\s*["']referrals["']\s*\)/);
     expect(body).toMatch(/\.is\(\s*["']deleted_at["']\s*,\s*null\s*\)/);
-    // Fallback guard: reject rows with a deleted_by attribution even when
-    // deleted_at is missing.
     expect(body).toMatch(/\.is\(\s*["']deleted_by["']\s*,\s*null\s*\)/);
+    // Test/demo entries must never contribute to clinical analytics.
+    expect(body).toMatch(/\.eq\(\s*["']is_test["']\s*,\s*false\s*\)/);
   });
 
-  it("getPostopAnalytics filters deleted_at IS NULL on postop_bookings", () => {
+  it("getPostopAnalytics filters deleted_at, deleted_by, and is_test", () => {
     const body = handlerBody("getPostopAnalytics");
     expect(body).toMatch(/\.from\(\s*["']postop_bookings["']\s*\)/);
     expect(body).toMatch(/\.is\(\s*["']deleted_at["']\s*,\s*null\s*\)/);
     expect(body).toMatch(/\.is\(\s*["']deleted_by["']\s*,\s*null\s*\)/);
+    expect(body).toMatch(/\.eq\(\s*["']is_test["']\s*,\s*false\s*\)/);
   });
 });
 
 /**
  * Forward-looking audit: any future `.from("referrals")` or
  * `.from("postop_bookings")` query added to `analytics.functions.ts` must
- * also carry the soft-delete filters. This walks every such call site in
- * the analytics module and asserts both `.is("deleted_at", null)` and
- * `.is("deleted_by", null)` appear in a short window after the `.from(...)`
- * call — catching regressions even in endpoints that don't exist yet.
+ * also carry the soft-delete AND is_test filters. This walks every such
+ * call site in the analytics module and asserts they still appear in a
+ * short window after each `.from(...)` call.
  */
-describe("analytics.functions.ts — every referrals/bookings query filters soft-deletes", () => {
+describe("analytics.functions.ts — every referrals/bookings query filters soft-deletes and test rows", () => {
   const TABLES = ["referrals", "postop_bookings"] as const;
   for (const table of TABLES) {
-    it(`every .from("${table}") in analytics.functions.ts filters deleted_at AND deleted_by`, () => {
+    it(`every .from("${table}") in analytics.functions.ts filters deleted_at, deleted_by, and is_test`, () => {
       const re = new RegExp(`\\.from\\(\\s*["']${table}["']\\s*\\)`, "g");
       const matches = [...SOURCE.matchAll(re)];
       expect(matches.length, `expected at least one .from("${table}") in analytics.functions.ts`).toBeGreaterThan(0);
       for (const m of matches) {
-        // Grab ~1000 chars after the .from(...) to cover the whole query chain.
         const window = SOURCE.slice(m.index ?? 0, (m.index ?? 0) + 1000);
         expect(window, `missing .is("deleted_at", null) after .from("${table}")`).toMatch(
           /\.is\(\s*["']deleted_at["']\s*,\s*null\s*\)/,
         );
         expect(window, `missing .is("deleted_by", null) after .from("${table}")`).toMatch(
           /\.is\(\s*["']deleted_by["']\s*,\s*null\s*\)/,
+        );
+        expect(window, `missing .eq("is_test", false) after .from("${table}")`).toMatch(
+          /\.eq\(\s*["']is_test["']\s*,\s*false\s*\)/,
         );
       }
     });
