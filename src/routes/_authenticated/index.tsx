@@ -111,6 +111,7 @@ function ReferralsList() {
   const [urgencyFilter, setUrgencyFilter] = useState<"all" | AdmissionUrgency>("all");
   const [locFilter, setLocFilter] = useState<string>("all");
   const [dateFilter, setDateFilter] = useState<"all" | "today" | "yesterday" | "7d" | "30d">("all");
+  const [pediatricFilter, setPediatricFilter] = useState<"all" | "pediatric">("all");
   const [showDeleted, setShowDeleted] = useState(false);
   const [deletedRows, setDeletedRows] = useState<Referral[]>([]);
   const [deletedLoading, setDeletedLoading] = useState(false);
@@ -265,6 +266,9 @@ function ReferralsList() {
       if (urgencyFilter !== "all" && r.admission_urgency !== urgencyFilter) return false;
       if (locFilter !== "all" && r.current_ward !== locFilter) return false;
       if (specialtyNeedle && (r.referring_specialty ?? "").trim().toLowerCase() !== specialtyNeedle) return false;
+      if (pediatricFilter === "pediatric") {
+        if (r.age === null || r.age > 16) return false;
+      }
       if (fromTs !== null) {
         const t = new Date(r.referral_received_at).getTime();
         if (t < fromTs) return false;
@@ -279,7 +283,7 @@ function ReferralsList() {
         .filter(Boolean)
         .some((v) => v!.toString().toLowerCase().includes(needle));
     });
-  }, [rows, q, hospSearch, statusFilter, urgencyFilter, locFilter, dateFilter, search.specialty, search.from, search.to]);
+  }, [rows, q, hospSearch, statusFilter, urgencyFilter, locFilter, dateFilter, search.specialty, search.from, search.to, pediatricFilter]);
 
   const displayed = useMemo(() => {
     if (timerSort === "none") return filtered;
@@ -554,6 +558,25 @@ function ReferralsList() {
           ))}
         </div>
       )}
+
+      <div className="flex flex-wrap gap-2 mb-4 items-center">
+        <span className="text-xs uppercase text-muted-foreground mr-1">Age group</span>
+        <Button
+          size="sm"
+          variant={pediatricFilter === "all" ? "default" : "outline"}
+          onClick={() => setPediatricFilter("all")}
+        >
+          All ages
+        </Button>
+        <Button
+          size="sm"
+          variant={pediatricFilter === "pediatric" ? "default" : "outline"}
+          onClick={() => setPediatricFilter("pediatric")}
+        >
+          <Baby className="w-3.5 h-3.5 mr-1" />
+          Pediatric (≤16)
+        </Button>
+      </div>
 
 
       {/* Desktop table */}
