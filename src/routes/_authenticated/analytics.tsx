@@ -6,6 +6,7 @@ import { useServerFn } from "@tanstack/react-start";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { PostopAnalyticsPanel } from "@/components/postop-analytics-panel";
 import { getReferralsAnalytics, getPostopAnalytics } from "@/lib/analytics.functions";
+import { updateIcnarcTargets } from "@/lib/admin.functions";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -1136,6 +1137,7 @@ function IcnarcTargetsDialog({
   const [seen, setSeen] = useState(String(timeToSeen));
   const [arrival, setArrival] = useState(String(decisionToArrival));
   const [saving, setSaving] = useState(false);
+  const updateTargets = useServerFn(updateIcnarcTargets);
 
   // Re-sync inputs when the dialog opens or upstream targets change.
   const openDialog = (next: boolean) => {
@@ -1158,23 +1160,21 @@ function IcnarcTargetsDialog({
       return;
     }
     setSaving(true);
-    const { data: { user } } = await supabase.auth.getUser();
-    const { error } = await supabase
-      .from("icnarc_targets")
-      .update({
-        time_to_seen_target_min: Math.round(seenMin),
-        decision_to_arrival_target_min: Math.round(arrivalMin),
-        updated_by: user?.id ?? null,
-      })
-      .eq("id", true);
-    setSaving(false);
-    if (error) {
-      toast.error(error.message || "Could not save thresholds.");
-      return;
+    try {
+      await updateTargets({
+        data: {
+          time_to_seen_target_min: Math.round(seenMin),
+          decision_to_arrival_target_min: Math.round(arrivalMin),
+        },
+      });
+      toast.success("ICNARC thresholds updated.");
+      onSaved();
+      setOpen(false);
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Could not save thresholds.");
+    } finally {
+      setSaving(false);
     }
-    toast.success("ICNARC thresholds updated.");
-    onSaved();
-    setOpen(false);
   };
 
   return (
