@@ -3,8 +3,9 @@ import { useEffect, useRef, useState } from "react";
 import { useServerFn } from "@tanstack/react-start";
 import { queryOptions, useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
-import { deleteNote, deleteReferral, findReferralsByHospitalNumber, getNoteHistory, getReferralDetail, logReferralView, updateNote, updateReferral, type DecryptedReferral, type DecryptedReferralNote } from "@/lib/referrals.functions";
+import { deleteNote, deleteReferral, getNoteHistory, getReferralDetail, logReferralView, updateNote, updateReferral, type DecryptedReferral, type DecryptedReferralNote } from "@/lib/referrals.functions";
 import { ReferralAuditTrail } from "@/components/referral-audit-trail";
+import { PriorDeclinedReferrals } from "@/components/prior-declined-referrals";
 import { addEncryptedNote, listEncryptedNotes, updateEncryptedNote } from "@/lib/encrypted-notes.functions";
 import { getMyPrivateKeyMaterial, getPublicKeyDirectory } from "@/lib/e2e-keys.functions";
 import { decryptNote as e2eDecryptNote, encryptNote as e2eEncryptNote } from "@/lib/e2e-crypto";
@@ -132,7 +133,7 @@ function ReferralDetail() {
   const [noteBody, setNoteBody] = useState("");
   const [saving, setSaving] = useState(false);
   const [posting, setPosting] = useState(false);
-  const [priorDeclined, setPriorDeclined] = useState<Referral[]>([]);
+  
   const [noteFilter, setNoteFilter] = useState<"all" | "e2e" | "legacy" | "failed">("all");
   const outcomeRef = useRef<HTMLDivElement>(null);
 
@@ -155,7 +156,7 @@ function ReferralDetail() {
   // updates — any note change invalidates the notes query and re-batches.
 
   const fetchDetail = useServerFn(getReferralDetail);
-  const fetchPriors = useServerFn(findReferralsByHospitalNumber);
+  
   const fetchKeyMaterial = useServerFn(getMyPrivateKeyMaterial);
   const fetchKeyDir = useServerFn(getPublicKeyDirectory);
   const submitEncNote = useServerFn(addEncryptedNote);
@@ -366,22 +367,9 @@ function ReferralDetail() {
   }, [id]);
 
 
-  // Fetch other declined referrals for the same patient.
-  useEffect(() => {
-    const hn = ref?.hospital_number?.trim();
-    if (!hn) {
-      setPriorDeclined([]);
-      return;
-    }
-    let cancelled = false;
-    fetchPriors({ data: { hospital_number: hn, exclude_id: id } })
-      .then((rows: any[]) => {
-        if (cancelled) return;
-        setPriorDeclined(((rows ?? []) as Referral[]).filter((r) => r.status === "declined"));
-      })
-      .catch(() => { if (!cancelled) setPriorDeclined([]); });
-    return () => { cancelled = true; };
-  }, [ref?.hospital_number, id, fetchPriors]);
+  // Prior declined referrals for this patient are now fetched by
+  // <PriorDeclinedReferrals /> using its own useQuery.
+
 
 
 
@@ -727,51 +715,8 @@ function ReferralDetail() {
         </Card>
 
 
-        {priorDeclined.length > 0 && (
-          <Card className="p-5 space-y-3 border-destructive/40">
-            <div className="flex items-center gap-2">
-              <AlertCircle className="w-4 h-4 text-destructive" />
-              <h2 className="font-semibold text-destructive">
-                Previously declined critical care referral{priorDeclined.length > 1 ? "s" : ""} for this patient
-              </h2>
-            </div>
-            <p className="text-xs text-muted-foreground">
-              Same hospital number ({ref.hospital_number}). Full decline reasons shown below.
-            </p>
-            <div className="space-y-3">
-              {priorDeclined.map((p) => {
-                const when = p.decision_at ?? p.referral_received_at;
-                return (
-                  <div key={p.id} className="border rounded-md p-3 bg-destructive/5">
-                    <div className="flex items-center justify-between gap-2 mb-2 flex-wrap">
-                      <div className="text-sm font-medium" title={when ? tzTooltip(when) : undefined}>
-                        Declined {when ? format(new Date(when), "dd/MM/yyyy HH:mm") : "date unknown"}
-                        {p.referring_specialty ? ` · ${p.referring_specialty}` : ""}
-                      </div>
-                      <Link
-                        to="/referrals/$id"
-                        params={{ id: p.id }}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="text-xs underline text-muted-foreground hover:text-foreground"
-                      >
-                        Open full referral
-                      </Link>
-                    </div>
-                    <div className="text-xs uppercase tracking-wide text-muted-foreground mb-1">
-                      Reason for declining
-                    </div>
-                    {p.decline_reason ? (
-                      <p className="text-sm whitespace-pre-wrap">{p.decline_reason}</p>
-                    ) : (
-                      <p className="text-sm italic text-muted-foreground">No reason recorded.</p>
-                    )}
-                  </div>
-                );
-              })}
-            </div>
-          </Card>
-        )}
+        <PriorDeclinedReferrals hospitalNumber={ref.hospital_number} excludeId={id} />
+
 
 
 
