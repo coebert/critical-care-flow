@@ -306,7 +306,7 @@ export const listEncryptedNotes = createServerFn({ method: "POST" })
     // Legacy plaintext / body_enc notes are still relayed for backward
     // compatibility. The client decides how to render each.
     const { decryptString } = await import("./crypto.server");
-    return (rows ?? []).map((n: any) => {
+    return allRows.map((n: any) => {
       const out: any = { ...n };
       // Legacy: server-side app-layer encryption.
       if (out.body_enc && !out.body_ciphertext) {
@@ -316,8 +316,13 @@ export const listEncryptedNotes = createServerFn({ method: "POST" })
           out.body = null;
         }
       }
-      out.wrapped_key = wrappedByNote[n.id] ?? null;
-      out.recipient_user_ids = recipientsByNote[n.id] ?? [];
+      // For notes older than the hydration window, flag that keys weren't
+      // fetched so the client can render a "load older notes" affordance
+      // rather than treat them as decryption failures.
+      const wasHydrated = hydratedIds.has(n.id);
+      out.wrapped_key = wasHydrated ? (wrappedByNote[n.id] ?? null) : null;
+      out.recipient_user_ids = wasHydrated ? (recipientsByNote[n.id] ?? []) : [];
+      out.keys_not_hydrated = !wasHydrated;
       return out;
     });
   });
