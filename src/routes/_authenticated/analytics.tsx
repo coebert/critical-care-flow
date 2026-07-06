@@ -118,9 +118,13 @@ function AnalyticsPage() {
   const filtered = useMemo(() => {
     return rows.filter((r) => {
       const t = new Date(r.referral_received_at).getTime();
-      return t >= from.getTime() && t <= to.getTime();
+      if (t < from.getTime() || t > to.getTime()) return false;
+      if (pediatricFilter === "pediatric") {
+        if (r.age === null || r.age === undefined || r.age > 16) return false;
+      }
+      return true;
     });
-  }, [rows, from, to]);
+  }, [rows, from, to, pediatricFilter]);
 
   const complianceFiltered = useMemo(() => {
     if (!complianceSpecialty) return filtered;
