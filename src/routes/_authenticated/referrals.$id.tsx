@@ -21,11 +21,10 @@ import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
-import { Collapsible, CollapsibleTrigger, CollapsibleContent } from "@/components/ui/collapsible";
 import type { Tables } from "@/integrations/supabase/types";
 import { ComboboxAdd } from "@/components/combobox-add";
 import { useReferralOptions } from "@/hooks/use-referral-options";
-import { ArrowLeft, Save, Trash2, ChevronDown, AlertCircle } from "lucide-react";
+import { ArrowLeft, Save, Trash2, AlertCircle } from "lucide-react";
 import { format } from "date-fns";
 import { tzTooltip } from "@/lib/format-timestamp";
 import { toast } from "sonner";
@@ -33,15 +32,14 @@ import { validateReferralTimings } from "@/lib/referral-validation";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { ADMISSION_URGENCY_OPTIONS, type AdmissionUrgency } from "@/lib/admission-urgency";
 import { cn } from "@/lib/utils";
-
+import { DateTimeNow, Field } from "@/components/referrals/referral-form-fields";
+import {
+  ReferralExpandableSection,
+  type ExpandCommand,
+} from "@/components/referrals/referral-expandable-section";
 
 type Referral = Tables<"referrals"> & DecryptedReferral;
 
-
-// Queryable cache key for a single referral's decrypted detail. The loader
-// primes this so navigation from the list page shows data on first paint;
-// the component still owns local `ref` state for form edits (to avoid
-// realtime refetches clobbering unsaved input), but seeds it from the cache.
 const referralDetailQueryOptions = (id: string) =>
   queryOptions({
     queryKey: ["referrals", "detail", id] as const,
@@ -62,7 +60,6 @@ export const Route = createFileRoute("/_authenticated/referrals/$id")({
   component: ReferralDetail,
 });
 
-
 function toLocal(iso: string | null) {
   if (!iso) return "";
   const d = new Date(iso);
@@ -81,12 +78,9 @@ function ReferralDetail() {
   const { user } = useAuth();
   const { hasRole: isAdmin } = useRole("admin");
   const [deleting, setDeleting] = useState(false);
-  const [expandCmd, setExpandCmd] = useState<{ open: boolean; id: number } | null>(null);
+  const [expandCmd, setExpandCmd] = useState<ExpandCommand>(null);
   const { specialties, wards, consultants } = useReferralOptions();
 
-  // Seed from the loader-primed cache so the initial paint has data. Local
-  // state still owns edits (controlled form inputs) — realtime UPDATE calls
-  // `loadRef` below to refresh the cache and the local state together.
   const queryClient = useQueryClient();
   const [ref, setRef] = useState<Referral | null>(
     () => (queryClient.getQueryData(referralDetailQueryOptions(id).queryKey) as Referral | null) ?? null,
@@ -119,8 +113,6 @@ function ReferralDetail() {
     logView({ data: { referral_id: id } }).catch(() => {});
     loadRef();
 
-    // Realtime for the referral row itself; notes/keys are handled inside
-    // <Noteboard />.
     const ch = supabase
       .channel(`ref-${id}`)
       .on("postgres_changes", { event: "UPDATE", schema: "public", table: "referrals", filter: `id=eq.${id}` },
@@ -132,7 +124,6 @@ function ReferralDetail() {
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id]);
-
 
   if (!ref) return <div className="p-6 text-muted-foreground">Loading…</div>;
 
@@ -199,9 +190,6 @@ function ReferralDetail() {
     }
   };
 
-
-
-
   const onDelete = async () => {
     setDeleting(true);
     try {
@@ -233,14 +221,16 @@ function ReferralDetail() {
   return (
     <div className="p-4 sm:p-6 max-w-5xl mx-auto">
       <div className="flex items-center justify-between gap-2 mb-6 flex-wrap">
-        <Button variant="ghost" size="sm" onClick={() => navigate({ to: "/" })}><ArrowLeft className="w-4 h-4 mr-1" /> Back to list</Button>
+        <Button variant="ghost" size="sm" onClick={() => navigate({ to: "/" })}>
+          <ArrowLeft className="w-4 h-4 mr-1" aria-hidden="true" /> Back to list
+        </Button>
         <div className="flex items-center gap-2">
           <Badge variant="outline" className={`capitalize ${statusStyles[ref.status]}`}>{ref.status}</Badge>
           {canDelete && (
             <AlertDialog>
               <AlertDialogTrigger asChild>
                 <Button variant="outline" size="sm" className="text-destructive hover:text-destructive">
-                  <Trash2 className="w-4 h-4 mr-1" /> Delete
+                  <Trash2 className="w-4 h-4 mr-1" aria-hidden="true" /> Delete
                 </Button>
               </AlertDialogTrigger>
               <AlertDialogContent>
@@ -291,23 +281,23 @@ function ReferralDetail() {
         <Card className="p-5 space-y-4">
           <h2 className="font-semibold">Details</h2>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <F label="Age"><Input type="number" value={ref.age ?? ""} onChange={(e) => set("age", e.target.value ? Number(e.target.value) : null)} /></F>
-            <F label="Sex">
+            <Field label="Age"><Input type="number" value={ref.age ?? ""} onChange={(e) => set("age", e.target.value ? Number(e.target.value) : null)} /></Field>
+            <Field label="Sex">
               <Select value={ref.sex ?? "unknown"} onValueChange={(v) => set("sex", v)}>
                 <SelectTrigger><SelectValue /></SelectTrigger>
                 <SelectContent>
                   {["male","female","other","unknown"].map((s) => <SelectItem key={s} value={s}>{s}</SelectItem>)}
                 </SelectContent>
               </Select>
-            </F>
-            <F label="Hospital number"><Input value={ref.hospital_number ?? ""} onChange={(e) => set("hospital_number", e.target.value)} /></F>
-            <F label="Referring specialty"><ComboboxAdd value={ref.referring_specialty ?? ""} onChange={(v) => set("referring_specialty", v)} options={specialties} /></F>
-            <F label="Ward"><ComboboxAdd value={ref.current_ward ?? ""} onChange={(v) => set("current_ward", v)} options={wards} /></F>
-            <F label="Bed"><Input value={ref.current_bed ?? ""} onChange={(e) => set("current_bed", e.target.value)} /></F>
+            </Field>
+            <Field label="Hospital number"><Input value={ref.hospital_number ?? ""} onChange={(e) => set("hospital_number", e.target.value)} /></Field>
+            <Field label="Referring specialty"><ComboboxAdd value={ref.referring_specialty ?? ""} onChange={(v) => set("referring_specialty", v)} options={specialties} /></Field>
+            <Field label="Ward"><ComboboxAdd value={ref.current_ward ?? ""} onChange={(v) => set("current_ward", v)} options={wards} /></Field>
+            <Field label="Bed"><Input value={ref.current_bed ?? ""} onChange={(e) => set("current_bed", e.target.value)} /></Field>
           </div>
-          <ExpandableSection label="Past medical history" command={expandCmd}><Textarea rows={3} value={ref.past_medical_history ?? ""} onChange={(e) => set("past_medical_history", e.target.value)} /></ExpandableSection>
-          <ExpandableSection label="Baseline function" command={expandCmd}><Textarea rows={2} value={ref.baseline_function ?? ""} onChange={(e) => set("baseline_function", e.target.value)} /></ExpandableSection>
-          <ExpandableSection label="Reason for referral" command={expandCmd}><Textarea rows={3} value={ref.reason_for_referral ?? ""} onChange={(e) => set("reason_for_referral", e.target.value)} /></ExpandableSection>
+          <ReferralExpandableSection label="Past medical history" command={expandCmd}><Textarea rows={3} value={ref.past_medical_history ?? ""} onChange={(e) => set("past_medical_history", e.target.value)} /></ReferralExpandableSection>
+          <ReferralExpandableSection label="Baseline function" command={expandCmd}><Textarea rows={2} value={ref.baseline_function ?? ""} onChange={(e) => set("baseline_function", e.target.value)} /></ReferralExpandableSection>
+          <ReferralExpandableSection label="Reason for referral" command={expandCmd}><Textarea rows={3} value={ref.reason_for_referral ?? ""} onChange={(e) => set("reason_for_referral", e.target.value)} /></ReferralExpandableSection>
           <div className="flex items-center gap-3">
             <Switch checked={ref.dnacpr_respect} onCheckedChange={(v) => set("dnacpr_respect", v)} id="dn" />
             <Label htmlFor="dn">DNACPR / ReSPECT in place</Label>
@@ -320,7 +310,7 @@ function ReferralDetail() {
             />
             <Label htmlFor="c2c">Consultant-to-consultant referral only</Label>
           </div>
-          <div className="flex items-start justify-between gap-4 rounded-md border border-amber-400/60 bg-amber-50/40 dark:bg-amber-950/20 p-3">
+          <div className="flex items-start justify-between gap-4 rounded-md border border-warning/60 bg-warning/10 p-3">
             <div>
               <Label htmlFor="is-test" className="text-sm font-medium cursor-pointer">
                 Test / demonstration referral
@@ -338,31 +328,27 @@ function ReferralDetail() {
           </div>
         </Card>
 
-
         <PriorDeclinedReferrals hospitalNumber={ref.hospital_number} excludeId={id} />
-
-
-
 
         <Card className="p-5 space-y-4">
           <h2 className="font-semibold">Timeline (ICNARC)</h2>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <F label="Received" required error={timing.fieldErrors.referral_received_at}>
-              <DTNow value={toLocal(ref.referral_received_at)} onChange={(v) => saveTimestamp("referral_received_at", v ? new Date(v).toISOString() : null)} invalid={!!timing.fieldErrors.referral_received_at} />
-            </F>
-            <F label="First seen" required={ref.status !== "pending"} error={timing.fieldErrors.first_seen_at}>
-              <DTNow value={toLocal(ref.first_seen_at)} onChange={(v) => saveTimestamp("first_seen_at", v ? new Date(v).toISOString() : null)} invalid={!!timing.fieldErrors.first_seen_at} />
-            </F>
-            <F label="Decision" required={ref.status !== "pending"} error={timing.fieldErrors.decision_at}>
-              <DTNow value={toLocal(ref.decision_at)} onChange={(v) => saveTimestamp("decision_at", v ? new Date(v).toISOString() : null)} invalid={!!timing.fieldErrors.decision_at} />
-            </F>
-            <F label="Arrived on unit" required={ref.status === "admitted"} error={timing.fieldErrors.arrived_on_unit_at}>
-              <DTNow value={toLocal(ref.arrived_on_unit_at)} onChange={(v) => saveTimestamp("arrived_on_unit_at", v ? new Date(v).toISOString() : null)} disabled={ref.status === "declined"} invalid={!!timing.fieldErrors.arrived_on_unit_at} />
-            </F>
+            <Field label="Received" required error={timing.fieldErrors.referral_received_at}>
+              <DateTimeNow value={toLocal(ref.referral_received_at)} onChange={(v) => saveTimestamp("referral_received_at", v ? new Date(v).toISOString() : null)} invalid={!!timing.fieldErrors.referral_received_at} />
+            </Field>
+            <Field label="First seen" required={ref.status !== "pending"} error={timing.fieldErrors.first_seen_at}>
+              <DateTimeNow value={toLocal(ref.first_seen_at)} onChange={(v) => saveTimestamp("first_seen_at", v ? new Date(v).toISOString() : null)} invalid={!!timing.fieldErrors.first_seen_at} />
+            </Field>
+            <Field label="Decision" required={ref.status !== "pending"} error={timing.fieldErrors.decision_at}>
+              <DateTimeNow value={toLocal(ref.decision_at)} onChange={(v) => saveTimestamp("decision_at", v ? new Date(v).toISOString() : null)} invalid={!!timing.fieldErrors.decision_at} />
+            </Field>
+            <Field label="Arrived on unit" required={ref.status === "admitted"} error={timing.fieldErrors.arrived_on_unit_at}>
+              <DateTimeNow value={toLocal(ref.arrived_on_unit_at)} onChange={(v) => saveTimestamp("arrived_on_unit_at", v ? new Date(v).toISOString() : null)} disabled={ref.status === "declined"} invalid={!!timing.fieldErrors.arrived_on_unit_at} />
+            </Field>
           </div>
           {timing.issues.length > 0 && (
             <Alert variant="destructive">
-              <AlertCircle className="h-4 w-4" />
+              <AlertCircle className="h-4 w-4" aria-hidden="true" />
               <AlertTitle>Inconsistent timings</AlertTitle>
               <AlertDescription>
                 <ul className="list-disc pl-4 space-y-1">
@@ -377,7 +363,7 @@ function ReferralDetail() {
         <Card ref={outcomeRef} className="p-5 space-y-4">
           <h2 className="font-semibold">Outcome</h2>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <F label="Status">
+            <Field label="Status">
               <Select value={ref.status} onValueChange={(v) => {
                 const next: Partial<Referral> = { status: v as Referral["status"] };
                 if ((v === "accepted" || v === "admitted") && !ref.decision_at) {
@@ -393,8 +379,8 @@ function ReferralDetail() {
                   <SelectItem value="declined">Declined</SelectItem>
                 </SelectContent>
               </Select>
-            </F>
-            <F label="Admission urgency">
+            </Field>
+            <Field label="Admission urgency">
               <Select
                 value={ref.admission_urgency ?? "none"}
                 onValueChange={(v) =>
@@ -409,11 +395,11 @@ function ReferralDetail() {
                   ))}
                 </SelectContent>
               </Select>
-            </F>
+            </Field>
           </div>
           {ref.status === "declined" && (
             <>
-              <ExpandableSection label="Reason for declining" command={expandCmd}>
+              <ReferralExpandableSection label="Reason for declining" command={expandCmd}>
                 <Textarea
                   rows={3}
                   value={ref.decline_reason ?? ""}
@@ -423,8 +409,8 @@ function ReferralDetail() {
                 {declineReasonMissing && (
                   <p className="text-xs text-destructive mt-1">Required when declining a referral.</p>
                 )}
-              </ExpandableSection>
-              <F label="Discussed with critical care consultant" required error={declineConsultantMissing ? "Required when declining a referral." : undefined}>
+              </ReferralExpandableSection>
+              <Field label="Discussed with critical care consultant" required error={declineConsultantMissing ? "Required when declining a referral." : undefined}>
                 <div className={cn(declineConsultantMissing && "rounded-md ring-1 ring-destructive")}>
                   <ComboboxAdd
                     value={ref.discussed_with_consultant ?? ""}
@@ -433,11 +419,11 @@ function ReferralDetail() {
                     placeholder="Select or add consultant…"
                   />
                 </div>
-              </F>
+              </Field>
             </>
           )}
           {(ref.status === "admitted" || ref.status === "accepted") && (
-            <F label="Accepting critical care consultant" required error={acceptingConsultantMissing ? "Required when a referral is accepted or admitted." : undefined}>
+            <Field label="Accepting critical care consultant" required error={acceptingConsultantMissing ? "Required when a referral is accepted or admitted." : undefined}>
               <div className={cn(acceptingConsultantMissing && "rounded-md ring-1 ring-destructive")}>
                 <ComboboxAdd
                   value={ref.accepting_consultant ?? ""}
@@ -446,30 +432,26 @@ function ReferralDetail() {
                   placeholder="Select or add consultant…"
                 />
               </div>
-            </F>
+            </Field>
           )}
         </Card>
 
         <div className="flex justify-end">
-          <Button onClick={save} disabled={saving || acceptingConsultantMissing || declineConsultantMissing}><Save className="w-4 h-4 mr-1" />{saving ? "Saving…" : "Save changes"}</Button>
+          <Button onClick={save} disabled={saving || acceptingConsultantMissing || declineConsultantMissing}>
+            <Save className="w-4 h-4 mr-1" aria-hidden="true" />{saving ? "Saving…" : "Save changes"}
+          </Button>
         </div>
 
         <Noteboard referralId={id} />
 
-
-
-
         <ReferralAuditTrail referralId={id} />
-
-
-
 
         {canDelete && (
           <div className="flex justify-end pt-2">
             <AlertDialog>
               <AlertDialogTrigger asChild>
                 <Button variant="destructive" size="sm">
-                  <Trash2 className="w-4 h-4 mr-1" /> Delete referral
+                  <Trash2 className="w-4 h-4 mr-1" aria-hidden="true" /> Delete referral
                 </Button>
               </AlertDialogTrigger>
               <AlertDialogContent>
@@ -493,82 +475,3 @@ function ReferralDetail() {
     </div>
   );
 }
-
-function F({ label, children, required, error }: { label: string; children: React.ReactNode; required?: boolean; error?: string }) {
-  return (
-    <div className="space-y-1.5">
-      <Label className="text-xs">
-        {label}
-        {required && <span className="text-destructive ml-0.5">*</span>}
-      </Label>
-      {children}
-      {error && <p className="text-xs text-destructive">{error}</p>}
-    </div>
-  );
-}
-
-function ExpandableSection({ label, children, command }: { label: string; children: React.ReactNode; command?: { open: boolean; id: number } | null }) {
-  const [open, setOpen] = useState(true);
-  const [isMobile, setIsMobile] = useState(false);
-
-  useEffect(() => {
-    const mq = window.matchMedia("(max-width: 767px)");
-    const update = () => {
-      setIsMobile(mq.matches);
-      setOpen(!mq.matches);
-    };
-    update();
-    mq.addEventListener("change", update);
-    return () => mq.removeEventListener("change", update);
-  }, []);
-
-  useEffect(() => {
-    if (command) {
-      setOpen(command.open);
-    }
-  }, [command?.id]);
-
-  if (!isMobile) {
-    return <F label={label}>{children}</F>;
-  }
-
-  return (
-    <Collapsible open={open} onOpenChange={setOpen} className="space-y-1.5">
-      <CollapsibleTrigger className="flex items-center justify-between w-full">
-        <Label className="text-xs">{label}</Label>
-        <ChevronDown className={`w-4 h-4 text-muted-foreground transition-transform duration-200 ${open ? "rotate-180" : ""}`} />
-      </CollapsibleTrigger>
-      <CollapsibleContent>{children}</CollapsibleContent>
-    </Collapsible>
-  );
-}
-
-function nowLocal() {
-  const d = new Date();
-  d.setMinutes(d.getMinutes() - d.getTimezoneOffset());
-  return d.toISOString().slice(0, 16);
-}
-
-function DTNow({ value, onChange, disabled, invalid }: { value: string; onChange: (v: string) => void; disabled?: boolean; invalid?: boolean }) {
-  return (
-    <div className={`flex gap-2 transition-opacity ${disabled ? "opacity-50" : ""}`}>
-      <Input
-        type="datetime-local"
-        value={value}
-        onChange={(e) => onChange(e.target.value)}
-        disabled={disabled}
-        className={cn(
-          disabled && "bg-muted border-muted-foreground/30",
-          !value && "text-muted-foreground",
-          invalid && !disabled && "border-destructive focus-visible:ring-destructive",
-        )}
-      />
-      <Button type="button" variant="outline" size="sm" onClick={() => onChange(nowLocal())} disabled={disabled}>Now</Button>
-    </div>
-  );
-}
-
-
-
-
-

@@ -1,5 +1,5 @@
-import { createFileRoute, useNavigate, Link } from "@tanstack/react-router";
-import { useState, useEffect } from "react";
+import { createFileRoute, useNavigate } from "@tanstack/react-router";
+import { useEffect, useState } from "react";
 import { useServerFn } from "@tanstack/react-start";
 import { createReferral, findReferralsByHospitalNumber } from "@/lib/referrals.functions";
 import { RouteErrorFallback } from "@/components/route-error-fallback";
@@ -7,7 +7,6 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { Card } from "@/components/ui/card";
 import {
   Select,
   SelectContent,
@@ -17,15 +16,6 @@ import {
 } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogDescription,
-  DialogFooter,
-} from "@/components/ui/dialog";
-import { Badge } from "@/components/ui/badge";
 import { AlertCircle } from "lucide-react";
 import { ComboboxAdd } from "@/components/combobox-add";
 import { useReferralOptions } from "@/hooks/use-referral-options";
@@ -37,126 +27,29 @@ import {
   type AdmissionUrgency,
 } from "@/lib/admission-urgency";
 import { cn } from "@/lib/utils";
-
-type PriorReferral = {
-  id: string;
-  hospital_number: string | null;
-  referral_received_at: string;
-  status: string;
-  referring_specialty: string | null;
-  current_ward: string | null;
-  current_bed: string | null;
-  reason_for_referral: string | null;
-  past_medical_history: string | null;
-  baseline_function: string | null;
-  age: number | null;
-  sex: string | null;
-  consultant_to_consultant_only: boolean | null;
-};
+import {
+  blankForm,
+  DRAFT_KEY,
+  DRAFT_SAFE_VERSION,
+  isSafeDraftDirty,
+  localISO,
+  SENSITIVE_DRAFT_KEYS,
+  toSafeDraft,
+  type DraftForm,
+  type SafeDraft,
+} from "@/lib/referral-draft";
+import { DateTimeNow, Field, Section } from "@/components/referrals/referral-form-fields";
+import {
+  PriorReferralsAlert,
+  PriorReferralsDialog,
+  type PriorReferral,
+} from "@/components/referrals/prior-referrals-dialog";
 
 export const Route = createFileRoute("/_authenticated/referrals/new")({
   head: () => ({ meta: [{ title: "New referral — SDH Critical Care" }] }),
   errorComponent: ({ error }) => <RouteErrorFallback error={error} label="New referral" />,
   component: NewReferralPage,
 });
-
-
-function localISO() {
-  const d = new Date();
-  d.setMinutes(d.getMinutes() - d.getTimezoneOffset());
-  return d.toISOString().slice(0, 16);
-}
-
-const DRAFT_KEY = "referral-draft-v1";
-// Bump this when the shape of what's persisted changes so old drafts (which
-// may have contained PHI written by an earlier version) are ignored / cleared.
-const DRAFT_SAFE_VERSION = 2;
-
-type DraftForm = {
-  age: string;
-  sex: "male" | "female" | "other" | "unknown";
-  hospital_number: string;
-  current_ward: string;
-  current_bed: string;
-  past_medical_history: string;
-  baseline_function: string;
-  dnacpr_respect: boolean;
-  consultant_to_consultant_only: boolean;
-  referring_specialty: string;
-  reason_for_referral: string;
-  referral_received_at: string;
-  first_seen_at: string;
-  decision_at: string;
-  arrived_on_unit_at: string;
-  status: "pending" | "accepted" | "declined" | "admitted";
-  decline_reason: string;
-  discussed_with_consultant: string;
-  accepting_consultant: string;
-  admission_urgency: AdmissionUrgency | "";
-  is_test: boolean;
-};
-
-// PHI / patient-identifying free-text fields are NEVER persisted to
-// localStorage. The database encrypts these at rest, but browser storage is
-// plaintext and readable by anyone with access to the workstation (common on
-// shared NHS terminals). Only non-identifying workflow scaffolding
-// (timestamps, status, ward/bed labels, urgency, flags) is auto-saved so a
-// user doesn't lose their place after an accidental reload.
-const SENSITIVE_DRAFT_KEYS = [
-  "hospital_number",
-  "past_medical_history",
-  "baseline_function",
-  "reason_for_referral",
-  "decline_reason",
-  "discussed_with_consultant",
-  "accepting_consultant",
-  "age",
-  "sex",
-] as const satisfies ReadonlyArray<keyof DraftForm>;
-
-type SafeDraft = Partial<Omit<DraftForm, (typeof SENSITIVE_DRAFT_KEYS)[number]>> & {
-  __v?: number;
-};
-
-function toSafeDraft(d: DraftForm): SafeDraft {
-  const copy: Partial<DraftForm> = { ...d };
-  for (const k of SENSITIVE_DRAFT_KEYS) delete copy[k];
-  return { ...(copy as SafeDraft), __v: DRAFT_SAFE_VERSION };
-}
-
-const blankForm = (): DraftForm => ({
-  age: "",
-  sex: "unknown",
-  hospital_number: "",
-  current_ward: "",
-  current_bed: "",
-  past_medical_history: "",
-  baseline_function: "",
-  dnacpr_respect: false,
-  consultant_to_consultant_only: false,
-  referring_specialty: "",
-  reason_for_referral: "",
-  referral_received_at: localISO(),
-  first_seen_at: "",
-  decision_at: "",
-  arrived_on_unit_at: "",
-  status: "pending",
-  decline_reason: "",
-  discussed_with_consultant: "",
-  accepting_consultant: "",
-  admission_urgency: "",
-  is_test: false,
-});
-
-function isSafeDraftDirty(d: DraftForm): boolean {
-  const b = blankForm();
-  const safeKeys = (Object.keys(b) as (keyof DraftForm)[]).filter(
-    (k) =>
-      k !== "referral_received_at" &&
-      !(SENSITIVE_DRAFT_KEYS as readonly string[]).includes(k),
-  );
-  return safeKeys.some((k) => d[k] !== b[k]);
-}
 
 function NewReferralPage() {
   const navigate = useNavigate();
@@ -167,23 +60,17 @@ function NewReferralPage() {
   const [draftRestored, setDraftRestored] = useState(false);
   const [draftSavedAt, setDraftSavedAt] = useState<Date | null>(null);
 
-  // Restore any in-progress draft from localStorage on mount. We never persist
-  // PHI, so restoring only refills non-identifying workflow fields — the user
-  // must re-enter hospital number, PMH, baseline function, reason, etc.
   useEffect(() => {
     if (typeof window === "undefined") return;
     try {
       const raw = window.localStorage.getItem(DRAFT_KEY);
       if (!raw) return;
       const parsed = JSON.parse(raw) as SafeDraft & Partial<DraftForm>;
-      // Ignore (and clear) any legacy draft written before we stripped PHI.
       if (parsed && parsed.__v !== DRAFT_SAFE_VERSION) {
         window.localStorage.removeItem(DRAFT_KEY);
         return;
       }
       const { __v: _v, ...safe } = parsed;
-      // Belt & braces: drop any sensitive keys even if the stored blob
-      // somehow contains them.
       for (const k of SENSITIVE_DRAFT_KEYS) {
         delete (safe as Partial<DraftForm>)[k];
       }
@@ -199,7 +86,6 @@ function NewReferralPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Auto-save the (sanitised) draft (debounced) whenever the form changes.
   useEffect(() => {
     if (typeof window === "undefined") return;
     const t = setTimeout(() => {
@@ -217,7 +103,6 @@ function NewReferralPage() {
     return () => clearTimeout(t);
   }, [f]);
 
-  // Warn before leaving with an unsaved draft on the page.
   useEffect(() => {
     if (typeof window === "undefined") return;
     const handler = (e: BeforeUnloadEvent) => {
@@ -229,7 +114,6 @@ function NewReferralPage() {
     window.addEventListener("beforeunload", handler);
     return () => window.removeEventListener("beforeunload", handler);
   }, [f]);
-
 
   const discardDraft = () => {
     if (typeof window !== "undefined") window.localStorage.removeItem(DRAFT_KEY);
@@ -271,7 +155,6 @@ function NewReferralPage() {
 
   const priorC2C = priors.some((p) => p.consultant_to_consultant_only === true);
 
-  // Auto-persist the C2C flag from any prior referral for this patient.
   useEffect(() => {
     if (priorC2C && !f.consultant_to_consultant_only) {
       setF((cur) => ({ ...cur, consultant_to_consultant_only: true }));
@@ -282,7 +165,6 @@ function NewReferralPage() {
   const showAlert =
     priors.length > 0 && dismissedFor !== f.hospital_number.trim();
 
-  // Most-recent prior with usable PMH or baseline function for autofill.
   const priorWithHistory = priors.find(
     (p) => (p.past_medical_history && p.past_medical_history.trim()) ||
            (p.baseline_function && p.baseline_function.trim()),
@@ -407,50 +289,17 @@ function NewReferralPage() {
             <Field label="Current ward"><ComboboxAdd value={f.current_ward} onChange={(v) => set("current_ward", v)} options={wards} placeholder="e.g. ED Resus, Pembroke" /></Field>
             <Field label="Bed"><Input value={f.current_bed} onChange={(e) => set("current_bed", e.target.value)} /></Field>
           </div>
-          {showAlert && (
-            <Alert variant="destructive" className="mt-2">
-              <AlertCircle className="h-4 w-4" />
-              <AlertTitle>Previous referral{priors.length > 1 ? "s" : ""} on record</AlertTitle>
-              <AlertDescription className="flex flex-col gap-2">
-                <span>
-                  This patient (hospital number <strong>{f.hospital_number}</strong>) has been referred to critical care {priors.length} time{priors.length > 1 ? "s" : ""} before.
-                </span>
-                <div className="flex gap-2 flex-wrap">
-                  <Button type="button" size="sm" variant="outline" onClick={() => setPriorOpen(true)}>
-                    View previous referrals for this patient
-                  </Button>
-                  {priorWithHistory && (
-                    <Button type="button" size="sm" variant="outline" onClick={autofillPMH}>
-                      Auto-fill past medical history
-                    </Button>
-                  )}
-                  <Button
-                    type="button"
-                    size="sm"
-                    variant="ghost"
-                    onClick={() => setDismissedFor(f.hospital_number.trim())}
-                  >
-                    Dismiss
-                  </Button>
-                </div>
-              </AlertDescription>
-            </Alert>
-          )}
-          {priorC2C && (
-            <Alert variant="destructive" className="mt-2">
-              <AlertCircle className="h-4 w-4" />
-              <AlertTitle>Consultant-to-consultant referral only</AlertTitle>
-              <AlertDescription>
-                A previous referral for this patient (hospital number{" "}
-                <strong>{f.hospital_number}</strong>) was flagged as{" "}
-                <strong>consultant-to-consultant only</strong>. This referral must
-                be made consultant-to-consultant. The flag has been applied
-                automatically below.
-              </AlertDescription>
-            </Alert>
-          )}
+          <PriorReferralsAlert
+            hospitalNumber={f.hospital_number}
+            priors={priors}
+            priorC2C={priorC2C}
+            showAlert={showAlert}
+            priorWithHistory={priorWithHistory}
+            onOpenDialog={() => setPriorOpen(true)}
+            onAutofillPMH={autofillPMH}
+            onDismiss={() => setDismissedFor(f.hospital_number.trim())}
+          />
         </Section>
-
 
         <Section title="Timestamps">
           <p className="text-xs text-muted-foreground -mt-2">
@@ -472,7 +321,7 @@ function NewReferralPage() {
           </div>
           {showErrors && timing.issues.length > 0 && (
             <Alert variant="destructive" className="mt-2">
-              <AlertCircle className="h-4 w-4" />
+              <AlertCircle className="h-4 w-4" aria-hidden="true" />
               <AlertTitle>Inconsistent timings</AlertTitle>
               <AlertDescription>
                 <ul className="list-disc pl-4 space-y-1">
@@ -499,7 +348,7 @@ function NewReferralPage() {
             />
             <Label htmlFor="c2c">Consultant-to-consultant referral only</Label>
           </div>
-          <div className="flex items-start justify-between gap-4 rounded-md border border-amber-400/60 bg-amber-50/40 dark:bg-amber-950/20 p-3">
+          <div className="flex items-start justify-between gap-4 rounded-md border border-warning/60 bg-warning/10 p-3">
             <div>
               <Label htmlFor="is-test" className="text-sm font-medium cursor-pointer">
                 Test / demonstration referral
@@ -516,7 +365,6 @@ function NewReferralPage() {
             />
           </div>
         </Section>
-
 
         <Section title="Outcome">
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -603,7 +451,6 @@ function NewReferralPage() {
               </div>
             </Field>
           )}
-
         </Section>
 
         <Section title="Noteboard">
@@ -618,85 +465,12 @@ function NewReferralPage() {
         </div>
       </form>
 
-      <Dialog open={priorOpen} onOpenChange={setPriorOpen}>
-        <DialogContent className="max-w-2xl">
-          <DialogHeader>
-            <DialogTitle>Previous referrals for {f.hospital_number || "this patient"}</DialogTitle>
-            <DialogDescription>
-              Click any referral to open the full form in a new tab.
-            </DialogDescription>
-          </DialogHeader>
-          <div className="max-h-[60vh] overflow-y-auto space-y-2">
-            {priors.length === 0 && (
-              <p className="text-sm text-muted-foreground py-6 text-center">No previous referrals.</p>
-            )}
-            {priors.map((p) => (
-              <Link
-                key={p.id}
-                to="/referrals/$id"
-                params={{ id: p.id }}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="block border rounded-md p-3 hover:bg-accent/40 transition-colors"
-              >
-                <div className="flex items-center justify-between gap-2 mb-1">
-                  <div className="text-sm font-medium">
-                    {format(new Date(p.referral_received_at), "dd/MM/yyyy HH:mm")}
-                  </div>
-                  <Badge variant="outline" className="capitalize">{p.status}</Badge>
-                </div>
-                <div className="text-xs text-muted-foreground">
-                  {p.referring_specialty ?? "Specialty unknown"}
-                  {p.current_ward ? ` · ${p.current_ward}` : ""}
-                  {p.current_bed ? ` ${p.current_bed}` : ""}
-                </div>
-                {p.reason_for_referral && (
-                  <div className="text-sm mt-1 line-clamp-2">{p.reason_for_referral}</div>
-                )}
-              </Link>
-            ))}
-          </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setPriorOpen(false)}>Close</Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-    </div>
-  );
-}
-
-
-function Section({ title, children }: { title: string; children: React.ReactNode }) {
-  return (
-    <Card className="p-5 space-y-4">
-      <h2 className="font-semibold text-sm uppercase tracking-wide text-muted-foreground">{title}</h2>
-      {children}
-    </Card>
-  );
-}
-function Field({ label, children, required, error }: { label: string; children: React.ReactNode; required?: boolean; error?: string }) {
-  return (
-    <div className="space-y-1.5">
-      <Label className="text-xs">
-        {label}
-        {required && <span className="text-destructive ml-0.5">*</span>}
-      </Label>
-      {children}
-      {error && <p className="text-xs text-destructive">{error}</p>}
-    </div>
-  );
-}
-
-function DateTimeNow({ value, onChange, invalid }: { value: string; onChange: (v: string) => void; invalid?: boolean }) {
-  return (
-    <div className="flex gap-2">
-      <Input
-        type="datetime-local"
-        value={value}
-        onChange={(e) => onChange(e.target.value)}
-        className={cn(!value && "text-muted-foreground", invalid && "border-destructive focus-visible:ring-destructive")}
+      <PriorReferralsDialog
+        open={priorOpen}
+        onOpenChange={setPriorOpen}
+        hospitalNumber={f.hospital_number}
+        priors={priors}
       />
-      <Button type="button" variant="outline" size="sm" onClick={() => onChange(localISO())}>Now</Button>
     </div>
   );
 }
