@@ -38,7 +38,12 @@ export const getReferralsAnalytics = createServerFn({ method: "GET" })
       const { data: rows, error } = await context.supabase
         .from("referrals")
         .select("*")
+        // Belt-and-braces: exclude any row marked as removed via either the
+        // deleted_at timestamp OR the deleted_by attribution. A partially
+        // written soft-delete (e.g. deleted_by set but deleted_at missing
+        // because of a client bug or historic data) must still be filtered.
         .is("deleted_at", null)
+        .is("deleted_by", null)
         .gte("referral_received_at", data.from)
         .lte("referral_received_at", data.to)
         .limit(5000);
