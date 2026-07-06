@@ -232,7 +232,12 @@ function NavItem({ to, icon, children, collapsed }: { to: string; icon: React.Re
     <Link
       to={to}
       className={`flex items-center gap-2 ${collapsed ? "justify-center px-2" : "px-3"} py-2 rounded-md hover:bg-sidebar-accent text-sidebar-foreground [&.active]:bg-sidebar-accent [&.active]:text-sidebar-accent-foreground [&.active]:font-medium`}
-      activeOptions={{ exact: to === "/" }}
+      // Exact match everywhere so a leaf link (e.g. Analytics → /analytics)
+      // is never highlighted while viewing a sibling route (e.g.
+      // /postop-bookings or /postop-bookings/analytics). Without exact,
+      // TanStack Router's default prefix match can activate a link for any
+      // descendant path that begins with `to`.
+      activeOptions={{ exact: true }}
       title={collapsed ? String(children) : undefined}
       aria-label={collapsed ? String(children) : undefined}
     >
