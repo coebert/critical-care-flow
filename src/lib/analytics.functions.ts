@@ -75,30 +75,10 @@ const REFERRAL_ANALYTICS_COLUMNS =
   "accepting_consultant,discussed_with_consultant,is_test," +
   "deleted_at,deleted_by,created_at,created_by,updated_at";
 
-export type ReferralAnalyticsRow = {
-  id: string;
-  age: number | null;
-  sex: string | null;
-  current_ward: string | null;
-  dnacpr_respect: string | null;
-  referring_specialty: string | null;
-  referral_received_at: string | null;
-  first_seen_at: string | null;
-  decision_at: string | null;
-  arrived_on_unit_at: string | null;
-  status: string;
-  decline_reason: string | null;
-  admission_urgency: string | null;
-  consultant_to_consultant_only: boolean | null;
-  accepting_consultant: string | null;
-  discussed_with_consultant: string | null;
-  is_test: boolean;
-  deleted_at: string | null;
-  deleted_by: string | null;
-  created_at: string;
-  created_by: string | null;
-  updated_at: string | null;
-};
+// Server returns the same row shape the analytics UI already consumes
+// (`Tables<"referrals">`), but only the safe columns are populated —
+// encrypted fields and the hospital-number hash are never selected.
+export type ReferralAnalyticsRow = Tables<"referrals">;
 
 export const getReferralsAnalytics = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
