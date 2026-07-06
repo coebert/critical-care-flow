@@ -114,34 +114,42 @@ function AuthedShell() {
     disabled: signingOut,
   });
 
+  const pageTitle = getPageTitle(pathname);
+
   const renderSidebar = (collapsed: boolean) => (
     <div className="flex h-full flex-col">
-      <div className={`${collapsed ? "px-2" : "px-5"} py-5 border-b`}>
-        <div className={`flex items-center gap-2 ${collapsed ? "justify-center" : ""}`}>
-          <div className="w-9 h-9 rounded-md bg-primary flex items-center justify-center shrink-0">
-            <Activity className="w-5 h-5 text-primary-foreground" />
+      <div className={`${collapsed ? "px-2" : "px-5"} h-12 border-b flex items-center`}>
+        <div className={`flex items-center gap-2 ${collapsed ? "justify-center w-full" : ""}`}>
+          <div className="w-8 h-8 rounded-md bg-primary flex items-center justify-center shrink-0">
+            <Activity className="w-4 h-4 text-primary-foreground" />
           </div>
           {!collapsed && (
             <div className="min-w-0">
               <div className="font-semibold text-sm leading-tight truncate">SDH Critical Care</div>
-              <div className="text-xs text-muted-foreground">Referral tracker</div>
+              <div className="text-[11px] text-muted-foreground leading-tight">Referral tracker</div>
             </div>
           )}
         </div>
       </div>
-      <nav className="flex-1 px-2 py-3 space-y-1 text-sm">
-        <NavItem to="/" icon={<ListChecks className="w-4 h-4" />} collapsed={collapsed} label="Referrals" />
-        <NavItem to="/referrals/new" icon={<Plus className="w-4 h-4" />} collapsed={collapsed} label="New referral" />
-        <NavItem to="/postop-bookings" icon={<CalendarClock className="w-4 h-4" />} collapsed={collapsed} label="Post-op bookings" />
+      <nav className="flex-1 overflow-y-auto px-2 py-3 text-sm">
+        <NavGroup label="Work" collapsed={collapsed}>
+          <NavItem to="/" icon={<ListChecks className="w-4 h-4" />} collapsed={collapsed} label="Referrals" />
+          <NavItem to="/referrals/new" icon={<Plus className="w-4 h-4" />} collapsed={collapsed} label="New referral" />
+          <NavItem to="/postop-bookings" icon={<CalendarClock className="w-4 h-4" />} collapsed={collapsed} label="Post-op bookings" />
+          <NavItem to="/inbox" icon={<Inbox className="w-4 h-4" />} collapsed={collapsed} label="Inbox" />
+        </NavGroup>
+        <NavGroup label="Alerts" collapsed={collapsed}>
+          <NavItem to="/notifications" icon={<Bell className="w-4 h-4" />} collapsed={collapsed} label="Notifications" />
+        </NavGroup>
+        <NavGroup label="You" collapsed={collapsed}>
+          <NavItem to="/profile" icon={<UserCircle className="w-4 h-4" />} collapsed={collapsed} label="Profile" />
+        </NavGroup>
         {isAdmin && (
-          <NavItem to="/analytics" icon={<BarChart3 className="w-4 h-4" />} collapsed={collapsed} label="Analytics" />
-        )}
-        <NavItem to="/inbox" icon={<Inbox className="w-4 h-4" />} collapsed={collapsed} label="Inbox" />
-        <NavItem to="/notifications" icon={<Bell className="w-4 h-4" />} collapsed={collapsed} label="Notifications" />
-        <NavItem to="/push-test" icon={<BellRing className="w-4 h-4" />} collapsed={collapsed} label="Push test" />
-        <NavItem to="/profile" icon={<UserCircle className="w-4 h-4" />} collapsed={collapsed} label="Profile" />
-        {isAdmin && (
-          <NavItem to="/admin" icon={<Shield className="w-4 h-4" />} collapsed={collapsed} label="Admin" />
+          <NavGroup label="Admin" collapsed={collapsed}>
+            <NavItem to="/analytics" icon={<BarChart3 className="w-4 h-4" />} collapsed={collapsed} label="Analytics" />
+            <NavItem to="/admin" icon={<Shield className="w-4 h-4" />} collapsed={collapsed} label="Admin" />
+            <NavItem to="/push-test" icon={<BellRing className="w-4 h-4" />} collapsed={collapsed} label="Push test" />
+          </NavGroup>
         )}
       </nav>
       <div className="p-3 border-t text-xs space-y-2">
@@ -174,46 +182,51 @@ function AuthedShell() {
         {renderSidebar(desktopCollapsed)}
       </aside>
       <div className="flex-1 flex flex-col min-w-0">
-        <header className="h-14 border-b flex items-center px-2 sm:px-4 md:px-6 gap-2 sm:gap-3 bg-card">
-          <Sheet open={mobileOpen} onOpenChange={setMobileOpen}>
-            <SheetTrigger asChild>
-              <Button
-                variant="ghost"
-                size="icon"
-                className="md:hidden shrink-0"
-                aria-label="Open navigation menu"
-                aria-expanded={mobileOpen}
-                aria-controls="mobile-sidebar"
+        <header className="h-12 border-b bg-card grid grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-2 px-2 sm:px-4 md:px-6">
+          <div className="flex items-center gap-1 shrink-0">
+            <Sheet open={mobileOpen} onOpenChange={setMobileOpen}>
+              <SheetTrigger asChild>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="md:hidden shrink-0 h-9 w-9"
+                  aria-label="Open navigation menu"
+                  aria-expanded={mobileOpen}
+                  aria-controls="mobile-sidebar"
+                >
+                  <Menu className="w-5 h-5" />
+                </Button>
+              </SheetTrigger>
+              <SheetContent
+                side="left"
+                className="p-0 w-64 bg-sidebar"
+                id="mobile-sidebar"
+                onInteractOutside={() => setMobileOpen(false)}
+                onEscapeKeyDown={() => setMobileOpen(false)}
               >
-                <Menu className="w-5 h-5" />
-              </Button>
-            </SheetTrigger>
-            <SheetContent
-              side="left"
-              className="p-0 w-64 bg-sidebar"
-              id="mobile-sidebar"
-              onInteractOutside={() => setMobileOpen(false)}
-              onEscapeKeyDown={() => setMobileOpen(false)}
+                <SheetHeader>
+                  <VisuallyHidden>
+                    <SheetTitle>Navigation</SheetTitle>
+                  </VisuallyHidden>
+                </SheetHeader>
+                {renderSidebar(false)}
+              </SheetContent>
+            </Sheet>
+            <Button
+              variant="ghost"
+              size="icon"
+              className="hidden md:inline-flex shrink-0 h-9 w-9"
+              onClick={() => setDesktopCollapsed((v) => !v)}
+              aria-label={desktopCollapsed ? "Expand sidebar" : "Collapse sidebar"}
+              title={desktopCollapsed ? "Expand sidebar" : "Collapse sidebar"}
             >
-              <SheetHeader>
-                <VisuallyHidden>
-                  <SheetTitle>Navigation</SheetTitle>
-                </VisuallyHidden>
-              </SheetHeader>
-              {renderSidebar(false)}
-            </SheetContent>
-          </Sheet>
-          <Button
-            variant="ghost"
-            size="icon"
-            className="hidden md:inline-flex shrink-0"
-            onClick={() => setDesktopCollapsed((v) => !v)}
-            aria-label={desktopCollapsed ? "Expand sidebar" : "Collapse sidebar"}
-            title={desktopCollapsed ? "Expand sidebar" : "Collapse sidebar"}
-          >
-            {desktopCollapsed ? <PanelLeftOpen className="w-5 h-5" /> : <PanelLeftClose className="w-5 h-5" />}
-          </Button>
-          <div className="ml-auto flex items-center gap-2 min-w-0 flex-wrap justify-end">
+              {desktopCollapsed ? <PanelLeftOpen className="w-5 h-5" /> : <PanelLeftClose className="w-5 h-5" />}
+            </Button>
+          </div>
+          <h1 className="min-w-0 truncate text-sm sm:text-base font-semibold text-foreground">
+            {pageTitle}
+          </h1>
+          <div className="flex items-center gap-1.5 sm:gap-2 shrink-0 justify-end">
             <ShiftToggle />
             {supported && permission === "granted" && subscribed && <TestPushButton />}
             <NotificationBell />
@@ -234,6 +247,45 @@ function AuthedShell() {
       />
     </div>
   );
+}
+
+function NavGroup({
+  label,
+  collapsed,
+  children,
+}: {
+  label: string;
+  collapsed: boolean;
+  children: React.ReactNode;
+}) {
+  return (
+    <div className="mb-3 last:mb-0">
+      {!collapsed && (
+        <div className="px-3 pb-1 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground/70">
+          {label}
+        </div>
+      )}
+      {collapsed && <div className="h-px bg-sidebar-border/60 mx-2 mb-1" aria-hidden="true" />}
+      <div className="space-y-0.5">{children}</div>
+    </div>
+  );
+}
+
+// Maps the current pathname to the human-facing page title shown in the
+// authenticated header. Falls back to the app name for unknown routes.
+function getPageTitle(pathname: string): string {
+  if (pathname === "/") return "Referrals";
+  if (pathname === "/referrals/new") return "New referral";
+  if (pathname.startsWith("/referrals/")) return "Referral";
+  if (pathname === "/postop-bookings") return "Post-op bookings";
+  if (pathname.startsWith("/postop-bookings/")) return "Post-op booking";
+  if (pathname === "/inbox") return "Inbox";
+  if (pathname === "/notifications") return "Notifications";
+  if (pathname === "/profile") return "Profile";
+  if (pathname === "/analytics") return "Analytics";
+  if (pathname === "/admin") return "Admin";
+  if (pathname === "/push-test") return "Push test";
+  return "SDH Critical Care";
 }
 
 function NavItem({
