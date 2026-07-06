@@ -67,6 +67,8 @@ export type DecryptedReferral = Tables<"referrals"> & {
   past_medical_history: string | null;
   baseline_function: string | null;
   reason_for_referral: string | null;
+  /** Names of encrypted fields that failed to decrypt for this row, if any. */
+  _decryption_failed_fields?: string[];
 };
 
 export type DecryptedReferralNote = Tables<"referral_notes"> & {
