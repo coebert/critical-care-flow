@@ -227,7 +227,7 @@ export type StartPasskeyAuthResult =
   | { status: "no_credentials"; code: "NO_PASSKEY_REGISTERED"; message: string };
 
 export const startPasskeyAuthentication = createServerFn({ method: "POST" })
-  .inputValidator((input: { email: string }) => input)
+  .inputValidator((input: unknown) => emailInputSchema.parse(input))
   .handler(async ({ data }): Promise<StartPasskeyAuthResult> => {
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const { rpID } = getRpAndOrigin();
