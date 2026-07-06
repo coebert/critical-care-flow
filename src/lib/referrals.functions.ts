@@ -385,7 +385,28 @@ export const listReferralsForList = createServerFn({ method: "GET" })
           `results are truncated. Add pagination before the active queue can exceed this.`,
       );
     }
-    return (data ?? []).map((r) => decryptReferralRow(r as any));
+    const rows = (data ?? []).map((r) => decryptReferralRow(r as any));
+
+    // Join clinician display names server-side to avoid a client-side N+1
+    // profile lookup for the "Taken by" column. RLS on profiles already
+    // permits authenticated users to read names.
+    const creatorIds = Array.from(
+      new Set(rows.map((r) => r.created_by).filter((id): id is string => !!id)),
+    );
+    if (creatorIds.length) {
+      const { data: profs } = await supabase
+        .from("profiles")
+        .select("id, full_name")
+        .in("id", creatorIds);
+      const nameById = new Map<string, string | null>(
+        (profs ?? []).map((p) => [p.id, p.full_name ?? null]),
+      );
+      for (const r of rows) {
+        r.creator_name = r.created_by ? nameById.get(r.created_by) ?? null : null;
+      }
+    }
+
+    return rows;
   });
 
 
