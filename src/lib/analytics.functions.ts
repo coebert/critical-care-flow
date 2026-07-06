@@ -2,30 +2,11 @@ import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { safeError } from "./safe-error";
-
-
-/**
- * Exported for unit tests. In production `context` is provided by the
- * `requireSupabaseAuth` middleware and always carries `supabase` (RLS-
- * scoped as the caller) plus `userId`. The RPC `has_role` is a security-
- * definer function, so RLS on `user_roles` cannot mask the caller's role.
- */
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-export async function assertAdmin(context: any) {
-  const { data, error } = await context.supabase.rpc("has_role", {
-    _user_id: context.userId,
-    _role: "admin",
-  });
-  if (error) throw safeError("analytics.assertAdmin", error, "Permission check failed.");
-  if (!data) {
-    // Surfaced to the client as a 403-style "Forbidden" state.
-    throw safeError(
-      "analytics.assertAdmin",
-      new Error("forbidden"),
-      "Forbidden: analytics are restricted to administrators.",
-    );
-  }
-}
+import type { Tables } from "@/integrations/supabase/types";
+import { assertAdmin } from "./auth-guards";
+// Re-export so existing unit tests importing `assertAdmin` from this module
+// keep working after the guard was consolidated into `auth-guards.ts`.
+export { assertAdmin };
 
 /**
  * Runtime guard: verifies that every row returned by an analytics query has
@@ -64,6 +45,21 @@ const rangeSchema = z
     message: "from must be <= to",
   });
 
+// Analytics only needs non-PHI columns. Explicitly project them so we never
+// pull ciphertext (`*_enc`) or the hospital-number hash into an analytics
+// payload — cheaper on the wire and impossible to leak downstream.
+const REFERRAL_ANALYTICS_COLUMNS =
+  "id,age,sex,current_ward,dnacpr_respect,referring_specialty," +
+  "referral_received_at,first_seen_at,decision_at,arrived_on_unit_at," +
+  "status,decline_reason,admission_urgency,consultant_to_consultant_only," +
+  "accepting_consultant,discussed_with_consultant,is_test," +
+  "deleted_at,deleted_by,created_at,created_by,updated_at";
+
+// Server returns the same row shape the analytics UI already consumes
+// (`Tables<"referrals">`), but only the safe columns are populated —
+// encrypted fields and the hospital-number hash are never selected.
+export type ReferralAnalyticsRow = Tables<"referrals">;
+
 export const getReferralsAnalytics = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
   .inputValidator((d: unknown) => rangeSchema.parse(d))
@@ -72,7 +68,7 @@ export const getReferralsAnalytics = createServerFn({ method: "GET" })
     try {
       const { data: rows, error } = await context.supabase
         .from("referrals")
-        .select("*")
+        .select(REFERRAL_ANALYTICS_COLUMNS)
         // Belt-and-braces: exclude any row marked as removed via either the
         // deleted_at timestamp OR the deleted_by attribution. A partially
         // written soft-delete (e.g. deleted_by set but deleted_at missing
@@ -86,7 +82,8 @@ export const getReferralsAnalytics = createServerFn({ method: "GET" })
         .lte("referral_received_at", data.to)
         .limit(5000);
       if (error) throw error;
-      return assertExcludesTestRows("getReferralsAnalytics", rows ?? []);
+      const typed = (rows ?? []) as unknown as ReferralAnalyticsRow[];
+      return assertExcludesTestRows("getReferralsAnalytics", typed) as ReferralAnalyticsRow[];
     } catch (err) {
       throw safeError("analytics.getReferralsAnalytics", err, "Could not load referrals analytics.");
     }
@@ -105,9 +102,16 @@ export const getPostopAnalytics = createServerFn({ method: "GET" })
   .handler(async ({ data, context }) => {
     await assertAdmin(context);
     try {
+      // Post-op analytics only needs non-PHI columns. Projecting explicitly
+      // avoids pulling ciphertext (`*_enc`) and the hospital-number hash
+      // over the wire; there is nothing to decrypt at the analytics layer.
+      const POSTOP_ANALYTICS_COLUMNS =
+        "id,age,sex,weight_kg,height_cm,bmi,predicted_level," +
+        "proposed_surgery_date,surgical_specialty,arrived_at,is_test," +
+        "deleted_at,deleted_by,created_at,created_by,updated_at";
       let query = context.supabase
         .from("postop_bookings")
-        .select("*")
+        .select(POSTOP_ANALYTICS_COLUMNS)
         // Belt-and-braces: exclude rows removed via either the deleted_at
         // timestamp OR the deleted_by attribution, so a partially written
         // soft-delete never leaks into analytics.
@@ -121,9 +125,11 @@ export const getPostopAnalytics = createServerFn({ method: "GET" })
       if (data.to) query = query.lte("created_at", data.to);
       const { data: rows, error } = await query;
       if (error) throw error;
-      const safeRows = assertExcludesTestRows("getPostopAnalytics", rows ?? []);
-      const { decryptRow } = await import("./postop-bookings-crypto.server");
-      return (safeRows as Array<Record<string, any>>).map(decryptRow) as Array<Record<string, any>>;
+      const safeRows = assertExcludesTestRows(
+        "getPostopAnalytics",
+        (rows ?? []) as unknown as Array<Tables<"postop_bookings">>,
+      );
+      return safeRows as Array<Tables<"postop_bookings">>;
     } catch (err) {
       throw safeError("analytics.getPostopAnalytics", err, "Could not load post-op analytics.");
     }

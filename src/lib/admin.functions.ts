@@ -2,15 +2,7 @@ import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { safeError } from "./safe-error";
-
-async function assertAdmin(context: any) {
-  const { data, error } = await context.supabase.rpc("has_role", {
-    _user_id: context.userId,
-    _role: "admin",
-  });
-  if (error) throw safeError("admin.assertAdmin", error, "Permission check failed.");
-  if (!data) throw new Error("Forbidden: admin role required");
-}
+import { assertAdmin } from "./auth-guards";
 
 export const inviteClinician = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
