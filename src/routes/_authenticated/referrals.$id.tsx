@@ -76,33 +76,8 @@ function ReferralDetail() {
   const deleteNoteFn = useServerFn(deleteNote);
   const logView = useServerFn(logReferralView);
   const removeReferral = useServerFn(deleteReferral);
-  const fetchHistory = useServerFn(getReferralHistory);
-  const [history, setHistory] = useState<ReferralAuditEntry[]>([]);
-  const [historyLoading, setHistoryLoading] = useState(false);
-  const [historyOpen, setHistoryOpen] = useState(false);
-  const [historyTotal, setHistoryTotal] = useState(0);
-  const [historyHasMore, setHistoryHasMore] = useState(false);
-  const HISTORY_PAGE_SIZE = 20;
-
-  const loadMoreHistory = async (reset = false) => {
-    if (historyLoading) return;
-    if (!reset && !historyHasMore) return;
-    setHistoryLoading(true);
-    try {
-      const currentOffset = reset ? 0 : history.length;
-      const page = await fetchHistory({
-        data: { referral_id: id, offset: currentOffset, limit: HISTORY_PAGE_SIZE },
-      });
-      setHistory((cur) => (reset ? page.entries : [...cur, ...page.entries]));
-      setHistoryTotal(page.total);
-      setHistoryHasMore(page.hasMore);
-    } catch (e: any) {
-      toast.error(e?.message ?? "Failed to load history");
-    } finally {
-      setHistoryLoading(false);
-    }
-  };
-  const historySentinelRef = useRef<HTMLDivElement>(null);
+  // Audit-trail state was extracted into <ReferralAuditTrail>. Note-history
+  // fetch below is a separate feature and stays put.
   const { user } = useAuth();
   const { hasRole: isAdmin } = useRole("admin");
   const [deleting, setDeleting] = useState(false);
