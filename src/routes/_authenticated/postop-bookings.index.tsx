@@ -42,6 +42,7 @@ type Booking = {
   predicted_level: "level_1" | "level_2" | "level_3";
   proposed_surgery_date: string | null;
   created_at: string;
+  created_by_name?: string | null;
   deleted_at?: string | null;
 };
 
