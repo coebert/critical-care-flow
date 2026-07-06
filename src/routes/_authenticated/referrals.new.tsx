@@ -497,7 +497,24 @@ function NewReferralPage() {
             />
             <Label htmlFor="c2c">Consultant-to-consultant referral only</Label>
           </div>
+          <div className="flex items-start justify-between gap-4 rounded-md border border-amber-400/60 bg-amber-50/40 dark:bg-amber-950/20 p-3">
+            <div>
+              <Label htmlFor="is-test" className="text-sm font-medium cursor-pointer">
+                Test / demonstration referral
+              </Label>
+              <p className="text-xs text-muted-foreground">
+                Mark as a test entry (not a real patient). Test referrals show a
+                badge on the list and are excluded from analytics.
+              </p>
+            </div>
+            <Switch
+              id="is-test"
+              checked={f.is_test}
+              onCheckedChange={(v) => set("is_test", v)}
+            />
+          </div>
         </Section>
+
 
         <Section title="Outcome">
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
