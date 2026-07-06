@@ -509,6 +509,7 @@ function ReferralDetail() {
         },
       });
       setNoteBody("");
+      await refetchNotes();
     } catch (err: any) {
       const msg = String(err?.message ?? "");
       const marker = "RECIPIENT_COVERAGE_CHANGED::";
