@@ -112,11 +112,21 @@ function InboxPage() {
   const { user } = useAuth();
   const search = Route.useSearch();
   const navigate = useNavigate({ from: "/inbox" });
-  const [items, setItems] = useState<Notification[]>([]);
-  const [loading, setLoading] = useState(true);
+  const queryClient = useQueryClient();
+  // Data primed by the route loader and read via suspense — no local
+  // "loading" state on cold render.
+  const { data: items } = useSuspenseQuery(notificationsQueryOptions);
+  const loading = false;
   const [busy, setBusy] = useState(false);
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [qInput, setQInput] = useState(search.q);
+
+  // Local helper: mutate the cached notifications list.
+  const patchItems = (updater: (prev: Notification[]) => Notification[]) => {
+    queryClient.setQueryData<Notification[]>(NOTIFICATIONS_QUERY_KEY, (cur) =>
+      updater(cur ?? []),
+    );
+  };
 
   // Keep local input in sync when URL changes externally (back/forward)
   useEffect(() => { setQInput(search.q); }, [search.q]);
@@ -130,38 +140,26 @@ function InboxPage() {
     return () => clearTimeout(t);
   }, [qInput, search.q, navigate]);
 
+  // Realtime: prepend new inserts into the cached list. Filtered by user_id
+  // so we don't receive teammates' notifications.
   useEffect(() => {
     if (!user) return;
-    let cancelled = false;
-    setLoading(true);
-    supabase
-      .from("notifications")
-      .select("*")
-      .order("created_at", { ascending: false })
-      .limit(500)
-      .then(({ data, error }) => {
-        if (cancelled) return;
-        if (error) toast.error("Could not load notifications");
-        setItems(data ?? []);
-        setLoading(false);
-      });
-
     const channel = supabase
       .channel(`inbox-${user.id}`)
       .on(
         "postgres_changes",
         { event: "INSERT", schema: "public", table: "notifications", filter: `user_id=eq.${user.id}` },
         (payload) => {
-          setItems((cur) => [payload.new as Notification, ...cur]);
+          patchItems((cur) => [payload.new as Notification, ...cur]);
         },
       )
       .subscribe();
-
     return () => {
-      cancelled = true;
       supabase.removeChannel(channel);
     };
-  }, [user]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user?.id]);
+
 
   const unreadCount = useMemo(() => items.filter((i) => !i.read_at).length, [items]);
 
