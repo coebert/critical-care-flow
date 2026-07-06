@@ -24,7 +24,7 @@ export const Route = createFileRoute("/security")({
 
 function SecurityPage() {
   return (
-    <main id="main" className="min-h-screen bg-background px-4 py-10">
+    <main id="main" className="min-h-dvh bg-background px-4 py-10">
       <article className="mx-auto max-w-3xl prose prose-slate dark:prose-invert">
         <h1>Security &amp; vulnerability disclosure</h1>
         <p className="lead">

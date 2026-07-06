@@ -24,7 +24,7 @@ export const Route = createFileRoute("/privacy")({
 
 function PrivacyPage() {
   return (
-    <main id="main" className="min-h-screen bg-background px-4 py-10">
+    <main id="main" className="min-h-dvh bg-background px-4 py-10">
       <article className="mx-auto max-w-3xl prose prose-slate dark:prose-invert">
         <p className="text-sm text-muted-foreground">
           This page is maintained by Salisbury NHS Foundation Trust to explain how the SDH Critical Care referral tracker processes personal data.
