@@ -1,7 +1,9 @@
 import { useNavigate } from "@tanstack/react-router";
 import { format } from "date-fns";
 import { Badge } from "@/components/ui/badge";
-import { Baby, HelpCircle } from "lucide-react";
+import { Skeleton } from "@/components/ui/skeleton";
+import { EmptyState } from "@/components/ui/empty-state";
+import { Baby, HelpCircle, Inbox } from "lucide-react";
 import { tzTooltip } from "@/lib/format-timestamp";
 import {
   ADMISSION_URGENCY_BADGE,
@@ -13,6 +15,8 @@ import {
   statusStyles,
   type Referral,
 } from "@/lib/referrals-list-utils";
+
+const SKELETON_ROWS = 5;
 
 interface Props {
   rows: Referral[];
@@ -62,11 +66,26 @@ export function ReferralsRows({ rows, loading, timerSort, onToggleTimerSort }: P
               </tr>
             </thead>
             <tbody>
-              {loading && (
-                <tr><td colSpan={10} className="px-3 py-8 text-center text-muted-foreground">Loading…</td></tr>
-              )}
+              {loading && Array.from({ length: SKELETON_ROWS }).map((_, i) => (
+                <tr key={`sk-${i}`} className="border-t">
+                  {Array.from({ length: 10 }).map((__, j) => (
+                    <td key={j} className="px-3 py-3">
+                      <Skeleton className="h-3 w-full max-w-[120px]" />
+                    </td>
+                  ))}
+                </tr>
+              ))}
               {!loading && rows.length === 0 && (
-                <tr><td colSpan={10} className="px-3 py-8 text-center text-muted-foreground">No referrals match.</td></tr>
+                <tr>
+                  <td colSpan={10} className="px-3 py-4">
+                    <EmptyState
+                      icon={Inbox}
+                      title="No referrals match"
+                      description="Try clearing filters or adjusting the date range to widen the search."
+                      compact
+                    />
+                  </td>
+                </tr>
               )}
               {rows.map((r) => (
                 <tr
@@ -153,11 +172,23 @@ export function ReferralsRows({ rows, loading, timerSort, onToggleTimerSort }: P
 
       {/* Mobile cards */}
       <div className="md:hidden flex flex-col gap-3">
-        {loading && (
-          <div className="text-center text-muted-foreground py-8">Loading…</div>
-        )}
+        {loading && Array.from({ length: SKELETON_ROWS }).map((_, i) => (
+          <div key={`sk-${i}`} className="border rounded-lg p-4 space-y-2 bg-card">
+            <div className="flex items-center justify-between">
+              <Skeleton className="h-3 w-24" />
+              <Skeleton className="h-4 w-16" />
+            </div>
+            <Skeleton className="h-3 w-32" />
+            <Skeleton className="h-3 w-full" />
+            <Skeleton className="h-3 w-2/3" />
+          </div>
+        ))}
         {!loading && rows.length === 0 && (
-          <div className="text-center text-muted-foreground py-8">No referrals match.</div>
+          <EmptyState
+            icon={Inbox}
+            title="No referrals match"
+            description="Try clearing filters or adjusting the date range to widen the search."
+          />
         )}
         {rows.map((r) => (
           <div
