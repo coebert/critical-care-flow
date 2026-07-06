@@ -559,6 +559,25 @@ function ReferralsList() {
         </div>
       )}
 
+      <div className="flex flex-wrap gap-2 mb-4 items-center">
+        <span className="text-xs uppercase text-muted-foreground mr-1">Age group</span>
+        <Button
+          size="sm"
+          variant={pediatricFilter === "all" ? "default" : "outline"}
+          onClick={() => setPediatricFilter("all")}
+        >
+          All ages
+        </Button>
+        <Button
+          size="sm"
+          variant={pediatricFilter === "pediatric" ? "default" : "outline"}
+          onClick={() => setPediatricFilter("pediatric")}
+        >
+          <Baby className="w-3.5 h-3.5 mr-1" />
+          Pediatric (≤16)
+        </Button>
+      </div>
+
 
       {/* Desktop table */}
       <div className="hidden md:block border rounded-md bg-card overflow-hidden">
