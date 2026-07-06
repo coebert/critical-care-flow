@@ -28,6 +28,12 @@ export const Route = createFileRoute("/_authenticated/postop-bookings/")({
     meta: [{ title: "Post-op HDU/ICU bookings — SDH Critical Care" }],
   }),
   component: PostopBookingsList,
+  errorComponent: ({ error }) => (
+    <pre className="p-4 text-xs text-destructive whitespace-pre-wrap">
+      POSTOP DEBUG: {String((error as any)?.message ?? error)}{"\n\n"}
+      {String((error as any)?.stack ?? "")}
+    </pre>
+  ),
 });
 
 type Booking = {
