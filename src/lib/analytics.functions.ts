@@ -3,10 +3,10 @@ import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { safeError } from "./safe-error";
 import type { Tables } from "@/integrations/supabase/types";
+import { assertAdmin } from "./auth-guards";
 // Re-export so existing unit tests importing `assertAdmin` from this module
 // keep working after the guard was consolidated into `auth-guards.ts`.
-export { assertAdmin } from "./auth-guards";
-import { assertAdmin } from "./auth-guards";
+export { assertAdmin };
 
 /**
  * Runtime guard: verifies that every row returned by an analytics query has
