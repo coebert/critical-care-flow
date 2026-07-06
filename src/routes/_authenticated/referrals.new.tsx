@@ -56,6 +56,7 @@ type PriorReferral = {
 
 export const Route = createFileRoute("/_authenticated/referrals/new")({
   head: () => ({ meta: [{ title: "New referral — SDH Critical Care" }] }),
+  errorComponent: ({ error }) => <RouteErrorFallback error={error} label="New referral" />,
   component: NewReferralPage,
 });
 
