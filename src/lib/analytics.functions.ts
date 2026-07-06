@@ -121,7 +121,8 @@ export const getReferralsAnalytics = createServerFn({ method: "GET" })
         .lte("referral_received_at", data.to)
         .limit(5000);
       if (error) throw error;
-      return assertExcludesTestRows("getReferralsAnalytics", rows ?? []);
+      const typed = (rows ?? []) as unknown as ReferralAnalyticsRow[];
+      return assertExcludesTestRows("getReferralsAnalytics", typed) as ReferralAnalyticsRow[];
     } catch (err) {
       throw safeError("analytics.getReferralsAnalytics", err, "Could not load referrals analytics.");
     }
