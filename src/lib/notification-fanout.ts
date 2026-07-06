@@ -118,6 +118,9 @@ export function selectRecipients(
       if (!eligible.has(p.id) || p.id === actorId) return false;
       if (kind === "note" && p.notify_notes === false) return false;
       if (kind === "status" && p.notify_status === false) return false;
+      if (kind === "new" && p.notify_new_referral === false) return false;
+      if (kind === "updated" && p.notify_updated_referral === false) return false;
+
       return true;
     })
     .map((p) => p.id);
