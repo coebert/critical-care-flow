@@ -90,7 +90,7 @@ export function ReferralsRows({ rows, loading, timerSort, onToggleTimerSort }: P
               {rows.map((r) => (
                 <tr
                   key={r.id}
-                  className={`border-t cursor-pointer hover:bg-muted/40 ${rowBgStyles[r.status] ?? ""}`}
+                  className={`border-t cursor-pointer transition-colors duration-150 hover:bg-muted/40 ${rowBgStyles[r.status] ?? ""}`}
                   role="link"
                   tabIndex={0}
                   onClick={() => navigate({ to: "/referrals/$id", params: { id: r.id } })}
