@@ -111,6 +111,7 @@ function ReferralsList() {
   const [urgencyFilter, setUrgencyFilter] = useState<"all" | AdmissionUrgency>("all");
   const [locFilter, setLocFilter] = useState<string>("all");
   const [dateFilter, setDateFilter] = useState<"all" | "today" | "yesterday" | "7d" | "30d">("all");
+  const [pediatricFilter, setPediatricFilter] = useState<"all" | "pediatric">("all");
   const [showDeleted, setShowDeleted] = useState(false);
   const [deletedRows, setDeletedRows] = useState<Referral[]>([]);
   const [deletedLoading, setDeletedLoading] = useState(false);
