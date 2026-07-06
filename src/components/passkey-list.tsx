@@ -16,7 +16,12 @@ import { Fingerprint, Loader2, Plus, Trash2 } from "lucide-react";
 import { format } from "date-fns";
 import { toast } from "sonner";
 import { listMyPasskeys, deleteMyPasskey } from "@/lib/webauthn.functions";
-import { isPasskeySupported, registerPasskey, PASSKEY_BLOCKED_BY_FRAME } from "@/lib/passkeys";
+import {
+  isPasskeySupported,
+  registerPasskey,
+  PASSKEY_BLOCKED_BY_FRAME,
+  isUnauthorizedPasskeyError,
+} from "@/lib/passkeys";
 
 type Passkey = {
   id: string;
@@ -52,6 +57,23 @@ export function PasskeyList() {
     void refresh();
   }, [refresh]);
 
+  const handleUnauthorized = useCallback(
+    (context: "add" | "remove") => {
+      toast.error("You're not signed in for this action", {
+        description:
+          context === "add"
+            ? "Your session may have expired, or the passkey didn't belong to your account. The list has been refreshed — please sign in again if needed and retry."
+            : "Your session may have expired, or this passkey no longer belongs to your account. The list has been refreshed.",
+        duration: 8000,
+      });
+      // Reconcile local state with the server — the failed op may have left
+      // a stale row visible, or a rejected registration may have partially
+      // written and been rolled back. `refresh()` is the source of truth.
+      void refresh();
+    },
+    [refresh],
+  );
+
   const addPasskey = async () => {
     setAddingKey(true);
     try {
@@ -68,6 +90,8 @@ export function PasskeyList() {
             ? { label: "Open in new tab", onClick: () => window.open(window.location.href, "_blank", "noopener") }
             : undefined,
         });
+      } else if (isUnauthorizedPasskeyError(err)) {
+        handleUnauthorized("add");
       } else if (err instanceof Error && err.name === "NotAllowedError") {
         toast.message("Passkey setup cancelled");
       } else {
@@ -87,7 +111,12 @@ export function PasskeyList() {
       setConfirmDelete(null);
       await refresh();
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Could not remove passkey");
+      if (isUnauthorizedPasskeyError(err)) {
+        setConfirmDelete(null);
+        handleUnauthorized("remove");
+      } else {
+        toast.error(err instanceof Error ? err.message : "Could not remove passkey");
+      }
     } finally {
       setDeleting(false);
     }
