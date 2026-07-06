@@ -114,8 +114,9 @@ export const getPostopAnalytics = createServerFn({ method: "GET" })
       if (data.to) query = query.lte("created_at", data.to);
       const { data: rows, error } = await query;
       if (error) throw error;
+      const safeRows = assertExcludesTestRows("getPostopAnalytics", rows ?? []);
       const { decryptRow } = await import("./postop-bookings-crypto.server");
-      return ((rows ?? []) as Array<Record<string, any>>).map(decryptRow) as Array<Record<string, any>>;
+      return (safeRows as Array<Record<string, any>>).map(decryptRow) as Array<Record<string, any>>;
     } catch (err) {
       throw safeError("analytics.getPostopAnalytics", err, "Could not load post-op analytics.");
     }
