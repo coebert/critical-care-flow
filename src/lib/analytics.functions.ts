@@ -4,7 +4,14 @@ import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { safeError } from "./safe-error";
 
 
-async function assertAdmin(context: any) {
+/**
+ * Exported for unit tests. In production `context` is provided by the
+ * `requireSupabaseAuth` middleware and always carries `supabase` (RLS-
+ * scoped as the caller) plus `userId`. The RPC `has_role` is a security-
+ * definer function, so RLS on `user_roles` cannot mask the caller's role.
+ */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export async function assertAdmin(context: any) {
   const { data, error } = await context.supabase.rpc("has_role", {
     _user_id: context.userId,
     _role: "admin",
