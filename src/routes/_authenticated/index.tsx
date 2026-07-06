@@ -201,43 +201,22 @@ function ReferralsList() {
     }
   };
 
-  const fetchList = useServerFn(listReferralsForList);
-
+  // Realtime payloads contain encrypted fields, so we can't apply them
+  // in-place. Use them purely as an invalidation signal — TanStack Query
+  // will refetch (deduped by `staleTime` on the options) and swap the data.
   useEffect(() => {
-    let cancelled = false;
-    let pending = false;
-    let queued = false;
-
-    const load = async () => {
-      if (pending) { queued = true; return; }
-      pending = true;
-      try {
-        const data = await fetchList();
-        if (!cancelled) setRows((data ?? []) as Referral[]);
-      } catch {
-        // leave existing rows in place on transient failure
-      } finally {
-        if (!cancelled) setLoading(false);
-        pending = false;
-        if (queued) { queued = false; load(); }
-      }
-    };
-
-    load();
-
-    // Realtime payloads contain encrypted fields, so use them only as a
-    // signal to refetch the decrypted list from the server.
     const ch = supabase
       .channel("referrals-list")
       .on("postgres_changes", { event: "*", schema: "public", table: "referrals" }, () => {
-        load();
+        queryClient.invalidateQueries({ queryKey: REFERRALS_LIST_QUERY_KEY });
       })
       .subscribe();
     return () => {
-      cancelled = true;
       supabase.removeChannel(ch);
     };
-  }, [fetchList]);
+  }, [queryClient]);
+
+
 
 
   // Resolve clinician names for the "Taken by" column.
