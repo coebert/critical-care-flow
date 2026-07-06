@@ -70,7 +70,11 @@ export const getPostopAnalytics = createServerFn({ method: "GET" })
       let query = context.supabase
         .from("postop_bookings")
         .select("*")
+        // Belt-and-braces: exclude rows removed via either the deleted_at
+        // timestamp OR the deleted_by attribution, so a partially written
+        // soft-delete never leaks into analytics.
         .is("deleted_at", null)
+        .is("deleted_by", null)
         .order("created_at", { ascending: false })
         .limit(5000);
       if (data.from) query = query.gte("created_at", data.from);
