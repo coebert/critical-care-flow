@@ -1,10 +1,12 @@
 import { Link, useNavigate } from "@tanstack/react-router";
 import { formatDistanceToNow } from "date-fns";
-import { Bell, Check, ChevronLeft, ChevronRight, ExternalLink, X } from "lucide-react";
+import { Bell, Check, ChevronLeft, ChevronRight, ExternalLink, Filter, X } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
+import { Skeleton } from "@/components/ui/skeleton";
+import { EmptyState } from "@/components/ui/empty-state";
 import { kindLabel, PAGE_SIZE, type Notification } from "@/lib/inbox-utils";
 
 interface Props {
