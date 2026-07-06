@@ -97,16 +97,6 @@ function kindLabel(kind: string): string {
 }
 
 
-function kindLabel(kind: string): string {
-  switch (kind) {
-    case "new": return "New referral";
-    case "status": return "Status change";
-    case "note": return "New note";
-    case "updated": return "Referral updated";
-    case "warning": return "Warning";
-    default: return kind;
-  }
-}
 
 function InboxPage() {
   const { user } = useAuth();
