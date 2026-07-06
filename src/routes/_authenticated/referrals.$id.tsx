@@ -1,6 +1,7 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useEffect, useRef, useState } from "react";
 import { useServerFn } from "@tanstack/react-start";
+import { queryOptions, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { deleteNote, deleteReferral, findReferralsByHospitalNumber, getNoteHistory, getReferralDetail, logReferralView, updateNote, updateReferral, type DecryptedReferral, type DecryptedReferralNote } from "@/lib/referrals.functions";
 import { ReferralAuditTrail } from "@/components/referral-audit-trail";
@@ -51,13 +52,27 @@ type Note = Tables<"referral_notes"> & DecryptedReferralNote & {
   _e2eStatus?: "plaintext" | "legacy-server-enc" | "e2e-decrypted" | "e2e-locked" | "e2e-no-key" | "e2e-failed";
 };
 
+// Queryable cache key for a single referral's decrypted detail. The loader
+// primes this so navigation from the list page shows data on first paint;
+// the component still owns local `ref` state for form edits (to avoid
+// realtime refetches clobbering unsaved input), but seeds it from the cache.
+const referralDetailQueryOptions = (id: string) =>
+  queryOptions({
+    queryKey: ["referrals", "detail", id] as const,
+    queryFn: () => getReferralDetail({ data: { id } }),
+    staleTime: 5_000,
+  });
+
 export const Route = createFileRoute("/_authenticated/referrals/$id")({
   validateSearch: (search: Record<string, unknown>) => ({
     highlight: typeof search.highlight === "string" ? search.highlight : undefined,
   }),
   head: () => ({ meta: [{ title: "Referral — SDH Critical Care" }, { name: "robots", content: "noindex" }] }),
+  loader: ({ context, params }) =>
+    context.queryClient.ensureQueryData(referralDetailQueryOptions(params.id)),
   component: ReferralDetail,
 });
+
 
 function toLocal(iso: string | null) {
   if (!iso) return "";
