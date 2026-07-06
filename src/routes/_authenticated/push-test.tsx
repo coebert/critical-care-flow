@@ -10,6 +10,7 @@ import { sendTestPushNotification } from "@/lib/push.functions";
 import { verifyPushSubscription } from "@/lib/push-verify.functions";
 import { recordTestPushSuccess } from "@/lib/last-test-push";
 import { toast } from "sonner";
+import { format } from "date-fns";
 
 export const Route = createFileRoute("/_authenticated/push-test")({
   head: () => ({
@@ -166,7 +167,7 @@ function PushTestPage() {
         setStep(
           "verify",
           "ok",
-          `Row found · last used ${new Date(result.lastUsedAt ?? result.createdAt ?? Date.now()).toLocaleString()}`,
+          `Row found · last used ${format(new Date(result.lastUsedAt ?? result.createdAt ?? Date.now()), "dd/MM/yyyy HH:mm:ss")}`,
         );
 
         setStep("send", "running", "Dispatching test push…");

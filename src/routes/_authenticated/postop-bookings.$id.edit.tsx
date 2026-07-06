@@ -16,6 +16,7 @@ import {
 } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
 import { toast } from "sonner";
+import { format } from "date-fns";
 import { ArrowLeft } from "lucide-react";
 import {
   SURGICAL_SPECIALTY_LABEL,
@@ -332,7 +333,7 @@ function EditPostopBookingPage() {
                   <span className="font-medium">{e.user_name}</span>
                   {" · "}
                   <span className="text-muted-foreground">
-                    {new Date(e.created_at).toLocaleString()}
+                    {format(new Date(e.created_at), "dd/MM/yyyy HH:mm:ss")}
                   </span>
                 </div>
                 {e.action === "update" && e.changes.length > 0 && (
