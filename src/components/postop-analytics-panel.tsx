@@ -29,10 +29,6 @@ const LEVEL_LABELS: Record<string, string> = {
 
 export function PostopAnalyticsPanel() {
   const listFn = useServerFn(getPostopAnalytics);
-  const { data: bookings = [] } = useQuery({
-    queryKey: ["postop-analytics"],
-    queryFn: () => listFn({ data: {} }),
-  });
 
   const [range, setRange] = useState<DateRange>(() => ({
     from: startOfDay(subDays(new Date(), 89)),
@@ -42,7 +38,20 @@ export function PostopAnalyticsPanel() {
   const from = range.from ? startOfDay(range.from) : startOfDay(subDays(new Date(), 89));
   const to = range.to ? endOfDay(range.to) : endOfDay(range.from ?? new Date());
   const days = Math.max(1, differenceInCalendarDays(to, from) + 1);
+  const fromIso = from.toISOString();
+  const toIso = to.toISOString();
 
+  // Push the date range into both the queryKey and the server call so the
+  // panel does not download the entire postop history and filter it
+  // client-side.
+  const { data: bookings = [] } = useQuery({
+    queryKey: ["postop-analytics", fromIso, toIso],
+    queryFn: () => listFn({ data: { from: fromIso, to: toIso } }),
+  });
+
+  // Server already scopes to [from, to], but keep this trivial filter so any
+  // rows returned outside the requested window (e.g. cached staler data) are
+  // ignored in the derivations below.
   const filtered = useMemo(
     () =>
       bookings.filter((b) => {
