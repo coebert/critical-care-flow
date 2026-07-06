@@ -57,6 +57,7 @@ export const Route = createFileRoute("/_authenticated/referrals/$id")({
     context.queryClient.ensureQueryData(referralNotesQueryOptions(params.id));
     return context.queryClient.ensureQueryData(referralDetailQueryOptions(params.id));
   },
+  errorComponent: ({ error }) => <RouteErrorFallback error={error} label="Referral" />,
   component: ReferralDetail,
 });
 
