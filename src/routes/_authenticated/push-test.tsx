@@ -12,6 +12,8 @@ import { recordTestPushSuccess } from "@/lib/last-test-push";
 import { toast } from "sonner";
 import { format } from "date-fns";
 
+import { AdminOnly } from "@/components/admin-only";
+
 export const Route = createFileRoute("/_authenticated/push-test")({
   head: () => ({
     meta: [
@@ -20,7 +22,11 @@ export const Route = createFileRoute("/_authenticated/push-test")({
       { name: "robots", content: "noindex,nofollow" },
     ],
   }),
-  component: PushTestPage,
+  component: () => (
+    <AdminOnly redirectTo="/notifications">
+      <PushTestPage />
+    </AdminOnly>
+  ),
 });
 
 type StepState = "idle" | "running" | "ok" | "fail";
