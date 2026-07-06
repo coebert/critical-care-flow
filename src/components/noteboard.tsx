@@ -1,25 +1,24 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useServerFn } from "@tanstack/react-start";
 import { queryOptions, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Lock, LockOpen } from "lucide-react";
 import { toast } from "sonner";
 
-
-import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
-
-import { NoteItem } from "@/components/note-item";
 import { NoteComposer, validateNoteBody } from "@/components/note-composer";
 import { ConfirmReducedRecipientsDialog } from "@/components/confirm-reduced-recipients-dialog";
 import { NoteMissingRecipientsAlert } from "@/components/note-missing-recipients-alert";
 import { NotePartialCoverageAlert } from "@/components/note-partial-coverage-alert";
 import { E2EUnlockModal } from "@/components/e2e-unlock-modal";
+import { NoteboardHeader } from "@/components/noteboard/noteboard-header";
+import { NoteboardList } from "@/components/noteboard/noteboard-list";
 
 import { supabase } from "@/integrations/supabase/client";
-import { addEncryptedNote, listEncryptedNotes, updateEncryptedNote } from "@/lib/encrypted-notes.functions";
+import {
+  addEncryptedNote,
+  listEncryptedNotes,
+  updateEncryptedNote,
+} from "@/lib/encrypted-notes.functions";
 import { deleteNote, updateNote } from "@/lib/referrals.functions";
 import { getMyPrivateKeyMaterial, getPublicKeyDirectory } from "@/lib/e2e-keys.functions";
 import { encryptNote as e2eEncryptNote } from "@/lib/e2e-crypto";
@@ -29,6 +28,11 @@ import { useDecryptedNotes } from "@/hooks/use-decrypted-notes";
 import { useRecipientDirectory, type DirectoryEntry } from "@/hooks/use-recipient-directory";
 import { useRecipientCoverage } from "@/hooks/use-recipient-coverage";
 import { friendlyE2EError } from "@/lib/friendly-e2e-error";
+import {
+  countNotesByFilter,
+  matchesNoteFilter,
+  type NoteFilter,
+} from "@/lib/note-filter";
 
 // Raw ciphertext rows for a referral's notes. Exported so the route loader
 // can prime the cache before mount.
@@ -51,7 +55,8 @@ interface NoteboardProps {
  *  - the E2E session bootstrap, unlock modal, and queued-action retry
  *  - the compose textarea, chip picker, and reduced-set opt-in dialog
  *
- * The parent route only supplies the `referralId`.
+ * The parent route only supplies the `referralId`. Header, list, and filter
+ * live in sibling presentational components under `components/noteboard/`.
  */
 export function Noteboard({ referralId: id }: NoteboardProps) {
   const { user } = useAuth();
@@ -78,7 +83,7 @@ export function Noteboard({ referralId: id }: NoteboardProps) {
 
   const [noteBody, setNoteBody] = useState("");
   const [posting, setPosting] = useState(false);
-  const [noteFilter, setNoteFilter] = useState<"all" | "e2e" | "legacy" | "failed">("all");
+  const [noteFilter, setNoteFilter] = useState<NoteFilter>("all");
   const [unlockOpen, setUnlockOpen] = useState(false);
   const [confirmMissingOpen, setConfirmMissingOpen] = useState(false);
   const pendingActionRef = useRef<null | (() => Promise<void>)>(null);
@@ -92,10 +97,17 @@ export function Noteboard({ referralId: id }: NoteboardProps) {
   useEffect(() => {
     const ch = supabase
       .channel(`ref-notes-${id}`)
-      .on("postgres_changes", { event: "*", schema: "public", table: "referral_notes", filter: `referral_id=eq.${id}` },
-        () => { refetchNotes(); })
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "referral_notes", filter: `referral_id=eq.${id}` },
+        () => {
+          refetchNotes();
+        },
+      )
       .subscribe();
-    return () => { supabase.removeChannel(ch); };
+    return () => {
+      supabase.removeChannel(ch);
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id]);
 
@@ -117,9 +129,12 @@ export function Noteboard({ referralId: id }: NoteboardProps) {
     (async () => {
       if (!e2e.hydrated) await e2e.hydrateFromSession();
       try {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const res: any = await fetchKeyMaterial();
         e2e.setMaterial(res?.material ?? null, res?.public_key ?? null);
-      } catch { /* non-fatal */ }
+      } catch {
+        /* non-fatal */
+      }
     })();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user?.id]);
@@ -136,7 +151,8 @@ export function Noteboard({ referralId: id }: NoteboardProps) {
   const encryptForRecipients = async (body: string, recipientIds: Set<string>) => {
     const dir = await fetchKeyDir();
     const byId = new Map<string, string>();
-    for (const r of (dir ?? []) as any[]) {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    for (const r of ((dir ?? []) as any[])) {
       if (r.public_key) byId.set(r.user_id, r.public_key as string);
     }
     if (e2e.publicKey && user && !byId.has(user.id)) byId.set(user.id, e2e.publicKey);
@@ -179,6 +195,7 @@ export function Noteboard({ referralId: id }: NoteboardProps) {
       });
       setNoteBody("");
       await refetchNotes();
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
     } catch (err: any) {
       const msg = String(err?.message ?? "");
       const marker = "RECIPIENT_COVERAGE_CHANGED::";
@@ -191,7 +208,9 @@ export function Noteboard({ referralId: id }: NoteboardProps) {
         } | null = null;
         try {
           payload = JSON.parse(msg.slice(idx + marker.length));
-        } catch { /* fall through to generic toast */ }
+        } catch {
+          /* fall through to generic toast */
+        }
         await loadDirectory();
         if (payload) {
           const fmt = (people: Array<{ full_name: string }>) =>
@@ -213,7 +232,9 @@ export function Noteboard({ referralId: id }: NoteboardProps) {
             duration: 12000,
             action: {
               label: "Refresh recipients",
-              onClick: () => { loadDirectory(); },
+              onClick: () => {
+                loadDirectory();
+              },
             },
           });
         } else {
@@ -254,13 +275,11 @@ export function Noteboard({ referralId: id }: NoteboardProps) {
     await doPostNote();
   };
 
-  const filteredNotes = notes.filter((n) => {
-    if (noteFilter === "all") return true;
-    if (noteFilter === "e2e") return n._e2eStatus === "e2e-decrypted" || n._e2eStatus === "e2e-locked" || n._e2eStatus === "e2e-no-key" || n._e2eStatus === "e2e-failed";
-    if (noteFilter === "legacy") return n._e2eStatus === "legacy-server-enc" || n._e2eStatus === "plaintext";
-    if (noteFilter === "failed") return n._e2eStatus === "e2e-failed";
-    return true;
-  });
+  const filteredNotes = useMemo(
+    () => notes.filter((n) => matchesNoteFilter(n, noteFilter)),
+    [notes, noteFilter],
+  );
+  const filterCounts = useMemo(() => countNotesByFilter(notes), [notes]);
 
   const toggleRecipient = (userId: string) => {
     setRecipientsTouched(true);
@@ -275,41 +294,14 @@ export function Noteboard({ referralId: id }: NoteboardProps) {
   return (
     <>
       <Card className="p-5">
-        <div className="flex items-center justify-between gap-2 mb-1 flex-wrap">
-          <div className="flex items-center gap-3 flex-wrap">
-            <h2 className="font-semibold flex items-center gap-2">
-              Noteboard
-              {e2e.isUnlocked ? (
-                <Badge variant="outline" className="text-[10px] gap-1">
-                  <LockOpen className="w-3 h-3" /> E2E unlocked
-                </Badge>
-              ) : (
-                <Badge variant="outline" className="text-[10px] gap-1">
-                  <Lock className="w-3 h-3" /> E2E locked
-                </Badge>
-              )}
-            </h2>
-            <Select value={noteFilter} onValueChange={(v) => setNoteFilter(v as typeof noteFilter)}>
-              <SelectTrigger className="h-7 text-xs w-auto min-w-[140px]">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All notes ({notes.length})</SelectItem>
-                <SelectItem value="e2e">E2E encrypted ({notes.filter((n) => n._e2eStatus === "e2e-decrypted" || n._e2eStatus === "e2e-locked" || n._e2eStatus === "e2e-no-key" || n._e2eStatus === "e2e-failed").length})</SelectItem>
-                <SelectItem value="legacy">Legacy plaintext ({notes.filter((n) => n._e2eStatus === "legacy-server-enc" || n._e2eStatus === "plaintext").length})</SelectItem>
-                <SelectItem value="failed">Failed to decrypt ({notes.filter((n) => n._e2eStatus === "e2e-failed").length})</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-          {!e2e.isUnlocked && (
-            <Button size="sm" variant="outline" onClick={() => setUnlockOpen(true)}>
-              {e2e.needsBootstrap ? "Enable encryption" : "Unlock notes"}
-            </Button>
-          )}
-        </div>
-        <p className="text-xs text-muted-foreground mb-3">
-          Messages are end-to-end encrypted in your browser — the server only stores ciphertext.
-        </p>
+        <NoteboardHeader
+          isUnlocked={e2e.isUnlocked}
+          needsBootstrap={e2e.needsBootstrap}
+          filter={noteFilter}
+          onFilterChange={setNoteFilter}
+          counts={filterCounts}
+          onUnlockRequest={() => setUnlockOpen(true)}
+        />
         {e2e.isUnlocked && (
           <>
             <NoteMissingRecipientsAlert missingRecipients={coverage.missingRecipients} />
@@ -333,51 +325,41 @@ export function Noteboard({ referralId: id }: NoteboardProps) {
             setSelectedRecipients(next);
           }}
         />
-        <div className="space-y-3 max-h-[520px] overflow-auto">
-          {filteredNotes.length === 0 && (
-            <p className="text-xs text-muted-foreground">
-              {notes.length === 0 ? "No notes yet." : "No notes match the selected filter."}
-            </p>
-          )}
-          {filteredNotes.map((n) => (
-            <NoteItem
-              key={n.id}
-              note={n}
-              authorName={authors[n.author_id] ?? "Clinician"}
-              authorMap={authors}
-              directory={directoryWithSelf}
-              currentUserId={user?.id}
-              canEdit={!!user && (user.id === n.author_id || isAdmin) && n._e2eStatus !== "e2e-locked" && n._e2eStatus !== "e2e-no-key" && n._e2eStatus !== "e2e-failed" && n._e2eStatus !== "legacy-server-enc" && n._e2eStatus !== "plaintext"}
-              onSave={async (body, recipients) => {
-                if (n.body_ciphertext) {
-                  const retry = () => (async () => {
-                    const enc2 = await encryptForRecipients(body, recipients ?? new Set());
-                    await editEncNote({ data: { id: n.id, ...enc2 } });
-                    await refetchNotes();
-                    toast.success("Note updated");
-                  })();
-                  if (!ensureUnlocked(() => retry())) return;
-                  if (!recipients || recipients.size === 0) {
-                    toast.error("Pick at least one recipient before saving.");
-                    return;
-                  }
-                  const enc = await encryptForRecipients(body, recipients);
-                  await editEncNote({ data: { id: n.id, ...enc } });
-                  await refetchNotes();
-                } else {
-                  await updateNoteFn({ data: { id: n.id, body } });
-                  await refetchNotes();
-                }
-                toast.success("Note updated");
-              }}
-              onDelete={async () => {
-                await deleteNoteFn({ data: { id: n.id } });
+        <NoteboardList
+          notes={filteredNotes}
+          authors={authors}
+          directory={directoryWithSelf}
+          currentUserId={user?.id}
+          isAdmin={isAdmin}
+          totalNotes={notes.length}
+          onSave={async (n, body, recipients) => {
+            if (n.body_ciphertext) {
+              const retry = () => (async () => {
+                const enc2 = await encryptForRecipients(body, recipients ?? new Set());
+                await editEncNote({ data: { id: n.id, ...enc2 } });
                 await refetchNotes();
-                toast.success("Note deleted");
-              }}
-            />
-          ))}
-        </div>
+                toast.success("Note updated");
+              })();
+              if (!ensureUnlocked(() => retry())) return;
+              if (!recipients || recipients.size === 0) {
+                toast.error("Pick at least one recipient before saving.");
+                return;
+              }
+              const enc = await encryptForRecipients(body, recipients);
+              await editEncNote({ data: { id: n.id, ...enc } });
+              await refetchNotes();
+            } else {
+              await updateNoteFn({ data: { id: n.id, body } });
+              await refetchNotes();
+            }
+            toast.success("Note updated");
+          }}
+          onDelete={async (n) => {
+            await deleteNoteFn({ data: { id: n.id } });
+            await refetchNotes();
+            toast.success("Note deleted");
+          }}
+        />
       </Card>
 
       <E2EUnlockModal
@@ -393,6 +375,7 @@ export function Noteboard({ referralId: id }: NoteboardProps) {
             pendingActionRef.current = null;
             try {
               await queued();
+              // eslint-disable-next-line @typescript-eslint/no-explicit-any
             } catch (err: any) {
               const friendly = friendlyE2EError(err, "post-note");
               toast.error(friendly.title, { description: friendly.description, duration: 8000 });
@@ -406,7 +389,9 @@ export function Noteboard({ referralId: id }: NoteboardProps) {
         onOpenChange={setConfirmMissingOpen}
         missingRecipients={missingRecipients}
         eligibleRecipientCount={eligibleRecipientCount}
-        onCancel={() => { pendingActionRef.current = null; }}
+        onCancel={() => {
+          pendingActionRef.current = null;
+        }}
         onConfirm={async () => {
           const fn = pendingActionRef.current;
           pendingActionRef.current = null;
