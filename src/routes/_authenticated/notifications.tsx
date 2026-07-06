@@ -71,8 +71,11 @@ function NotificationSettingsPage() {
   const [busy, setBusy] = useState<"enable" | "disable" | null>(null);
   const [notifyNotes, setNotifyNotes] = useState(true);
   const [notifyStatus, setNotifyStatus] = useState(true);
+  const [notifyNew, setNotifyNew] = useState(true);
+  const [notifyUpdated, setNotifyUpdated] = useState(true);
   const [prefsLoaded, setPrefsLoaded] = useState(false);
-  const [savingPref, setSavingPref] = useState<"notes" | "status" | null>(null);
+  type PrefKey = "notes" | "status" | "new" | "updated";
+  const [savingPref, setSavingPref] = useState<PrefKey | null>(null);
   const getPrefs = useServerFn(getNotificationPrefs);
   const savePrefs = useServerFn(setNotificationPrefs);
 
@@ -82,6 +85,8 @@ function NotificationSettingsPage() {
       .then((p) => {
         setNotifyNotes(p.notify_notes);
         setNotifyStatus(p.notify_status);
+        setNotifyNew(p.notify_new_referral);
+        setNotifyUpdated(p.notify_updated_referral);
       })
       .catch(() => {})
       .finally(() => setPrefsLoaded(true));
@@ -89,21 +94,27 @@ function NotificationSettingsPage() {
 
   const refreshLastTest = () => setLastTestAt(readLastTestPushAt());
 
-  const togglePref = async (key: "notes" | "status", next: boolean) => {
-    const prev = key === "notes" ? notifyNotes : notifyStatus;
-    (key === "notes" ? setNotifyNotes : setNotifyStatus)(next);
+  const prefState: Record<PrefKey, [boolean, (v: boolean) => void, string]> = {
+    notes: [notifyNotes, setNotifyNotes, "notify_notes"],
+    status: [notifyStatus, setNotifyStatus, "notify_status"],
+    new: [notifyNew, setNotifyNew, "notify_new_referral"],
+    updated: [notifyUpdated, setNotifyUpdated, "notify_updated_referral"],
+  };
+
+  const togglePref = async (key: PrefKey, next: boolean) => {
+    const [prev, setter, field] = prefState[key];
+    setter(next);
     setSavingPref(key);
     try {
-      await savePrefs({
-        data: key === "notes" ? { notify_notes: next } : { notify_status: next },
-      });
+      await savePrefs({ data: { [field]: next } as any });
     } catch (e: any) {
-      (key === "notes" ? setNotifyNotes : setNotifyStatus)(prev);
+      setter(prev);
       toast.error(e?.message ?? "Could not save preference.");
     } finally {
       setSavingPref(null);
     }
   };
+
 
 
   // Synchronous handler — fire Notification.requestPermission() before any
