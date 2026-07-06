@@ -229,97 +229,106 @@ function AuthPage() {
 
 
   return (
-    <div className="min-h-dvh flex items-center justify-center bg-background p-4">
-      <Card className="w-full max-w-md p-8">
-        <div className="flex items-center gap-3 mb-6">
-          <div className="w-10 h-10 rounded-md bg-primary flex items-center justify-center">
-            <Activity className="w-5 h-5 text-primary-foreground" />
+    <div className="min-h-dvh flex flex-col bg-background">
+      <main className="flex-1 flex items-center justify-center p-4">
+        <Card className="w-full max-w-md p-8">
+          <div className="flex items-center gap-3 mb-6">
+            <div className="w-10 h-10 rounded-md bg-primary flex items-center justify-center">
+              <Activity className="w-5 h-5 text-primary-foreground" />
+            </div>
+            <div>
+              <h1 className="font-semibold leading-tight">SDH Critical Care</h1>
+              <p className="text-xs text-muted-foreground">Referral tracker</p>
+            </div>
           </div>
-          <div>
-            <h1 className="font-semibold leading-tight">SDH Critical Care</h1>
-            <p className="text-xs text-muted-foreground">Referral tracker</p>
-          </div>
-        </div>
-        <h2 className="text-lg font-semibold mb-1">
-          {mode === "signin" ? "Sign in" : "Reset password"}
-        </h2>
-        <p className="text-sm text-muted-foreground mb-6">
-          {mode === "signin"
-            ? "Access is restricted to invited critical care team members."
-            : "Enter your email and we'll send a reset link."}
-        </p>
-        <form onSubmit={submit} className="space-y-4">
-          <div className="space-y-1.5">
-            <Label htmlFor="email">Email</Label>
-            <Input id="email" type="email" required value={email} onChange={(e) => setEmail(e.target.value)} autoComplete="email" />
-          </div>
-          {mode === "signin" && (
+          <h2 className="text-lg font-semibold mb-1">
+            {mode === "signin" ? "Sign in" : "Reset password"}
+          </h2>
+          <p className="text-sm text-muted-foreground mb-6">
+            {mode === "signin"
+              ? "Access is restricted to invited critical care team members."
+              : "Enter your email and we'll send a reset link."}
+          </p>
+          <form onSubmit={submit} className="space-y-4">
             <div className="space-y-1.5">
-              <Label htmlFor="password">Password</Label>
-              <Input id="password" type="password" required value={password} onChange={(e) => setPassword(e.target.value)} autoComplete="current-password" />
+              <Label htmlFor="email">Email</Label>
+              <Input id="email" type="email" required value={email} onChange={(e) => setEmail(e.target.value)} autoComplete="email" />
             </div>
-          )}
-          {mode === "signin" && (
-            <div className="flex items-start gap-2">
-              <Checkbox
-                id="remember-me"
-                checked={rememberMe}
-                onCheckedChange={(v) => setRememberMe(v === true)}
-              />
-              <div className="grid gap-0.5 leading-none">
-                <Label htmlFor="remember-me" className="text-sm font-normal cursor-pointer">
-                  Keep me signed in
-                </Label>
-                <p className="text-[11px] text-muted-foreground">
-                  Stay logged in on this device. Uncheck on shared computers — your session will end when you close the browser.
-                </p>
+            {mode === "signin" && (
+              <div className="space-y-1.5">
+                <Label htmlFor="password">Password</Label>
+                <Input id="password" type="password" required value={password} onChange={(e) => setPassword(e.target.value)} autoComplete="current-password" />
               </div>
-            </div>
-          )}
-          <Button type="submit" className="w-full" disabled={loading || passkeyBusy}>
-            {loading ? "Please wait…" : mode === "signin" ? "Sign in" : "Send reset link"}
-          </Button>
-          {mode === "signin" && passkeySupported && (
-            <>
-              <div className="relative py-1">
-                <div className="absolute inset-0 flex items-center">
-                  <span className="w-full border-t" />
-                </div>
-                <div className="relative flex justify-center text-[11px] uppercase tracking-wide">
-                  <span className="bg-card px-2 text-muted-foreground">or</span>
+            )}
+            {mode === "signin" && (
+              <div className="flex items-start gap-2">
+                <Checkbox
+                  id="remember-me"
+                  checked={rememberMe}
+                  onCheckedChange={(v) => setRememberMe(v === true)}
+                />
+                <div className="grid gap-0.5 leading-none">
+                  <Label htmlFor="remember-me" className="text-sm font-normal cursor-pointer">
+                    Keep me signed in
+                  </Label>
+                  <p className="text-[11px] text-muted-foreground">
+                    Stay logged in on this device. Uncheck on shared computers — your session will end when you close the browser.
+                  </p>
                 </div>
               </div>
-              <Button
-                type="button"
-                variant="outline"
-                className="w-full"
-                onClick={handlePasskeySignIn}
-                disabled={loading || passkeyBusy}
-              >
-                {passkeyBusy ? (
-                  <>
-                    <Loader2 className="w-4 h-4 mr-2 animate-spin" /> Verifying…
-                  </>
-                ) : (
-                  <>
-                    <Fingerprint className="w-4 h-4 mr-2" /> Sign in with a passkey
-                  </>
-                )}
-              </Button>
-            </>
-          )}
-          <button
-            type="button"
-            className="text-xs text-muted-foreground hover:text-foreground underline w-full text-center"
-            onClick={() => setMode(mode === "signin" ? "forgot" : "signin")}
-          >
-            {mode === "signin" ? "Forgot your password?" : "Back to sign in"}
-          </button>
-        </form>
-        <p className="text-[11px] text-muted-foreground mt-6 leading-snug">
-          Internal NHS use only. Data is encrypted in transit and at rest. Do not use this system with patient-identifiable data until your trust's IG team has approved it.
-        </p>
-      </Card>
+            )}
+            <Button type="submit" className="w-full" disabled={loading || passkeyBusy}>
+              {loading ? "Please wait…" : mode === "signin" ? "Sign in" : "Send reset link"}
+            </Button>
+            {mode === "signin" && passkeySupported && (
+              <>
+                <div className="relative py-1">
+                  <div className="absolute inset-0 flex items-center">
+                    <span className="w-full border-t" />
+                  </div>
+                  <div className="relative flex justify-center text-[11px] uppercase tracking-wide">
+                    <span className="bg-card px-2 text-muted-foreground">or</span>
+                  </div>
+                </div>
+                <Button
+                  type="button"
+                  variant="outline"
+                  className="w-full"
+                  onClick={handlePasskeySignIn}
+                  disabled={loading || passkeyBusy}
+                >
+                  {passkeyBusy ? (
+                    <>
+                      <Loader2 className="w-4 h-4 mr-2 animate-spin" /> Verifying…
+                    </>
+                  ) : (
+                    <>
+                      <Fingerprint className="w-4 h-4 mr-2" /> Sign in with a passkey
+                    </>
+                  )}
+                </Button>
+              </>
+            )}
+            <button
+              type="button"
+              className="text-xs text-muted-foreground hover:text-foreground underline w-full text-center"
+              onClick={() => setMode(mode === "signin" ? "forgot" : "signin")}
+            >
+              {mode === "signin" ? "Forgot your password?" : "Back to sign in"}
+            </button>
+          </form>
+          <p className="text-[11px] text-muted-foreground mt-6 leading-snug">
+            Internal NHS use only. Data is encrypted in transit and at rest. Do not use this system with patient-identifiable data until your trust's IG team has approved it.
+          </p>
+        </Card>
+      </main>
+      <footer className="border-t bg-card/50">
+        <div className="mx-auto max-w-3xl px-4 py-3 flex flex-wrap items-center justify-center gap-x-5 gap-y-1 text-xs text-muted-foreground">
+          <a href="/clinical-safety" className="hover:text-foreground hover:underline">Clinical safety</a>
+          <a href="/privacy" className="hover:text-foreground hover:underline">Privacy notice</a>
+          <a href="/security" className="hover:text-foreground hover:underline">Security disclosure</a>
+        </div>
+      </footer>
       <PasskeyEnrollPrompt
         open={enrollPromptOpen}
         onOpenChange={(v) => {
