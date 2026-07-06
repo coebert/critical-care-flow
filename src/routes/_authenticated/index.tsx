@@ -5,7 +5,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
-import { Plus, Search, RotateCcw, Trash2, MapPin, Baby } from "lucide-react";
+import { Plus, Search, RotateCcw, Trash2, MapPin, Baby, HelpCircle } from "lucide-react";
 import type { Tables } from "@/integrations/supabase/types";
 import { format, formatDistanceToNow } from "date-fns";
 import { listDeletedReferrals, listReferralsForList, restoreReferral, RESTORE_WINDOW_DAYS, type DecryptedReferral } from "@/lib/referrals.functions";
@@ -630,8 +630,18 @@ function ReferralsList() {
                         <Baby className="w-4 h-4 text-primary" />
                       </span>
                     )}
+                    {r.age === null && (
+                      <span
+                        title="Age not recorded — cannot be classified as pediatric"
+                        className="inline-flex items-center gap-1 rounded border border-amber-500/60 bg-amber-100/60 dark:bg-amber-900/30 text-amber-800 dark:text-amber-200 px-1.5 py-0 text-[10px] font-medium"
+                      >
+                        <HelpCircle className="w-3 h-3" />
+                        Age unknown
+                      </span>
+                    )}
                     <span>{r.age ?? "?"} / {r.sex ?? "?"}</span>
                   </div>
+
                 </td>
                 <td className="px-3 py-2">{r.current_ward ?? "—"} {r.current_bed ? `· ${r.current_bed}` : ""}</td>
                 <td className="px-3 py-2">{r.referring_specialty ?? "—"}</td>
@@ -715,15 +725,25 @@ function ReferralsList() {
               </div>
               <div>
                 <span className="text-xs text-muted-foreground block">Age / Sex</span>
-                <div className="flex items-center gap-1.5">
+                <div className="flex items-center gap-1.5 flex-wrap">
                   {r.age !== null && r.age <= 16 && (
                     <span title="Pediatric patient (≤16)">
                       <Baby className="w-4 h-4 text-primary" />
                     </span>
                   )}
                   <span className="font-medium">{r.age ?? "?"} / {r.sex ?? "?"}</span>
+                  {r.age === null && (
+                    <span
+                      title="Age not recorded — cannot be classified as pediatric"
+                      className="inline-flex items-center gap-1 rounded border border-amber-500/60 bg-amber-100/60 dark:bg-amber-900/30 text-amber-800 dark:text-amber-200 px-1.5 py-0 text-[10px] font-medium"
+                    >
+                      <HelpCircle className="w-3 h-3" />
+                      Age unknown
+                    </span>
+                  )}
                 </div>
               </div>
+
               <div>
                 <span className="text-xs text-muted-foreground block">Location</span>
                 <span className="font-medium">{r.current_ward ?? "—"} {r.current_bed ? `· ${r.current_bed}` : ""}</span>
