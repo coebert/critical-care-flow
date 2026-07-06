@@ -149,9 +149,9 @@ function ReferralDetail() {
   const declineReasonMissing =
     ref.status === "declined" && !(ref.decline_reason ?? "").trim();
   const declineConsultantMissing =
-    ref.status === "declined" && !((ref as any).discussed_with_consultant ?? "").trim();
+    ref.status === "declined" && !(ref.discussed_with_consultant ?? "").trim();
   const acceptingConsultantMissing =
-    (ref.status === "admitted" || ref.status === "accepted") && !((ref as any).accepting_consultant ?? "").trim();
+    (ref.status === "admitted" || ref.status === "accepted") && !(ref.accepting_consultant ?? "").trim();
 
   const save = async () => {
     if (!timing.isValid) {
@@ -177,16 +177,16 @@ function ReferralDetail() {
         current_ward: ref.current_ward, current_bed: ref.current_bed,
         past_medical_history: ref.past_medical_history, baseline_function: ref.baseline_function,
         dnacpr_respect: ref.dnacpr_respect, referring_specialty: ref.referring_specialty,
-        consultant_to_consultant_only: (ref as any).consultant_to_consultant_only ?? false,
+        consultant_to_consultant_only: ref.consultant_to_consultant_only ?? false,
         reason_for_referral: ref.reason_for_referral, status: ref.status,
         decline_reason: ref.decline_reason,
-        discussed_with_consultant: (ref as any).discussed_with_consultant ?? null,
+        discussed_with_consultant: ref.discussed_with_consultant ?? null,
         admission_urgency: ref.admission_urgency ?? null,
-        accepting_consultant: (ref as any).accepting_consultant ?? null,
+        accepting_consultant: ref.accepting_consultant ?? null,
         referral_received_at: ref.referral_received_at,
         first_seen_at: ref.first_seen_at, decision_at: ref.decision_at,
         arrived_on_unit_at: ref.arrived_on_unit_at,
-        is_test: (ref as any).is_test ?? false,
+        is_test: ref.is_test ?? false,
       };
       await update({ data: { id: ref.id, patch } });
       toast.success("Saved");
@@ -312,8 +312,8 @@ function ReferralDetail() {
           </div>
           <div className="flex items-center gap-3">
             <Switch
-              checked={(ref as any).consultant_to_consultant_only ?? false}
-              onCheckedChange={(v) => set("consultant_to_consultant_only" as any, v as any)}
+              checked={ref.consultant_to_consultant_only ?? false}
+              onCheckedChange={(v) => set("consultant_to_consultant_only", v)}
               id="c2c"
             />
             <Label htmlFor="c2c">Consultant-to-consultant referral only</Label>
@@ -330,8 +330,8 @@ function ReferralDetail() {
             </div>
             <Switch
               id="is-test"
-              checked={(ref as any).is_test ?? false}
-              onCheckedChange={(v) => set("is_test" as any, v as any)}
+              checked={ref.is_test ?? false}
+              onCheckedChange={(v) => set("is_test", v)}
             />
           </div>
         </Card>
@@ -425,8 +425,8 @@ function ReferralDetail() {
               <F label="Discussed with critical care consultant" required error={declineConsultantMissing ? "Required when declining a referral." : undefined}>
                 <div className={cn(declineConsultantMissing && "rounded-md ring-1 ring-destructive")}>
                   <ComboboxAdd
-                    value={(ref as any).discussed_with_consultant ?? ""}
-                    onChange={(v) => set("discussed_with_consultant" as any, (v || null) as any)}
+                    value={ref.discussed_with_consultant ?? ""}
+                    onChange={(v) => set("discussed_with_consultant", v || null)}
                     options={consultants}
                     placeholder="Select or add consultant…"
                   />
