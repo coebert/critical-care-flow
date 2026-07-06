@@ -20,10 +20,10 @@ Owner completes in the DTAC response document.
 
 | Item | Artefact | Status |
 | --- | --- | --- |
-| Named Clinical Safety Officer | `docs/clinical-safety-case.md` (Phase 3) | Pending owner input |
+| Named Clinical Safety Officer | `docs/clinical-safety-case.md` (Phase 3) | Holding placard — `/clinical-safety` |
 | Hazard log | `docs/hazard-log.md` (Phase 3) | Pending owner input |
 | Clinical safety case | `docs/clinical-safety-case.md` (Phase 3) | Pending owner input |
-| In-app safety-issue reporting | `/clinical-safety` route (Phase 3) | Pending |
+| In-app safety-issue reporting | `/clinical-safety` route (Phase 3) | Holding placard live |
 | Known-issues / field-safety notices page | Admin-editable page (Phase 3) | Pending |
 
 ## Section C4 — Data protection (UK GDPR / DPA 2018)
@@ -32,7 +32,7 @@ Owner completes in the DTAC response document.
 | --- | --- | --- |
 | DPIA | `docs/dpia.md` (Phase 2) | Pending owner input |
 | ROPA | `docs/ropa.md` (Phase 2) | Pending owner input |
-| Public privacy notice | `/privacy` route (Phase 2) | Pending |
+| Public privacy notice | `/privacy` route (Phase 2) | Complete |
 | Cookie statement | `/cookies` route (Phase 2) | Pending |
 | Data-subject rights (SAR / erasure) | `/profile` actions (Phase 2) | Pending |
 | Data retention & purge | Retention cron job (Phase 2) | Pending |
@@ -61,7 +61,7 @@ Owner completes in the DTAC response document.
 | Item | Artefact | Status |
 | --- | --- | --- |
 | NHS Number capture + Mod 11 validation | Phase 4 | Pending |
-| ODS organisation code | Phase 4 | Pending |
+| ODS organisation code | `docs/ods-code.md` (Phase 4) | Holding placard |
 | SNOMED CT for reason-for-referral / specialty | Phase 4 | Pending |
 | FHIR R4 UK Core export | `/api/public/fhir/*` (Phase 4) | Pending |
 
