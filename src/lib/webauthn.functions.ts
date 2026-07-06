@@ -13,8 +13,9 @@ import { safeError } from "@/lib/safe-error";
 // there and keep only the erased `type` imports at module scope.
 import type {
   AuthenticationResponseJSON,
+  PublicKeyCredentialRequestOptionsJSON,
   RegistrationResponseJSON,
-} from "@simplewebauthn/server";
+} from "@simplewebauthn/browser";
 
 async function loadWebauthnServer() {
   return await import("@simplewebauthn/server");
@@ -184,7 +185,7 @@ export const verifyPasskeyRegistration = createServerFn({ method: "POST" })
  * the product spec requires routing users straight into enrolment.
  */
 export type StartPasskeyAuthResult =
-  | { status: "ok"; options: Awaited<ReturnType<typeof import("@simplewebauthn/server").generateAuthenticationOptions>> }
+  | { status: "ok"; options: PublicKeyCredentialRequestOptionsJSON }
   | { status: "no_credentials"; code: "NO_PASSKEY_REGISTERED"; message: string };
 
 export const startPasskeyAuthentication = createServerFn({ method: "POST" })
