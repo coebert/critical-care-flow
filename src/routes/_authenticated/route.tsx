@@ -217,6 +217,12 @@ function AuthedShell() {
         </main>
       </div>
       <Toaster />
+      <IdleTimeoutModal
+        open={idle.warning && !signingOut}
+        secondsLeft={idle.secondsLeft}
+        onStayActive={idle.stayActive}
+        onSignOutNow={() => handleSignOut()}
+      />
     </div>
   );
 }
