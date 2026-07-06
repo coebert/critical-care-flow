@@ -122,6 +122,11 @@ function ReferralDetail() {
     () => (queryClient.getQueryData(referralDetailQueryOptions(id).queryKey) as Referral | null) ?? null,
   );
 
+  // Raw ciphertext rows come from the query cache (loader-primed).
+  // `notes` below is the decrypted, sorted-newest-first projection that the
+  // UI actually renders; it's derived in an effect whenever the raw rows or
+  // the E2E session change.
+  const { data: rawNotes } = useQuery(referralNotesQueryOptions(id));
   const [notes, setNotes] = useState<Note[]>([]);
   const [authors, setAuthors] = useState<Record<string, string>>({});
   const [noteBody, setNoteBody] = useState("");
