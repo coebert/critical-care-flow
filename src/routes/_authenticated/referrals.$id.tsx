@@ -101,7 +101,14 @@ function ReferralDetail() {
   const { specialties, wards, consultants } = useReferralOptions();
 
 
-  const [ref, setRef] = useState<Referral | null>(null);
+  // Seed from the loader-primed cache so the initial paint has data. Local
+  // state still owns edits (controlled form inputs) — realtime UPDATE calls
+  // `loadRef` below to refresh the cache and the local state together.
+  const queryClient = useQueryClient();
+  const [ref, setRef] = useState<Referral | null>(
+    () => (queryClient.getQueryData(referralDetailQueryOptions(id).queryKey) as Referral | null) ?? null,
+  );
+
   const [notes, setNotes] = useState<Note[]>([]);
   const [authors, setAuthors] = useState<Record<string, string>>({});
   const [noteBody, setNoteBody] = useState("");
