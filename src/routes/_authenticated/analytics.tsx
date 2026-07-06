@@ -140,17 +140,9 @@ function AnalyticsPage() {
   });
 
   const queryClient = useQueryClient();
-  const { data: icnarcTargets } = useQuery({
-    queryKey: ["icnarc-targets"],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from("icnarc_targets")
-        .select("time_to_seen_target_min, decision_to_arrival_target_min")
-        .maybeSingle();
-      if (error) throw error;
-      return data;
-    },
-  });
+  // Share the file-scope options object with the loader prefetch so the
+  // queryKey and queryFn are defined exactly once.
+  const { data: icnarcTargets } = useQuery(icnarcTargetsQueryOptions);
   // ICNARC / GPICS-aligned targets, configurable via the dialog below.
   const ICNARC_TIME_TO_SEEN_TARGET_MIN = icnarcTargets?.time_to_seen_target_min ?? 30;
   const ICNARC_DECISION_TO_ARRIVAL_TARGET_MIN = icnarcTargets?.decision_to_arrival_target_min ?? 240;
