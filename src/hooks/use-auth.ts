@@ -51,17 +51,47 @@ export function useRole(role: "admin" | "clinician") {
       setLoading(false);
       return;
     }
-    setLoading(true);
-    supabase
-      .from("user_roles")
-      .select("role")
-      .eq("user_id", user.id)
-      .eq("role", role)
-      .maybeSingle()
-      .then(({ data }) => {
+
+    let cancelled = false;
+    const check = async () => {
+      const { data } = await supabase
+        .from("user_roles")
+        .select("role")
+        .eq("user_id", user.id)
+        .eq("role", role)
+        .maybeSingle();
+      if (!cancelled) {
         setHasRole(!!data);
         setLoading(false);
-      });
+      }
+    };
+
+    setLoading(true);
+    void check();
+
+    // Subscribe to role changes for this user so revocations/grants take
+    // effect immediately without waiting for the next identity transition.
+    // The RLS "read own roles" policy makes this scoped filter safe.
+    const channel = supabase
+      .channel(`user-roles-${user.id}`)
+      .on(
+        "postgres_changes",
+        {
+          event: "*",
+          schema: "public",
+          table: "user_roles",
+          filter: `user_id=eq.${user.id}`,
+        },
+        () => {
+          void check();
+        },
+      )
+      .subscribe();
+
+    return () => {
+      cancelled = true;
+      void supabase.removeChannel(channel);
+    };
   }, [user, role, authLoading]);
 
   return { hasRole, loading };
