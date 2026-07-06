@@ -104,72 +104,6 @@ function ReferralDetail() {
     }
   }, [highlight, ref?.status]);
 
-  const loadDirectory = async () => {
-    try {
-      const d = (await fetchKeyDir({ data: undefined as any })) as any[];
-      const list = (d ?? []) as Array<{ user_id: string; full_name: string; public_key: string | null }>;
-      setDirectory((prev) => {
-        // Detect teammates who newly published a key since the last snapshot
-        // and surface it — helps the author know the block might now lift.
-        const wasMissing = new Map(prev.map((r) => [r.user_id, !r.public_key] as const));
-        const newlyEnrolled = list.filter(
-          (r) => r.public_key && wasMissing.get(r.user_id) === true && r.user_id !== user?.id,
-        );
-        if (newlyEnrolled.length > 0 && prev.length > 0) {
-          const names = newlyEnrolled.map((r) => r.full_name).slice(0, 3).join(", ");
-          const extra = newlyEnrolled.length > 3 ? ` and ${newlyEnrolled.length - 3} more` : "";
-          toast.success(`${names}${extra} enabled encryption — recipients updated.`);
-          const freshIds = newlyEnrolled.map((r) => r.user_id);
-          setNewlyEligibleIds((cur) => {
-            const next = new Set(cur);
-            freshIds.forEach((id) => next.add(id));
-            return next;
-          });
-          // Auto-fade the "new" highlight after 45s so it stays informative.
-          window.setTimeout(() => {
-            setNewlyEligibleIds((cur) => {
-              const next = new Set(cur);
-              freshIds.forEach((id) => next.delete(id));
-              return next;
-            });
-          }, 45_000);
-        }
-        return list;
-      });
-      return list;
-    } catch { return null; }
-  };
-  useEffect(() => { if (user) loadDirectory(); /* eslint-disable-next-line */ }, [user?.id, e2e.isUnlocked]);
-
-  // Default the recipient selection to every enrolled teammate (plus self)
-  // until the author manually changes it.
-  useEffect(() => {
-    if (recipientsTouched) return;
-    const ids = new Set<string>(directory.filter((r) => !!r.public_key).map((r) => r.user_id));
-    if (user?.id && e2e.publicKey) ids.add(user.id);
-    setSelectedRecipients(ids);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [directory, user?.id, e2e.publicKey]);
-
-  const directoryWithSelf = (() => {
-    if (!user?.id || !e2e.publicKey) return directory;
-    if (directory.some((r) => r.user_id === user.id)) return directory;
-    return [...directory, { user_id: user.id, full_name: "You", public_key: e2e.publicKey }];
-  })();
-
-  const missingRecipients = directory.filter((r) => !r.public_key && r.user_id !== user?.id);
-  const eligibleRecipientCount = Array.from(selectedRecipients).length;
-  // Teammates who will NOT be able to read the note as currently composed —
-  // split by reason so the inline warning can spell out exactly who is excluded.
-  const excludedMissingKey = directory.filter(
-    (r) => r.user_id !== user?.id && !r.public_key,
-  );
-  const excludedDeselected = directory.filter(
-    (r) => r.user_id !== user?.id && !!r.public_key && !selectedRecipients.has(r.user_id),
-  );
-  const partialCoverage =
-    eligibleRecipientCount > 0 && (excludedMissingKey.length + excludedDeselected.length) > 0;
-
   const loadRef = async () => {
     try {
       const r = await fetchDetail({ data: { id } });
@@ -179,136 +113,24 @@ function ReferralDetail() {
     }
   };
 
-  // Bootstrap E2E session: rehydrate a persisted unlock (sessionStorage)
-  // before falling back to fetching the stored key material.
-  useEffect(() => {
-    if (!user) return;
-    if (e2e.material || e2e.needsBootstrap) return;
-    (async () => {
-      // Restore an unlocked session if one is cached for this tab.
-      if (!e2e.hydrated) await e2e.hydrateFromSession();
-      try {
-        const res: any = await fetchKeyMaterial({ data: undefined as any });
-        e2e.setMaterial(res?.material ?? null, res?.public_key ?? null);
-      } catch { /* non-fatal */ }
-    })();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [user?.id]);
-
-  // Once we're unlocked (fresh or rehydrated), refresh the directory so the
-  // compose UI shows enrolled teammates. Note decryption is handled by the
-  // effect below, which re-runs on `e2e.isUnlocked` automatically.
-  useEffect(() => {
-    if (!e2e.isUnlocked) return;
-    loadDirectory();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [e2e.isUnlocked]);
-
-
-  const refetchNotes = () =>
-    queryClient.invalidateQueries({ queryKey: referralNotesQueryOptions(id).queryKey });
-
-  const decryptNoteRow = async (n: any): Promise<Note> => {
-    if (n.body_ciphertext && n.body_nonce) {
-      if (!n.wrapped_key) return { ...n, body: null, _e2eStatus: "e2e-no-key" };
-      if (!e2e.isUnlocked || !e2e.privateKey || !e2e.publicKey) {
-        return { ...n, body: null, _e2eStatus: "e2e-locked" };
-      }
-      try {
-        const body = await e2eDecryptNote(
-          { body_ciphertext: n.body_ciphertext, body_nonce: n.body_nonce, wrapped_key: n.wrapped_key },
-          { publicKey: e2e.publicKey, privateKey: e2e.privateKey },
-        );
-        return { ...n, body, _e2eStatus: "e2e-decrypted" };
-      } catch {
-        return { ...n, body: null, _e2eStatus: "e2e-failed" };
-      }
-    }
-    if (n.body_enc) return { ...n, _e2eStatus: "legacy-server-enc" };
-    return { ...n, _e2eStatus: "plaintext" };
-  };
-
-  // Decrypt whenever the ciphertext rows or the E2E session change. Cancel
-  // stale runs so a fast succession of updates (post → realtime → unlock)
-  // can't have an earlier decryption overwrite a newer one.
-  useEffect(() => {
-    if (!rawNotes) return;
-    let cancelled = false;
-    const sorted = [...rawNotes].sort(
-      (a: any, b: any) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime(),
-    );
-    (async () => {
-      const decrypted = await Promise.all(sorted.map((n) => decryptNoteRow(n)));
-      if (!cancelled) setNotes(decrypted);
-    })();
-    // Batch-fetch author display names for the current row set.
-    const ids = Array.from(new Set(sorted.map((n: any) => n.author_id))) as string[];
-    if (ids.length) {
-      supabase
-        .from("profiles")
-        .select("id,full_name")
-        .in("id", ids)
-        .then(({ data: ps }) => {
-          if (cancelled || !ps) return;
-          const map: Record<string, string> = {};
-          ps.forEach((p) => { map[p.id] = p.full_name ?? "Clinician"; });
-          setAuthors((cur) => ({ ...cur, ...map }));
-        });
-    }
-    return () => { cancelled = true; };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [rawNotes, e2e.isUnlocked, e2e.privateKey, e2e.publicKey]);
-
   useEffect(() => {
     logView({ data: { referral_id: id } }).catch(() => {});
     loadRef();
 
-    // Realtime payloads contain ciphertext, so we use them only as a
-    // signal to refetch via the decrypting server fn.
+    // Realtime for the referral row itself; notes/keys are handled inside
+    // <Noteboard />.
     const ch = supabase
       .channel(`ref-${id}`)
       .on("postgres_changes", { event: "UPDATE", schema: "public", table: "referrals", filter: `id=eq.${id}` },
         () => { loadRef(); })
-      .on("postgres_changes", { event: "*", schema: "public", table: "referral_notes", filter: `referral_id=eq.${id}` },
-        () => { refetchNotes(); })
-      // A teammate publishing / rotating / removing their public key changes
-      // who this note can be encrypted for. Refresh the directory live so the
-      // compose UI and the missing-recipients block reflect reality.
-      .on("postgres_changes", { event: "*", schema: "public", table: "user_public_keys" },
-        () => { loadDirectory(); })
       .subscribe();
-
-    // Also re-check when the tab regains focus / comes back online, in case
-    // realtime dropped an event while the tab was backgrounded.
-    const refresh = () => { loadDirectory(); };
-    const onVis = () => { if (document.visibilityState === "visible") refresh(); };
-    window.addEventListener("focus", refresh);
-    window.addEventListener("online", refresh);
-    document.addEventListener("visibilitychange", onVis);
 
     return () => {
       supabase.removeChannel(ch);
-      window.removeEventListener("focus", refresh);
-      window.removeEventListener("online", refresh);
-      document.removeEventListener("visibilitychange", onVis);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id]);
 
-
-  // Prior declined referrals for this patient are now fetched by
-  // <PriorDeclinedReferrals /> using its own useQuery.
-
-
-
-
-  const filteredNotes = notes.filter((n) => {
-    if (noteFilter === "all") return true;
-    if (noteFilter === "e2e") return n._e2eStatus === "e2e-decrypted" || n._e2eStatus === "e2e-locked" || n._e2eStatus === "e2e-no-key" || n._e2eStatus === "e2e-failed";
-    if (noteFilter === "legacy") return n._e2eStatus === "legacy-server-enc" || n._e2eStatus === "plaintext";
-    if (noteFilter === "failed") return n._e2eStatus === "e2e-failed";
-    return true;
-  });
 
   if (!ref) return <div className="p-6 text-muted-foreground">Loading…</div>;
 
