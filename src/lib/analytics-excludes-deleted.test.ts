@@ -87,6 +87,7 @@ type Row = {
   id: string;
   deleted_at: string | null;
   deleted_by: string | null;
+  is_test: boolean;
   referral_received_at?: string;
   created_at?: string;
 };
@@ -101,6 +102,10 @@ function makeFakeSupabase(table: string, rows: Row[]) {
     order() { return builder; },
     limit() { return Promise.resolve({ data: rows.filter((r) => state.filters.every((f) => f(r))), error: null }); },
     is(col: string, val: unknown) {
+      state.filters.push((r) => (r as any)[col] === val);
+      return builder;
+    },
+    eq(col: string, val: unknown) {
       state.filters.push((r) => (r as any)[col] === val);
       return builder;
     },
@@ -122,36 +127,42 @@ function makeFakeSupabase(table: string, rows: Row[]) {
   };
 }
 
-describe("fluent Supabase filter parity — deleted rows dropped", () => {
-  // Includes a partial soft-delete ("orphan") row where deleted_by is set but
-  // deleted_at is missing — must still be excluded thanks to the fallback.
+describe("fluent Supabase filter parity — deleted and test rows dropped", () => {
+  // Fixture covers all exclusion paths:
+  //   - live-*  → normal live rows (must be included)
+  //   - deleted-1 → fully soft-deleted (deleted_at + deleted_by set)
+  //   - orphan-1 → partial soft-delete (deleted_by set, deleted_at missing)
+  //   - test-1   → live but flagged as a test/demo entry
   const rows: Row[] = [
-    { id: "live-1", deleted_at: null, deleted_by: null, referral_received_at: "2026-07-01T00:00:00Z", created_at: "2026-07-01T00:00:00Z" },
-    { id: "deleted-1", deleted_at: "2026-07-02T00:00:00Z", deleted_by: "u1", referral_received_at: "2026-07-01T00:00:00Z", created_at: "2026-07-01T00:00:00Z" },
-    { id: "orphan-1", deleted_at: null, deleted_by: "u2", referral_received_at: "2026-07-02T00:00:00Z", created_at: "2026-07-02T00:00:00Z" },
-    { id: "live-2", deleted_at: null, deleted_by: null, referral_received_at: "2026-07-03T00:00:00Z", created_at: "2026-07-03T00:00:00Z" },
+    { id: "live-1", deleted_at: null, deleted_by: null, is_test: false, referral_received_at: "2026-07-01T00:00:00Z", created_at: "2026-07-01T00:00:00Z" },
+    { id: "deleted-1", deleted_at: "2026-07-02T00:00:00Z", deleted_by: "u1", is_test: false, referral_received_at: "2026-07-01T00:00:00Z", created_at: "2026-07-01T00:00:00Z" },
+    { id: "orphan-1", deleted_at: null, deleted_by: "u2", is_test: false, referral_received_at: "2026-07-02T00:00:00Z", created_at: "2026-07-02T00:00:00Z" },
+    { id: "test-1", deleted_at: null, deleted_by: null, is_test: true, referral_received_at: "2026-07-02T12:00:00Z", created_at: "2026-07-02T12:00:00Z" },
+    { id: "live-2", deleted_at: null, deleted_by: null, is_test: false, referral_received_at: "2026-07-03T00:00:00Z", created_at: "2026-07-03T00:00:00Z" },
   ];
 
-  it("referrals: only live rows within the date range are returned (orphan excluded)", async () => {
+  it("referrals: only live, non-test rows within the date range are returned", async () => {
     const sb = makeFakeSupabase("referrals", rows);
     const { data } = await sb
       .from("referrals")
       .select("*")
       .is("deleted_at", null)
       .is("deleted_by", null)
+      .eq("is_test", false)
       .gte("referral_received_at", "2026-06-01T00:00:00Z")
       .lte("referral_received_at", "2026-07-31T00:00:00Z")
       .limit(5000);
     expect(data.map((r: Row) => r.id).sort()).toEqual(["live-1", "live-2"]);
   });
 
-  it("postop_bookings: only live rows within the date range are returned (orphan excluded)", async () => {
+  it("postop_bookings: only live, non-test rows within the date range are returned", async () => {
     const sb = makeFakeSupabase("postop_bookings", rows);
     const { data } = await sb
       .from("postop_bookings")
       .select("*")
       .is("deleted_at", null)
       .is("deleted_by", null)
+      .eq("is_test", false)
       .order("created_at", { ascending: false })
       .gte("created_at", "2026-06-01T00:00:00Z")
       .lte("created_at", "2026-07-31T00:00:00Z")
@@ -159,4 +170,5 @@ describe("fluent Supabase filter parity — deleted rows dropped", () => {
     expect(data.map((r: Row) => r.id).sort()).toEqual(["live-1", "live-2"]);
   });
 });
+
 
