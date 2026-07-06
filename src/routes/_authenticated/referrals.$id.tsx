@@ -5,6 +5,7 @@ import { queryOptions, useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { deleteNote, deleteReferral, findReferralsByHospitalNumber, getNoteHistory, getReferralDetail, logReferralView, updateNote, updateReferral, type DecryptedReferral, type DecryptedReferralNote } from "@/lib/referrals.functions";
 import { ReferralAuditTrail } from "@/components/referral-audit-trail";
+import { PriorDeclinedReferrals } from "@/components/prior-declined-referrals";
 import { addEncryptedNote, listEncryptedNotes, updateEncryptedNote } from "@/lib/encrypted-notes.functions";
 import { getMyPrivateKeyMaterial, getPublicKeyDirectory } from "@/lib/e2e-keys.functions";
 import { decryptNote as e2eDecryptNote, encryptNote as e2eEncryptNote } from "@/lib/e2e-crypto";
