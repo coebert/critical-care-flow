@@ -280,42 +280,63 @@ function NotificationSettingsPage() {
       <Card className="p-5">
         <h2 className="font-medium mb-1">Alert types</h2>
         <p className="text-sm text-muted-foreground mb-4">
-          New and updated referrals always alert you while on shift. Choose whether to also
-          receive alerts for note additions and status changes.
+          Choose which referral events send you a push and in-app alert while you're on shift.
+          All alerts default on so nothing is missed.
         </p>
-        <div className="flex items-start justify-between gap-4 py-3 border-b">
-          <div className="min-w-0">
-            <Label htmlFor="pref-notes" className="text-sm font-medium">
-              New notes on referrals
-            </Label>
-            <div className="text-xs text-muted-foreground mt-0.5">
-              Push and in-app alert when someone adds a note to a referral.
+        {[
+          {
+            key: "new" as const,
+            id: "pref-new",
+            checked: notifyNew,
+            label: "New referrals",
+            hint: "Alert when a new referral is added.",
+            border: true,
+          },
+          {
+            key: "updated" as const,
+            id: "pref-updated",
+            checked: notifyUpdated,
+            label: "Referral updates",
+            hint: "Alert when referral details (patient, plan, timings) are edited.",
+            border: true,
+          },
+          {
+            key: "status" as const,
+            id: "pref-status",
+            checked: notifyStatus,
+            label: "Referral status changes",
+            hint: "Alerts for accepted, declined, admitted and other status transitions.",
+            border: true,
+          },
+          {
+            key: "notes" as const,
+            id: "pref-notes",
+            checked: notifyNotes,
+            label: "New notes on referrals",
+            hint: "Alert when someone adds a note to a referral.",
+            border: false,
+          },
+        ].map((row) => (
+          <div
+            key={row.key}
+            className={`flex items-start justify-between gap-4 py-3 ${row.border ? "border-b" : ""}`}
+          >
+            <div className="min-w-0">
+              <Label htmlFor={row.id} className="text-sm font-medium">
+                {row.label}
+              </Label>
+              <div className="text-xs text-muted-foreground mt-0.5">{row.hint}</div>
             </div>
+            <Switch
+              id={row.id}
+              checked={row.checked}
+              disabled={!prefsLoaded || savingPref !== null}
+              onCheckedChange={(v) => togglePref(row.key, v)}
+            />
           </div>
-          <Switch
-            id="pref-notes"
-            checked={notifyNotes}
-            disabled={!prefsLoaded || savingPref !== null}
-            onCheckedChange={(v) => togglePref("notes", v)}
-          />
-        </div>
-        <div className="flex items-start justify-between gap-4 py-3">
-          <div className="min-w-0">
-            <Label htmlFor="pref-status" className="text-sm font-medium">
-              Referral status changes
-            </Label>
-            <div className="text-xs text-muted-foreground mt-0.5">
-              Alerts for accepted, declined, admitted and other status transitions.
-            </div>
-          </div>
-          <Switch
-            id="pref-status"
-            checked={notifyStatus}
-            disabled={!prefsLoaded || savingPref !== null}
-            onCheckedChange={(v) => togglePref("status", v)}
-          />
-        </div>
+        ))}
       </Card>
+
     </div>
 
   );
