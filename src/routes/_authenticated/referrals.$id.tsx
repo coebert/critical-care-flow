@@ -3,9 +3,10 @@ import { useEffect, useRef, useState } from "react";
 import { useServerFn } from "@tanstack/react-start";
 import { queryOptions, useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
-import { deleteNote, deleteReferral, getNoteHistory, getReferralDetail, logReferralView, updateNote, updateReferral, type DecryptedReferral, type DecryptedReferralNote } from "@/lib/referrals.functions";
+import { deleteNote, deleteReferral, getReferralDetail, logReferralView, updateNote, updateReferral, type DecryptedReferral } from "@/lib/referrals.functions";
 import { ReferralAuditTrail } from "@/components/referral-audit-trail";
 import { PriorDeclinedReferrals } from "@/components/prior-declined-referrals";
+import { NoteItem, type Note } from "@/components/note-item";
 import { addEncryptedNote, listEncryptedNotes, updateEncryptedNote } from "@/lib/encrypted-notes.functions";
 import { getMyPrivateKeyMaterial, getPublicKeyDirectory } from "@/lib/e2e-keys.functions";
 import { decryptNote as e2eDecryptNote, encryptNote as e2eEncryptNote } from "@/lib/e2e-crypto";
@@ -25,16 +26,12 @@ import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Collapsible, CollapsibleTrigger, CollapsibleContent } from "@/components/ui/collapsible";
 import type { Tables } from "@/integrations/supabase/types";
 import { ComboboxAdd } from "@/components/combobox-add";
 import { useReferralOptions } from "@/hooks/use-referral-options";
 import { NoteRecipientPicker } from "@/components/note-recipient-picker";
-import { ArrowLeft, History, Pencil, Save, Trash2, X, ChevronDown, AlertCircle, Lock, LockOpen, ShieldAlert, ShieldCheck, ShieldOff, Users } from "lucide-react";
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { format, formatDistanceToNow } from "date-fns";
-import { tzTooltip } from "@/lib/format-timestamp";
+import { ArrowLeft, Save, Trash2, ChevronDown, LockOpen } from "lucide-react";
 import { toast } from "sonner";
 import { friendlyE2EError } from "@/lib/friendly-e2e-error";
 import { validateReferralTimings } from "@/lib/referral-validation";
@@ -44,14 +41,7 @@ import { cn } from "@/lib/utils";
 
 
 type Referral = Tables<"referrals"> & DecryptedReferral;
-type Note = Tables<"referral_notes"> & DecryptedReferralNote & {
-  wrapped_key?: string | null;
-  body_ciphertext?: string | null;
-  body_nonce?: string | null;
-  enc_version?: number | null;
-  recipient_user_ids?: string[];
-  _e2eStatus?: "plaintext" | "legacy-server-enc" | "e2e-decrypted" | "e2e-locked" | "e2e-no-key" | "e2e-failed";
-};
+
 
 // Queryable cache key for a single referral's decrypted detail. The loader
 // primes this so navigation from the list page shows data on first paint;
