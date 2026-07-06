@@ -366,22 +366,9 @@ function ReferralDetail() {
   }, [id]);
 
 
-  // Fetch other declined referrals for the same patient.
-  useEffect(() => {
-    const hn = ref?.hospital_number?.trim();
-    if (!hn) {
-      setPriorDeclined([]);
-      return;
-    }
-    let cancelled = false;
-    fetchPriors({ data: { hospital_number: hn, exclude_id: id } })
-      .then((rows: any[]) => {
-        if (cancelled) return;
-        setPriorDeclined(((rows ?? []) as Referral[]).filter((r) => r.status === "declined"));
-      })
-      .catch(() => { if (!cancelled) setPriorDeclined([]); });
-    return () => { cancelled = true; };
-  }, [ref?.hospital_number, id, fetchPriors]);
+  // Prior declined referrals for this patient are now fetched by
+  // <PriorDeclinedReferrals /> using its own useQuery.
+
 
 
 
