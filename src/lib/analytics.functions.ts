@@ -154,7 +154,3 @@ export const getPostopAnalytics = createServerFn({ method: "GET" })
       throw safeError("analytics.getPostopAnalytics", err, "Could not load post-op analytics.");
     }
   });
-    } catch (err) {
-      throw safeError("analytics.getPostopAnalytics", err, "Could not load post-op analytics.");
-    }
-  });
