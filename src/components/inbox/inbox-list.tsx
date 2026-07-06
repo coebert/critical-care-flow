@@ -70,12 +70,39 @@ export function InboxList(props: Props) {
       )}
       <Card className="divide-y">
         {loading ? (
-          <div className="p-6 text-sm text-muted-foreground text-center">Loading…</div>
-        ) : visible.length === 0 ? (
-          <div className="p-8 text-sm text-muted-foreground text-center flex flex-col items-center gap-2">
-            <Bell className="w-6 h-6 opacity-50" aria-hidden="true" />
-            {hasFilters ? "No notifications match your filters" : tab === "unread" ? "No unread notifications" : "No notifications yet"}
+          <div className="divide-y">
+            {Array.from({ length: 4 }).map((_, i) => (
+              <div key={i} className="flex items-start gap-3 p-3">
+                <Skeleton className="h-4 w-4 mt-1 rounded" />
+                <Skeleton className="h-2 w-2 rounded-full mt-2" />
+                <div className="flex-1 space-y-2">
+                  <div className="flex items-center gap-2">
+                    <Skeleton className="h-3 w-20" />
+                    <Skeleton className="h-3 w-16" />
+                  </div>
+                  <Skeleton className="h-3 w-full max-w-md" />
+                </div>
+              </div>
+            ))}
           </div>
+        ) : visible.length === 0 ? (
+          <EmptyState
+            icon={hasFilters ? Filter : Bell}
+            title={
+              hasFilters
+                ? "No notifications match your filters"
+                : tab === "unread"
+                ? "No unread notifications"
+                : "No notifications yet"
+            }
+            description={
+              hasFilters
+                ? "Try widening the date range or clearing the type filter."
+                : tab === "unread"
+                ? "You're all caught up. New alerts will appear here."
+                : "You'll see referral updates, notes, and system alerts here as they arrive."
+            }
+          />
         ) : (
           visible.map((n) => {
             const isChecked = selected.has(n.id);
