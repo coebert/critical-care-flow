@@ -8,10 +8,7 @@ import { safeError } from "./safe-error";
 
 const b64 = z.string().min(1).max(20000);
 
-async function getAdmin() {
-  const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-  return supabaseAdmin;
-}
+import { getAdmin } from "./server-utils";
 
 async function fanOutForNote(userId: string, referralId: string) {
   const admin = await getAdmin();
