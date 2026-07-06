@@ -283,7 +283,7 @@ function ReferralsList() {
         .filter(Boolean)
         .some((v) => v!.toString().toLowerCase().includes(needle));
     });
-  }, [rows, q, hospSearch, statusFilter, urgencyFilter, locFilter, dateFilter, search.specialty, search.from, search.to]);
+  }, [rows, q, hospSearch, statusFilter, urgencyFilter, locFilter, dateFilter, search.specialty, search.from, search.to, pediatricFilter]);
 
   const displayed = useMemo(() => {
     if (timerSort === "none") return filtered;
