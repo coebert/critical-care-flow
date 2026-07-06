@@ -86,6 +86,20 @@ function ReferralTimer({ r }: { r: Referral }) {
 }
 
 
+function ReferralsListPending() {
+  return (
+    <div className="p-6 text-sm text-muted-foreground">Loading referrals…</div>
+  );
+}
+
+function ReferralsListError({ error }: { error: Error }) {
+  return (
+    <div className="p-6 text-sm text-destructive" role="alert">
+      Failed to load referrals: {error.message}
+    </div>
+  );
+}
+
 export const Route = createFileRoute("/_authenticated/")({
   head: () => ({
     meta: [
@@ -98,8 +112,16 @@ export const Route = createFileRoute("/_authenticated/")({
     from: typeof search.from === "string" ? search.from : undefined, // yyyy-MM-dd inclusive
     to: typeof search.to === "string" ? search.to : undefined,       // yyyy-MM-dd inclusive
   }),
+  // Prime the referrals list cache before the component mounts. The parent
+  // `_authenticated` layout is `ssr: false`, so this runs client-side after
+  // the auth gate — bearer middleware is attached and the fetch is authorised.
+  loader: ({ context }) =>
+    context.queryClient.ensureQueryData(referralsListQueryOptions),
+  pendingComponent: ReferralsListPending,
+  errorComponent: ReferralsListError,
   component: ReferralsList,
 });
+
 
 const statusStyles: Record<string, string> = {
   pending: "bg-warning/15 text-warning-foreground border-warning/30",
