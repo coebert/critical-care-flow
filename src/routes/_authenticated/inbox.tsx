@@ -1,60 +1,22 @@
-import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
+import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
-import { Bell, Check, CheckCheck, ExternalLink, Inbox as InboxIcon, Search, X, ChevronLeft, ChevronRight, ArrowUpDown } from "lucide-react";
-import { formatDistanceToNow } from "date-fns";
-import { zodValidator, fallback } from "@tanstack/zod-adapter";
-import { z } from "zod";
-import { queryOptions, useQueryClient, useSuspenseQuery } from "@tanstack/react-query";
+import { CheckCheck, Inbox as InboxIcon } from "lucide-react";
+import { useQueryClient, useSuspenseQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/use-auth";
-import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Checkbox } from "@/components/ui/checkbox";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { toast } from "sonner";
-
-const KIND_VALUES = ["all", "new", "status", "note", "updated", "warning"] as const;
-const PAGE_SIZE = 25;
-
-const inboxSearchSchema = z.object({
-  tab: fallback(z.enum(["all", "unread"]), "all").default("all"),
-  q: fallback(z.string(), "").default(""),
-  kind: fallback(z.enum(KIND_VALUES), "all").default("all"),
-  from: fallback(z.string(), "").default(""),
-  to: fallback(z.string(), "").default(""),
-  sort: fallback(z.enum(["newest", "oldest"]), "newest").default("newest"),
-  page: fallback(z.number().int().min(1), 1).default(1),
-});
-
-interface Notification {
-  id: string;
-  referral_id: string | null;
-  kind: string;
-  message: string;
-  read_at: string | null;
-  created_at: string;
-}
-
-// RLS scopes this to the current user; the queryKey doesn't need the user id.
-// Realtime pushes updates via `queryClient.setQueryData` below.
-export const NOTIFICATIONS_QUERY_KEY = ["notifications", "list"] as const;
-const notificationsQueryOptions = queryOptions({
-  queryKey: NOTIFICATIONS_QUERY_KEY,
-  queryFn: async (): Promise<Notification[]> => {
-    const { data, error } = await supabase
-      .from("notifications")
-      .select("*")
-      .order("created_at", { ascending: false })
-      .limit(500);
-    if (error) throw new Error(error.message);
-    return (data ?? []) as Notification[];
-  },
-  staleTime: 10_000,
-});
+import {
+  inboxSearchValidator,
+  notificationsQueryOptions,
+  NOTIFICATIONS_QUERY_KEY,
+  PAGE_SIZE,
+  type InboxSearch,
+  type Notification,
+} from "@/lib/inbox-utils";
+import { InboxFilters } from "@/components/inbox/inbox-filters";
+import { InboxList } from "@/components/inbox/inbox-list";
 
 function InboxPending() {
   return <div className="p-6 text-sm text-muted-foreground text-center">Loading…</div>;
@@ -68,7 +30,7 @@ function InboxError({ error }: { error: Error }) {
 }
 
 export const Route = createFileRoute("/_authenticated/inbox")({
-  validateSearch: zodValidator(inboxSearchSchema),
+  validateSearch: inboxSearchValidator,
   head: () => ({
     meta: [
       { title: "Inbox — SDH Critical Care" },
@@ -76,8 +38,6 @@ export const Route = createFileRoute("/_authenticated/inbox")({
       { name: "robots", content: "noindex,nofollow" },
     ],
   }),
-  // Prime the cache before mount. Runs client-side under the auth-gated
-  // parent, so the RLS-scoped query already sees the signed-in user.
   loader: ({ context }) =>
     context.queryClient.ensureQueryData(notificationsQueryOptions),
   pendingComponent: InboxPending,
@@ -85,43 +45,26 @@ export const Route = createFileRoute("/_authenticated/inbox")({
   component: InboxPage,
 });
 
-function kindLabel(kind: string): string {
-  switch (kind) {
-    case "new": return "New referral";
-    case "status": return "Status change";
-    case "note": return "New note";
-    case "updated": return "Referral updated";
-    case "warning": return "Warning";
-    default: return kind;
-  }
-}
-
-
+export { NOTIFICATIONS_QUERY_KEY };
 
 function InboxPage() {
   const { user } = useAuth();
   const search = Route.useSearch();
   const navigate = useNavigate({ from: "/inbox" });
   const queryClient = useQueryClient();
-  // Data primed by the route loader and read via suspense — no local
-  // "loading" state on cold render.
   const { data: items } = useSuspenseQuery(notificationsQueryOptions);
-  const loading = false;
   const [busy, setBusy] = useState(false);
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [qInput, setQInput] = useState(search.q);
 
-  // Local helper: mutate the cached notifications list.
   const patchItems = (updater: (prev: Notification[]) => Notification[]) => {
     queryClient.setQueryData<Notification[]>(NOTIFICATIONS_QUERY_KEY, (cur) =>
       updater(cur ?? []),
     );
   };
 
-  // Keep local input in sync when URL changes externally (back/forward)
   useEffect(() => { setQInput(search.q); }, [search.q]);
 
-  // Debounce q input into URL
   useEffect(() => {
     if (qInput === search.q) return;
     const t = setTimeout(() => {
@@ -130,8 +73,6 @@ function InboxPage() {
     return () => clearTimeout(t);
   }, [qInput, search.q, navigate]);
 
-  // Realtime: prepend new inserts into the cached list. Filtered by user_id
-  // so we don't receive teammates' notifications.
   useEffect(() => {
     if (!user) return;
     const channel = supabase
@@ -149,7 +90,6 @@ function InboxPage() {
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user?.id]);
-
 
   const unreadCount = useMemo(() => items.filter((i) => !i.read_at).length, [items]);
 
@@ -191,7 +131,9 @@ function InboxPage() {
   const allVisibleSelected = visibleIds.length > 0 && selectedVisible.length === visibleIds.length;
   const someVisibleSelected = selectedVisible.length > 0 && !allVisibleSelected;
 
-  const hasFilters = search.q !== "" || search.kind !== "all" || search.from !== "" || search.to !== "" || search.sort !== "newest";
+  const hasFilters =
+    search.q !== "" || search.kind !== "all" || search.from !== "" ||
+    search.to !== "" || search.sort !== "newest";
 
   const toggleOne = (id: string, checked: boolean) => {
     setSelected((cur) => {
@@ -212,12 +154,12 @@ function InboxPage() {
 
   const markRead = async (id: string) => {
     const now = new Date().toISOString();
-    patchItems((cur) => cur.map((i: Notification) => (i.id === id ? { ...i, read_at: now } : i)));
+    patchItems((cur) => cur.map((i) => (i.id === id ? { ...i, read_at: now } : i)));
     const { error } = await supabase.from("notifications").update({ read_at: now }).eq("id", id);
     if (error) toast.error("Could not mark as read");
   };
   const markUnread = async (id: string) => {
-    patchItems((cur) => cur.map((i: Notification) => (i.id === id ? { ...i, read_at: null } : i)));
+    patchItems((cur) => cur.map((i) => (i.id === id ? { ...i, read_at: null } : i)));
     const { error } = await supabase.from("notifications").update({ read_at: null }).eq("id", id);
     if (error) toast.error("Could not mark as unread");
   };
@@ -226,7 +168,7 @@ function InboxPage() {
     if (!ids.length) return;
     setBusy(true);
     const now = new Date().toISOString();
-    patchItems((cur) => cur.map((i: Notification) => (i.read_at ? i : { ...i, read_at: now })));
+    patchItems((cur) => cur.map((i) => (i.read_at ? i : { ...i, read_at: now })));
     const { error } = await supabase.from("notifications").update({ read_at: now }).in("id", ids);
     setBusy(false);
     if (error) toast.error("Some notifications could not be updated");
@@ -237,7 +179,7 @@ function InboxPage() {
     if (!ids.length) return;
     setBusy(true);
     const now = asRead ? new Date().toISOString() : null;
-    patchItems((cur) => cur.map((i: Notification) => (selected.has(i.id) ? { ...i, read_at: now } : i)));
+    patchItems((cur) => cur.map((i) => (selected.has(i.id) ? { ...i, read_at: now } : i)));
     const { error } = await supabase.from("notifications").update({ read_at: now }).in("id", ids);
     setBusy(false);
     if (error) toast.error("Some notifications could not be updated");
@@ -247,7 +189,7 @@ function InboxPage() {
     }
   };
 
-  const setSearch = (patch: Partial<z.infer<typeof inboxSearchSchema>>) => {
+  const setSearch = (patch: Partial<InboxSearch>) => {
     navigate({ search: (prev: Record<string, unknown>) => ({ ...prev, ...patch, page: patch.page ?? 1 }) });
   };
   const clearFilters = () => {
@@ -260,81 +202,26 @@ function InboxPage() {
       <div className="flex items-center justify-between gap-2 flex-wrap">
         <div>
           <h1 className="text-xl font-semibold flex items-center gap-2">
-            <InboxIcon className="w-5 h-5" /> Inbox
+            <InboxIcon className="w-5 h-5" aria-hidden="true" /> Inbox
           </h1>
           <p className="text-sm text-muted-foreground">
             {unreadCount > 0 ? `${unreadCount} unread` : "All caught up"}
           </p>
         </div>
         <Button variant="outline" size="sm" onClick={markAllRead} disabled={busy || unreadCount === 0}>
-          <CheckCheck className="w-4 h-4 mr-1" /> Mark all read
+          <CheckCheck className="w-4 h-4 mr-1" aria-hidden="true" /> Mark all read
         </Button>
       </div>
 
-      <Card className="p-3 space-y-3">
-        <div className="relative">
-          <Search className="w-4 h-4 absolute left-2.5 top-2.5 text-muted-foreground" />
-          <Input
-            value={qInput}
-            onChange={(e) => setQInput(e.target.value)}
-            placeholder="Search by message or referral ID…"
-            className="pl-8 pr-8"
-            aria-label="Search notifications"
-          />
-          {qInput && (
-            <button
-              type="button"
-              onClick={() => setQInput("")}
-              className="absolute right-2 top-2 text-muted-foreground hover:text-foreground"
-              aria-label="Clear search"
-            >
-              <X className="w-4 h-4" />
-            </button>
-          )}
-        </div>
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2">
-          <div>
-            <Label className="text-xs">Type</Label>
-            <Select value={search.kind} onValueChange={(v) => setSearch({ kind: v as typeof search.kind })}>
-              <SelectTrigger><SelectValue /></SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All types</SelectItem>
-                <SelectItem value="new">New referral</SelectItem>
-                <SelectItem value="status">Status change</SelectItem>
-                <SelectItem value="note">New note</SelectItem>
-                <SelectItem value="updated">Referral updated</SelectItem>
-                <SelectItem value="warning">Warning</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-          <div>
-            <Label htmlFor="from" className="text-xs">From</Label>
-            <Input id="from" type="date" value={search.from} onChange={(e) => setSearch({ from: e.target.value })} />
-          </div>
-          <div>
-            <Label htmlFor="to" className="text-xs">To</Label>
-            <Input id="to" type="date" value={search.to} onChange={(e) => setSearch({ to: e.target.value })} />
-          </div>
-          <div>
-            <Label className="text-xs">Sort</Label>
-            <Select value={search.sort} onValueChange={(v) => setSearch({ sort: v as "newest" | "oldest" })}>
-              <SelectTrigger><SelectValue /></SelectTrigger>
-              <SelectContent>
-                <SelectItem value="newest">Newest first</SelectItem>
-                <SelectItem value="oldest">Oldest first</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-        </div>
-        {hasFilters && (
-          <div className="flex items-center justify-between text-xs text-muted-foreground">
-            <span>{filtered.length} match{filtered.length === 1 ? "" : "es"}</span>
-            <Button variant="ghost" size="sm" className="h-7" onClick={clearFilters}>
-              <X className="w-3 h-3 mr-1" /> Clear filters
-            </Button>
-          </div>
-        )}
-      </Card>
+      <InboxFilters
+        qInput={qInput}
+        setQInput={setQInput}
+        search={search}
+        filteredCount={filtered.length}
+        hasFilters={hasFilters}
+        setSearch={setSearch}
+        clearFilters={clearFilters}
+      />
 
       <Tabs
         value={search.tab}
@@ -345,119 +232,28 @@ function InboxPage() {
           <TabsTrigger value="unread">Unread ({unreadCount})</TabsTrigger>
         </TabsList>
         <TabsContent value={search.tab} className="mt-3 space-y-2">
-          {visible.length > 0 && (
-            <div className="flex items-center gap-2 flex-wrap px-1">
-              <Checkbox
-                id="select-all-visible"
-                checked={allVisibleSelected ? true : someVisibleSelected ? "indeterminate" : false}
-                onCheckedChange={(c) => toggleAllVisible(c === true)}
-                aria-label="Select all visible notifications"
-              />
-              <label htmlFor="select-all-visible" className="text-sm text-muted-foreground cursor-pointer">
-                {selected.size > 0 ? `${selected.size} selected` : "Select page"}
-              </label>
-              {selected.size > 0 && (
-                <div className="flex items-center gap-2 ml-auto">
-                  <Button size="sm" variant="outline" disabled={busy} onClick={() => bulkMark(true)}>
-                    <Check className="w-4 h-4 mr-1" /> Mark read
-                  </Button>
-                  <Button size="sm" variant="outline" disabled={busy} onClick={() => bulkMark(false)}>
-                    Mark unread
-                  </Button>
-                  <Button size="sm" variant="ghost" onClick={clearSelection} aria-label="Clear selection">
-                    <X className="w-4 h-4" />
-                  </Button>
-                </div>
-              )}
-            </div>
-          )}
-          <Card className="divide-y">
-            {loading ? (
-              <div className="p-6 text-sm text-muted-foreground text-center">Loading…</div>
-            ) : visible.length === 0 ? (
-              <div className="p-8 text-sm text-muted-foreground text-center flex flex-col items-center gap-2">
-                <Bell className="w-6 h-6 opacity-50" />
-                {hasFilters ? "No notifications match your filters" : search.tab === "unread" ? "No unread notifications" : "No notifications yet"}
-              </div>
-            ) : (
-              visible.map((n) => {
-                const isChecked = selected.has(n.id);
-                const rowClass = `flex items-start gap-3 p-3 hover:bg-accent ${!n.read_at ? "bg-accent/40" : ""}`;
-                return (
-                  <div key={n.id} className={rowClass}>
-                    <div className="pt-1" onClick={(e) => e.stopPropagation()}>
-                      <Checkbox
-                        checked={isChecked}
-                        onCheckedChange={(c) => toggleOne(n.id, c === true)}
-                        aria-label={`Select notification ${n.message}`}
-                      />
-                    </div>
-                    <Link to="/inbox/$id" params={{ id: n.id }} className="flex items-start gap-3 flex-1 min-w-0">
-                      <div className="mt-1">
-                        <span
-                          className={`inline-block w-2 h-2 rounded-full ${n.read_at ? "bg-muted-foreground/30" : "bg-primary"}`}
-                          aria-label={n.read_at ? "Read" : "Unread"}
-                        />
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-2 flex-wrap">
-                          <Badge variant="secondary" className="text-[10px]">{kindLabel(n.kind)}</Badge>
-                          <span className="text-xs text-muted-foreground">
-                            {formatDistanceToNow(new Date(n.created_at), { addSuffix: true })}
-                          </span>
-                        </div>
-                        <div className="text-sm mt-1 break-words">{n.message}</div>
-                        <div className="flex items-center gap-2 mt-2">
-                          {n.read_at ? (
-                            <Button variant="ghost" size="sm" className="h-7 px-2 text-xs"
-                              onClick={(e) => { e.preventDefault(); e.stopPropagation(); markUnread(n.id); }}>
-                              Mark unread
-                            </Button>
-                          ) : (
-                            <Button variant="ghost" size="sm" className="h-7 px-2 text-xs"
-                              onClick={(e) => { e.preventDefault(); e.stopPropagation(); markRead(n.id); }}>
-                              <Check className="w-3 h-3 mr-1" /> Mark read
-                            </Button>
-                          )}
-                        </div>
-                      </div>
-                    </Link>
-                    {n.referral_id && (
-                      <div className="pt-1">
-                        <Button variant="ghost" size="sm" className="h-8 w-8 p-0"
-                          title="Open referral"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            if (!n.read_at) markRead(n.id);
-                            navigate({ to: "/referrals/$id", params: { id: n.referral_id! } });
-                          }}>
-                          <ExternalLink className="w-4 h-4" />
-                        </Button>
-                      </div>
-                    )}
-                  </div>
-                );
-              })
-            )}
-          </Card>
-          {filtered.length > 0 && (
-            <div className="flex items-center justify-between text-sm text-muted-foreground pt-1">
-              <span>
-                {pageStart + 1}–{Math.min(pageStart + PAGE_SIZE, filtered.length)} of {filtered.length}
-              </span>
-              <div className="flex items-center gap-1">
-                <Button variant="outline" size="sm" disabled={page <= 1}
-                  onClick={() => setSearch({ page: page - 1 })}>
-                  <ChevronLeft className="w-4 h-4" /> Prev
-                </Button>
-                <span className="px-2">Page {page} / {totalPages}</span>
-                <Button variant="outline" size="sm" disabled={page >= totalPages}
-                  onClick={() => setSearch({ page: page + 1 })}>
-                  Next <ChevronRight className="w-4 h-4" />
-                </Button>
-              </div>
-            </div>
-          )}
+          <InboxList
+            loading={false}
+            busy={busy}
+            visible={visible}
+            filteredCount={filtered.length}
+            page={page}
+            totalPages={totalPages}
+            pageStart={pageStart}
+            hasFilters={hasFilters}
+            tab={search.tab}
+            selected={selected}
+            visibleIds={visibleIds}
+            allVisibleSelected={allVisibleSelected}
+            someVisibleSelected={someVisibleSelected}
+            toggleOne={toggleOne}
+            toggleAllVisible={toggleAllVisible}
+            clearSelection={clearSelection}
+            bulkMark={bulkMark}
+            markRead={markRead}
+            markUnread={markUnread}
+            setPage={(p) => setSearch({ page: p })}
+          />
         </TabsContent>
       </Tabs>
     </div>
