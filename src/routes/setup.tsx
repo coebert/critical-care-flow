@@ -87,10 +87,10 @@ function SetupPage() {
     }
   };
 
-  if (checking) return <div className="min-h-screen flex items-center justify-center text-muted-foreground">Checking…</div>;
+  if (checking) return <div className="min-h-dvh flex items-center justify-center text-muted-foreground">Checking…</div>;
   if (!available) {
     return (
-      <div className="min-h-screen flex items-center justify-center p-4">
+      <div className="min-h-dvh flex items-center justify-center p-4">
         <Card className="p-6 max-w-md">
           <h1 className="font-semibold mb-2">Setup already complete</h1>
           <p className="text-sm text-muted-foreground mb-4">An administrator already exists for this system.</p>
@@ -101,7 +101,7 @@ function SetupPage() {
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-background p-4">
+    <div className="min-h-dvh flex items-center justify-center bg-background p-4">
       <Card className="w-full max-w-md p-8">
         <h1 className="text-lg font-semibold mb-1">Create the first admin</h1>
         <p className="text-sm text-muted-foreground mb-6">

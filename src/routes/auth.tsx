@@ -229,7 +229,7 @@ function AuthPage() {
 
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-background p-4">
+    <div className="min-h-dvh flex items-center justify-center bg-background p-4">
       <Card className="w-full max-w-md p-8">
         <div className="flex items-center gap-3 mb-6">
           <div className="w-10 h-10 rounded-md bg-primary flex items-center justify-center">

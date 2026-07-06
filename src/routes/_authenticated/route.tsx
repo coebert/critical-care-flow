@@ -167,7 +167,7 @@ function AuthedShell() {
   );
 
   return (
-    <div className="min-h-screen flex bg-background">
+    <div className="min-h-dvh flex bg-background">
       <aside
         className={`hidden md:flex ${desktopCollapsed ? "w-16" : "w-60"} border-r bg-sidebar flex-col shrink-0 transition-[width] duration-200`}
       >
