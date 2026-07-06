@@ -51,23 +51,78 @@ export const inviteClinician = createServerFn({ method: "POST" })
     return { user_id: newUserId };
   });
 
-export const listUsers = createServerFn({ method: "GET" })
+const listUsersInputSchema = z
+  .object({
+    page: z.number().int().min(1).max(1000).optional(),
+    perPage: z.number().int().min(1).max(200).optional(),
+  })
+  .default({});
+
+export type ListUsersPage = {
+  users: Array<{
+    id: string;
+    email: string;
+    created_at: string;
+    last_sign_in_at: string | null;
+    profile: any;
+    roles: string[];
+  }>;
+  page: number;
+  perPage: number;
+  hasMore: boolean;
+};
+
+export const listUsers = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .handler(async ({ context }) => {
+  .inputValidator((input: unknown) => listUsersInputSchema.parse(input ?? {}))
+  .handler(async ({ data, context }): Promise<ListUsersPage> => {
     await assertAdmin(context);
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-    const { data: users, error } = await supabaseAdmin.auth.admin.listUsers({ perPage: 200 });
+    const page = data.page ?? 1;
+    const perPage = data.perPage ?? 50;
+
+    // Ask for perPage+1 so we can report hasMore without a second call.
+    const { data: usersRes, error } = await supabaseAdmin.auth.admin.listUsers({
+      page,
+      perPage: perPage + 1,
+    });
     if (error) throw safeError("admin.listUsers", error, "Failed to load users.");
-    const { data: profiles } = await supabaseAdmin.from("profiles").select("*");
-    const { data: roles } = await supabaseAdmin.from("user_roles").select("*");
-    return users.users.map((u) => ({
-      id: u.id,
-      email: u.email ?? "",
-      created_at: u.created_at,
-      last_sign_in_at: u.last_sign_in_at,
-      profile: profiles?.find((p) => p.id === u.id) ?? null,
-      roles: (roles ?? []).filter((r) => r.user_id === u.id).map((r) => r.role),
-    }));
+    const allUsers = usersRes.users ?? [];
+    const hasMore = allUsers.length > perPage;
+    const pageUsers = hasMore ? allUsers.slice(0, perPage) : allUsers;
+    const ids = pageUsers.map((u) => u.id);
+
+    // Fetch profiles + roles ONLY for the current page and index by id in a
+    // Map — replaces the previous O(N²) filter/find joins over every user.
+    const [{ data: profiles }, { data: roles }] = await Promise.all([
+      ids.length
+        ? supabaseAdmin.from("profiles").select("*").in("id", ids)
+        : Promise.resolve({ data: [] as any[] }),
+      ids.length
+        ? supabaseAdmin.from("user_roles").select("*").in("user_id", ids)
+        : Promise.resolve({ data: [] as any[] }),
+    ]);
+    const profileById = new Map((profiles ?? []).map((p: any) => [p.id, p]));
+    const rolesById = new Map<string, string[]>();
+    for (const r of roles ?? []) {
+      const list = rolesById.get(r.user_id) ?? [];
+      list.push(r.role);
+      rolesById.set(r.user_id, list);
+    }
+
+    return {
+      users: pageUsers.map((u) => ({
+        id: u.id,
+        email: u.email ?? "",
+        created_at: u.created_at,
+        last_sign_in_at: u.last_sign_in_at ?? null,
+        profile: profileById.get(u.id) ?? null,
+        roles: rolesById.get(u.id) ?? [],
+      })),
+      page,
+      perPage,
+      hasMore,
+    };
   });
 
 export const setUserRole = createServerFn({ method: "POST" })
