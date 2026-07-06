@@ -21,6 +21,15 @@ import { toast } from "sonner";
 
 export const Route = createFileRoute("/_authenticated")({
   ssr: false,
+  // Every route under this layout renders behind sign-in and holds patient
+  // data. Explicitly ask search engines not to index or follow any of it,
+  // even though `ssr:false` already means no HTML is served to crawlers.
+  // (`ssr:false` disables SSR; the client-side `head()` still emits meta
+  // tags for compliant bots that render the app, and this layout tag is
+  // inherited by every child route.)
+  head: () => ({
+    meta: [{ name: "robots", content: "noindex, nofollow, noarchive" }],
+  }),
   beforeLoad: async ({ location }) => {
     // Use the locally persisted session so transient network failures
     // against /auth/v1/user don't bounce signed-in users back to /auth.
