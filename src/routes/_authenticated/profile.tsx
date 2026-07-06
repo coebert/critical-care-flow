@@ -22,6 +22,7 @@ import { generateAndWrapKeypair, unwrapPrivateKey, verifyStoredKeypair, type Key
 import { E2EUnlockModal } from "@/components/e2e-unlock-modal";
 import { toast } from "sonner";
 import { PasskeyList } from "@/components/passkey-list";
+import { RouteErrorFallback } from "@/components/route-error-fallback";
 
 export const Route = createFileRoute("/_authenticated/profile")({
   head: () => ({
@@ -31,6 +32,7 @@ export const Route = createFileRoute("/_authenticated/profile")({
       { name: "robots", content: "noindex,nofollow" },
     ],
   }),
+  errorComponent: ({ error }) => <RouteErrorFallback error={error} label="Profile" />,
   component: ProfilePage,
 });
 
