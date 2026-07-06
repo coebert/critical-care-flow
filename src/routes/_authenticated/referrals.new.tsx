@@ -639,7 +639,7 @@ function NewReferralPage() {
               >
                 <div className="flex items-center justify-between gap-2 mb-1">
                   <div className="text-sm font-medium">
-                    {format(new Date(p.referral_received_at), "dd MMM yyyy HH:mm")}
+                    {format(new Date(p.referral_received_at), "dd/MM/yyyy HH:mm")}
                   </div>
                   <Badge variant="outline" className="capitalize">{p.status}</Badge>
                 </div>
