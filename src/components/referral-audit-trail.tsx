@@ -75,7 +75,7 @@ function AuditEntry({ entry }: { entry: ReferralAuditEntry }) {
         : "Updated";
   const actionTone =
     entry.action === "create"
-      ? "bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 border-emerald-500/40"
+      ? "bg-success/10 text-success-text border-success/40"
       : entry.action === "delete"
         ? "bg-destructive/10 text-destructive border-destructive/40"
         : "bg-muted text-foreground border-border";
