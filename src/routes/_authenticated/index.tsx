@@ -725,15 +725,25 @@ function ReferralsList() {
               </div>
               <div>
                 <span className="text-xs text-muted-foreground block">Age / Sex</span>
-                <div className="flex items-center gap-1.5">
+                <div className="flex items-center gap-1.5 flex-wrap">
                   {r.age !== null && r.age <= 16 && (
                     <span title="Pediatric patient (≤16)">
                       <Baby className="w-4 h-4 text-primary" />
                     </span>
                   )}
                   <span className="font-medium">{r.age ?? "?"} / {r.sex ?? "?"}</span>
+                  {r.age === null && (
+                    <span
+                      title="Age not recorded — cannot be classified as pediatric"
+                      className="inline-flex items-center gap-1 rounded border border-amber-500/60 bg-amber-100/60 dark:bg-amber-900/30 text-amber-800 dark:text-amber-200 px-1.5 py-0 text-[10px] font-medium"
+                    >
+                      <HelpCircle className="w-3 h-3" />
+                      Age unknown
+                    </span>
+                  )}
                 </div>
               </div>
+
               <div>
                 <span className="text-xs text-muted-foreground block">Location</span>
                 <span className="font-medium">{r.current_ward ?? "—"} {r.current_bed ? `· ${r.current_bed}` : ""}</span>
