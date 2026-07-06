@@ -1145,7 +1145,7 @@ function ReferralDetail() {
             if (!o && !e2e.isUnlocked) pendingActionRef.current = null;
           }}
           onUnlocked={async () => {
-            await Promise.all([loadNotes(), loadDirectory()]);
+            await Promise.all([refetchNotes(), loadDirectory()]);
             // If an encryption action prompted the unlock, run it now so the
             // user doesn't have to click Post/Save a second time.
             const queued = pendingActionRef.current;
