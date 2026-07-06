@@ -157,21 +157,36 @@ export const verifyPasskeyRegistration = createServerFn({ method: "POST" })
 
     const { credential, aaguid } = verification.registrationInfo;
 
-    const { error: insertError } = await supabaseAdmin
+    // Defence-in-depth: the row we're about to insert MUST be owned by the
+    // authenticated caller. context.userId comes from the verified bearer
+    // token in requireSupabaseAuth; we still assert it explicitly and route
+    // the insert through the RLS-scoped client so the ownership-bound
+    // INSERT policy (auth.uid() = user_id) rejects any mismatch even if a
+    // future refactor swaps the client.
+    const ownerId = context.userId;
+    if (!ownerId) throw new Error("Missing authenticated user for passkey registration");
+
+    const row = {
+      user_id: ownerId,
+      credential_id: credential.id,
+      public_key: `\\x${Buffer.from(credential.publicKey).toString("hex")}`,
+      counter: credential.counter ?? 0,
+      transports: credential.transports ?? [],
+      device_label: data.deviceLabel?.slice(0, 100) ?? null,
+      aaguid: aaguid ?? null,
+    };
+    if (row.user_id !== ownerId) {
+      throw new Error("Passkey owner mismatch — refusing to register");
+    }
+
+    const { error: insertError } = await context.supabase
       .from("webauthn_credentials")
-      .insert({
-        user_id: context.userId,
-        credential_id: credential.id,
-        public_key: `\\x${Buffer.from(credential.publicKey).toString("hex")}`,
-        counter: credential.counter ?? 0,
-        transports: credential.transports ?? [],
-        device_label: data.deviceLabel?.slice(0, 100) ?? null,
-        aaguid: aaguid ?? null,
-      });
+      .insert(row);
 
     if (insertError) throw safeError("webauthn.register", insertError, "Could not save passkey.");
 
     await supabaseAdmin.from("webauthn_challenges").delete().eq("id", challengeRow.id);
+
 
     return { ok: true };
   });
