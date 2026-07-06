@@ -143,6 +143,7 @@ const blankForm = (): DraftForm => ({
   discussed_with_consultant: "",
   accepting_consultant: "",
   admission_urgency: "",
+  is_test: false,
 });
 
 function isSafeDraftDirty(d: DraftForm): boolean {
