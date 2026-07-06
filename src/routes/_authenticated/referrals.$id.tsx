@@ -73,20 +73,14 @@ function ReferralDetail() {
   const { highlight } = Route.useSearch();
   const navigate = useNavigate();
   const update = useServerFn(updateReferral);
-  // Legacy non-E2E addNote path is intentionally removed — new notes always
-  // go through the end-to-end encrypted `submitEncNote` flow below.
-  const updateNoteFn = useServerFn(updateNote);
-  const deleteNoteFn = useServerFn(deleteNote);
   const logView = useServerFn(logReferralView);
   const removeReferral = useServerFn(deleteReferral);
-  // Audit-trail state was extracted into <ReferralAuditTrail>. Note-history
-  // fetch below is a separate feature and stays put.
+  const fetchDetail = useServerFn(getReferralDetail);
   const { user } = useAuth();
   const { hasRole: isAdmin } = useRole("admin");
   const [deleting, setDeleting] = useState(false);
   const [expandCmd, setExpandCmd] = useState<{ open: boolean; id: number } | null>(null);
   const { specialties, wards, consultants } = useReferralOptions();
-
 
   // Seed from the loader-primed cache so the initial paint has data. Local
   // state still owns edits (controlled form inputs) — realtime UPDATE calls
@@ -96,22 +90,8 @@ function ReferralDetail() {
     () => (queryClient.getQueryData(referralDetailQueryOptions(id).queryKey) as Referral | null) ?? null,
   );
 
-  // Raw ciphertext rows come from the query cache (loader-primed).
-  // `notes` below is the decrypted, sorted-newest-first projection that the
-  // UI actually renders; it's derived in an effect whenever the raw rows or
-  // the E2E session change.
-  const { data: rawNotes } = useQuery(referralNotesQueryOptions(id));
-  const [notes, setNotes] = useState<Note[]>([]);
-  const [authors, setAuthors] = useState<Record<string, string>>({});
-  const [noteBody, setNoteBody] = useState("");
   const [saving, setSaving] = useState(false);
-  const [posting, setPosting] = useState(false);
-  
-  const [noteFilter, setNoteFilter] = useState<"all" | "e2e" | "legacy" | "failed">("all");
   const outcomeRef = useRef<HTMLDivElement>(null);
-
-  // (Audit-trail IntersectionObserver moved into <ReferralAuditTrail>.)
-
 
   useEffect(() => {
     if (highlight === "declined" && ref?.status === "declined" && outcomeRef.current) {
@@ -123,30 +103,6 @@ function ReferralDetail() {
       return () => clearTimeout(timer);
     }
   }, [highlight, ref?.status]);
-
-  // Author names are batch-fetched inside the decrypt effect in a single
-  // query over all note author ids; no per-author fetch on realtime
-  // updates — any note change invalidates the notes query and re-batches.
-
-  const fetchDetail = useServerFn(getReferralDetail);
-  
-  const fetchKeyMaterial = useServerFn(getMyPrivateKeyMaterial);
-  const fetchKeyDir = useServerFn(getPublicKeyDirectory);
-  const submitEncNote = useServerFn(addEncryptedNote);
-  const editEncNote = useServerFn(updateEncryptedNote);
-
-  const e2e = useE2ESession();
-  const [unlockOpen, setUnlockOpen] = useState(false);
-  const [directory, setDirectory] = useState<Array<{ user_id: string; full_name: string; public_key: string | null }>>([]);
-  const [confirmMissingOpen, setConfirmMissingOpen] = useState(false);
-  const [ackReducedSet, setAckReducedSet] = useState(false);
-  const pendingActionRef = useRef<null | (() => Promise<void>)>(null);
-  const [selectedRecipients, setSelectedRecipients] = useState<Set<string>>(new Set());
-  const [recipientsTouched, setRecipientsTouched] = useState(false);
-  // Teammates who published/rotated a key since this session loaded the
-  // directory — highlighted in the compose chip row so the author immediately
-  // sees who just became eligible.
-  const [newlyEligibleIds, setNewlyEligibleIds] = useState<Set<string>>(new Set());
 
   const loadDirectory = async () => {
     try {
