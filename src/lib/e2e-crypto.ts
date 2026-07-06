@@ -17,14 +17,21 @@
 // or undefined" (the constants come back undefined). The `-sumo` build is
 // API-compatible and includes password hashing, which we need to wrap the
 // user's private key with their password.
-import _sodium from "libsodium-wrappers-sumo";
+// Dynamic import: the sumo build is ~400KB minified. Importing it lazily
+// keeps it out of every chunk that merely `import`s a symbol from this
+// module (types, small helpers), and lets Rollup emit a dedicated
+// `libsodium-wrappers-sumo` chunk that only downloads when we actually
+// need to encrypt / decrypt / derive.
+type Sodium = typeof import("libsodium-wrappers-sumo").default;
 
-let ready: Promise<typeof _sodium> | null = null;
-export async function sodium() {
+let ready: Promise<Sodium> | null = null;
+export async function sodium(): Promise<Sodium> {
   if (!ready) {
     ready = (async () => {
-      await _sodium.ready;
-      return _sodium;
+      const mod = await import("libsodium-wrappers-sumo");
+      const s = (mod as unknown as { default: Sodium }).default ?? (mod as unknown as Sodium);
+      await s.ready;
+      return s;
     })();
   }
   return ready;
