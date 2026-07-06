@@ -46,6 +46,35 @@ describe("analytics endpoints exclude soft-deleted rows", () => {
 });
 
 /**
+ * Forward-looking audit: any future `.from("referrals")` or
+ * `.from("postop_bookings")` query added to `analytics.functions.ts` must
+ * also carry the soft-delete filters. This walks every such call site in
+ * the analytics module and asserts both `.is("deleted_at", null)` and
+ * `.is("deleted_by", null)` appear in a short window after the `.from(...)`
+ * call — catching regressions even in endpoints that don't exist yet.
+ */
+describe("analytics.functions.ts — every referrals/bookings query filters soft-deletes", () => {
+  const TABLES = ["referrals", "postop_bookings"] as const;
+  for (const table of TABLES) {
+    it(`every .from("${table}") in analytics.functions.ts filters deleted_at AND deleted_by`, () => {
+      const re = new RegExp(`\\.from\\(\\s*["']${table}["']\\s*\\)`, "g");
+      const matches = [...SOURCE.matchAll(re)];
+      expect(matches.length, `expected at least one .from("${table}") in analytics.functions.ts`).toBeGreaterThan(0);
+      for (const m of matches) {
+        // Grab ~1000 chars after the .from(...) to cover the whole query chain.
+        const window = SOURCE.slice(m.index ?? 0, (m.index ?? 0) + 1000);
+        expect(window, `missing .is("deleted_at", null) after .from("${table}")`).toMatch(
+          /\.is\(\s*["']deleted_at["']\s*,\s*null\s*\)/,
+        );
+        expect(window, `missing .is("deleted_by", null) after .from("${table}")`).toMatch(
+          /\.is\(\s*["']deleted_by["']\s*,\s*null\s*\)/,
+        );
+      }
+    });
+  }
+});
+
+/**
  * Behavioural check: simulate the fluent Supabase query the handlers build
  * and confirm that when `.is("deleted_at", null)` is applied to a mixed
  * fixture of deleted + live rows, only the live rows come through. This is
