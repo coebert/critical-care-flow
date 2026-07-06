@@ -201,10 +201,7 @@ export function PasskeyList() {
 
 function formatDate(iso: string): string {
   try {
-    return new Date(iso).toLocaleString(undefined, {
-      dateStyle: "medium",
-      timeStyle: "short",
-    });
+    return format(new Date(iso), "dd/MM/yyyy HH:mm");
   } catch {
     return iso;
   }

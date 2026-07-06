@@ -449,13 +449,13 @@ export function PostopAnalyticsPanel() {
                     const h = arrivalHoursOf(b);
                     return (
                       <tr key={b.id} className="border-b last:border-0 hover:bg-muted/40">
-                        <td className="py-2 pr-3 whitespace-nowrap">{format(new Date(b.created_at), "dd MMM yy HH:mm")}</td>
+                        <td className="py-2 pr-3 whitespace-nowrap">{format(new Date(b.created_at), "dd/MM/yyyy HH:mm")}</td>
                         <td className="py-2 pr-3">{b.age ?? "—"}</td>
                         <td className="py-2 pr-3">{b.sex ?? "—"}</td>
                         <td className="py-2 pr-3">{b.bmi != null ? Number(b.bmi).toFixed(1) : "—"}</td>
                         <td className="py-2 pr-3">{LEVEL_LABELS[b.predicted_level as string] ?? "—"}</td>
                         <td className="py-2 pr-3 whitespace-nowrap">
-                          {(b as any).arrived_at ? format(new Date((b as any).arrived_at), "dd MMM yy HH:mm") : "—"}
+                          {(b as any).arrived_at ? format(new Date((b as any).arrived_at), "dd/MM/yyyy HH:mm") : "—"}
                         </td>
                         <td className="py-2 pr-3">{h != null ? fmtH(h) : "—"}</td>
                         <td className="py-2 pr-3">
