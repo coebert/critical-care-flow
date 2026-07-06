@@ -7,6 +7,7 @@ import { Label } from "@/components/ui/label";
 import { Card } from "@/components/ui/card";
 import { toast } from "sonner";
 import { Toaster } from "@/components/ui/sonner";
+import { checkPassword, PASSWORD_MIN_LENGTH, PASSWORD_RULES_HINT } from "@/lib/password-policy";
 
 export const Route = createFileRoute("/reset-password")({
   ssr: false,
