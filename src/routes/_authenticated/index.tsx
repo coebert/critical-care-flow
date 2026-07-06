@@ -5,7 +5,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
-import { Plus, Search, RotateCcw, Trash2, MapPin } from "lucide-react";
+import { Plus, Search, RotateCcw, Trash2, MapPin, Baby } from "lucide-react";
 import type { Tables } from "@/integrations/supabase/types";
 import { format, formatDistanceToNow } from "date-fns";
 import { listDeletedReferrals, listReferralsForList, restoreReferral, RESTORE_WINDOW_DAYS, type DecryptedReferral } from "@/lib/referrals.functions";
@@ -623,7 +623,16 @@ function ReferralsList() {
                     )}
                   </div>
                 </td>
-                <td className="px-3 py-2">{r.age ?? "?"} / {r.sex ?? "?"}</td>
+                <td className="px-3 py-2">
+                  <div className="flex items-center gap-1.5">
+                    {r.age !== null && r.age <= 16 && (
+                      <span title="Pediatric patient (≤16)">
+                        <Baby className="w-4 h-4 text-primary" />
+                      </span>
+                    )}
+                    <span>{r.age ?? "?"} / {r.sex ?? "?"}</span>
+                  </div>
+                </td>
                 <td className="px-3 py-2">{r.current_ward ?? "—"} {r.current_bed ? `· ${r.current_bed}` : ""}</td>
                 <td className="px-3 py-2">{r.referring_specialty ?? "—"}</td>
                 <td className="px-3 py-2 max-w-xs truncate">{r.reason_for_referral ?? "—"}</td>
@@ -706,7 +715,14 @@ function ReferralsList() {
               </div>
               <div>
                 <span className="text-xs text-muted-foreground block">Age / Sex</span>
-                <span className="font-medium">{r.age ?? "?"} / {r.sex ?? "?"}</span>
+                <div className="flex items-center gap-1.5">
+                  {r.age !== null && r.age <= 16 && (
+                    <span title="Pediatric patient (≤16)">
+                      <Baby className="w-4 h-4 text-primary" />
+                    </span>
+                  )}
+                  <span className="font-medium">{r.age ?? "?"} / {r.sex ?? "?"}</span>
+                </div>
               </div>
               <div>
                 <span className="text-xs text-muted-foreground block">Location</span>
