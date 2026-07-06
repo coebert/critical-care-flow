@@ -156,7 +156,7 @@ function ReferralDetail() {
   // updates — any note change invalidates the notes query and re-batches.
 
   const fetchDetail = useServerFn(getReferralDetail);
-  const fetchPriors = useServerFn(findReferralsByHospitalNumber);
+  
   const fetchKeyMaterial = useServerFn(getMyPrivateKeyMaterial);
   const fetchKeyDir = useServerFn(getPublicKeyDirectory);
   const submitEncNote = useServerFn(addEncryptedNote);
