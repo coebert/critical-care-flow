@@ -125,56 +125,11 @@ export const addEncryptedNote = createServerFn({ method: "POST" })
   .handler(async ({ data, context }) => {
     const { supabase, userId } = context;
 
-    // ---- Server-side recipient coverage check ---------------------------
-    // Even if the client thinks every teammate has a key, the directory may
-    // have changed between the last check and submit. Re-verify against the
-    // live public-key + clinician tables so a race can't sneak a note past
-    // a teammate who just enrolled (they'd be silently excluded) OR post
-    // when someone lost their key (they'd be silently unreadable to).
-    const admin = await getAdmin();
-    const [{ data: clinicianRows }, { data: keyRows }] = await Promise.all([
-      admin
-        .from("user_roles")
-        .select("user_id")
-        .in("role", ["admin", "clinician"]),
-      admin.from("user_public_keys").select("user_id"),
-    ]);
-
-
-
-    // Delegate the rules to the pure evaluator so they can be exercised in
-    // isolation by unit tests (see e2e-recipient-coverage.test.ts).
-    const { evaluateRecipientCoverage } = await import("./e2e-recipient-coverage");
-    const verdict = evaluateRecipientCoverage({
+    await assertRecipientCoverage({
       authorId: userId,
-      clinicianIds: (clinicianRows ?? []).map((r: any) => r.user_id as string),
-      enrolledIds: (keyRows ?? []).map((r: any) => r.user_id as string),
       requestedRecipientIds: data.wrapped_keys.map((w) => w.recipient_user_id),
       allowReducedRecipients: !!data.allow_reduced_recipients,
     });
-
-    if (!verdict.ok) {
-      // Resolve names so the client toast can list teammates by name.
-      const allIds = [
-        ...verdict.missingNoKey,
-        ...verdict.enrolledButExcluded,
-        ...verdict.strayRecipients,
-      ];
-      const { data: profs } = allIds.length
-        ? await admin.from("profiles").select("id, full_name").in("id", allIds)
-        : { data: [] as Array<{ id: string; full_name: string }> };
-      const nameFor = new Map<string, string>((profs ?? []).map((p: any) => [p.id, p.full_name]));
-      const decorate = (ids: string[]) =>
-        ids.map((id) => ({ user_id: id, full_name: nameFor.get(id) ?? "Unknown teammate" }));
-      const payload = {
-        code: verdict.reason,
-        missing_no_key: decorate(verdict.missingNoKey),
-        enrolled_but_excluded: decorate(verdict.enrolledButExcluded),
-        stray_recipients: decorate(verdict.strayRecipients),
-      };
-      throw new Error(`RECIPIENT_COVERAGE_CHANGED::${JSON.stringify(payload)}`);
-    }
-    // ---------------------------------------------------------------------
 
     // Insert the note (no plaintext, no body_enc — pure ciphertext).
     const { data: row, error } = await supabase
