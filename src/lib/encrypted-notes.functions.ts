@@ -29,7 +29,7 @@ async function fanOutForNote(userId: string, referralId: string) {
       fetchAtWorkProfiles: async (ids) => {
         const { data } = await admin
           .from("profiles")
-          .select("id, is_at_work, notify_notes, notify_status")
+          .select("id, is_at_work, notify_notes, notify_status, notify_new_referral, notify_updated_referral")
           .in("id", ids)
           .eq("is_at_work", true);
         return (data ?? []) as any;
