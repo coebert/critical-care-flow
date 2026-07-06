@@ -143,6 +143,7 @@ function EditPostopBookingPage() {
           proposed_surgery_date: surgeryDate.trim() || null,
           arrived_at: arrivedAt.trim() ? new Date(arrivedAt).toISOString() : null,
           surgical_specialty: specialty || null,
+          is_test: isTest,
         },
       });
       toast.success("Post-op booking updated");
