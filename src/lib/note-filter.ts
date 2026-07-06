@@ -1,4 +1,4 @@
-import type { DecryptedNote } from "@/hooks/use-decrypted-notes";
+import type { Note } from "@/components/note-item";
 
 export type NoteFilter = "all" | "e2e" | "legacy" | "failed";
 
