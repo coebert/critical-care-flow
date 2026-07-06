@@ -1107,7 +1107,7 @@ function ReferralDetail() {
                       // Re-run this exact edit (same body/recipients) after unlock.
                       const enc2 = await encryptForRecipients(body, recipients ?? new Set());
                       await editEncNote({ data: { id: n.id, ...enc2 } });
-                      await loadNotes();
+                      await refetchNotes();
                       toast.success("Note updated");
                     })();
                     if (!ensureUnlocked(() => retry())) return;
@@ -1117,16 +1117,16 @@ function ReferralDetail() {
                     }
                     const enc = await encryptForRecipients(body, recipients);
                     await editEncNote({ data: { id: n.id, ...enc } });
-                    await loadNotes();
+                    await refetchNotes();
                   } else {
-                    const updated = await updateNoteFn({ data: { id: n.id, body } });
-                    setNotes((cur) => cur.map((x) => (x.id === n.id ? { ...x, ...(updated as Note) } : x)));
+                    await updateNoteFn({ data: { id: n.id, body } });
+                    await refetchNotes();
                   }
                   toast.success("Note updated");
                 }}
                 onDelete={async () => {
                   await deleteNoteFn({ data: { id: n.id } });
-                  setNotes((cur) => cur.filter((x) => x.id !== n.id));
+                  await refetchNotes();
                   toast.success("Note deleted");
                 }}
               />
