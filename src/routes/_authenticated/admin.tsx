@@ -152,31 +152,62 @@ function UsersPanel() {
 function AuditPanel() {
   const fetchLog = useServerFn(getAuditLog);
   const [rows, setRows] = useState<any[]>([]);
+  const [nextOffset, setNextOffset] = useState(0);
+  const [hasMore, setHasMore] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false);
+
   useEffect(() => {
-    fetchLog({}).then((d) => { setRows(d as any[]); setLoading(false); });
+    fetchLog({ data: { limit: 100, offset: 0 } })
+      .then((page) => {
+        setRows(page.rows);
+        setHasMore(page.hasMore);
+        setNextOffset(page.nextOffset);
+      })
+      .finally(() => setLoading(false));
   }, [fetchLog]);
+
+  const loadMore = async () => {
+    setLoadingMore(true);
+    try {
+      const page = await fetchLog({ data: { limit: 100, offset: nextOffset } });
+      setRows((cur) => [...cur, ...page.rows]);
+      setHasMore(page.hasMore);
+      setNextOffset(page.nextOffset);
+    } finally {
+      setLoadingMore(false);
+    }
+  };
 
   return (
     <Card className="p-5">
-      <h2 className="font-semibold mb-3">Audit log (last 500 events)</h2>
+      <h2 className="font-semibold mb-3">Audit log</h2>
       {loading ? <p className="text-sm text-muted-foreground">Loading…</p> : (
-        <div className="overflow-x-auto"><table className="w-full text-sm min-w-[640px]">
-          <thead className="text-xs uppercase text-muted-foreground">
-            <tr><th className="text-left py-2">When</th><th className="text-left">Action</th><th className="text-left">Entity</th><th className="text-left">ID</th><th className="text-left">User</th></tr>
-          </thead>
-          <tbody>
-            {rows.map((r) => (
-              <tr key={r.id} className="border-t">
-                <td className="py-1.5 whitespace-nowrap" title={tzTooltip(r.created_at)}>{format(new Date(r.created_at), "dd/MM/yyyy HH:mm:ss")}</td>
-                <td className="capitalize">{r.action}</td>
-                <td>{r.entity}</td>
-                <td className="font-mono text-xs">{r.entity_id?.slice(0, 8) ?? "—"}</td>
-                <td className="font-mono text-xs">{r.user_id?.slice(0, 8) ?? "—"}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table></div>
+        <>
+          <div className="overflow-x-auto"><table className="w-full text-sm min-w-[640px]">
+            <thead className="text-xs uppercase text-muted-foreground">
+              <tr><th className="text-left py-2">When</th><th className="text-left">Action</th><th className="text-left">Entity</th><th className="text-left">ID</th><th className="text-left">User</th></tr>
+            </thead>
+            <tbody>
+              {rows.map((r) => (
+                <tr key={r.id} className="border-t">
+                  <td className="py-1.5 whitespace-nowrap" title={tzTooltip(r.created_at)}>{format(new Date(r.created_at), "dd/MM/yyyy HH:mm:ss")}</td>
+                  <td className="capitalize">{r.action}</td>
+                  <td>{r.entity}</td>
+                  <td className="font-mono text-xs">{r.entity_id?.slice(0, 8) ?? "—"}</td>
+                  <td className="font-mono text-xs">{r.user_id?.slice(0, 8) ?? "—"}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table></div>
+          {hasMore && (
+            <div className="mt-3 flex justify-center">
+              <Button variant="outline" size="sm" onClick={loadMore} disabled={loadingMore}>
+                {loadingMore ? "Loading…" : "Load more"}
+              </Button>
+            </div>
+          )}
+        </>
       )}
     </Card>
   );

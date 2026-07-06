@@ -108,19 +108,53 @@ export const setUserRole = createServerFn({ method: "POST" })
     return { ok: true };
   });
 
-export const getAuditLog = createServerFn({ method: "GET" })
+const auditLogInputSchema = z
+  .object({
+    limit: z.number().int().min(1).max(200).optional(),
+    offset: z.number().int().min(0).max(10_000).optional(),
+  })
+  .default({});
+
+export type AuditLogEntry = {
+  id: string;
+  user_id: string | null;
+  action: string;
+  entity: string;
+  entity_id: string | null;
+  // Free-form JSON diff written by callers; keep loose so TSS can serialize.
+  diff: any;
+  created_at: string;
+};
+
+export type AuditLogPage = {
+  rows: AuditLogEntry[];
+  hasMore: boolean;
+  nextOffset: number;
+};
+
+export const getAuditLog = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .handler(async ({ context }) => {
+  .inputValidator((input: unknown) => auditLogInputSchema.parse(input ?? {}))
+  .handler(async ({ data, context }): Promise<AuditLogPage> => {
     await assertAdmin(context);
     // Use the admin client so RLS on audit_log cannot silently hide rows from
     // admins (e.g. entries written by service_role or by users whose scope
     // no longer matches the policy). Access is gated by assertAdmin above.
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-    const { data, error } = await supabaseAdmin
+    const limit = data.limit ?? 100;
+    const offset = data.offset ?? 0;
+    // Fetch limit+1 to detect whether more rows exist without a second query.
+    const { data: rows, error } = await supabaseAdmin
       .from("audit_log")
       .select("*")
       .order("created_at", { ascending: false })
-      .limit(500);
+      .range(offset, offset + limit);
     if (error) throw safeError("admin.getAuditLog", error, "Failed to load audit log.");
-    return data;
+    const list = rows ?? [];
+    const hasMore = list.length > limit;
+    return {
+      rows: list.slice(0, limit) as AuditLogPage["rows"],
+      hasMore,
+      nextOffset: offset + limit,
+    };
   });

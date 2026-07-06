@@ -183,15 +183,24 @@ export const listPostopBookings = createServerFn({ method: "GET" })
         }
         includeDeleted = true;
       }
+      // Bounded list; realtime-refreshed. See referrals.listReferralsForList
+      // for the rationale on why this stays as a hard cap rather than a
+      // paginated feed. Warn if we ever hit the cap so we know to revisit.
+      const POSTOP_LIST_HARD_CAP = 500;
       let query = context.supabase
         .from("postop_bookings")
         .select("*")
         .order("proposed_surgery_date", { ascending: true, nullsFirst: false })
         .order("created_at", { ascending: false })
-        .limit(500);
+        .limit(POSTOP_LIST_HARD_CAP);
       if (!includeDeleted) query = query.is("deleted_at", null);
       const { data: rows, error } = await query;
       if (error) throw error;
+      if ((rows?.length ?? 0) >= POSTOP_LIST_HARD_CAP) {
+        console.warn(
+          `[postop.list] hit hard cap of ${POSTOP_LIST_HARD_CAP} rows — results are truncated.`,
+        );
+      }
       const { decryptRow } = await loadCrypto();
       const decrypted = ((rows ?? []) as Array<Record<string, any>>).map(decryptRow) as Array<Record<string, any>>;
 
