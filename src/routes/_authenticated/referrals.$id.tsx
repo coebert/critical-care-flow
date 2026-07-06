@@ -6,6 +6,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { deleteReferral, getReferralDetail, logReferralView, updateReferral, type DecryptedReferral } from "@/lib/referrals.functions";
 import { ReferralAuditTrail } from "@/components/referral-audit-trail";
 import { PriorDeclinedReferrals } from "@/components/prior-declined-referrals";
+import { RouteErrorFallback } from "@/components/route-error-fallback";
 import { Noteboard, referralNotesQueryOptions } from "@/components/noteboard";
 import { useAuth, useRole } from "@/hooks/use-auth";
 import { Button } from "@/components/ui/button";
