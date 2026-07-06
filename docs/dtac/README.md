@@ -55,6 +55,7 @@ Owner completes in the DTAC response document.
 | Cyber Essentials self-assessment | `docs/dtac/cyber-essentials.md` (Phase 6) | Pending |
 | Penetration test | Scope doc under Phase 6 | Pending |
 | SBOM | Generated via `bun x @cyclonedx/cyclonedx-npm` (Phase 6) | Pending |
+| Push notification fanout test plan | `docs/dtac/push-notification-test-plan.md` | Complete |
 
 ## Section C6 — Interoperability
 
