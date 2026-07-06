@@ -106,7 +106,7 @@ export function InboxList(props: Props) {
         ) : (
           visible.map((n) => {
             const isChecked = selected.has(n.id);
-            const rowClass = `flex items-start gap-3 p-3 hover:bg-accent ${!n.read_at ? "bg-accent/40" : ""}`;
+            const rowClass = `flex items-start gap-3 p-3 transition-colors duration-150 hover:bg-accent ${!n.read_at ? "bg-accent/40" : ""}`;
             return (
               <div key={n.id} className={rowClass}>
                 <div className="pt-1" onClick={(e) => e.stopPropagation()}>
