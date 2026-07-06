@@ -1,6 +1,8 @@
-import { RotateCcw } from "lucide-react";
+import { RotateCcw, Trash2 } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
 import { Button } from "@/components/ui/button";
+import { Skeleton } from "@/components/ui/skeleton";
+import { EmptyState } from "@/components/ui/empty-state";
 import { RESTORE_WINDOW_DAYS } from "@/lib/referrals.functions";
 import type { Referral } from "@/lib/referrals-list-utils";
 
@@ -39,11 +41,24 @@ export function ReferralsDeletedPanel({ rows, loading, restoringId, onRestore }:
             </tr>
           </thead>
           <tbody>
-            {loading && (
-              <tr><td colSpan={6} className="px-3 py-6 text-center text-muted-foreground">Loading…</td></tr>
-            )}
+            {loading && Array.from({ length: 3 }).map((_, i) => (
+              <tr key={`sk-${i}`} className="border-t">
+                {Array.from({ length: 6 }).map((__, j) => (
+                  <td key={j} className="px-3 py-3">
+                    <Skeleton className="h-3 w-full max-w-[110px]" />
+                  </td>
+                ))}
+              </tr>
+            ))}
             {!loading && rows.length === 0 && (
-              <tr><td colSpan={6} className="px-3 py-6 text-center text-muted-foreground">No restorable referrals.</td></tr>
+              <tr><td colSpan={6} className="px-3 py-3">
+                <EmptyState
+                  icon={Trash2}
+                  title="Nothing to restore"
+                  description={`Deleted referrals appear here for ${RESTORE_WINDOW_DAYS} days before they're purged.`}
+                  compact
+                />
+              </td></tr>
             )}
             {rows.map((r) => (
               <tr key={r.id} className="border-t">
@@ -74,11 +89,23 @@ export function ReferralsDeletedPanel({ rows, loading, restoringId, onRestore }:
       </div>
       {/* Mobile cards */}
       <div className="md:hidden flex flex-col gap-2 p-3">
-        {loading && (
-          <div className="text-center text-muted-foreground py-6">Loading…</div>
-        )}
+        {loading && Array.from({ length: 2 }).map((_, i) => (
+          <div key={`sk-${i}`} className="border rounded-lg p-3 space-y-2 bg-background">
+            <div className="flex items-center justify-between">
+              <Skeleton className="h-3 w-24" />
+              <Skeleton className="h-8 w-20" />
+            </div>
+            <Skeleton className="h-3 w-full" />
+            <Skeleton className="h-3 w-2/3" />
+          </div>
+        ))}
         {!loading && rows.length === 0 && (
-          <div className="text-center text-muted-foreground py-6">No restorable referrals.</div>
+          <EmptyState
+            icon={Trash2}
+            title="Nothing to restore"
+            description={`Deleted referrals appear here for ${RESTORE_WINDOW_DAYS} days before they're purged.`}
+            compact
+          />
         )}
         {rows.map((r) => (
           <div key={r.id} className="border rounded-lg bg-background p-3 flex flex-col gap-2">
