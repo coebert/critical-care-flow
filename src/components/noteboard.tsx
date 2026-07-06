@@ -316,39 +316,23 @@ export function Noteboard({ referralId: id }: NoteboardProps) {
             <NotePartialCoverageAlert coverage={coverage} recipientsTouched={recipientsTouched} />
           </>
         )}
-        <div className="space-y-2 mb-4">
-          {e2e.isUnlocked && directoryWithSelf.length > 0 && (
-            <NoteRecipientChipRow
-              directory={directoryWithSelf}
-              selected={selectedRecipients}
-              newlyEligibleIds={newlyEligibleIds}
-              currentUserId={user?.id}
-              onToggle={toggleRecipient}
-            />
-          )}
-          <Textarea rows={3} value={noteBody} onChange={(e) => setNoteBody(e.target.value)} placeholder="e.g. seen in ED resus, awaiting bloods, for re-review at 6pm" />
-          <div className="flex items-center justify-between gap-2 flex-wrap">
-            <span className="text-[11px] text-muted-foreground">
-              {e2e.isUnlocked
-                ? `Will be readable by ${eligibleRecipientCount} teammate${eligibleRecipientCount === 1 ? "" : "s"}.`
-                : ""}
-            </span>
-            <div className="flex items-center gap-2">
-              {e2e.isUnlocked && (
-                <NoteRecipientPicker
-                  directory={directoryWithSelf}
-                  selected={selectedRecipients}
-                  onChange={(next) => { setRecipientsTouched(true); setSelectedRecipients(next); }}
-                  currentUserId={user?.id}
-                  compact
-                />
-              )}
-              <Button size="sm" onClick={postNote} disabled={posting || !noteBody.trim()}>
-                {posting ? "Posting…" : e2e.isUnlocked ? "Post encrypted note" : "Unlock & post"}
-              </Button>
-            </div>
-          </div>
-        </div>
+        <NoteComposer
+          value={noteBody}
+          onValueChange={setNoteBody}
+          onSubmit={postNote}
+          posting={posting}
+          isUnlocked={e2e.isUnlocked}
+          eligibleRecipientCount={eligibleRecipientCount}
+          directory={directoryWithSelf}
+          selectedRecipients={selectedRecipients}
+          newlyEligibleIds={newlyEligibleIds}
+          currentUserId={user?.id}
+          onToggleRecipient={toggleRecipient}
+          onChangeRecipients={(next) => {
+            setRecipientsTouched(true);
+            setSelectedRecipients(next);
+          }}
+        />
         <div className="space-y-3 max-h-[520px] overflow-auto">
           {filteredNotes.length === 0 && (
             <p className="text-xs text-muted-foreground">
