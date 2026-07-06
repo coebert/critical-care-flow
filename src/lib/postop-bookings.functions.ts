@@ -45,6 +45,9 @@ const bookingSchema = z.object({
     .nullable()
     .optional(),
   arrived_at: z.string().datetime().nullable().optional(),
+  // Flags a booking entered for testing/demonstration only. Rows with
+  // is_test=true are excluded from analytics dashboards.
+  is_test: z.boolean().optional(),
 });
 
 export type PostopBookingInput = z.infer<typeof bookingSchema>;
