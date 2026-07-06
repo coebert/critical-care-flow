@@ -16,7 +16,7 @@ const authVerifyInputSchema = z.object({
     rawId: z.string().min(1).max(1024),
     type: z.literal("public-key"),
     clientExtensionResults: z.record(z.any()).optional().default({}),
-    authenticatorAttachment: z.string().optional(),
+    authenticatorAttachment: z.enum(["platform", "cross-platform"]).optional(),
     response: z.object({
       clientDataJSON: z.string().min(1),
       authenticatorData: z.string().min(1),
