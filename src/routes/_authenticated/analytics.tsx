@@ -47,6 +47,7 @@ import { SURGICAL_SPECIALTY_LABEL, type SurgicalSpecialty } from "@/lib/surgical
 type Referral = Tables<"referrals">;
 
 import { AdminOnly } from "@/components/admin-only";
+import { RouteErrorFallback } from "@/components/route-error-fallback";
 
 const analyticsSearchSchema = z.object({
   view: z.enum(["referrals", "postop"]).optional(),
