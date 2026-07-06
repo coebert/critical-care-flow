@@ -9,11 +9,10 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Textarea } from "@/components/ui/textarea";
+
 
 import { NoteItem } from "@/components/note-item";
-import { NoteRecipientPicker } from "@/components/note-recipient-picker";
-import { NoteRecipientChipRow } from "@/components/note-recipient-chip-row";
+import { NoteComposer, validateNoteBody } from "@/components/note-composer";
 import { ConfirmReducedRecipientsDialog } from "@/components/confirm-reduced-recipients-dialog";
 import { NoteMissingRecipientsAlert } from "@/components/note-missing-recipients-alert";
 import { NotePartialCoverageAlert } from "@/components/note-partial-coverage-alert";
@@ -233,7 +232,11 @@ export function Noteboard({ referralId: id }: NoteboardProps) {
   };
 
   const postNote = async () => {
-    if (!noteBody.trim()) return;
+    const validation = validateNoteBody(noteBody);
+    if (!validation.ok) {
+      if (validation.reason === "too-long") toast.error("Note is too long — trim it before posting.");
+      return;
+    }
     if (!ensureUnlocked(postNote)) return;
     if (selectedRecipients.size === 0) {
       toast.error("Pick at least one recipient for this note.");
@@ -313,39 +316,23 @@ export function Noteboard({ referralId: id }: NoteboardProps) {
             <NotePartialCoverageAlert coverage={coverage} recipientsTouched={recipientsTouched} />
           </>
         )}
-        <div className="space-y-2 mb-4">
-          {e2e.isUnlocked && directoryWithSelf.length > 0 && (
-            <NoteRecipientChipRow
-              directory={directoryWithSelf}
-              selected={selectedRecipients}
-              newlyEligibleIds={newlyEligibleIds}
-              currentUserId={user?.id}
-              onToggle={toggleRecipient}
-            />
-          )}
-          <Textarea rows={3} value={noteBody} onChange={(e) => setNoteBody(e.target.value)} placeholder="e.g. seen in ED resus, awaiting bloods, for re-review at 6pm" />
-          <div className="flex items-center justify-between gap-2 flex-wrap">
-            <span className="text-[11px] text-muted-foreground">
-              {e2e.isUnlocked
-                ? `Will be readable by ${eligibleRecipientCount} teammate${eligibleRecipientCount === 1 ? "" : "s"}.`
-                : ""}
-            </span>
-            <div className="flex items-center gap-2">
-              {e2e.isUnlocked && (
-                <NoteRecipientPicker
-                  directory={directoryWithSelf}
-                  selected={selectedRecipients}
-                  onChange={(next) => { setRecipientsTouched(true); setSelectedRecipients(next); }}
-                  currentUserId={user?.id}
-                  compact
-                />
-              )}
-              <Button size="sm" onClick={postNote} disabled={posting || !noteBody.trim()}>
-                {posting ? "Posting…" : e2e.isUnlocked ? "Post encrypted note" : "Unlock & post"}
-              </Button>
-            </div>
-          </div>
-        </div>
+        <NoteComposer
+          value={noteBody}
+          onValueChange={setNoteBody}
+          onSubmit={postNote}
+          posting={posting}
+          isUnlocked={e2e.isUnlocked}
+          eligibleRecipientCount={eligibleRecipientCount}
+          directory={directoryWithSelf}
+          selectedRecipients={selectedRecipients}
+          newlyEligibleIds={newlyEligibleIds}
+          currentUserId={user?.id}
+          onToggleRecipient={toggleRecipient}
+          onChangeRecipients={(next) => {
+            setRecipientsTouched(true);
+            setSelectedRecipients(next);
+          }}
+        />
         <div className="space-y-3 max-h-[520px] overflow-auto">
           {filteredNotes.length === 0 && (
             <p className="text-xs text-muted-foreground">
