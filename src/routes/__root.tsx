@@ -95,8 +95,8 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
       { name: "twitter:site", content: "@Lovable" },
       { name: "twitter:title", content: "Critical Care Connect" },
       { name: "twitter:description", content: "Critical Care Connect streamlines patient referral data capture and analysis for critical care teams." },
-      { property: "og:image", content: "https://pub-bb2e103a32db4e198524a2e9ed8f35b4.r2.dev/90e3671a-cf96-44d3-9573-a2b0871e7625/id-preview-ea0b624c--a8eeeba1-1944-4344-93c0-4f9de4184412.lovable.app-1781876863220.png" },
-      { name: "twitter:image", content: "https://pub-bb2e103a32db4e198524a2e9ed8f35b4.r2.dev/90e3671a-cf96-44d3-9573-a2b0871e7625/id-preview-ea0b624c--a8eeeba1-1944-4344-93c0-4f9de4184412.lovable.app-1781876863220.png" },
+      // og:image intentionally omitted at the root — leaf routes may add
+      // their own; otherwise the hosting platform injects a screenshot.
     ],
     links: [
       {
