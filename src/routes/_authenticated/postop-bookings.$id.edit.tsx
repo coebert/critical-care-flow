@@ -23,11 +23,13 @@ import {
   SURGICAL_SPECIALTY_OPTIONS,
   type SurgicalSpecialty,
 } from "@/lib/surgical-specialties";
+import { RouteErrorFallback } from "@/components/route-error-fallback";
 
 export const Route = createFileRoute("/_authenticated/postop-bookings/$id/edit")({
   head: () => ({
     meta: [{ title: "Edit post-op HDU/ICU booking — SDH Critical Care" }],
   }),
+  errorComponent: ({ error }) => <RouteErrorFallback error={error} label="Post-op booking" />,
   component: EditPostopBookingPage,
 });
 

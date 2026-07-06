@@ -2,6 +2,7 @@ import { createFileRoute, useNavigate, Link } from "@tanstack/react-router";
 import { useState, useEffect } from "react";
 import { useServerFn } from "@tanstack/react-start";
 import { createReferral, findReferralsByHospitalNumber } from "@/lib/referrals.functions";
+import { RouteErrorFallback } from "@/components/route-error-fallback";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -55,6 +56,7 @@ type PriorReferral = {
 
 export const Route = createFileRoute("/_authenticated/referrals/new")({
   head: () => ({ meta: [{ title: "New referral — SDH Critical Care" }] }),
+  errorComponent: ({ error }) => <RouteErrorFallback error={error} label="New referral" />,
   component: NewReferralPage,
 });
 

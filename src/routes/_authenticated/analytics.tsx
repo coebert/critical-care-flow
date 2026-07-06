@@ -47,6 +47,7 @@ import { SURGICAL_SPECIALTY_LABEL, type SurgicalSpecialty } from "@/lib/surgical
 type Referral = Tables<"referrals">;
 
 import { AdminOnly } from "@/components/admin-only";
+import { RouteErrorFallback } from "@/components/route-error-fallback";
 
 const analyticsSearchSchema = z.object({
   view: z.enum(["referrals", "postop"]).optional(),
@@ -93,6 +94,7 @@ export const Route = createFileRoute("/_authenticated/analytics")({
     });
     void context.queryClient.prefetchQuery(icnarcTargetsQueryOptions);
   },
+  errorComponent: ({ error }) => <RouteErrorFallback error={error} label="Analytics" />,
   component: () => (
     <AdminOnly redirectTo="/postop-bookings">
       <AnalyticsPage />
@@ -140,17 +142,9 @@ function AnalyticsPage() {
   });
 
   const queryClient = useQueryClient();
-  const { data: icnarcTargets } = useQuery({
-    queryKey: ["icnarc-targets"],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from("icnarc_targets")
-        .select("time_to_seen_target_min, decision_to_arrival_target_min")
-        .maybeSingle();
-      if (error) throw error;
-      return data;
-    },
-  });
+  // Share the file-scope options object with the loader prefetch so the
+  // queryKey and queryFn are defined exactly once.
+  const { data: icnarcTargets } = useQuery(icnarcTargetsQueryOptions);
   // ICNARC / GPICS-aligned targets, configurable via the dialog below.
   const ICNARC_TIME_TO_SEEN_TARGET_MIN = icnarcTargets?.time_to_seen_target_min ?? 30;
   const ICNARC_DECISION_TO_ARRIVAL_TARGET_MIN = icnarcTargets?.decision_to_arrival_target_min ?? 240;
@@ -338,17 +332,26 @@ function AnalyticsPage() {
     [filtered]
   );
 
-  const admittedConsultants = useMemo(() => {
+  // Build the count Map once, then reuse it for both the top-8 list and the
+  // totals. The previous version rebuilt counts with an O(n²) filter-in-map
+  // for `consultantTotals`.
+  const admittedConsultantCounts = useMemo(() => {
     const counts = new Map<string, number>();
     admittedWithConsultant.forEach((r) => {
       const name = r.accepting_consultant!.trim();
       counts.set(name, (counts.get(name) ?? 0) + 1);
     });
-    return Array.from(counts.entries())
-      .sort((a, b) => b[1] - a[1])
-      .slice(0, 8)
-      .map(([name]) => name);
+    return counts;
   }, [admittedWithConsultant]);
+
+  const admittedConsultants = useMemo(
+    () =>
+      Array.from(admittedConsultantCounts.entries())
+        .sort((a, b) => b[1] - a[1])
+        .slice(0, 8)
+        .map(([name]) => name),
+    [admittedConsultantCounts]
+  );
 
   const perDayByConsultant = useMemo(() => {
     const map = new Map<string, Record<string, number | string>>(
@@ -370,14 +373,9 @@ function AnalyticsPage() {
   const consultantTotals = useMemo(
     () =>
       admittedConsultants
-        .map((name) => ({
-          name,
-          count: admittedWithConsultant.filter(
-            (r) => r.accepting_consultant!.trim() === name
-          ).length,
-        }))
+        .map((name) => ({ name, count: admittedConsultantCounts.get(name) ?? 0 }))
         .sort((a, b) => b.count - a.count),
-    [admittedConsultants, admittedWithConsultant]
+    [admittedConsultants, admittedConsultantCounts]
   );
 
   const minutesSamples = (sel: (r: Referral) => [string | null, string | null]) =>

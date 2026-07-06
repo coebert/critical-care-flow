@@ -3,6 +3,7 @@ import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { safeError } from "./safe-error";
 import { assertAdmin } from "./auth-guards";
+import type { Tables } from "@/integrations/supabase/types";
 
 export const inviteClinician = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
@@ -64,7 +65,7 @@ export type ListUsersPage = {
     email: string;
     created_at: string;
     last_sign_in_at: string | null;
-    profile: any;
+    profile: Tables<"profiles"> | null;
     roles: string[];
   }>;
   page: number;
