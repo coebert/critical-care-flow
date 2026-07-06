@@ -133,7 +133,7 @@ function ReferralDetail() {
   const [noteBody, setNoteBody] = useState("");
   const [saving, setSaving] = useState(false);
   const [posting, setPosting] = useState(false);
-  const [priorDeclined, setPriorDeclined] = useState<Referral[]>([]);
+  
   const [noteFilter, setNoteFilter] = useState<"all" | "e2e" | "legacy" | "failed">("all");
   const outcomeRef = useRef<HTMLDivElement>(null);
 
