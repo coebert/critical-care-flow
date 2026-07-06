@@ -208,6 +208,7 @@ function PostopBookingsList() {
                     </div>
                     <div className="text-xs text-muted-foreground">
                       Booked {format(parseISO(b.created_at), "PP")}
+                      {b.created_by_name ? ` by ${b.created_by_name}` : ""}
                     </div>
                   </div>
                   <Button asChild size="sm" variant="outline">
