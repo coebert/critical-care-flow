@@ -120,7 +120,11 @@ export const getAuditLog = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
   .handler(async ({ context }) => {
     await assertAdmin(context);
-    const { data, error } = await context.supabase
+    // Use the admin client so RLS on audit_log cannot silently hide rows from
+    // admins (e.g. entries written by service_role or by users whose scope
+    // no longer matches the policy). Access is gated by assertAdmin above.
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { data, error } = await supabaseAdmin
       .from("audit_log")
       .select("*")
       .order("created_at", { ascending: false })
