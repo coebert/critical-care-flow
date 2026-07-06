@@ -140,8 +140,15 @@ const rowBgStyles: Record<string, string> = {
 function ReferralsList() {
   const navigate = useNavigate();
   const search = Route.useSearch();
-  const [rows, setRows] = useState<Referral[]>([]);
-  const [loading, setLoading] = useState(true);
+  // Data is primed by the route loader and read via useSuspenseQuery, so
+  // there's no local "loading" state on initial render — the suspense
+  // boundary shows `pendingComponent` until data resolves. Background
+  // refetches (from realtime invalidation) are silent by design.
+  const { data: rowsData } = useSuspenseQuery(referralsListQueryOptions);
+  const rows = rowsData as Referral[];
+  const loading = false;
+  const queryClient = useQueryClient();
+
   const [hospSearch, setHospSearch] = useState("");
   const [q, setQ] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("all");
