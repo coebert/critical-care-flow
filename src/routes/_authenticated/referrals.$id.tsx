@@ -643,7 +643,7 @@ function ReferralDetail() {
         {ref.hospital_number ?? "Referral"} · {ref.age ?? "?"}/{ref.sex ?? "?"}
       </h1>
       <p className="text-sm text-muted-foreground mb-2">
-        Received {format(new Date(ref.referral_received_at), "dd/MM/yyyy, HH:mm:ss")}
+        Received {format(new Date(ref.referral_received_at), "dd/MM/yyyy HH:mm:ss")}
       </p>
       <div className="flex gap-2 mb-4 md:hidden">
         <Button
@@ -734,7 +734,7 @@ function ReferralDetail() {
                   <div key={p.id} className="border rounded-md p-3 bg-destructive/5">
                     <div className="flex items-center justify-between gap-2 mb-2 flex-wrap">
                       <div className="text-sm font-medium">
-                        Declined {when ? format(new Date(when), "dd/MM/yyyy, HH:mm") : "date unknown"}
+                        Declined {when ? format(new Date(when), "dd/MM/yyyy HH:mm") : "date unknown"}
                         {p.referring_specialty ? ` · ${p.referring_specialty}` : ""}
                       </div>
                       <Link
@@ -1447,10 +1447,10 @@ function NoteItem({
           {authorName}
           <E2EBadge status={note._e2eStatus} />
         </span>
-        <span className="text-[11px] text-muted-foreground" title={format(new Date(note.created_at), "dd/MM/yyyy, HH:mm:ss")}>
+        <span className="text-[11px] text-muted-foreground" title={format(new Date(note.created_at), "dd/MM/yyyy HH:mm:ss")}>
           {format(new Date(note.created_at), "dd/MM/yyyy HH:mm")} · {formatDistanceToNow(new Date(note.created_at), { addSuffix: true })}
           {edited && (
-            <span className="ml-1 italic" title={`Edited ${format(new Date(edited), "dd/MM/yyyy, HH:mm:ss")}`}>(edited)</span>
+            <span className="ml-1 italic" title={`Edited ${format(new Date(edited), "dd/MM/yyyy HH:mm:ss")}`}>(edited)</span>
           )}
         </span>
       </div>

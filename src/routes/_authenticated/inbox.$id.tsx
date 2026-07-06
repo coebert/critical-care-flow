@@ -177,7 +177,7 @@ function NotificationDetailPage() {
           <div>
             <dt className="text-xs text-muted-foreground">Received</dt>
             <dd>
-              {format(new Date(n.created_at), "dd/MM/yyyy, HH:mm:ss")}
+              {format(new Date(n.created_at), "dd/MM/yyyy HH:mm:ss")}
               <span className="text-muted-foreground text-xs ml-1">
                 ({formatDistanceToNow(new Date(n.created_at), { addSuffix: true })})
               </span>
@@ -188,7 +188,7 @@ function NotificationDetailPage() {
             <dd>
               {n.read_at ? (
                 <>
-                  {format(new Date(n.read_at), "dd/MM/yyyy, HH:mm:ss")}
+                  {format(new Date(n.read_at), "dd/MM/yyyy HH:mm:ss")}
                   <span className="text-muted-foreground text-xs ml-1">
                     ({formatDistanceToNow(new Date(n.read_at), { addSuffix: true })})
                   </span>
@@ -219,7 +219,7 @@ function NotificationDetailPage() {
                   </div>
                   {ref.referral_received_at && (
                     <div className="text-xs text-muted-foreground">
-                      Received {format(new Date(ref.referral_received_at), "dd/MM/yyyy, HH:mm:ss")}
+                      Received {format(new Date(ref.referral_received_at), "dd/MM/yyyy HH:mm:ss")}
                     </div>
                   )}
                 </div>
