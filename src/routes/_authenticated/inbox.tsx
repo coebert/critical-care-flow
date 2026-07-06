@@ -212,12 +212,12 @@ function InboxPage() {
 
   const markRead = async (id: string) => {
     const now = new Date().toISOString();
-    setItems((cur) => cur.map((i) => (i.id === id ? { ...i, read_at: now } : i)));
+    patchItems((cur) => cur.map((i: Notification) => (i.id === id ? { ...i, read_at: now } : i)));
     const { error } = await supabase.from("notifications").update({ read_at: now }).eq("id", id);
     if (error) toast.error("Could not mark as read");
   };
   const markUnread = async (id: string) => {
-    setItems((cur) => cur.map((i) => (i.id === id ? { ...i, read_at: null } : i)));
+    patchItems((cur) => cur.map((i: Notification) => (i.id === id ? { ...i, read_at: null } : i)));
     const { error } = await supabase.from("notifications").update({ read_at: null }).eq("id", id);
     if (error) toast.error("Could not mark as unread");
   };
@@ -226,7 +226,7 @@ function InboxPage() {
     if (!ids.length) return;
     setBusy(true);
     const now = new Date().toISOString();
-    setItems((cur) => cur.map((i) => (i.read_at ? i : { ...i, read_at: now })));
+    patchItems((cur) => cur.map((i: Notification) => (i.read_at ? i : { ...i, read_at: now })));
     const { error } = await supabase.from("notifications").update({ read_at: now }).in("id", ids);
     setBusy(false);
     if (error) toast.error("Some notifications could not be updated");
@@ -237,7 +237,7 @@ function InboxPage() {
     if (!ids.length) return;
     setBusy(true);
     const now = asRead ? new Date().toISOString() : null;
-    setItems((cur) => cur.map((i) => (selected.has(i.id) ? { ...i, read_at: now } : i)));
+    patchItems((cur) => cur.map((i: Notification) => (selected.has(i.id) ? { ...i, read_at: now } : i)));
     const { error } = await supabase.from("notifications").update({ read_at: now }).in("id", ids);
     setBusy(false);
     if (error) toast.error("Some notifications could not be updated");
