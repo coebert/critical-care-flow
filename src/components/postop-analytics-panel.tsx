@@ -5,10 +5,7 @@ import { useServerFn } from "@tanstack/react-start";
 import { getPostopAnalytics } from "@/lib/analytics.functions";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Calendar } from "@/components/ui/calendar";
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { CalendarIcon } from "lucide-react";
-import { cn } from "@/lib/utils";
+import { DateRangePicker } from "@/components/date-range-picker";
 import type { DateRange } from "react-day-picker";
 import {
   ResponsiveContainer, LineChart, Line, XAxis, YAxis, Tooltip, CartesianGrid,
@@ -211,46 +208,7 @@ export function PostopAnalyticsPanel() {
         <p className="text-sm text-muted-foreground">
           {format(from, "dd/MM/yyyy")} – {format(to, "dd/MM/yyyy")} · {days} day{days === 1 ? "" : "s"} · {filtered.length} bookings
         </p>
-        <div className="flex gap-2 flex-wrap items-center">
-          {[30, 90, 180, 365].map((d) => (
-            <Button
-              key={d}
-              size="sm"
-              variant={days === d ? "default" : "outline"}
-              onClick={() =>
-                setRange({ from: startOfDay(subDays(new Date(), d - 1)), to: endOfDay(new Date()) })
-              }
-            >
-              {d}d
-            </Button>
-          ))}
-          <Popover>
-            <PopoverTrigger asChild>
-              <Button
-                variant="outline"
-                size="sm"
-                className={cn("justify-start text-left font-normal", !range.from && "text-muted-foreground")}
-              >
-                <CalendarIcon className="mr-2 h-4 w-4" />
-                {range.from
-                  ? range.to
-                    ? `${format(range.from, "dd/MM/yyyy")} – ${format(range.to, "dd/MM/yyyy")}`
-                    : format(range.from, "dd/MM/yyyy")
-                  : "Pick a date range"}
-              </Button>
-            </PopoverTrigger>
-            <PopoverContent className="w-auto p-0" align="end">
-              <Calendar
-                mode="range"
-                selected={range}
-                onSelect={(r) => r && setRange(r)}
-                numberOfMonths={2}
-                initialFocus
-                className={cn("p-3 pointer-events-auto")}
-              />
-            </PopoverContent>
-          </Popover>
-        </div>
+        <DateRangePicker range={range} onChange={setRange} presets={[30, 90, 180, 365]} activeDays={days} />
       </div>
 
       <div className="grid md:grid-cols-4 gap-4 mb-6">
