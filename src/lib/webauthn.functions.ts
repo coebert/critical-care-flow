@@ -184,7 +184,7 @@ export const verifyPasskeyRegistration = createServerFn({ method: "POST" })
  * the product spec requires routing users straight into enrolment.
  */
 export type StartPasskeyAuthResult =
-  | { status: "ok"; options: Awaited<ReturnType<typeof generateAuthenticationOptions>> }
+  | { status: "ok"; options: Awaited<ReturnType<typeof import("@simplewebauthn/server").generateAuthenticationOptions>> }
   | { status: "no_credentials"; code: "NO_PASSKEY_REGISTERED"; message: string };
 
 export const startPasskeyAuthentication = createServerFn({ method: "POST" })
