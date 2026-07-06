@@ -80,7 +80,7 @@ function AuthedShell() {
   }, [pathname]);
 
 
-  const handleSignOut = async () => {
+  const handleSignOut = async (reason?: "timeout") => {
     setSigningOut(true);
     // Wipe the persisted E2E session so the next user on this device can't
     // resume the previous user's unlocked private key.
@@ -90,8 +90,20 @@ function AuthedShell() {
     } catch { /* non-fatal */ }
     await supabase.auth.signOut();
     router.invalidate();
+    if (reason === "timeout") {
+      toast.message("Signed out for inactivity", {
+        description: "For patient safety, this session ended after a period of no activity.",
+      });
+    }
     navigate({ to: "/auth", replace: true });
   };
+
+  // NHS DTAC / Technical Assurance — idle session timeout.
+  // 30 min inactivity or 12 h absolute, whichever comes first, with a 60 s warning.
+  const idle = useIdleTimeout({
+    onTimeout: () => handleSignOut("timeout"),
+    disabled: signingOut,
+  });
 
   const renderSidebar = (collapsed: boolean) => (
     <div className="flex h-full flex-col">
