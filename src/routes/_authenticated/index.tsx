@@ -609,7 +609,20 @@ function ReferralsList() {
                 <td className="px-3 py-2 whitespace-nowrap">
                   {format(new Date(r.referral_received_at), "dd MMM HH:mm")}
                 </td>
-                <td className="px-3 py-2">{r.hospital_number ?? "—"}</td>
+                <td className="px-3 py-2">
+                  <div className="flex items-center gap-1.5 flex-wrap">
+                    <span>{r.hospital_number ?? "—"}</span>
+                    {(r as any).is_test && (
+                      <Badge
+                        variant="outline"
+                        className="border-amber-500/60 text-amber-700 dark:text-amber-300 bg-amber-100/60 dark:bg-amber-900/30 text-[10px] px-1.5 py-0"
+                        title="Test/demonstration entry — excluded from analytics"
+                      >
+                        Test
+                      </Badge>
+                    )}
+                  </div>
+                </td>
                 <td className="px-3 py-2">{r.age ?? "?"} / {r.sex ?? "?"}</td>
                 <td className="px-3 py-2">{r.current_ward ?? "—"} {r.current_bed ? `· ${r.current_bed}` : ""}</td>
                 <td className="px-3 py-2">{r.referring_specialty ?? "—"}</td>
@@ -662,9 +675,20 @@ function ReferralsList() {
                 <span className="text-xs text-muted-foreground shrink-0">
                   {format(new Date(r.referral_received_at), "dd MMM HH:mm")}
                 </span>
-                <Badge variant="outline" className={`capitalize text-xs shrink-0 ${statusStyles[r.status]}`}>
-                  {r.status}
-                </Badge>
+                <div className="flex items-center gap-1.5">
+                  {(r as any).is_test && (
+                    <Badge
+                      variant="outline"
+                      className="border-amber-500/60 text-amber-700 dark:text-amber-300 bg-amber-100/60 dark:bg-amber-900/30 text-[10px] px-1.5 py-0"
+                      title="Test/demonstration entry — excluded from analytics"
+                    >
+                      Test
+                    </Badge>
+                  )}
+                  <Badge variant="outline" className={`capitalize text-xs shrink-0 ${statusStyles[r.status]}`}>
+                    {r.status}
+                  </Badge>
+                </div>
               </div>
               <div className="flex items-center justify-between gap-2 flex-wrap">
                 <ReferralTimer r={r} />

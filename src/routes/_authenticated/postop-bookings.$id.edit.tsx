@@ -14,6 +14,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { Switch } from "@/components/ui/switch";
 import { toast } from "sonner";
 import { ArrowLeft } from "lucide-react";
 import {
@@ -65,6 +66,7 @@ function EditPostopBookingPage() {
   const [surgeryDate, setSurgeryDate] = useState("");
   const [arrivedAt, setArrivedAt] = useState("");
   const [specialty, setSpecialty] = useState<SurgicalSpecialty | "">("");
+  const [isTest, setIsTest] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -85,6 +87,7 @@ function EditPostopBookingPage() {
         setSurgeryDate(row.proposed_surgery_date ?? "");
         setArrivedAt(row.arrived_at ? new Date(row.arrived_at).toISOString().slice(0, 16) : "");
         setSpecialty((row.surgical_specialty ?? "") as SurgicalSpecialty | "");
+        setIsTest(!!row.is_test);
         setLoading(false);
       })
       .catch((err) => {
@@ -140,6 +143,7 @@ function EditPostopBookingPage() {
           proposed_surgery_date: surgeryDate.trim() || null,
           arrived_at: arrivedAt.trim() ? new Date(arrivedAt).toISOString() : null,
           surgical_specialty: specialty || null,
+          is_test: isTest,
         },
       });
       toast.success("Post-op booking updated");
@@ -278,6 +282,22 @@ function EditPostopBookingPage() {
               <Textarea id="social" rows={3} value={social} onChange={(e) => setSocial(e.target.value)} maxLength={2000} />
             </div>
           </Card>
+
+          <Card className="p-4 sm:p-6 space-y-2 border-amber-400/60 bg-amber-50/40 dark:bg-amber-950/20">
+            <div className="flex items-center justify-between gap-4">
+              <div>
+                <Label htmlFor="is-test" className="text-sm font-medium cursor-pointer">
+                  Test / demonstration booking
+                </Label>
+                <p className="text-xs text-muted-foreground">
+                  Mark this booking as a test entry (not a real patient). Test
+                  bookings are shown with a badge and are excluded from analytics.
+                </p>
+              </div>
+              <Switch id="is-test" checked={isTest} onCheckedChange={setIsTest} />
+            </div>
+          </Card>
+
 
           <div className="flex gap-2 justify-end">
             <Button type="button" variant="ghost" asChild disabled={saving}>

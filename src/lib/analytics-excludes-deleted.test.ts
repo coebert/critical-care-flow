@@ -27,47 +27,49 @@ function handlerBody(exportName: string): string {
   return SOURCE.slice(start, nextExport === -1 ? SOURCE.length : nextExport);
 }
 
-describe("analytics endpoints exclude soft-deleted rows", () => {
-  it("getReferralsAnalytics filters deleted_at IS NULL on referrals", () => {
+describe("analytics endpoints exclude soft-deleted and test rows", () => {
+  it("getReferralsAnalytics filters deleted_at, deleted_by, and is_test", () => {
     const body = handlerBody("getReferralsAnalytics");
     expect(body).toMatch(/\.from\(\s*["']referrals["']\s*\)/);
     expect(body).toMatch(/\.is\(\s*["']deleted_at["']\s*,\s*null\s*\)/);
-    // Fallback guard: reject rows with a deleted_by attribution even when
-    // deleted_at is missing.
     expect(body).toMatch(/\.is\(\s*["']deleted_by["']\s*,\s*null\s*\)/);
+    // Test/demo entries must never contribute to clinical analytics.
+    expect(body).toMatch(/\.eq\(\s*["']is_test["']\s*,\s*false\s*\)/);
   });
 
-  it("getPostopAnalytics filters deleted_at IS NULL on postop_bookings", () => {
+  it("getPostopAnalytics filters deleted_at, deleted_by, and is_test", () => {
     const body = handlerBody("getPostopAnalytics");
     expect(body).toMatch(/\.from\(\s*["']postop_bookings["']\s*\)/);
     expect(body).toMatch(/\.is\(\s*["']deleted_at["']\s*,\s*null\s*\)/);
     expect(body).toMatch(/\.is\(\s*["']deleted_by["']\s*,\s*null\s*\)/);
+    expect(body).toMatch(/\.eq\(\s*["']is_test["']\s*,\s*false\s*\)/);
   });
 });
 
 /**
  * Forward-looking audit: any future `.from("referrals")` or
  * `.from("postop_bookings")` query added to `analytics.functions.ts` must
- * also carry the soft-delete filters. This walks every such call site in
- * the analytics module and asserts both `.is("deleted_at", null)` and
- * `.is("deleted_by", null)` appear in a short window after the `.from(...)`
- * call — catching regressions even in endpoints that don't exist yet.
+ * also carry the soft-delete AND is_test filters. This walks every such
+ * call site in the analytics module and asserts they still appear in a
+ * short window after each `.from(...)` call.
  */
-describe("analytics.functions.ts — every referrals/bookings query filters soft-deletes", () => {
+describe("analytics.functions.ts — every referrals/bookings query filters soft-deletes and test rows", () => {
   const TABLES = ["referrals", "postop_bookings"] as const;
   for (const table of TABLES) {
-    it(`every .from("${table}") in analytics.functions.ts filters deleted_at AND deleted_by`, () => {
+    it(`every .from("${table}") in analytics.functions.ts filters deleted_at, deleted_by, and is_test`, () => {
       const re = new RegExp(`\\.from\\(\\s*["']${table}["']\\s*\\)`, "g");
       const matches = [...SOURCE.matchAll(re)];
       expect(matches.length, `expected at least one .from("${table}") in analytics.functions.ts`).toBeGreaterThan(0);
       for (const m of matches) {
-        // Grab ~1000 chars after the .from(...) to cover the whole query chain.
         const window = SOURCE.slice(m.index ?? 0, (m.index ?? 0) + 1000);
         expect(window, `missing .is("deleted_at", null) after .from("${table}")`).toMatch(
           /\.is\(\s*["']deleted_at["']\s*,\s*null\s*\)/,
         );
         expect(window, `missing .is("deleted_by", null) after .from("${table}")`).toMatch(
           /\.is\(\s*["']deleted_by["']\s*,\s*null\s*\)/,
+        );
+        expect(window, `missing .eq("is_test", false) after .from("${table}")`).toMatch(
+          /\.eq\(\s*["']is_test["']\s*,\s*false\s*\)/,
         );
       }
     });
@@ -85,6 +87,7 @@ type Row = {
   id: string;
   deleted_at: string | null;
   deleted_by: string | null;
+  is_test: boolean;
   referral_received_at?: string;
   created_at?: string;
 };
@@ -99,6 +102,10 @@ function makeFakeSupabase(table: string, rows: Row[]) {
     order() { return builder; },
     limit() { return Promise.resolve({ data: rows.filter((r) => state.filters.every((f) => f(r))), error: null }); },
     is(col: string, val: unknown) {
+      state.filters.push((r) => (r as any)[col] === val);
+      return builder;
+    },
+    eq(col: string, val: unknown) {
       state.filters.push((r) => (r as any)[col] === val);
       return builder;
     },
@@ -120,36 +127,42 @@ function makeFakeSupabase(table: string, rows: Row[]) {
   };
 }
 
-describe("fluent Supabase filter parity — deleted rows dropped", () => {
-  // Includes a partial soft-delete ("orphan") row where deleted_by is set but
-  // deleted_at is missing — must still be excluded thanks to the fallback.
+describe("fluent Supabase filter parity — deleted and test rows dropped", () => {
+  // Fixture covers all exclusion paths:
+  //   - live-*  → normal live rows (must be included)
+  //   - deleted-1 → fully soft-deleted (deleted_at + deleted_by set)
+  //   - orphan-1 → partial soft-delete (deleted_by set, deleted_at missing)
+  //   - test-1   → live but flagged as a test/demo entry
   const rows: Row[] = [
-    { id: "live-1", deleted_at: null, deleted_by: null, referral_received_at: "2026-07-01T00:00:00Z", created_at: "2026-07-01T00:00:00Z" },
-    { id: "deleted-1", deleted_at: "2026-07-02T00:00:00Z", deleted_by: "u1", referral_received_at: "2026-07-01T00:00:00Z", created_at: "2026-07-01T00:00:00Z" },
-    { id: "orphan-1", deleted_at: null, deleted_by: "u2", referral_received_at: "2026-07-02T00:00:00Z", created_at: "2026-07-02T00:00:00Z" },
-    { id: "live-2", deleted_at: null, deleted_by: null, referral_received_at: "2026-07-03T00:00:00Z", created_at: "2026-07-03T00:00:00Z" },
+    { id: "live-1", deleted_at: null, deleted_by: null, is_test: false, referral_received_at: "2026-07-01T00:00:00Z", created_at: "2026-07-01T00:00:00Z" },
+    { id: "deleted-1", deleted_at: "2026-07-02T00:00:00Z", deleted_by: "u1", is_test: false, referral_received_at: "2026-07-01T00:00:00Z", created_at: "2026-07-01T00:00:00Z" },
+    { id: "orphan-1", deleted_at: null, deleted_by: "u2", is_test: false, referral_received_at: "2026-07-02T00:00:00Z", created_at: "2026-07-02T00:00:00Z" },
+    { id: "test-1", deleted_at: null, deleted_by: null, is_test: true, referral_received_at: "2026-07-02T12:00:00Z", created_at: "2026-07-02T12:00:00Z" },
+    { id: "live-2", deleted_at: null, deleted_by: null, is_test: false, referral_received_at: "2026-07-03T00:00:00Z", created_at: "2026-07-03T00:00:00Z" },
   ];
 
-  it("referrals: only live rows within the date range are returned (orphan excluded)", async () => {
+  it("referrals: only live, non-test rows within the date range are returned", async () => {
     const sb = makeFakeSupabase("referrals", rows);
     const { data } = await sb
       .from("referrals")
       .select("*")
       .is("deleted_at", null)
       .is("deleted_by", null)
+      .eq("is_test", false)
       .gte("referral_received_at", "2026-06-01T00:00:00Z")
       .lte("referral_received_at", "2026-07-31T00:00:00Z")
       .limit(5000);
     expect(data.map((r: Row) => r.id).sort()).toEqual(["live-1", "live-2"]);
   });
 
-  it("postop_bookings: only live rows within the date range are returned (orphan excluded)", async () => {
+  it("postop_bookings: only live, non-test rows within the date range are returned", async () => {
     const sb = makeFakeSupabase("postop_bookings", rows);
     const { data } = await sb
       .from("postop_bookings")
       .select("*")
       .is("deleted_at", null)
       .is("deleted_by", null)
+      .eq("is_test", false)
       .order("created_at", { ascending: false })
       .gte("created_at", "2026-06-01T00:00:00Z")
       .lte("created_at", "2026-07-31T00:00:00Z")
@@ -157,4 +170,5 @@ describe("fluent Supabase filter parity — deleted rows dropped", () => {
     expect(data.map((r: Row) => r.id).sort()).toEqual(["live-1", "live-2"]);
   });
 });
+
 

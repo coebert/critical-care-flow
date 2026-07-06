@@ -44,6 +44,7 @@ type Booking = {
   created_at: string;
   created_by_name?: string | null;
   deleted_at?: string | null;
+  is_test?: boolean | null;
 };
 
 const LEVEL_LABEL = {
@@ -172,7 +173,7 @@ function PostopBookingsList() {
       {rows && rows.length > 0 && (
         <div className="grid gap-3">
           {rows.map((b) => (
-            <Card key={b.id} className={`p-4 space-y-2 ${b.deleted_at ? "opacity-60 border-dashed" : ""}`}>
+            <Card key={b.id} className={`p-4 space-y-2 ${b.deleted_at ? "opacity-60 border-dashed" : ""} ${b.is_test ? "border-amber-400/70" : ""}`}>
               <div className="flex items-start justify-between gap-3 flex-wrap">
                 <div className="min-w-0">
                   <div className="flex items-center gap-2 flex-wrap">
@@ -182,6 +183,15 @@ function PostopBookingsList() {
                     <Badge className={LEVEL_CLASS[b.predicted_level]} variant="secondary">
                       {LEVEL_LABEL[b.predicted_level]}
                     </Badge>
+                    {b.is_test && (
+                      <Badge
+                        variant="outline"
+                        className="border-amber-500/60 text-amber-700 dark:text-amber-300 bg-amber-100/60 dark:bg-amber-900/30"
+                        title="Test/demonstration entry — excluded from analytics"
+                      >
+                        Test patient
+                      </Badge>
+                    )}
                     {b.deleted_at && (
                       <Badge variant="outline" className="text-destructive border-destructive/50">
                         Deleted

@@ -45,6 +45,9 @@ const bookingSchema = z.object({
     .nullable()
     .optional(),
   arrived_at: z.string().datetime().nullable().optional(),
+  // Flags a booking entered for testing/demonstration only. Rows with
+  // is_test=true are excluded from analytics dashboards.
+  is_test: z.boolean().optional(),
 });
 
 export type PostopBookingInput = z.infer<typeof bookingSchema>;
@@ -76,6 +79,7 @@ const AUDITED_FIELDS = [
   "past_surgical_history",
   "social_history",
   "reason_for_bed",
+  "is_test",
 ] as const;
 
 const ENC_SET = new Set<string>([...ENC_FIELDS, "hospital_number"]);

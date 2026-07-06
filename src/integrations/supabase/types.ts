@@ -196,6 +196,7 @@ export type Database = {
           hospital_number_enc: string | null
           hospital_number_hash: string | null
           id: string
+          is_test: boolean
           past_medical_history_enc: string | null
           past_surgical_history_enc: string | null
           predicted_level: Database["public"]["Enums"]["postop_level"]
@@ -221,6 +222,7 @@ export type Database = {
           hospital_number_enc?: string | null
           hospital_number_hash?: string | null
           id?: string
+          is_test?: boolean
           past_medical_history_enc?: string | null
           past_surgical_history_enc?: string | null
           predicted_level: Database["public"]["Enums"]["postop_level"]
@@ -246,6 +248,7 @@ export type Database = {
           hospital_number_enc?: string | null
           hospital_number_hash?: string | null
           id?: string
+          is_test?: boolean
           past_medical_history_enc?: string | null
           past_surgical_history_enc?: string | null
           predicted_level?: Database["public"]["Enums"]["postop_level"]
@@ -436,6 +439,7 @@ export type Database = {
           hospital_number_enc: string | null
           hospital_number_hash: string | null
           id: string
+          is_test: boolean
           past_medical_history_enc: string | null
           reason_for_referral_enc: string | null
           referral_received_at: string
@@ -468,6 +472,7 @@ export type Database = {
           hospital_number_enc?: string | null
           hospital_number_hash?: string | null
           id?: string
+          is_test?: boolean
           past_medical_history_enc?: string | null
           reason_for_referral_enc?: string | null
           referral_received_at?: string
@@ -500,6 +505,7 @@ export type Database = {
           hospital_number_enc?: string | null
           hospital_number_hash?: string | null
           id?: string
+          is_test?: boolean
           past_medical_history_enc?: string | null
           reason_for_referral_enc?: string | null
           referral_received_at?: string

@@ -14,6 +14,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { Switch } from "@/components/ui/switch";
 import { toast } from "sonner";
 import { ArrowLeft } from "lucide-react";
 import {
@@ -56,6 +57,7 @@ function NewPostopBookingPage() {
   const [level, setLevel] = useState<Level | "">("");
   const [surgeryDate, setSurgeryDate] = useState("");
   const [specialty, setSpecialty] = useState<SurgicalSpecialty | "">("");
+  const [isTest, setIsTest] = useState(false);
 
   const bmi = useMemo(() => {
     const w = parseFloat(weight);
@@ -88,6 +90,7 @@ function NewPostopBookingPage() {
         predicted_level: level as Level,
         proposed_surgery_date: surgeryDate.trim() || null,
         surgical_specialty: specialty || null,
+        is_test: isTest,
       };
       await submit({ data: payload });
       toast.success("Post-op booking saved");
@@ -213,6 +216,22 @@ function NewPostopBookingPage() {
             <Textarea id="social" rows={3} value={social} onChange={(e) => setSocial(e.target.value)} maxLength={2000} />
           </div>
         </Card>
+
+        <Card className="p-4 sm:p-6 space-y-2 border-amber-400/60 bg-amber-50/40 dark:bg-amber-950/20">
+          <div className="flex items-center justify-between gap-4">
+            <div>
+              <Label htmlFor="is-test" className="text-sm font-medium cursor-pointer">
+                Test / demonstration booking
+              </Label>
+              <p className="text-xs text-muted-foreground">
+                Mark this booking as a test entry (not a real patient). Test
+                bookings are shown with a badge and are excluded from analytics.
+              </p>
+            </div>
+            <Switch id="is-test" checked={isTest} onCheckedChange={setIsTest} />
+          </div>
+        </Card>
+
 
         <div className="flex gap-2 justify-end">
           <Button type="button" variant="ghost" asChild disabled={saving}>
