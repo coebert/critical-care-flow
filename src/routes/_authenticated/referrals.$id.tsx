@@ -63,13 +63,26 @@ const referralDetailQueryOptions = (id: string) =>
     staleTime: 5_000,
   });
 
+// Raw (still-ciphertext) notes for a referral. The loader primes this so the
+// noteboard has data on first paint; the component owns a derived
+// `decryptedNotes` state because decryption requires the unlocked E2E key,
+// which isn't available during SSR/prerender.
+const referralNotesQueryOptions = (id: string) =>
+  queryOptions({
+    queryKey: ["referrals", "detail", id, "notes"] as const,
+    queryFn: () => listEncryptedNotes({ data: { referral_id: id } }),
+    staleTime: 5_000,
+  });
+
 export const Route = createFileRoute("/_authenticated/referrals/$id")({
   validateSearch: (search: Record<string, unknown>) => ({
     highlight: typeof search.highlight === "string" ? search.highlight : undefined,
   }),
   head: () => ({ meta: [{ title: "Referral — SDH Critical Care" }, { name: "robots", content: "noindex" }] }),
-  loader: ({ context, params }) =>
-    context.queryClient.ensureQueryData(referralDetailQueryOptions(params.id)),
+  loader: ({ context, params }) => {
+    context.queryClient.ensureQueryData(referralNotesQueryOptions(params.id));
+    return context.queryClient.ensureQueryData(referralDetailQueryOptions(params.id));
+  },
   component: ReferralDetail,
 });
 
