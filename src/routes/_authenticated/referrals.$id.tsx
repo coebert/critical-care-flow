@@ -1761,6 +1761,7 @@ const FIELD_LABELS: Record<string, string> = {
   discussed_with_consultant: "Discussed with consultant",
   admission_urgency: "Admission urgency",
   accepting_consultant: "Accepting consultant",
+  is_test: "Test / demonstration entry",
 };
 
 const DATE_FIELDS = new Set([
