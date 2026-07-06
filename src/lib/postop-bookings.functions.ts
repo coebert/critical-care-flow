@@ -79,6 +79,7 @@ const AUDITED_FIELDS = [
   "past_surgical_history",
   "social_history",
   "reason_for_bed",
+  "is_test",
 ] as const;
 
 const ENC_SET = new Set<string>([...ENC_FIELDS, "hospital_number"]);
