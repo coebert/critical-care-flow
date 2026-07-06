@@ -35,10 +35,7 @@ const refSchema = z.object({
   is_test: z.boolean().optional(),
 });
 
-async function getAdmin() {
-  const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-  return supabaseAdmin;
-}
+import { getAdmin } from "./server-utils";
 
 // ---------------------------------------------------------------------------
 // Encryption mapping helpers
