@@ -63,8 +63,8 @@ export function NotePartialCoverageAlert({
   const total = eligibleRecipientCount + excludedMissingKey.length + excludedDeselected.length;
 
   return (
-    <Alert className="mb-3 border-amber-500/40 bg-amber-500/10 text-amber-900 dark:text-amber-200 [&>svg]:text-amber-600 relative pr-10">
-      <ShieldAlert className="w-4 h-4" />
+    <Alert className="mb-3 border-warning/40 bg-warning/10 text-warning-text [&>svg]:text-warning relative pr-10">
+      <ShieldAlert className="w-4 h-4" aria-hidden="true" />
       <AlertTitle>
         Only {eligibleRecipientCount} of {total} teammates will be able to read this note
       </AlertTitle>
@@ -95,10 +95,10 @@ export function NotePartialCoverageAlert({
         size="icon"
         variant="ghost"
         aria-label="Dismiss coverage warning"
-        className="absolute top-1.5 right-1.5 h-6 w-6 text-amber-900/70 hover:text-amber-900 dark:text-amber-200/70 dark:hover:text-amber-200"
+        className="absolute top-1 right-1 h-8 w-8 text-warning-text/80 hover:text-warning-text hover:bg-warning/15"
         onClick={() => setDismissedKey(exclusionKey)}
       >
-        <X className="w-3.5 h-3.5" />
+        <X className="w-4 h-4" aria-hidden="true" />
       </Button>
     </Alert>
   );
