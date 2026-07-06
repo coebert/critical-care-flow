@@ -12,7 +12,7 @@ import type { FanOutDeps } from "./notification-fanout";
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type AdminClient = any;
 
-export function buildNotificationFanoutDeps(admin: AdminClient): FanoutDeps {
+export function buildNotificationFanoutDeps(admin: AdminClient): FanOutDeps {
   return {
     fetchEligibleRoles: async (actorId) => {
       const { data } = await admin
