@@ -61,7 +61,7 @@ Owner completes in the DTAC response document.
 | Item | Artefact | Status |
 | --- | --- | --- |
 | NHS Number capture + Mod 11 validation | Phase 4 | Pending |
-| ODS organisation code | Phase 4 | Pending |
+| ODS organisation code | `docs/ods-code.md` (Phase 4) | Holding placard |
 | SNOMED CT for reason-for-referral / specialty | Phase 4 | Pending |
 | FHIR R4 UK Core export | `/api/public/fhir/*` (Phase 4) | Pending |
 
