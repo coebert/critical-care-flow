@@ -2,13 +2,13 @@ import type { Note } from "@/components/note-item";
 
 export type NoteFilter = "all" | "e2e" | "legacy" | "failed";
 
-const E2E_STATUSES = new Set([
+const E2E_STATUSES = new Set<string>([
   "e2e-decrypted",
   "e2e-locked",
   "e2e-no-key",
   "e2e-failed",
 ]);
-const LEGACY_STATUSES = new Set(["legacy-server-enc", "plaintext"]);
+const LEGACY_STATUSES = new Set<string>(["legacy-server-enc", "plaintext"]);
 
 /** Filter predicate matching the noteboard filter select values. */
 export function matchesNoteFilter(note: Note, filter: NoteFilter): boolean {
