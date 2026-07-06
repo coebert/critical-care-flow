@@ -4,6 +4,7 @@ import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { encryptString, decryptString, hashHospitalNumber } from "./crypto.server";
 import { decideReferralRestore, decideReferralUpdate } from "./referral-restore-authz";
+import type { Tables } from "@/integrations/supabase/types";
 
 const refSchema = z.object({
   age: z.number().int().min(0).max(130).nullable().optional(),
@@ -57,17 +58,18 @@ const ENCRYPTED_TEXT_FIELDS = [
 
 type EncryptedField = (typeof ENCRYPTED_TEXT_FIELDS)[number];
 
-export type DecryptedReferral = Record<string, any> & {
-  id: string;
+// Row shape returned by list/detail server fns: the underlying
+// `Tables<"referrals">` row (including the `*_enc` ciphertext columns)
+// with the plaintext values decrypted back onto their original field
+// names so the UI can consume them without knowing about encryption.
+export type DecryptedReferral = Tables<"referrals"> & {
   hospital_number: string | null;
   past_medical_history: string | null;
   baseline_function: string | null;
   reason_for_referral: string | null;
 };
 
-export type DecryptedReferralNote = Record<string, any> & {
-  id: string;
-  referral_id: string;
+export type DecryptedReferralNote = Tables<"referral_notes"> & {
   body: string | null;
 };
 
