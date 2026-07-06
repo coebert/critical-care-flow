@@ -1,10 +1,10 @@
 import { useEffect, useRef, useState } from "react";
 import { useServerFn } from "@tanstack/react-start";
 import { queryOptions, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Lock, LockOpen, ShieldAlert } from "lucide-react";
+import { Lock, LockOpen } from "lucide-react";
 import { toast } from "sonner";
 
-import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -15,6 +15,7 @@ import { NoteItem } from "@/components/note-item";
 import { NoteRecipientPicker } from "@/components/note-recipient-picker";
 import { NoteRecipientChipRow } from "@/components/note-recipient-chip-row";
 import { ConfirmReducedRecipientsDialog } from "@/components/confirm-reduced-recipients-dialog";
+import { NoteRecipientCoverageAlerts } from "@/components/note-recipient-coverage-alerts";
 import { E2EUnlockModal } from "@/components/e2e-unlock-modal";
 
 import { supabase } from "@/integrations/supabase/client";
@@ -26,6 +27,7 @@ import { useE2ESession } from "@/hooks/use-e2e-session";
 import { useAuth, useRole } from "@/hooks/use-auth";
 import { useDecryptedNotes } from "@/hooks/use-decrypted-notes";
 import { useRecipientDirectory, type DirectoryEntry } from "@/hooks/use-recipient-directory";
+import { useRecipientCoverage } from "@/hooks/use-recipient-coverage";
 import { friendlyE2EError } from "@/lib/friendly-e2e-error";
 
 // Raw ciphertext rows for a referral's notes. Exported so the route loader
@@ -128,16 +130,8 @@ export function Noteboard({ referralId: id }: NoteboardProps) {
     return [...directory, { user_id: user.id, full_name: "You", public_key: e2e.publicKey }];
   })();
 
-  const missingRecipients = directory.filter((r) => !r.public_key && r.user_id !== user?.id);
-  const eligibleRecipientCount = selectedRecipients.size;
-  const excludedMissingKey = directory.filter(
-    (r) => r.user_id !== user?.id && !r.public_key,
-  );
-  const excludedDeselected = directory.filter(
-    (r) => r.user_id !== user?.id && !!r.public_key && !selectedRecipients.has(r.user_id),
-  );
-  const partialCoverage =
-    eligibleRecipientCount > 0 && (excludedMissingKey.length + excludedDeselected.length) > 0;
+  const coverage = useRecipientCoverage(directory, selectedRecipients, user?.id);
+  const { missingRecipients, eligibleRecipientCount } = coverage;
 
   const encryptForRecipients = async (body: string, recipientIds: Set<string>) => {
     const dir = await fetchKeyDir();
@@ -312,67 +306,11 @@ export function Noteboard({ referralId: id }: NoteboardProps) {
         <p className="text-xs text-muted-foreground mb-3">
           Messages are end-to-end encrypted in your browser — the server only stores ciphertext.
         </p>
-        {e2e.isUnlocked && missingRecipients.length > 0 && (
-          <Alert variant="destructive" className="mb-3">
-            <ShieldAlert className="w-4 h-4" />
-            <AlertTitle>
-              {missingRecipients.length} teammate{missingRecipients.length === 1 ? "" : "s"} can't read encrypted notes yet
-            </AlertTitle>
-            <AlertDescription>
-              <div className="mb-2">
-                They haven't enabled end-to-end encryption on their account, so anything you post now will be
-                <strong> undecryptable for them</strong> until they enroll and you re-post. Ask them to open the
-                noteboard and choose <em>Enable encryption</em>.
-              </div>
-              <ul className="list-disc pl-5 text-xs max-h-24 overflow-auto">
-                {missingRecipients.slice(0, 8).map((r) => (
-                  <li key={r.user_id}>{r.full_name}</li>
-                ))}
-                {missingRecipients.length > 8 && <li>and {missingRecipients.length - 8} more…</li>}
-              </ul>
-            </AlertDescription>
-          </Alert>
-        )}
-        {e2e.isUnlocked && partialCoverage && (recipientsTouched || excludedDeselected.length > 0) && (
-          <Alert className="mb-3 border-amber-500/40 bg-amber-500/10 text-amber-900 dark:text-amber-200 [&>svg]:text-amber-600">
-            <ShieldAlert className="w-4 h-4" />
-            <AlertTitle>
-              Only {eligibleRecipientCount} of {eligibleRecipientCount + excludedMissingKey.length + excludedDeselected.length} teammates will be able to read this note
-            </AlertTitle>
-            <AlertDescription>
-              <div className="mb-2 text-xs">
-                The people below <strong>will not</strong> be able to decrypt this note as composed.
-                Adjust recipients or ask them to enable encryption before posting.
-              </div>
-              {excludedDeselected.length > 0 && (
-                <div className="mb-2">
-                  <div className="text-[11px] font-medium uppercase tracking-wide opacity-80">
-                    Deselected ({excludedDeselected.length})
-                  </div>
-                  <ul className="list-disc pl-5 text-xs max-h-24 overflow-auto">
-                    {excludedDeselected.slice(0, 8).map((r) => (
-                      <li key={r.user_id}>{r.full_name}</li>
-                    ))}
-                    {excludedDeselected.length > 8 && <li>and {excludedDeselected.length - 8} more…</li>}
-                  </ul>
-                </div>
-              )}
-              {excludedMissingKey.length > 0 && (
-                <div>
-                  <div className="text-[11px] font-medium uppercase tracking-wide opacity-80">
-                    No encryption key yet ({excludedMissingKey.length})
-                  </div>
-                  <ul className="list-disc pl-5 text-xs max-h-24 overflow-auto">
-                    {excludedMissingKey.slice(0, 8).map((r) => (
-                      <li key={r.user_id}>{r.full_name}</li>
-                    ))}
-                    {excludedMissingKey.length > 8 && <li>and {excludedMissingKey.length - 8} more…</li>}
-                  </ul>
-                </div>
-              )}
-            </AlertDescription>
-          </Alert>
-        )}
+        <NoteRecipientCoverageAlerts
+          isUnlocked={e2e.isUnlocked}
+          coverage={coverage}
+          recipientsTouched={recipientsTouched}
+        />
         <div className="space-y-2 mb-4">
           {e2e.isUnlocked && directoryWithSelf.length > 0 && (
             <NoteRecipientChipRow
