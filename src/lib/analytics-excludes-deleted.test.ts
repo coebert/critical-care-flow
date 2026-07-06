@@ -52,7 +52,13 @@ describe("analytics endpoints exclude soft-deleted rows", () => {
  * a small model of the PostgREST filter, exercised end-to-end against the
  * same call sequence the analytics handlers use.
  */
-type Row = { id: string; deleted_at: string | null; referral_received_at?: string; created_at?: string };
+type Row = {
+  id: string;
+  deleted_at: string | null;
+  deleted_by: string | null;
+  referral_received_at?: string;
+  created_at?: string;
+};
 
 function makeFakeSupabase(table: string, rows: Row[]) {
   const state = {
@@ -86,30 +92,35 @@ function makeFakeSupabase(table: string, rows: Row[]) {
 }
 
 describe("fluent Supabase filter parity — deleted rows dropped", () => {
+  // Includes a partial soft-delete ("orphan") row where deleted_by is set but
+  // deleted_at is missing — must still be excluded thanks to the fallback.
   const rows: Row[] = [
-    { id: "live-1", deleted_at: null, referral_received_at: "2026-07-01T00:00:00Z", created_at: "2026-07-01T00:00:00Z" },
-    { id: "deleted-1", deleted_at: "2026-07-02T00:00:00Z", referral_received_at: "2026-07-01T00:00:00Z", created_at: "2026-07-01T00:00:00Z" },
-    { id: "live-2", deleted_at: null, referral_received_at: "2026-07-03T00:00:00Z", created_at: "2026-07-03T00:00:00Z" },
+    { id: "live-1", deleted_at: null, deleted_by: null, referral_received_at: "2026-07-01T00:00:00Z", created_at: "2026-07-01T00:00:00Z" },
+    { id: "deleted-1", deleted_at: "2026-07-02T00:00:00Z", deleted_by: "u1", referral_received_at: "2026-07-01T00:00:00Z", created_at: "2026-07-01T00:00:00Z" },
+    { id: "orphan-1", deleted_at: null, deleted_by: "u2", referral_received_at: "2026-07-02T00:00:00Z", created_at: "2026-07-02T00:00:00Z" },
+    { id: "live-2", deleted_at: null, deleted_by: null, referral_received_at: "2026-07-03T00:00:00Z", created_at: "2026-07-03T00:00:00Z" },
   ];
 
-  it("referrals: only live rows within the date range are returned", async () => {
+  it("referrals: only live rows within the date range are returned (orphan excluded)", async () => {
     const sb = makeFakeSupabase("referrals", rows);
     const { data } = await sb
       .from("referrals")
       .select("*")
       .is("deleted_at", null)
+      .is("deleted_by", null)
       .gte("referral_received_at", "2026-06-01T00:00:00Z")
       .lte("referral_received_at", "2026-07-31T00:00:00Z")
       .limit(5000);
     expect(data.map((r: Row) => r.id).sort()).toEqual(["live-1", "live-2"]);
   });
 
-  it("postop_bookings: only live rows within the date range are returned", async () => {
+  it("postop_bookings: only live rows within the date range are returned (orphan excluded)", async () => {
     const sb = makeFakeSupabase("postop_bookings", rows);
     const { data } = await sb
       .from("postop_bookings")
       .select("*")
       .is("deleted_at", null)
+      .is("deleted_by", null)
       .order("created_at", { ascending: false })
       .gte("created_at", "2026-06-01T00:00:00Z")
       .lte("created_at", "2026-07-31T00:00:00Z")
@@ -117,3 +128,4 @@ describe("fluent Supabase filter parity — deleted rows dropped", () => {
     expect(data.map((r: Row) => r.id).sort()).toEqual(["live-1", "live-2"]);
   });
 });
+
