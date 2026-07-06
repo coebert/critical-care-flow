@@ -51,15 +51,54 @@ const analyticsSearchSchema = z.object({
   view: z.enum(["referrals", "postop"]).optional(),
 });
 
+// Deterministic "initial 30 days" window so the loader and the component's
+// first render agree on the queryKey. `startOfDay`/`endOfDay` normalise the
+// clock to the same value regardless of the millisecond the code runs at.
+function initialAnalyticsRange() {
+  const to = endOfDay(new Date());
+  const from = startOfDay(subDays(new Date(), 29));
+  return { from, to, fromIso: from.toISOString(), toIso: to.toISOString() };
+}
+
+const icnarcTargetsQueryOptions = {
+  queryKey: ["icnarc-targets"] as const,
+  queryFn: async () => {
+    const { data, error } = await supabase
+      .from("icnarc_targets")
+      .select("time_to_seen_target_min, decision_to_arrival_target_min")
+      .maybeSingle();
+    if (error) throw error;
+    return data;
+  },
+};
+
 export const Route = createFileRoute("/_authenticated/analytics")({
   head: () => ({ meta: [{ title: "Analytics — SDH Critical Care" }] }),
   validateSearch: analyticsSearchSchema,
+  // Prime the analytics caches for the default 30-day window plus the
+  // shared ICNARC targets row. Component-level `useQuery`s share the same
+  // keys, so cold navigation renders without a spinner. Fetches run in
+  // parallel; failures don't block the route (loader intentionally doesn't
+  // await individual promises).
+  loader: ({ context }) => {
+    const { fromIso, toIso } = initialAnalyticsRange();
+    void context.queryClient.prefetchQuery({
+      queryKey: ["analytics", "referrals", fromIso, toIso],
+      queryFn: () => getReferralsAnalytics({ data: { from: fromIso, to: toIso } }),
+    });
+    void context.queryClient.prefetchQuery({
+      queryKey: ["analytics", "postop", fromIso, toIso],
+      queryFn: () => getPostopAnalytics({ data: { from: fromIso, to: toIso } }),
+    });
+    void context.queryClient.prefetchQuery(icnarcTargetsQueryOptions);
+  },
   component: () => (
     <AdminOnly redirectTo="/postop-bookings">
       <AnalyticsPage />
     </AdminOnly>
   ),
 });
+
 
 const COLORS = ["var(--chart-1)", "var(--chart-2)", "var(--chart-3)", "var(--chart-4)", "var(--chart-5)"];
 

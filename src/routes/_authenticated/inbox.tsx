@@ -4,6 +4,7 @@ import { Bell, Check, CheckCheck, ExternalLink, Inbox as InboxIcon, Search, X, C
 import { formatDistanceToNow } from "date-fns";
 import { zodValidator, fallback } from "@tanstack/zod-adapter";
 import { z } from "zod";
+import { queryOptions, useQueryClient, useSuspenseQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/use-auth";
 import { Card } from "@/components/ui/card";
@@ -29,6 +30,43 @@ const inboxSearchSchema = z.object({
   page: fallback(z.number().int().min(1), 1).default(1),
 });
 
+interface Notification {
+  id: string;
+  referral_id: string | null;
+  kind: string;
+  message: string;
+  read_at: string | null;
+  created_at: string;
+}
+
+// RLS scopes this to the current user; the queryKey doesn't need the user id.
+// Realtime pushes updates via `queryClient.setQueryData` below.
+export const NOTIFICATIONS_QUERY_KEY = ["notifications", "list"] as const;
+const notificationsQueryOptions = queryOptions({
+  queryKey: NOTIFICATIONS_QUERY_KEY,
+  queryFn: async (): Promise<Notification[]> => {
+    const { data, error } = await supabase
+      .from("notifications")
+      .select("*")
+      .order("created_at", { ascending: false })
+      .limit(500);
+    if (error) throw new Error(error.message);
+    return (data ?? []) as Notification[];
+  },
+  staleTime: 10_000,
+});
+
+function InboxPending() {
+  return <div className="p-6 text-sm text-muted-foreground text-center">Loading…</div>;
+}
+function InboxError({ error }: { error: Error }) {
+  return (
+    <div className="p-6 text-sm text-destructive" role="alert">
+      Could not load notifications: {error.message}
+    </div>
+  );
+}
+
 export const Route = createFileRoute("/_authenticated/inbox")({
   validateSearch: zodValidator(inboxSearchSchema),
   head: () => ({
@@ -38,17 +76,14 @@ export const Route = createFileRoute("/_authenticated/inbox")({
       { name: "robots", content: "noindex,nofollow" },
     ],
   }),
+  // Prime the cache before mount. Runs client-side under the auth-gated
+  // parent, so the RLS-scoped query already sees the signed-in user.
+  loader: ({ context }) =>
+    context.queryClient.ensureQueryData(notificationsQueryOptions),
+  pendingComponent: InboxPending,
+  errorComponent: InboxError,
   component: InboxPage,
 });
-
-interface Notification {
-  id: string;
-  referral_id: string | null;
-  kind: string;
-  message: string;
-  read_at: string | null;
-  created_at: string;
-}
 
 function kindLabel(kind: string): string {
   switch (kind) {
@@ -61,15 +96,27 @@ function kindLabel(kind: string): string {
   }
 }
 
+
+
 function InboxPage() {
   const { user } = useAuth();
   const search = Route.useSearch();
   const navigate = useNavigate({ from: "/inbox" });
-  const [items, setItems] = useState<Notification[]>([]);
-  const [loading, setLoading] = useState(true);
+  const queryClient = useQueryClient();
+  // Data primed by the route loader and read via suspense — no local
+  // "loading" state on cold render.
+  const { data: items } = useSuspenseQuery(notificationsQueryOptions);
+  const loading = false;
   const [busy, setBusy] = useState(false);
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [qInput, setQInput] = useState(search.q);
+
+  // Local helper: mutate the cached notifications list.
+  const patchItems = (updater: (prev: Notification[]) => Notification[]) => {
+    queryClient.setQueryData<Notification[]>(NOTIFICATIONS_QUERY_KEY, (cur) =>
+      updater(cur ?? []),
+    );
+  };
 
   // Keep local input in sync when URL changes externally (back/forward)
   useEffect(() => { setQInput(search.q); }, [search.q]);
@@ -83,38 +130,26 @@ function InboxPage() {
     return () => clearTimeout(t);
   }, [qInput, search.q, navigate]);
 
+  // Realtime: prepend new inserts into the cached list. Filtered by user_id
+  // so we don't receive teammates' notifications.
   useEffect(() => {
     if (!user) return;
-    let cancelled = false;
-    setLoading(true);
-    supabase
-      .from("notifications")
-      .select("*")
-      .order("created_at", { ascending: false })
-      .limit(500)
-      .then(({ data, error }) => {
-        if (cancelled) return;
-        if (error) toast.error("Could not load notifications");
-        setItems(data ?? []);
-        setLoading(false);
-      });
-
     const channel = supabase
       .channel(`inbox-${user.id}`)
       .on(
         "postgres_changes",
         { event: "INSERT", schema: "public", table: "notifications", filter: `user_id=eq.${user.id}` },
         (payload) => {
-          setItems((cur) => [payload.new as Notification, ...cur]);
+          patchItems((cur) => [payload.new as Notification, ...cur]);
         },
       )
       .subscribe();
-
     return () => {
-      cancelled = true;
       supabase.removeChannel(channel);
     };
-  }, [user]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user?.id]);
+
 
   const unreadCount = useMemo(() => items.filter((i) => !i.read_at).length, [items]);
 
@@ -177,12 +212,12 @@ function InboxPage() {
 
   const markRead = async (id: string) => {
     const now = new Date().toISOString();
-    setItems((cur) => cur.map((i) => (i.id === id ? { ...i, read_at: now } : i)));
+    patchItems((cur) => cur.map((i: Notification) => (i.id === id ? { ...i, read_at: now } : i)));
     const { error } = await supabase.from("notifications").update({ read_at: now }).eq("id", id);
     if (error) toast.error("Could not mark as read");
   };
   const markUnread = async (id: string) => {
-    setItems((cur) => cur.map((i) => (i.id === id ? { ...i, read_at: null } : i)));
+    patchItems((cur) => cur.map((i: Notification) => (i.id === id ? { ...i, read_at: null } : i)));
     const { error } = await supabase.from("notifications").update({ read_at: null }).eq("id", id);
     if (error) toast.error("Could not mark as unread");
   };
@@ -191,7 +226,7 @@ function InboxPage() {
     if (!ids.length) return;
     setBusy(true);
     const now = new Date().toISOString();
-    setItems((cur) => cur.map((i) => (i.read_at ? i : { ...i, read_at: now })));
+    patchItems((cur) => cur.map((i: Notification) => (i.read_at ? i : { ...i, read_at: now })));
     const { error } = await supabase.from("notifications").update({ read_at: now }).in("id", ids);
     setBusy(false);
     if (error) toast.error("Some notifications could not be updated");
@@ -202,7 +237,7 @@ function InboxPage() {
     if (!ids.length) return;
     setBusy(true);
     const now = asRead ? new Date().toISOString() : null;
-    setItems((cur) => cur.map((i) => (selected.has(i.id) ? { ...i, read_at: now } : i)));
+    patchItems((cur) => cur.map((i: Notification) => (selected.has(i.id) ? { ...i, read_at: now } : i)));
     const { error } = await supabase.from("notifications").update({ read_at: now }).in("id", ids);
     setBusy(false);
     if (error) toast.error("Some notifications could not be updated");
