@@ -1,7 +1,7 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useEffect, useRef, useState } from "react";
 import { useServerFn } from "@tanstack/react-start";
-import { queryOptions, useQueryClient } from "@tanstack/react-query";
+import { queryOptions, useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { deleteNote, deleteReferral, findReferralsByHospitalNumber, getNoteHistory, getReferralDetail, logReferralView, updateNote, updateReferral, type DecryptedReferral, type DecryptedReferralNote } from "@/lib/referrals.functions";
 import { ReferralAuditTrail } from "@/components/referral-audit-trail";
