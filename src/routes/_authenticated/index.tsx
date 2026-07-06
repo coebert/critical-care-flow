@@ -626,7 +626,9 @@ function ReferralsList() {
                 <td className="px-3 py-2">
                   <div className="flex items-center gap-1.5">
                     {r.age !== null && r.age <= 16 && (
-                      <Baby className="w-4 h-4 text-primary" title="Pediatric patient (≤16)" />
+                      <span title="Pediatric patient (≤16)">
+                        <Baby className="w-4 h-4 text-primary" />
+                      </span>
                     )}
                     <span>{r.age ?? "?"} / {r.sex ?? "?"}</span>
                   </div>
@@ -715,7 +717,9 @@ function ReferralsList() {
                 <span className="text-xs text-muted-foreground block">Age / Sex</span>
                 <div className="flex items-center gap-1.5">
                   {r.age !== null && r.age <= 16 && (
-                    <Baby className="w-4 h-4 text-primary" title="Pediatric patient (≤16)" />
+                    <span title="Pediatric patient (≤16)">
+                      <Baby className="w-4 h-4 text-primary" />
+                    </span>
                   )}
                   <span className="font-medium">{r.age ?? "?"} / {r.sex ?? "?"}</span>
                 </div>
