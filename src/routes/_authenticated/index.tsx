@@ -162,7 +162,8 @@ function ReferralsList() {
   const [restoringId, setRestoringId] = useState<string | null>(null);
   const [timerSort, setTimerSort] = useState<"none" | "desc" | "asc">("none");
   const [sortTick, setSortTick] = useState(0);
-  const [clinicianNames, setClinicianNames] = useState<Record<string, string>>({});
+  // Clinician names for the "Taken by" column are joined server-side into
+  // each row's `creator_name` field — no client fetch needed.
   useEffect(() => {
     if (timerSort === "none") return;
     const id = setInterval(() => setSortTick((t) => t + 1), 30000);
