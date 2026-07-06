@@ -340,7 +340,7 @@ function ReferralsList() {
           )}
           {(search.from || search.to) && (
             <Badge variant="secondary" className="gap-1">
-              Date: {search.from ?? "…"}{search.to && search.to !== search.from ? ` → ${search.to}` : ""}
+            Date: {search.from ? format(parseISO(search.from), "dd/MM/yyyy") : "…"}{search.to && search.to !== search.from ? ` → ${format(parseISO(search.to), "dd/MM/yyyy")}` : ""}
               <button
                 type="button"
                 aria-label="Clear date filter"
@@ -630,7 +630,7 @@ function ReferralsList() {
                 }}
               >
                 <td className="px-3 py-2 whitespace-nowrap">
-                  {format(new Date(r.referral_received_at), "dd MMM HH:mm")}
+                  {format(new Date(r.referral_received_at), "dd/MM/yyyy HH:mm")}
                 </td>
                 <td className="px-3 py-2">
                   <div className="flex items-center gap-1.5 flex-wrap">
@@ -715,7 +715,7 @@ function ReferralsList() {
             <div className="flex flex-col gap-2 mb-2">
               <div className="flex items-center justify-between gap-2">
                 <span className="text-xs text-muted-foreground shrink-0">
-                  {format(new Date(r.referral_received_at), "dd MMM HH:mm")}
+                  {format(new Date(r.referral_received_at), "dd/MM/yyyy HH:mm")}
                 </span>
                 <div className="flex items-center gap-1.5">
                   {(r as any).is_test && (

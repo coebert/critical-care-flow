@@ -142,7 +142,7 @@ function AnalyticsPage() {
       const k = format(startOfDay(new Date(r.referral_received_at)), "yyyy-MM-dd");
       if (map.has(k)) map.set(k, (map.get(k) ?? 0) + 1);
     });
-    return Array.from(map.entries()).map(([date, count]) => ({ key: date, date: format(new Date(date), "dd MMM"), count }));
+    return Array.from(map.entries()).map(([date, count]) => ({ key: date, date: format(new Date(date), "dd/MM/yyyy"), count }));
   }, [filtered, dayKeys]);
 
   const combinedPerDay = useMemo(() => {
@@ -158,7 +158,7 @@ function AnalyticsPage() {
     });
     return dayKeys.map((k) => ({
       key: k,
-      date: format(new Date(k), "dd MMM"),
+      date: format(new Date(k), "dd/MM/yyyy"),
       referrals: refMap.get(k) ?? 0,
       bookings: bookMap.get(k) ?? 0,
     }));
@@ -211,7 +211,7 @@ function AnalyticsPage() {
     });
     return Array.from(map.entries()).map(([date, count]) => ({
       key: date,
-      date: format(new Date(date), "dd MMM"),
+      date: format(new Date(date), "dd/MM/yyyy"),
       count,
     }));
   }, [pediatricFiltered, dayKeys]);
@@ -314,7 +314,7 @@ function AnalyticsPage() {
     const map = new Map<string, Record<string, number | string>>(
       dayKeys.map((k) => [
         k,
-        { date: format(new Date(k), "dd MMM"), ...Object.fromEntries(admittedConsultants.map((c) => [c, 0])) },
+        { date: format(new Date(k), "dd/MM/yyyy"), ...Object.fromEntries(admittedConsultants.map((c) => [c, 0])) },
       ])
     );
     admittedWithConsultant.forEach((r) => {
