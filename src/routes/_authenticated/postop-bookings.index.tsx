@@ -42,6 +42,7 @@ type Booking = {
   predicted_level: "level_1" | "level_2" | "level_3";
   proposed_surgery_date: string | null;
   created_at: string;
+  created_by_name?: string | null;
   deleted_at?: string | null;
 };
 
@@ -207,6 +208,7 @@ function PostopBookingsList() {
                     </div>
                     <div className="text-xs text-muted-foreground">
                       Booked {format(parseISO(b.created_at), "PP")}
+                      {b.created_by_name ? ` by ${b.created_by_name}` : ""}
                     </div>
                   </div>
                   <Button asChild size="sm" variant="outline">

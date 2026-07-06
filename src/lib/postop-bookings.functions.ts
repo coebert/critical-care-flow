@@ -189,7 +189,27 @@ export const listPostopBookings = createServerFn({ method: "GET" })
       const { data: rows, error } = await query;
       if (error) throw error;
       const { decryptRow } = await loadCrypto();
-      return ((rows ?? []) as Array<Record<string, any>>).map(decryptRow) as Array<Record<string, any>>;
+      const decrypted = ((rows ?? []) as Array<Record<string, any>>).map(decryptRow) as Array<Record<string, any>>;
+
+      // Attach creator display names so the list can show who made each booking.
+      const creatorIds = Array.from(
+        new Set(decrypted.map((r) => r.created_by).filter(Boolean) as string[]),
+      );
+      const nameById: Record<string, string> = {};
+      if (creatorIds.length) {
+        const admin = await getAdmin();
+        const { data: profs } = await admin
+          .from("profiles")
+          .select("id, full_name")
+          .in("id", creatorIds);
+        profs?.forEach((p: any) => {
+          nameById[p.id] = p.full_name ?? "Clinician";
+        });
+      }
+      return decrypted.map((r) => ({
+        ...r,
+        created_by_name: r.created_by ? nameById[r.created_by] ?? "Clinician" : null,
+      }));
     } catch (err) {
       throw safeError("listPostopBookings", err, "Could not load post-op bookings");
     }
