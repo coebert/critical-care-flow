@@ -11,7 +11,7 @@ const E2E_STATUSES = new Set([
 const LEGACY_STATUSES = new Set(["legacy-server-enc", "plaintext"]);
 
 /** Filter predicate matching the noteboard filter select values. */
-export function matchesNoteFilter(note: DecryptedNote, filter: NoteFilter): boolean {
+export function matchesNoteFilter(note: Note, filter: NoteFilter): boolean {
   if (filter === "all") return true;
   if (filter === "e2e") return E2E_STATUSES.has(note._e2eStatus);
   if (filter === "legacy") return LEGACY_STATUSES.has(note._e2eStatus);
@@ -27,7 +27,7 @@ export interface NoteFilterCounts {
   failed: number;
 }
 
-export function countNotesByFilter(notes: DecryptedNote[]): NoteFilterCounts {
+export function countNotesByFilter(notes: Note[]): NoteFilterCounts {
   return {
     all: notes.length,
     e2e: notes.filter((n) => E2E_STATUSES.has(n._e2eStatus)).length,
