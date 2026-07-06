@@ -6,9 +6,19 @@ function ensureConfigured() {
   if (configured) return;
   const publicKey = process.env.VAPID_PUBLIC_KEY;
   const privateKey = process.env.VAPID_PRIVATE_KEY;
-  const subject = process.env.VAPID_SUBJECT || "mailto:admin@example.com";
+  const subject = process.env.VAPID_SUBJECT;
   if (!publicKey || !privateKey) {
     throw new Error("VAPID keys are not configured");
+  }
+  // A real mailto:/https: subject is required by RFC 8292. A placeholder like
+  // "mailto:admin@example.com" would advertise a fake contact to push
+  // providers and can get the app rate-limited or blocked, so treat a
+  // missing/empty subject as a fatal configuration error rather than
+  // silently falling back.
+  if (!subject || !/^(mailto:|https:\/\/)/.test(subject)) {
+    throw new Error(
+      "VAPID_SUBJECT is not configured — set it to a mailto: or https:// URL identifying the app operator.",
+    );
   }
   webpush.setVapidDetails(subject, publicKey, privateKey);
   configured = true;
