@@ -12,7 +12,10 @@ export interface ProfileRow {
   is_at_work: boolean;
   notify_notes?: boolean;
   notify_status?: boolean;
+  notify_new_referral?: boolean;
+  notify_updated_referral?: boolean;
 }
+
 
 
 export interface PushSubRow {
