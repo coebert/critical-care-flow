@@ -2,6 +2,7 @@ import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { ArrowLeft, Check, ExternalLink, Inbox as InboxIcon } from "lucide-react";
 import { format, formatDistanceToNow } from "date-fns";
+import { tzTooltip } from "@/lib/format-timestamp";
 import { supabase } from "@/integrations/supabase/client";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -176,7 +177,7 @@ function NotificationDetailPage() {
         <dl className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm border-t pt-3">
           <div>
             <dt className="text-xs text-muted-foreground">Received</dt>
-            <dd>
+            <dd title={tzTooltip(n.created_at)}>
               {format(new Date(n.created_at), "dd/MM/yyyy HH:mm:ss")}
               <span className="text-muted-foreground text-xs ml-1">
                 ({formatDistanceToNow(new Date(n.created_at), { addSuffix: true })})
@@ -185,7 +186,7 @@ function NotificationDetailPage() {
           </div>
           <div>
             <dt className="text-xs text-muted-foreground">Read</dt>
-            <dd>
+            <dd title={n.read_at ? tzTooltip(n.read_at) : undefined}>
               {n.read_at ? (
                 <>
                   {format(new Date(n.read_at), "dd/MM/yyyy HH:mm:ss")}
@@ -218,7 +219,7 @@ function NotificationDetailPage() {
                     )}
                   </div>
                   {ref.referral_received_at && (
-                    <div className="text-xs text-muted-foreground">
+                    <div className="text-xs text-muted-foreground" title={tzTooltip(ref.referral_received_at)}>
                       Received {format(new Date(ref.referral_received_at), "dd/MM/yyyy HH:mm:ss")}
                     </div>
                   )}

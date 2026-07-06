@@ -31,6 +31,7 @@ import { NoteRecipientPicker } from "@/components/note-recipient-picker";
 import { ArrowLeft, History, Pencil, Save, Trash2, X, ChevronDown, AlertCircle, Lock, LockOpen, ShieldAlert, ShieldCheck, ShieldOff, Users } from "lucide-react";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { format, formatDistanceToNow } from "date-fns";
+import { tzTooltip } from "@/lib/format-timestamp";
 import { toast } from "sonner";
 import { friendlyE2EError } from "@/lib/friendly-e2e-error";
 import { validateReferralTimings } from "@/lib/referral-validation";
@@ -642,7 +643,7 @@ function ReferralDetail() {
       <h1 className="text-2xl font-semibold mb-1">
         {ref.hospital_number ?? "Referral"} · {ref.age ?? "?"}/{ref.sex ?? "?"}
       </h1>
-      <p className="text-sm text-muted-foreground mb-2">
+      <p className="text-sm text-muted-foreground mb-2" title={tzTooltip(ref.referral_received_at)}>
         Received {format(new Date(ref.referral_received_at), "dd/MM/yyyy HH:mm:ss")}
       </p>
       <div className="flex gap-2 mb-4 md:hidden">
@@ -733,7 +734,7 @@ function ReferralDetail() {
                 return (
                   <div key={p.id} className="border rounded-md p-3 bg-destructive/5">
                     <div className="flex items-center justify-between gap-2 mb-2 flex-wrap">
-                      <div className="text-sm font-medium">
+                      <div className="text-sm font-medium" title={when ? tzTooltip(when) : undefined}>
                         Declined {when ? format(new Date(when), "dd/MM/yyyy HH:mm") : "date unknown"}
                         {p.referring_specialty ? ` · ${p.referring_specialty}` : ""}
                       </div>
@@ -1447,10 +1448,10 @@ function NoteItem({
           {authorName}
           <E2EBadge status={note._e2eStatus} />
         </span>
-        <span className="text-[11px] text-muted-foreground" title={format(new Date(note.created_at), "dd/MM/yyyy HH:mm:ss")}>
+        <span className="text-[11px] text-muted-foreground" title={tzTooltip(note.created_at)}>
           {format(new Date(note.created_at), "dd/MM/yyyy HH:mm")} · {formatDistanceToNow(new Date(note.created_at), { addSuffix: true })}
           {edited && (
-            <span className="ml-1 italic" title={`Edited ${format(new Date(edited), "dd/MM/yyyy HH:mm:ss")}`}>(edited)</span>
+            <span className="ml-1 italic" title={`Edited\n${tzTooltip(edited)}`}>(edited)</span>
           )}
         </span>
       </div>
@@ -1714,7 +1715,7 @@ function NoteHistoryButton({ noteId }: { noteId: string }) {
             <div key={e.id} className="text-sm border-l-2 border-muted pl-3">
               <div className="flex items-baseline justify-between gap-3 mb-1">
                 <span className="text-xs font-medium capitalize">{e.action} · {e.user_name}</span>
-                <span className="text-[11px] text-muted-foreground">
+                <span className="text-[11px] text-muted-foreground" title={tzTooltip(e.created_at)}>
                   {format(new Date(e.created_at), "dd/MM/yyyy HH:mm:ss")}
                 </span>
               </div>
@@ -1801,7 +1802,7 @@ function AuditEntry({ entry }: { entry: ReferralAuditEntry }) {
         </div>
         <span
           className="text-xs text-muted-foreground"
-          title={format(when, "dd/MM/yyyy HH:mm:ss")}
+          title={tzTooltip(when)}
         >
           {format(when, "dd/MM/yyyy HH:mm")} · {formatDistanceToNow(when, { addSuffix: true })}
         </span>
