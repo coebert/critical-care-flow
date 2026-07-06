@@ -310,7 +310,7 @@ function NoteAudienceInfo({
 
             {excludedWithKey.length > 0 && (
               <section>
-                <div className="flex items-center gap-1 font-medium text-amber-700 dark:text-amber-400 mb-1">
+                <div className="flex items-center gap-1 font-medium text-warning-text mb-1">
                   <ShieldOff className="w-3.5 h-3.5" /> Not selected as a recipient
                   ({excludedWithKey.length})
                 </div>
