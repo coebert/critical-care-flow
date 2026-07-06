@@ -162,53 +162,12 @@ async function fanOutNotifications(
   title?: string,
 ) {
   const admin = await getAdmin();
-  const { fanOutNotifications: runFanOut } = await import("./notification-fanout");
+  const [{ fanOutNotifications: runFanOut }, { buildNotificationFanoutDeps }] = await Promise.all([
+    import("./notification-fanout"),
+    import("./notification-fanout-deps.server"),
+  ]);
   await runFanOut(
-    {
-      fetchEligibleRoles: async (actorId) => {
-        const { data } = await admin
-          .from("user_roles")
-          .select("user_id, role")
-          .in("role", ["admin", "clinician"])
-          .neq("user_id", actorId);
-        return (data ?? []) as any;
-      },
-      fetchAtWorkProfiles: async (ids) => {
-        const { data } = await admin
-          .from("profiles")
-          .select("id, is_at_work, notify_notes, notify_status, notify_new_referral, notify_updated_referral")
-          .in("id", ids)
-          .eq("is_at_work", true);
-        return (data ?? []) as any;
-      },
-      fetchPushSubs: async (ids) => {
-        const { data } = await admin
-          .from("push_subscriptions")
-          .select("user_id, endpoint, p256dh, auth")
-          .in("user_id", ids);
-        return (data ?? []) as any;
-      },
-      insertNotifications: async (rows) => {
-        const { data } = await admin
-          .from("notifications")
-          .insert(rows as any)
-          .select("id, user_id");
-        return (data ?? []) as any;
-      },
-      sendPush: async (subs, payload) => {
-        const { sendPushToMany } = await import("./push.server");
-        return sendPushToMany(subs as any, payload);
-      },
-      deletePushSubs: async (endpoints) => {
-        await admin.from("push_subscriptions").delete().in("endpoint", endpoints);
-      },
-      recordDeliveries: async (rows) => {
-        const { error } = await admin
-          .from("notification_deliveries" as any)
-          .insert(rows as any);
-        if (error) console.error("[fanOut] recordDeliveries", error);
-      },
-    },
+    buildNotificationFanoutDeps(admin),
     { actorId: userId, referralId, kind, message, url, title },
   );
 }

@@ -2,7 +2,8 @@ import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useEffect, useRef, useState } from "react";
 import { useServerFn } from "@tanstack/react-start";
 import { supabase } from "@/integrations/supabase/client";
-import { deleteNote, deleteReferral, findReferralsByHospitalNumber, getNoteHistory, getReferralDetail, getReferralHistory, logReferralView, updateNote, updateReferral, type ReferralAuditEntry, type DecryptedReferral, type DecryptedReferralNote } from "@/lib/referrals.functions";
+import { deleteNote, deleteReferral, findReferralsByHospitalNumber, getNoteHistory, getReferralDetail, logReferralView, updateNote, updateReferral, type DecryptedReferral, type DecryptedReferralNote } from "@/lib/referrals.functions";
+import { ReferralAuditTrail } from "@/components/referral-audit-trail";
 import { addEncryptedNote, listEncryptedNotes, updateEncryptedNote } from "@/lib/encrypted-notes.functions";
 import { getMyPrivateKeyMaterial, getPublicKeyDirectory } from "@/lib/e2e-keys.functions";
 import { decryptNote as e2eDecryptNote, encryptNote as e2eEncryptNote } from "@/lib/e2e-crypto";
@@ -76,33 +77,8 @@ function ReferralDetail() {
   const deleteNoteFn = useServerFn(deleteNote);
   const logView = useServerFn(logReferralView);
   const removeReferral = useServerFn(deleteReferral);
-  const fetchHistory = useServerFn(getReferralHistory);
-  const [history, setHistory] = useState<ReferralAuditEntry[]>([]);
-  const [historyLoading, setHistoryLoading] = useState(false);
-  const [historyOpen, setHistoryOpen] = useState(false);
-  const [historyTotal, setHistoryTotal] = useState(0);
-  const [historyHasMore, setHistoryHasMore] = useState(false);
-  const HISTORY_PAGE_SIZE = 20;
-
-  const loadMoreHistory = async (reset = false) => {
-    if (historyLoading) return;
-    if (!reset && !historyHasMore) return;
-    setHistoryLoading(true);
-    try {
-      const currentOffset = reset ? 0 : history.length;
-      const page = await fetchHistory({
-        data: { referral_id: id, offset: currentOffset, limit: HISTORY_PAGE_SIZE },
-      });
-      setHistory((cur) => (reset ? page.entries : [...cur, ...page.entries]));
-      setHistoryTotal(page.total);
-      setHistoryHasMore(page.hasMore);
-    } catch (e: any) {
-      toast.error(e?.message ?? "Failed to load history");
-    } finally {
-      setHistoryLoading(false);
-    }
-  };
-  const historySentinelRef = useRef<HTMLDivElement>(null);
+  // Audit-trail state was extracted into <ReferralAuditTrail>. Note-history
+  // fetch below is a separate feature and stays put.
   const { user } = useAuth();
   const { hasRole: isAdmin } = useRole("admin");
   const [deleting, setDeleting] = useState(false);
@@ -120,21 +96,7 @@ function ReferralDetail() {
   const [noteFilter, setNoteFilter] = useState<"all" | "e2e" | "legacy" | "failed">("all");
   const outcomeRef = useRef<HTMLDivElement>(null);
 
-  // Auto-load the next page of audit history when the sentinel scrolls into view.
-  useEffect(() => {
-    if (!historyOpen || !historyHasMore) return;
-    const node = historySentinelRef.current;
-    if (!node || typeof IntersectionObserver === "undefined") return;
-    const observer = new IntersectionObserver(
-      (entries) => {
-        if (entries.some((e) => e.isIntersecting)) loadMoreHistory(false);
-      },
-      { rootMargin: "200px" },
-    );
-    observer.observe(node);
-    return () => observer.disconnect();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [historyOpen, historyHasMore, history.length]);
+  // (Audit-trail IntersectionObserver moved into <ReferralAuditTrail>.)
 
 
   useEffect(() => {
@@ -1217,61 +1179,8 @@ function ReferralDetail() {
 
 
 
-        <Card className="p-5">
-          <Collapsible
-            open={historyOpen}
-            onOpenChange={(o) => {
-              setHistoryOpen(o);
-              if (o && history.length === 0 && !historyLoading) loadMoreHistory(true);
-            }}
-          >
-            <CollapsibleTrigger asChild>
-              <button type="button" className="w-full flex items-center justify-between text-left">
-                <div>
-                  <h2 className="font-semibold">Audit trail</h2>
-                  <p className="text-xs text-muted-foreground">
-                    When key fields were created or changed, and by whom.
-                    {historyOpen && historyTotal > 0 && (
-                      <span> · Showing {history.length} of {historyTotal}</span>
-                    )}
-                  </p>
-                </div>
-                <ChevronDown className={cn("w-4 h-4 transition-transform", historyOpen && "rotate-180")} />
-              </button>
-            </CollapsibleTrigger>
-            <CollapsibleContent className="mt-4">
-              {history.length === 0 && historyLoading && (
-                <p className="text-xs text-muted-foreground">Loading history…</p>
-              )}
-              {!historyLoading && history.length === 0 && (
-                <p className="text-xs text-muted-foreground">No audit entries.</p>
-              )}
-              <div className="space-y-3">
-                {history.map((h) => (
-                  <AuditEntry key={h.id} entry={h} />
-                ))}
-              </div>
-              {history.length > 0 && historyHasMore && (
-                <div ref={historySentinelRef} className="pt-3 flex justify-center">
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    onClick={() => loadMoreHistory(false)}
-                    disabled={historyLoading}
-                  >
-                    {historyLoading ? "Loading…" : "Load more"}
-                  </Button>
-                </div>
-              )}
-              {history.length > 0 && !historyHasMore && (
-                <p className="pt-3 text-center text-xs text-muted-foreground">
-                  End of history.
-                </p>
-              )}
-            </CollapsibleContent>
-          </Collapsible>
-        </Card>
+        <ReferralAuditTrail referralId={id} />
+
 
 
 
@@ -1741,99 +1650,4 @@ function NoteHistoryButton({ noteId }: { noteId: string }) {
   );
 }
 
-const FIELD_LABELS: Record<string, string> = {
-  age: "Age",
-  sex: "Sex",
-  hospital_number: "Hospital number",
-  current_ward: "Current ward",
-  current_bed: "Bed",
-  past_medical_history: "Past medical history",
-  baseline_function: "Baseline function",
-  dnacpr_respect: "DNACPR / ReSPECT",
-  consultant_to_consultant_only: "Consultant-to-consultant only",
-  referring_specialty: "Referring specialty",
-  reason_for_referral: "Reason for referral",
-  referral_received_at: "Referral received",
-  first_seen_at: "First seen by CC",
-  decision_at: "Decision",
-  arrived_on_unit_at: "Arrived on unit",
-  status: "Status",
-  decline_reason: "Reason for declining",
-  discussed_with_consultant: "Discussed with consultant",
-  admission_urgency: "Admission urgency",
-  accepting_consultant: "Accepting consultant",
-  is_test: "Test / demonstration entry",
-};
-
-const DATE_FIELDS = new Set([
-  "referral_received_at",
-  "first_seen_at",
-  "decision_at",
-  "arrived_on_unit_at",
-]);
-
-function formatAuditValue(field: string, value: string | number | boolean | null): string {
-  if (value === null || value === "") return "—";
-  if (typeof value === "boolean") return value ? "Yes" : "No";
-  if (DATE_FIELDS.has(field) && typeof value === "string") {
-    const d = new Date(value);
-    if (!isNaN(d.getTime())) return format(d, "dd/MM/yyyy HH:mm");
-  }
-  return String(value);
-}
-
-function AuditEntry({ entry }: { entry: ReferralAuditEntry }) {
-  const when = new Date(entry.created_at);
-  const actionLabel =
-    entry.action === "create" ? "Created" :
-    entry.action === "delete" ? "Deleted" :
-    "Updated";
-  const actionTone =
-    entry.action === "create" ? "bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 border-emerald-500/40" :
-    entry.action === "delete" ? "bg-destructive/10 text-destructive border-destructive/40" :
-    "bg-muted text-foreground border-border";
-
-  return (
-    <div className="border rounded-md p-3 text-sm">
-      <div className="flex items-center justify-between gap-2 flex-wrap mb-2">
-        <div className="flex items-center gap-2">
-          <Badge variant="outline" className={cn("capitalize", actionTone)}>{actionLabel}</Badge>
-          <span className="font-medium">{entry.user_name}</span>
-        </div>
-        <span
-          className="text-xs text-muted-foreground"
-          title={tzTooltip(when)}
-        >
-          {format(when, "dd/MM/yyyy HH:mm")} · {formatDistanceToNow(when, { addSuffix: true })}
-        </span>
-      </div>
-
-      {entry.action === "create" && entry.snapshot && (
-        <dl className="grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-1 text-xs">
-          {Object.entries(entry.snapshot)
-            .filter(([, v]) => v !== null && v !== "")
-            .map(([k, v]) => (
-              <div key={k} className="flex gap-1">
-                <dt className="text-muted-foreground">{FIELD_LABELS[k] ?? k}:</dt>
-                <dd className="break-words">{formatAuditValue(k, v)}</dd>
-              </div>
-            ))}
-        </dl>
-      )}
-
-      {entry.action === "update" && entry.changes.length > 0 && (
-        <ul className="space-y-1 text-xs">
-          {entry.changes.map((c) => (
-            <li key={c.field}>
-              <span className="text-muted-foreground">{FIELD_LABELS[c.field] ?? c.field}:</span>{" "}
-              <span className="line-through text-muted-foreground">{formatAuditValue(c.field, c.from)}</span>
-              {" → "}
-              <span className="font-medium">{formatAuditValue(c.field, c.to)}</span>
-            </li>
-          ))}
-        </ul>
-      )}
-    </div>
-  );
-}
 
