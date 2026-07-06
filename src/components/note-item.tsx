@@ -269,7 +269,7 @@ function NoteAudienceInfo({
           </div>
           <div className="max-h-72 overflow-auto p-3 space-y-3 text-xs">
             <section>
-              <div className="flex items-center gap-1 font-medium text-emerald-700 dark:text-emerald-400 mb-1">
+              <div className="flex items-center gap-1 font-medium text-success-text mb-1">
                 <ShieldCheck className="w-3.5 h-3.5" /> Can decrypt ({canDecrypt.length})
               </div>
               {canDecrypt.length === 0 ? (
