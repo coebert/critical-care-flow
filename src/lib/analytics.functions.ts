@@ -122,9 +122,16 @@ export const getPostopAnalytics = createServerFn({ method: "GET" })
   .handler(async ({ data, context }) => {
     await assertAdmin(context);
     try {
+      // Post-op analytics only needs non-PHI columns. Projecting explicitly
+      // avoids pulling ciphertext (`*_enc`) and the hospital-number hash
+      // over the wire; there is nothing to decrypt at the analytics layer.
+      const POSTOP_ANALYTICS_COLUMNS =
+        "id,age,sex,weight_kg,height_cm,bmi,predicted_level," +
+        "proposed_surgery_date,surgical_specialty,arrived_at,is_test," +
+        "deleted_at,deleted_by,created_at,created_by,updated_at";
       let query = context.supabase
         .from("postop_bookings")
-        .select("*")
+        .select(POSTOP_ANALYTICS_COLUMNS)
         // Belt-and-braces: exclude rows removed via either the deleted_at
         // timestamp OR the deleted_by attribution, so a partially written
         // soft-delete never leaks into analytics.
@@ -138,9 +145,15 @@ export const getPostopAnalytics = createServerFn({ method: "GET" })
       if (data.to) query = query.lte("created_at", data.to);
       const { data: rows, error } = await query;
       if (error) throw error;
-      const safeRows = assertExcludesTestRows("getPostopAnalytics", rows ?? []);
-      const { decryptRow } = await import("./postop-bookings-crypto.server");
-      return (safeRows as Array<Record<string, any>>).map(decryptRow) as Array<Record<string, any>>;
+      const safeRows = assertExcludesTestRows(
+        "getPostopAnalytics",
+        (rows ?? []) as unknown as Array<Tables<"postop_bookings">>,
+      );
+      return safeRows as Array<Tables<"postop_bookings">>;
+    } catch (err) {
+      throw safeError("analytics.getPostopAnalytics", err, "Could not load post-op analytics.");
+    }
+  });
     } catch (err) {
       throw safeError("analytics.getPostopAnalytics", err, "Could not load post-op analytics.");
     }
