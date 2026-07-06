@@ -115,16 +115,19 @@ const auditLogInputSchema = z
   })
   .default({});
 
+export type AuditLogEntry = {
+  id: string;
+  user_id: string | null;
+  action: string;
+  entity: string;
+  entity_id: string | null;
+  // Free-form JSON diff written by callers; keep loose so TSS can serialize.
+  diff: any;
+  created_at: string;
+};
+
 export type AuditLogPage = {
-  rows: Array<{
-    id: string;
-    user_id: string | null;
-    action: string;
-    entity: string;
-    entity_id: string | null;
-    diff: unknown;
-    created_at: string;
-  }>;
+  rows: AuditLogEntry[];
   hasMore: boolean;
   nextOffset: number;
 };
