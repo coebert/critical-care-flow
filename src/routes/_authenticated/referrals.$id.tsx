@@ -1,17 +1,12 @@
-import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
+import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useEffect, useRef, useState } from "react";
 import { useServerFn } from "@tanstack/react-start";
-import { queryOptions, useQuery, useQueryClient } from "@tanstack/react-query";
+import { queryOptions, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
-import { deleteNote, deleteReferral, getReferralDetail, logReferralView, updateNote, updateReferral, type DecryptedReferral } from "@/lib/referrals.functions";
+import { deleteReferral, getReferralDetail, logReferralView, updateReferral, type DecryptedReferral } from "@/lib/referrals.functions";
 import { ReferralAuditTrail } from "@/components/referral-audit-trail";
 import { PriorDeclinedReferrals } from "@/components/prior-declined-referrals";
-import { NoteItem, type Note } from "@/components/note-item";
-import { addEncryptedNote, listEncryptedNotes, updateEncryptedNote } from "@/lib/encrypted-notes.functions";
-import { getMyPrivateKeyMaterial, getPublicKeyDirectory } from "@/lib/e2e-keys.functions";
-import { decryptNote as e2eDecryptNote, encryptNote as e2eEncryptNote } from "@/lib/e2e-crypto";
-import { useE2ESession } from "@/hooks/use-e2e-session";
-import { E2EUnlockModal } from "@/components/e2e-unlock-modal";
+import { Noteboard, referralNotesQueryOptions } from "@/components/noteboard";
 import { useAuth, useRole } from "@/hooks/use-auth";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -21,7 +16,6 @@ import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Checkbox } from "@/components/ui/checkbox";
 import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger,
@@ -30,12 +24,10 @@ import { Collapsible, CollapsibleTrigger, CollapsibleContent } from "@/component
 import type { Tables } from "@/integrations/supabase/types";
 import { ComboboxAdd } from "@/components/combobox-add";
 import { useReferralOptions } from "@/hooks/use-referral-options";
-import { NoteRecipientPicker } from "@/components/note-recipient-picker";
-import { ArrowLeft, Save, Trash2, ChevronDown, LockOpen, AlertCircle, Lock, ShieldAlert, ShieldCheck, ShieldOff } from "lucide-react";
+import { ArrowLeft, Save, Trash2, ChevronDown, AlertCircle } from "lucide-react";
 import { format } from "date-fns";
 import { tzTooltip } from "@/lib/format-timestamp";
 import { toast } from "sonner";
-import { friendlyE2EError } from "@/lib/friendly-e2e-error";
 import { validateReferralTimings } from "@/lib/referral-validation";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { ADMISSION_URGENCY_OPTIONS, type AdmissionUrgency } from "@/lib/admission-urgency";
@@ -53,17 +45,6 @@ const referralDetailQueryOptions = (id: string) =>
   queryOptions({
     queryKey: ["referrals", "detail", id] as const,
     queryFn: () => getReferralDetail({ data: { id } }),
-    staleTime: 5_000,
-  });
-
-// Raw (still-ciphertext) notes for a referral. The loader primes this so the
-// noteboard has data on first paint; the component owns a derived
-// `decryptedNotes` state because decryption requires the unlocked E2E key,
-// which isn't available during SSR/prerender.
-const referralNotesQueryOptions = (id: string) =>
-  queryOptions({
-    queryKey: ["referrals", "detail", id, "notes"] as const,
-    queryFn: () => listEncryptedNotes({ data: { referral_id: id } }),
     staleTime: 5_000,
   });
 
