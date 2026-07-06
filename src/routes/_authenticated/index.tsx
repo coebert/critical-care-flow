@@ -5,7 +5,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
-import { Plus, Search, RotateCcw, Trash2, MapPin } from "lucide-react";
+import { Plus, Search, RotateCcw, Trash2, MapPin, Baby } from "lucide-react";
 import type { Tables } from "@/integrations/supabase/types";
 import { format, formatDistanceToNow } from "date-fns";
 import { listDeletedReferrals, listReferralsForList, restoreReferral, RESTORE_WINDOW_DAYS, type DecryptedReferral } from "@/lib/referrals.functions";
