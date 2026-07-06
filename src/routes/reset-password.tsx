@@ -130,11 +130,15 @@ function ResetPage() {
                 id="pw"
                 type="password"
                 required
-                minLength={8}
+                minLength={PASSWORD_MIN_LENGTH}
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 autoComplete="new-password"
+                aria-describedby="pw-help"
               />
+              <p id="pw-help" className="text-[11px] text-muted-foreground leading-snug">
+                {PASSWORD_RULES_HINT}
+              </p>
             </div>
             <Button type="submit" className="w-full" disabled={loading}>
               {loading ? "Updating…" : "Update password"}
