@@ -84,6 +84,20 @@ export const setUserRole = createServerFn({ method: "POST" })
   .handler(async ({ data, context }) => {
     await assertAdmin(context);
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+
+    // Self-demotion guard: an admin cannot revoke their own admin role.
+    // Even if another admin exists, requiring a peer to demote you avoids
+    // the "sole-admin footgun" of an accidental self-lockout.
+    if (
+      !data.grant &&
+      data.role === "admin" &&
+      data.user_id === context.userId
+    ) {
+      throw new Error(
+        "You cannot revoke your own admin role. Ask another admin to do it.",
+      );
+    }
+
     if (data.grant) {
       const { error } = await supabaseAdmin
         .from("user_roles")
