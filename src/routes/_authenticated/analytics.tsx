@@ -227,6 +227,11 @@ function AnalyticsPage() {
     ? (pediatricFiltered.length / filtered.length) * 100
     : 0;
 
+  const missingAgeCount = useMemo(
+    () => filtered.filter((r) => r.age === null || r.age === undefined).length,
+    [filtered]
+  );
+
   const bmiBySpecialtyKey = useMemo(() => {
     const map = new Map<string, { sum: number; n: number }>();
     postopBmi.forEach((b) => {
