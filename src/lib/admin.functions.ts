@@ -227,3 +227,41 @@ export const getAuditLog = createServerFn({ method: "POST" })
       nextOffset: offset + limit,
     };
   });
+
+export const updateIcnarcTargets = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d: unknown) =>
+    z
+      .object({
+        time_to_seen_target_min: z.number().int().min(1).max(100_000),
+        decision_to_arrival_target_min: z.number().int().min(1).max(100_000),
+      })
+      .parse(d),
+  )
+  .handler(async ({ data, context }) => {
+    await assertAdmin(context);
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+
+    const { error } = await supabaseAdmin
+      .from("icnarc_targets")
+      .update({
+        time_to_seen_target_min: data.time_to_seen_target_min,
+        decision_to_arrival_target_min: data.decision_to_arrival_target_min,
+        updated_by: context.userId,
+      })
+      .eq("id", true);
+    if (error) throw safeError("admin.updateIcnarcTargets", error, "Failed to update ICNARC targets.");
+
+    await supabaseAdmin.from("audit_log").insert({
+      user_id: context.userId,
+      action: "update",
+      entity: "icnarc_targets",
+      entity_id: null,
+      diff: {
+        time_to_seen_target_min: data.time_to_seen_target_min,
+        decision_to_arrival_target_min: data.decision_to_arrival_target_min,
+      },
+    });
+
+    return { ok: true };
+  });
