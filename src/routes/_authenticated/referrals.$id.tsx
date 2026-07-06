@@ -1715,7 +1715,7 @@ function NoteHistoryButton({ noteId }: { noteId: string }) {
               <div className="flex items-baseline justify-between gap-3 mb-1">
                 <span className="text-xs font-medium capitalize">{e.action} · {e.user_name}</span>
                 <span className="text-[11px] text-muted-foreground">
-                  {format(new Date(e.created_at), "d MMM yyyy, HH:mm:ss")}
+                  {format(new Date(e.created_at), "dd/MM/yyyy HH:mm:ss")}
                 </span>
               </div>
               {e.action === "update" && e.diff?.before?.body !== undefined && (
@@ -1776,7 +1776,7 @@ function formatAuditValue(field: string, value: string | number | boolean | null
   if (typeof value === "boolean") return value ? "Yes" : "No";
   if (DATE_FIELDS.has(field) && typeof value === "string") {
     const d = new Date(value);
-    if (!isNaN(d.getTime())) return format(d, "dd MMM yyyy HH:mm");
+    if (!isNaN(d.getTime())) return format(d, "dd/MM/yyyy HH:mm");
   }
   return String(value);
 }
@@ -1801,9 +1801,9 @@ function AuditEntry({ entry }: { entry: ReferralAuditEntry }) {
         </div>
         <span
           className="text-xs text-muted-foreground"
-          title={format(when, "dd MMM yyyy HH:mm:ss")}
+          title={format(when, "dd/MM/yyyy HH:mm:ss")}
         >
-          {format(when, "dd MMM yyyy HH:mm")} · {formatDistanceToNow(when, { addSuffix: true })}
+          {format(when, "dd/MM/yyyy HH:mm")} · {formatDistanceToNow(when, { addSuffix: true })}
         </span>
       </div>
 
