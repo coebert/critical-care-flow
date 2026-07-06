@@ -114,7 +114,7 @@ export async function ensureRecipientKeyImpl(
 export async function ensureRecipientKey(password: string): Promise<EnsureKeyOutcome> {
   const outcome = await ensureRecipientKeyImpl(password, {
     fetchMaterial: async () => {
-      const res: any = await getMyPrivateKeyMaterial({ data: undefined as any });
+      const res: any = await getMyPrivateKeyMaterial();
       return { material: res?.material ?? null, public_key: res?.public_key ?? null };
     },
     generate: (pw) => generateAndWrapKeypair(pw),

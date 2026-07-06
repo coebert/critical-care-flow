@@ -222,8 +222,21 @@ export const updateEncryptedNote = createServerFn({ method: "POST" })
       .single();
     if (error) throw safeError("e2e.updateNote", error, "Failed to update note.");
 
-    // Replace the recipient key set.
-    await supabase.from("referral_note_keys").delete().eq("note_id", data.id);
+    // Replace the recipient key set. Snapshot the existing keys first so we
+    // can restore them if the re-insert fails — a naked delete+insert leaves
+    // the note permanently unreadable (updated ciphertext, zero wrapped keys).
+    const { data: oldKeys, error: fetchErr } = await supabase
+      .from("referral_note_keys")
+      .select("note_id, recipient_user_id, wrapped_key")
+      .eq("note_id", data.id);
+    if (fetchErr) throw safeError("e2e.updateNoteKeys.snapshot", fetchErr, "Failed to snapshot existing keys.");
+
+    const { error: delErr } = await supabase
+      .from("referral_note_keys")
+      .delete()
+      .eq("note_id", data.id);
+    if (delErr) throw safeError("e2e.updateNoteKeys.delete", delErr, "Failed to clear existing keys.");
+
     const seen = new Set<string>();
     const wrappedRows = data.wrapped_keys
       .filter((w) => (seen.has(w.recipient_user_id) ? false : seen.add(w.recipient_user_id)))
@@ -235,7 +248,20 @@ export const updateEncryptedNote = createServerFn({ method: "POST" })
     const { error: e2 } = await supabase
       .from("referral_note_keys")
       .insert(wrappedRows as any);
-    if (e2) throw safeError("e2e.updateNoteKeys", e2, "Failed to update recipient keys.");
+    if (e2) {
+      // Restore the previous key set so the note remains readable to its
+      // original recipients. If this also fails, log both — the note body
+      // was still updated and we surface the original failure to the caller.
+      if (oldKeys && oldKeys.length) {
+        const { error: restoreErr } = await supabase
+          .from("referral_note_keys")
+          .insert(oldKeys as any);
+        if (restoreErr) {
+          console.error("e2e.updateNoteKeys.restore FAILED", restoreErr, "originalError=", e2);
+        }
+      }
+      throw safeError("e2e.updateNoteKeys", e2, "Failed to update recipient keys.");
+    }
 
     await writeAuditE2E({
       user_id: userId,
