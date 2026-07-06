@@ -55,7 +55,10 @@ export function PostopDrilldown({ drill, onClose }: PostopDrilldownProps) {
               {drill.rows.map((b) => {
                 const h = arrivalHoursOf(b);
                 return (
-                  <tr key={b.id} className="border-b last:border-0 hover:bg-muted/40 transition-colors duration-150">
+                  <tr
+                    key={b.id}
+                    className="border-b last:border-0 hover:bg-muted/40 transition-colors duration-150"
+                  >
                     <td className="py-2 pr-3 whitespace-nowrap">
                       {format(new Date(b.created_at), "dd/MM/yyyy HH:mm")}
                     </td>

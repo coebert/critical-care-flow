@@ -48,10 +48,7 @@ export function usePostopAnalytics(from: Date, to: Date) {
 
   const dayKeys = useMemo(() => makeDayKeys(clampedFrom, clampedTo), [clampedFrom, clampedTo]);
   const perDay = useMemo(() => buildPerDay(filtered, dayKeys), [filtered, dayKeys]);
-  const perDayByLevel = useMemo(
-    () => buildPerDayByLevel(filtered, dayKeys),
-    [filtered, dayKeys],
-  );
+  const perDayByLevel = useMemo(() => buildPerDayByLevel(filtered, dayKeys), [filtered, dayKeys]);
   const byLevel = useMemo(() => buildByLevel(filtered), [filtered]);
   const bySex = useMemo(() => buildBySex(filtered), [filtered]);
 

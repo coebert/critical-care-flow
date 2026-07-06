@@ -28,11 +28,7 @@ import { useDecryptedNotes } from "@/hooks/use-decrypted-notes";
 import { useRecipientDirectory, type DirectoryEntry } from "@/hooks/use-recipient-directory";
 import { useRecipientCoverage } from "@/hooks/use-recipient-coverage";
 import { friendlyE2EError } from "@/lib/friendly-e2e-error";
-import {
-  countNotesByFilter,
-  matchesNoteFilter,
-  type NoteFilter,
-} from "@/lib/note-filter";
+import { countNotesByFilter, matchesNoteFilter, type NoteFilter } from "@/lib/note-filter";
 
 // Raw ciphertext rows for a referral's notes. Exported so the route loader
 // can prime the cache before mount.
@@ -75,7 +71,11 @@ export function Noteboard({ referralId: id }: NoteboardProps) {
   const { data: rawNotes } = useQuery(referralNotesQueryOptions(id));
   const { notes, authors } = useDecryptedNotes(rawNotes, e2e);
 
-  const { directory, newlyEligibleIds, reload: loadDirectory } = useRecipientDirectory({
+  const {
+    directory,
+    newlyEligibleIds,
+    reload: loadDirectory,
+  } = useRecipientDirectory({
     currentUserId: user?.id,
     isUnlocked: e2e.isUnlocked,
     fetchKeyDir,
@@ -152,7 +152,7 @@ export function Noteboard({ referralId: id }: NoteboardProps) {
     const dir = await fetchKeyDir();
     const byId = new Map<string, string>();
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    for (const r of ((dir ?? []) as any[])) {
+    for (const r of (dir ?? []) as any[]) {
       if (r.public_key) byId.set(r.user_id, r.public_key as string);
     }
     if (e2e.publicKey && user && !byId.has(user.id)) byId.set(user.id, e2e.publicKey);
@@ -216,7 +216,10 @@ export function Noteboard({ referralId: id }: NoteboardProps) {
           const fmt = (people: Array<{ full_name: string }>) =>
             people.length <= 3
               ? people.map((p) => p.full_name).join(", ")
-              : `${people.slice(0, 3).map((p) => p.full_name).join(", ")} and ${people.length - 3} more`;
+              : `${people
+                  .slice(0, 3)
+                  .map((p) => p.full_name)
+                  .join(", ")} and ${people.length - 3} more`;
           const lines: string[] = [];
           if (payload.missing_no_key.length > 0) {
             lines.push(`Lost/never-published keys: ${fmt(payload.missing_no_key)}`);
@@ -255,7 +258,8 @@ export function Noteboard({ referralId: id }: NoteboardProps) {
   const postNote = async () => {
     const validation = validateNoteBody(noteBody);
     if (!validation.ok) {
-      if (validation.reason === "too-long") toast.error("Note is too long — trim it before posting.");
+      if (validation.reason === "too-long")
+        toast.error("Note is too long — trim it before posting.");
       return;
     }
     if (!ensureUnlocked(postNote)) return;
@@ -264,9 +268,7 @@ export function Noteboard({ referralId: id }: NoteboardProps) {
       return;
     }
     const list = await loadDirectory();
-    const missing = (list ?? directory).filter(
-      (r) => !r.public_key && r.user_id !== user?.id,
-    );
+    const missing = (list ?? directory).filter((r) => !r.public_key && r.user_id !== user?.id);
     if (missing.length > 0 && !recipientsTouched) {
       pendingActionRef.current = doPostNote;
       setConfirmMissingOpen(true);
@@ -334,12 +336,13 @@ export function Noteboard({ referralId: id }: NoteboardProps) {
           totalNotes={notes.length}
           onSave={async (n, body, recipients) => {
             if (n.body_ciphertext) {
-              const retry = () => (async () => {
-                const enc2 = await encryptForRecipients(body, recipients ?? new Set());
-                await editEncNote({ data: { id: n.id, ...enc2 } });
-                await refetchNotes();
-                toast.success("Note updated");
-              })();
+              const retry = () =>
+                (async () => {
+                  const enc2 = await encryptForRecipients(body, recipients ?? new Set());
+                  await editEncNote({ data: { id: n.id, ...enc2 } });
+                  await refetchNotes();
+                  toast.success("Note updated");
+                })();
               if (!ensureUnlocked(() => retry())) return;
               if (!recipients || recipients.size === 0) {
                 toast.error("Pick at least one recipient before saving.");
