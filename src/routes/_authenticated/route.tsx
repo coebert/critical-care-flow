@@ -130,18 +130,18 @@ function AuthedShell() {
         </div>
       </div>
       <nav className="flex-1 px-2 py-3 space-y-1 text-sm">
-        <NavItem to="/" icon={<ListChecks className="w-4 h-4" />} collapsed={collapsed}>Referrals</NavItem>
-        <NavItem to="/referrals/new" icon={<Plus className="w-4 h-4" />} collapsed={collapsed}>New referral</NavItem>
-        <NavItem to="/postop-bookings" icon={<CalendarClock className="w-4 h-4" />} collapsed={collapsed}>Post-op bookings</NavItem>
+        <NavItem to="/" icon={<ListChecks className="w-4 h-4" />} collapsed={collapsed} label="Referrals" />
+        <NavItem to="/referrals/new" icon={<Plus className="w-4 h-4" />} collapsed={collapsed} label="New referral" />
+        <NavItem to="/postop-bookings" icon={<CalendarClock className="w-4 h-4" />} collapsed={collapsed} label="Post-op bookings" />
         {isAdmin && (
-          <NavItem to="/analytics" icon={<BarChart3 className="w-4 h-4" />} collapsed={collapsed}>Analytics</NavItem>
+          <NavItem to="/analytics" icon={<BarChart3 className="w-4 h-4" />} collapsed={collapsed} label="Analytics" />
         )}
-        <NavItem to="/inbox" icon={<Inbox className="w-4 h-4" />} collapsed={collapsed}>Inbox</NavItem>
-        <NavItem to="/notifications" icon={<Bell className="w-4 h-4" />} collapsed={collapsed}>Notifications</NavItem>
-        <NavItem to="/push-test" icon={<BellRing className="w-4 h-4" />} collapsed={collapsed}>Push test</NavItem>
-        <NavItem to="/profile" icon={<UserCircle className="w-4 h-4" />} collapsed={collapsed}>Profile</NavItem>
+        <NavItem to="/inbox" icon={<Inbox className="w-4 h-4" />} collapsed={collapsed} label="Inbox" />
+        <NavItem to="/notifications" icon={<Bell className="w-4 h-4" />} collapsed={collapsed} label="Notifications" />
+        <NavItem to="/push-test" icon={<BellRing className="w-4 h-4" />} collapsed={collapsed} label="Push test" />
+        <NavItem to="/profile" icon={<UserCircle className="w-4 h-4" />} collapsed={collapsed} label="Profile" />
         {isAdmin && (
-          <NavItem to="/admin" icon={<Shield className="w-4 h-4" />} collapsed={collapsed}>Admin</NavItem>
+          <NavItem to="/admin" icon={<Shield className="w-4 h-4" />} collapsed={collapsed} label="Admin" />
         )}
       </nav>
       <div className="p-3 border-t text-xs space-y-2">
@@ -236,7 +236,17 @@ function AuthedShell() {
   );
 }
 
-function NavItem({ to, icon, children, collapsed }: { to: string; icon: React.ReactNode; children: React.ReactNode; collapsed?: boolean }) {
+function NavItem({
+  to,
+  icon,
+  label,
+  collapsed,
+}: {
+  to: string;
+  icon: React.ReactNode;
+  label: string;
+  collapsed?: boolean;
+}) {
   return (
     <Link
       to={to}
@@ -247,11 +257,11 @@ function NavItem({ to, icon, children, collapsed }: { to: string; icon: React.Re
       // TanStack Router's default prefix match can activate a link for any
       // descendant path that begins with `to`.
       activeOptions={{ exact: true }}
-      title={collapsed ? String(children) : undefined}
-      aria-label={collapsed ? String(children) : undefined}
+      title={collapsed ? label : undefined}
+      aria-label={collapsed ? label : undefined}
     >
       {icon}
-      {!collapsed && <span className="truncate">{children}</span>}
+      {!collapsed && <span className="truncate">{label}</span>}
     </Link>
   );
 }
