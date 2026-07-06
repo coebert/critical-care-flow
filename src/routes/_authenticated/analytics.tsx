@@ -192,6 +192,41 @@ function AnalyticsPage() {
 
   const bySpecialtyTop = useMemo(() => bySpecialty.slice(0, 10), [bySpecialty]);
 
+  // Pediatric analytics — patients aged 16 and under.
+  const pediatricFiltered = useMemo(
+    () => filtered.filter((r) => typeof r.age === "number" && r.age <= 16),
+    [filtered]
+  );
+
+  const pediatricPerDay = useMemo(() => {
+    const map = new Map<string, number>(dayKeys.map((k) => [k, 0]));
+    pediatricFiltered.forEach((r) => {
+      const k = format(startOfDay(new Date(r.referral_received_at)), "yyyy-MM-dd");
+      if (map.has(k)) map.set(k, (map.get(k) ?? 0) + 1);
+    });
+    return Array.from(map.entries()).map(([date, count]) => ({
+      key: date,
+      date: format(new Date(date), "dd MMM"),
+      count,
+    }));
+  }, [pediatricFiltered, dayKeys]);
+
+  const pediatricBySpecialty = useMemo(() => {
+    const map = new Map<string, number>();
+    pediatricFiltered.forEach((r) => {
+      const k = r.referring_specialty || "Unknown";
+      map.set(k, (map.get(k) ?? 0) + 1);
+    });
+    return Array.from(map.entries())
+      .map(([specialty, count]) => ({ specialty, count }))
+      .sort((a, b) => b.count - a.count)
+      .slice(0, 10);
+  }, [pediatricFiltered]);
+
+  const pediatricPct = filtered.length
+    ? (pediatricFiltered.length / filtered.length) * 100
+    : 0;
+
   const bmiBySpecialtyKey = useMemo(() => {
     const map = new Map<string, { sum: number; n: number }>();
     postopBmi.forEach((b) => {
