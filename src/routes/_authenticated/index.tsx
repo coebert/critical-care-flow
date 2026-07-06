@@ -1,6 +1,7 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useEffect, useState, useMemo, useCallback } from "react";
 import { useServerFn } from "@tanstack/react-start";
+import { queryOptions, useQueryClient, useSuspenseQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -14,6 +15,19 @@ import { ADMISSION_URGENCY_LABELS, ADMISSION_URGENCY_BADGE, ADMISSION_URGENCY_OP
 import { toast } from "sonner";
 
 type Referral = Tables<"referrals"> & DecryptedReferral;
+
+// Cache key for the live referrals list. Kept as a stable tuple so the
+// realtime subscription can invalidate it without importing the options.
+export const REFERRALS_LIST_QUERY_KEY = ["referrals", "list"] as const;
+
+const referralsListQueryOptions = queryOptions({
+  queryKey: REFERRALS_LIST_QUERY_KEY,
+  // Server fn invocations work identically from loader and component.
+  queryFn: () => listReferralsForList(),
+  // Realtime drives invalidation; a small staleTime dedupes bursts.
+  staleTime: 5_000,
+});
+
 
 
 function formatElapsed(ms: number): string {
@@ -72,6 +86,20 @@ function ReferralTimer({ r }: { r: Referral }) {
 }
 
 
+function ReferralsListPending() {
+  return (
+    <div className="p-6 text-sm text-muted-foreground">Loading referrals…</div>
+  );
+}
+
+function ReferralsListError({ error }: { error: Error }) {
+  return (
+    <div className="p-6 text-sm text-destructive" role="alert">
+      Failed to load referrals: {error.message}
+    </div>
+  );
+}
+
 export const Route = createFileRoute("/_authenticated/")({
   head: () => ({
     meta: [
@@ -84,8 +112,16 @@ export const Route = createFileRoute("/_authenticated/")({
     from: typeof search.from === "string" ? search.from : undefined, // yyyy-MM-dd inclusive
     to: typeof search.to === "string" ? search.to : undefined,       // yyyy-MM-dd inclusive
   }),
+  // Prime the referrals list cache before the component mounts. The parent
+  // `_authenticated` layout is `ssr: false`, so this runs client-side after
+  // the auth gate — bearer middleware is attached and the fetch is authorised.
+  loader: ({ context }) =>
+    context.queryClient.ensureQueryData(referralsListQueryOptions),
+  pendingComponent: ReferralsListPending,
+  errorComponent: ReferralsListError,
   component: ReferralsList,
 });
+
 
 const statusStyles: Record<string, string> = {
   pending: "bg-warning/15 text-warning-foreground border-warning/30",
@@ -104,8 +140,15 @@ const rowBgStyles: Record<string, string> = {
 function ReferralsList() {
   const navigate = useNavigate();
   const search = Route.useSearch();
-  const [rows, setRows] = useState<Referral[]>([]);
-  const [loading, setLoading] = useState(true);
+  // Data is primed by the route loader and read via useSuspenseQuery, so
+  // there's no local "loading" state on initial render — the suspense
+  // boundary shows `pendingComponent` until data resolves. Background
+  // refetches (from realtime invalidation) are silent by design.
+  const { data: rowsData } = useSuspenseQuery(referralsListQueryOptions);
+  const rows = rowsData as Referral[];
+  const loading = false;
+  const queryClient = useQueryClient();
+
   const [hospSearch, setHospSearch] = useState("");
   const [q, setQ] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("all");
@@ -158,43 +201,22 @@ function ReferralsList() {
     }
   };
 
-  const fetchList = useServerFn(listReferralsForList);
-
+  // Realtime payloads contain encrypted fields, so we can't apply them
+  // in-place. Use them purely as an invalidation signal — TanStack Query
+  // will refetch (deduped by `staleTime` on the options) and swap the data.
   useEffect(() => {
-    let cancelled = false;
-    let pending = false;
-    let queued = false;
-
-    const load = async () => {
-      if (pending) { queued = true; return; }
-      pending = true;
-      try {
-        const data = await fetchList();
-        if (!cancelled) setRows((data ?? []) as Referral[]);
-      } catch {
-        // leave existing rows in place on transient failure
-      } finally {
-        if (!cancelled) setLoading(false);
-        pending = false;
-        if (queued) { queued = false; load(); }
-      }
-    };
-
-    load();
-
-    // Realtime payloads contain encrypted fields, so use them only as a
-    // signal to refetch the decrypted list from the server.
     const ch = supabase
       .channel("referrals-list")
       .on("postgres_changes", { event: "*", schema: "public", table: "referrals" }, () => {
-        load();
+        queryClient.invalidateQueries({ queryKey: REFERRALS_LIST_QUERY_KEY });
       })
       .subscribe();
     return () => {
-      cancelled = true;
       supabase.removeChannel(ch);
     };
-  }, [fetchList]);
+  }, [queryClient]);
+
+
 
 
   // Resolve clinician names for the "Taken by" column.
