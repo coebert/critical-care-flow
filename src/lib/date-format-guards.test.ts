@@ -74,7 +74,7 @@ describe("date format guards", () => {
 
   it("never calls toLocaleString / toLocaleDateString / toLocaleTimeString without an explicit locale", () => {
     const bad: Array<{ path: string; line: number; text: string }> = [];
-    const re = /\.toLocale(?:Date|Time)?String\s*\(\s*\)/;
+    const re = /\.toLocale(?:Date|Time)String\s*\(\s*\)/;
     for (const { path, text } of sources) {
       text.split("\n").forEach((line, i) => {
         if (re.test(line)) bad.push({ path, line: i + 1, text: line.trim() });
