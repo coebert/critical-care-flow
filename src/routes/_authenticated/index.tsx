@@ -266,6 +266,9 @@ function ReferralsList() {
       if (urgencyFilter !== "all" && r.admission_urgency !== urgencyFilter) return false;
       if (locFilter !== "all" && r.current_ward !== locFilter) return false;
       if (specialtyNeedle && (r.referring_specialty ?? "").trim().toLowerCase() !== specialtyNeedle) return false;
+      if (pediatricFilter === "pediatric") {
+        if (r.age === null || r.age > 16) return false;
+      }
       if (fromTs !== null) {
         const t = new Date(r.referral_received_at).getTime();
         if (t < fromTs) return false;
