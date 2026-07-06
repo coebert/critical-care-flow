@@ -50,7 +50,7 @@ export function NoteRecipientChipRow({
             : "deselected";
         const styles = {
           selected:
-            "border-emerald-500/40 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 hover:bg-emerald-500/20",
+            "border-success/40 bg-success/10 text-success-text hover:bg-success/20",
           deselected:
             "border-border bg-background text-muted-foreground hover:bg-accent",
           blocked:
@@ -71,19 +71,21 @@ export function NoteRecipientChipRow({
             disabled={!hasKey}
             onClick={() => { if (hasKey) onToggle(r.user_id); }}
             title={title}
+            aria-label={title}
+            aria-pressed={hasKey ? isSelected : undefined}
             className={cn(
               "relative inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-xs transition-colors",
               styles,
-              isNew && "ring-2 ring-sky-400 ring-offset-1 ring-offset-background",
+              isNew && "ring-2 ring-info ring-offset-1 ring-offset-background",
             )}
           >
-            <Icon className="w-3 h-3" />
+            <Icon className="w-3 h-3" aria-hidden="true" />
             <span className="max-w-[9rem] truncate">
               {r.full_name}
               {isMe && <span className="ml-1 opacity-70">(you)</span>}
             </span>
             {isNew && (
-              <span className="ml-1 rounded bg-sky-500/20 px-1 text-[9px] font-semibold uppercase tracking-wide text-sky-700 dark:text-sky-300">
+              <span className="ml-1 rounded bg-info/20 px-1 text-[9px] font-semibold uppercase tracking-wide text-info-text">
                 New
               </span>
             )}
