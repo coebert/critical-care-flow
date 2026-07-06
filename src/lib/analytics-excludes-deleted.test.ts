@@ -32,12 +32,16 @@ describe("analytics endpoints exclude soft-deleted rows", () => {
     const body = handlerBody("getReferralsAnalytics");
     expect(body).toMatch(/\.from\(\s*["']referrals["']\s*\)/);
     expect(body).toMatch(/\.is\(\s*["']deleted_at["']\s*,\s*null\s*\)/);
+    // Fallback guard: reject rows with a deleted_by attribution even when
+    // deleted_at is missing.
+    expect(body).toMatch(/\.is\(\s*["']deleted_by["']\s*,\s*null\s*\)/);
   });
 
   it("getPostopAnalytics filters deleted_at IS NULL on postop_bookings", () => {
     const body = handlerBody("getPostopAnalytics");
     expect(body).toMatch(/\.from\(\s*["']postop_bookings["']\s*\)/);
     expect(body).toMatch(/\.is\(\s*["']deleted_at["']\s*,\s*null\s*\)/);
+    expect(body).toMatch(/\.is\(\s*["']deleted_by["']\s*,\s*null\s*\)/);
   });
 });
 
