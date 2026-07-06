@@ -193,7 +193,7 @@ export function ReferralsRows({ rows, loading, timerSort, onToggleTimerSort }: P
         {rows.map((r) => (
           <div
             key={r.id}
-            className={`border rounded-lg p-4 cursor-pointer active:scale-[0.99] transition-transform ${rowBgStyles[r.status] ?? "bg-card"}`}
+            className={`border rounded-lg p-4 cursor-pointer active:scale-[0.99] transition-[transform,colors,background-color] duration-150 hover:bg-muted/30 ${rowBgStyles[r.status] ?? "bg-card"}`}
             role="link"
             tabIndex={0}
             onClick={() => navigate({ to: "/referrals/$id", params: { id: r.id } })}
