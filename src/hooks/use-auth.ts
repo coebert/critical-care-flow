@@ -33,11 +33,19 @@ export function useAuth(): AuthState {
 }
 
 export function useRole(role: "admin" | "clinician") {
-  const { user } = useAuth();
+  const { user, loading: authLoading } = useAuth();
   const [hasRole, setHasRole] = useState<boolean>(false);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    // Wait for auth to resolve before deciding — otherwise a freshly
+    // mounted consumer briefly sees user=null and would incorrectly
+    // conclude the user has no role (triggering guards like AdminOnly
+    // to redirect before the session hydrates).
+    if (authLoading) {
+      setLoading(true);
+      return;
+    }
     if (!user) {
       setHasRole(false);
       setLoading(false);
@@ -54,7 +62,7 @@ export function useRole(role: "admin" | "clinician") {
         setHasRole(!!data);
         setLoading(false);
       });
-  }, [user, role]);
+  }, [user, role, authLoading]);
 
   return { hasRole, loading };
 }
