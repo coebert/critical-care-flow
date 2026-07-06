@@ -15,6 +15,42 @@ export function isPasskeySupported(): boolean {
   return typeof window !== "undefined" && browserSupportsWebAuthn();
 }
 
+/**
+ * WebAuthn is gated by the `publickey-credentials-create` / `-get`
+ * Permissions Policy. In a cross-origin iframe (e.g. the Lovable preview
+ * frame) the parent must delegate that policy or the browser rejects
+ * navigator.credentials.create() immediately with NotAllowedError — with
+ * no user prompt shown. Detect that up-front so we can surface a useful
+ * message instead of "setup cancelled".
+ */
+export function isInCrossOriginIframe(): boolean {
+  if (typeof window === "undefined") return false;
+  try {
+    return window.self !== window.top;
+  } catch {
+    return true;
+  }
+}
+
+export function passkeyCreateAllowed(): boolean {
+  if (typeof document === "undefined") return true;
+  const doc = document as unknown as {
+    featurePolicy?: { allowsFeature: (name: string) => boolean };
+    permissionsPolicy?: { allowsFeature: (name: string) => boolean };
+  };
+  const fp = doc.featurePolicy ?? doc.permissionsPolicy;
+  if (fp && typeof fp.allowsFeature === "function") {
+    try {
+      return fp.allowsFeature("publickey-credentials-create");
+    } catch {
+      /* fall through */
+    }
+  }
+  return !isInCrossOriginIframe();
+}
+
+export const PASSKEY_BLOCKED_BY_FRAME = "PASSKEY_BLOCKED_BY_FRAME";
+
 export async function isPlatformAuthenticatorAvailable(): Promise<boolean> {
   if (!isPasskeySupported()) return false;
   try {
