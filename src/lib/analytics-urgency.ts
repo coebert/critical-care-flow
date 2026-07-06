@@ -73,7 +73,7 @@ export function aggregateUrgencyPerDay(
     }
   });
   return Array.from(buckets.entries()).map(([date, vals]) => ({
-    date: format(new Date(date), "dd MMM"),
+    date: format(new Date(date), "dd/MM/yyyy"),
     ...vals,
   }));
 }
