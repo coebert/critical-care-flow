@@ -437,6 +437,7 @@ function ReferralDetail() {
         referral_received_at: ref.referral_received_at,
         first_seen_at: ref.first_seen_at, decision_at: ref.decision_at,
         arrived_on_unit_at: ref.arrived_on_unit_at,
+        is_test: (ref as any).is_test ?? false,
       };
       await update({ data: { id: ref.id, patch } });
       toast.success("Saved");
