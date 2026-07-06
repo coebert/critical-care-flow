@@ -72,8 +72,13 @@ export function useRole(role: "admin" | "clinician") {
     // Subscribe to role changes for this user so revocations/grants take
     // effect immediately without waiting for the next identity transition.
     // The RLS "read own roles" policy makes this scoped filter safe.
+    // Use a per-instance nonce so multiple hook consumers on the same page
+    // (e.g. the sidebar plus a route component) don't collide on the same
+    // channel name — supabase-js caches by name and would then throw
+    // "cannot add `postgres_changes` callbacks after `subscribe()`".
+    const channelKey = `user-roles-${user.id}-${Math.random().toString(36).slice(2, 10)}`;
     const channel = supabase
-      .channel(`user-roles-${user.id}`)
+      .channel(channelKey)
       .on(
         "postgres_changes",
         {
