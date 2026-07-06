@@ -480,12 +480,75 @@ function AnalyticsPage() {
         </div>
       </div>
 
-      <div className="grid md:grid-cols-4 gap-4 mb-6">
+      <div className="grid md:grid-cols-3 lg:grid-cols-5 gap-4 mb-6">
         <Kpi label="Total referrals" value={filtered.length.toString()} />
         <Kpi label="Mean / 24h" value={meanPer24h.toFixed(1)} />
         <Kpi label="Mean age (yrs)" value={meanAge ? meanAge.toFixed(1) : "—"} />
         <Kpi label="Mean time-to-first-seen" value={meanTimeToSeen ? `${Math.round(meanTimeToSeen)} min` : "—"} />
+        <Kpi
+          label="Pediatric (≤16)"
+          value={`${pediatricFiltered.length}${filtered.length ? ` · ${pediatricPct.toFixed(0)}%` : ""}`}
+        />
       </div>
+
+      <Card className="p-5 mb-6">
+        <div className="flex items-baseline justify-between gap-3 mb-3 flex-wrap">
+          <div>
+            <h2 className="font-semibold">Pediatric referrals (≤16 years)</h2>
+            <p className="text-xs text-muted-foreground">
+              {pediatricFiltered.length} of {filtered.length} referrals ({pediatricPct.toFixed(1)}%) in the selected range.
+            </p>
+          </div>
+        </div>
+        <div className="grid md:grid-cols-2 gap-4">
+          <div className="h-64">
+            <p className="text-xs text-muted-foreground mb-1">Over time · click a day to open</p>
+            <ResponsiveContainer width="100%" height="100%">
+              <LineChart
+                data={pediatricPerDay}
+                style={{ cursor: "pointer" }}
+                onClick={(e: any) => {
+                  const p = e?.activePayload?.[0]?.payload;
+                  if (p?.key) openDay(p.key);
+                }}
+              >
+                <CartesianGrid strokeDasharray="3 3" opacity={0.3} />
+                <XAxis dataKey="date" fontSize={11} />
+                <YAxis allowDecimals={false} fontSize={11} />
+                <Tooltip />
+                <Line type="monotone" dataKey="count" name="Pediatric" stroke="var(--chart-4)" strokeWidth={2} dot={false} />
+              </LineChart>
+            </ResponsiveContainer>
+          </div>
+          <div className="h-64">
+            <p className="text-xs text-muted-foreground mb-1">By referring specialty · click a bar to filter</p>
+            {pediatricBySpecialty.length === 0 ? (
+              <div className="h-full flex items-center justify-center text-sm text-muted-foreground">
+                No pediatric referrals in this range.
+              </div>
+            ) : (
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart
+                  data={pediatricBySpecialty}
+                  layout="vertical"
+                  style={{ cursor: "pointer" }}
+                  onClick={(e: any) => {
+                    const p = e?.activePayload?.[0]?.payload;
+                    if (p?.specialty) openSpecialty(p.specialty);
+                  }}
+                >
+                  <CartesianGrid strokeDasharray="3 3" opacity={0.3} />
+                  <XAxis type="number" allowDecimals={false} fontSize={11} />
+                  <YAxis type="category" dataKey="specialty" width={140} fontSize={11} />
+                  <Tooltip />
+                  <Bar dataKey="count" fill="var(--chart-4)" radius={[0, 4, 4, 0]} />
+                </BarChart>
+              </ResponsiveContainer>
+            )}
+          </div>
+        </div>
+      </Card>
+
 
       <Card className="p-5 mb-6">
         <div className="flex items-baseline justify-between gap-3 mb-4 flex-wrap">
