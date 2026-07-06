@@ -338,17 +338,26 @@ function AnalyticsPage() {
     [filtered]
   );
 
-  const admittedConsultants = useMemo(() => {
+  // Build the count Map once, then reuse it for both the top-8 list and the
+  // totals. The previous version rebuilt counts with an O(n²) filter-in-map
+  // for `consultantTotals`.
+  const admittedConsultantCounts = useMemo(() => {
     const counts = new Map<string, number>();
     admittedWithConsultant.forEach((r) => {
       const name = r.accepting_consultant!.trim();
       counts.set(name, (counts.get(name) ?? 0) + 1);
     });
-    return Array.from(counts.entries())
-      .sort((a, b) => b[1] - a[1])
-      .slice(0, 8)
-      .map(([name]) => name);
+    return counts;
   }, [admittedWithConsultant]);
+
+  const admittedConsultants = useMemo(
+    () =>
+      Array.from(admittedConsultantCounts.entries())
+        .sort((a, b) => b[1] - a[1])
+        .slice(0, 8)
+        .map(([name]) => name),
+    [admittedConsultantCounts]
+  );
 
   const perDayByConsultant = useMemo(() => {
     const map = new Map<string, Record<string, number | string>>(
@@ -370,14 +379,9 @@ function AnalyticsPage() {
   const consultantTotals = useMemo(
     () =>
       admittedConsultants
-        .map((name) => ({
-          name,
-          count: admittedWithConsultant.filter(
-            (r) => r.accepting_consultant!.trim() === name
-          ).length,
-        }))
+        .map((name) => ({ name, count: admittedConsultantCounts.get(name) ?? 0 }))
         .sort((a, b) => b.count - a.count),
-    [admittedConsultants, admittedWithConsultant]
+    [admittedConsultants, admittedConsultantCounts]
   );
 
   const minutesSamples = (sel: (r: Referral) => [string | null, string | null]) =>
