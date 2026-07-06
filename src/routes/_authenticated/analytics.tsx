@@ -504,7 +504,18 @@ function AnalyticsPage() {
               {pediatricFiltered.length} of {filtered.length} referrals ({pediatricPct.toFixed(1)}%) in the selected range.
             </p>
           </div>
+          {missingAgeCount > 0 && (
+            <Badge
+              variant="outline"
+              title="These referrals have no recorded age and are excluded from pediatric counts."
+              className="border-amber-500/60 text-amber-800 dark:text-amber-200 bg-amber-100/60 dark:bg-amber-900/30"
+            >
+              <TriangleAlert className="w-3 h-3 mr-1" />
+              {missingAgeCount} missing age — not counted
+            </Badge>
+          )}
         </div>
+
         <div className="grid md:grid-cols-2 gap-4">
           <div className="h-64">
             <p className="text-xs text-muted-foreground mb-1">Over time · click a day to open</p>
