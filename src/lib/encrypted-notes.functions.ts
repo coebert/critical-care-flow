@@ -55,6 +55,55 @@ const wrappedKeySchema = z.object({
   wrapped_key: b64,
 });
 
+/**
+ * Server-side re-check of recipient coverage. The client caches the
+ * public-key directory; between that cache and the server insert, teammates
+ * may have enrolled (silently excluded) or lost keys (silently unreadable).
+ * Both `addEncryptedNote` and `updateEncryptedNote` must call this so an
+ * edit can't drop colleagues either.
+ */
+async function assertRecipientCoverage(params: {
+  authorId: string;
+  requestedRecipientIds: string[];
+  allowReducedRecipients: boolean;
+}) {
+  const admin = await getAdmin();
+  const [{ data: clinicianRows }, { data: keyRows }] = await Promise.all([
+    admin.from("user_roles").select("user_id").in("role", ["admin", "clinician"]),
+    admin.from("user_public_keys").select("user_id"),
+  ]);
+  const { evaluateRecipientCoverage } = await import("./e2e-recipient-coverage");
+  const verdict = evaluateRecipientCoverage({
+    authorId: params.authorId,
+    clinicianIds: (clinicianRows ?? []).map((r: any) => r.user_id as string),
+    enrolledIds: (keyRows ?? []).map((r: any) => r.user_id as string),
+    requestedRecipientIds: params.requestedRecipientIds,
+    allowReducedRecipients: params.allowReducedRecipients,
+  });
+  if (verdict.ok) return;
+
+  const allIds = [
+    ...verdict.missingNoKey,
+    ...verdict.enrolledButExcluded,
+    ...verdict.strayRecipients,
+  ];
+  const { data: profs } = allIds.length
+    ? await admin.from("profiles").select("id, full_name").in("id", allIds)
+    : { data: [] as Array<{ id: string; full_name: string }> };
+  const nameFor = new Map<string, string>(
+    (profs ?? []).map((p: any) => [p.id, p.full_name]),
+  );
+  const decorate = (ids: string[]) =>
+    ids.map((id) => ({ user_id: id, full_name: nameFor.get(id) ?? "Unknown teammate" }));
+  const payload = {
+    code: verdict.reason,
+    missing_no_key: decorate(verdict.missingNoKey),
+    enrolled_but_excluded: decorate(verdict.enrolledButExcluded),
+    stray_recipients: decorate(verdict.strayRecipients),
+  };
+  throw new Error(`RECIPIENT_COVERAGE_CHANGED::${JSON.stringify(payload)}`);
+}
+
 export const addEncryptedNote = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((d: unknown) =>
