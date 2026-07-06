@@ -781,8 +781,8 @@ function ReferralsList() {
               <div className="col-span-2">
                 <span className="text-xs text-muted-foreground block">Taken by</span>
                 <span className="font-medium">
-                  {r.created_by && clinicianNames[r.created_by]
-                    ? clinicianNames[r.created_by]
+                  {r.creator_name
+                    ? r.creator_name
                     : "—"}
                 </span>
               </div>
