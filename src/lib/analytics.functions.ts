@@ -44,6 +44,9 @@ export const getReferralsAnalytics = createServerFn({ method: "GET" })
         // because of a client bug or historic data) must still be filtered.
         .is("deleted_at", null)
         .is("deleted_by", null)
+        // Exclude referrals explicitly flagged as test/demo entries so they
+        // don't skew clinical analytics.
+        .eq("is_test", false)
         .gte("referral_received_at", data.from)
         .lte("referral_received_at", data.to)
         .limit(5000);
