@@ -150,12 +150,11 @@ function ReferralDetail() {
     }
   }, [highlight, ref?.status]);
 
-  // Author names are batch-fetched inside `loadNotes` in a single query
-  // over all note author ids; no per-author fetch on realtime updates —
-  // any new note triggers a refetch that re-batches names too.
+  // Author names are batch-fetched inside the decrypt effect in a single
+  // query over all note author ids; no per-author fetch on realtime
+  // updates — any note change invalidates the notes query and re-batches.
 
   const fetchDetail = useServerFn(getReferralDetail);
-  const fetchNotes = useServerFn(listEncryptedNotes);
   const fetchPriors = useServerFn(findReferralsByHospitalNumber);
   const fetchKeyMaterial = useServerFn(getMyPrivateKeyMaterial);
   const fetchKeyDir = useServerFn(getPublicKeyDirectory);
