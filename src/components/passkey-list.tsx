@@ -13,6 +13,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { Fingerprint, Loader2, Plus, Trash2 } from "lucide-react";
+import { format } from "date-fns";
 import { toast } from "sonner";
 import { listMyPasskeys, deleteMyPasskey } from "@/lib/webauthn.functions";
 import { isPasskeySupported, registerPasskey, PASSKEY_BLOCKED_BY_FRAME } from "@/lib/passkeys";
