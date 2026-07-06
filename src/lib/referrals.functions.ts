@@ -348,6 +348,13 @@ export const updateReferral = createServerFn({ method: "POST" })
 // ciphertext payloads and should be used only as a refetch trigger.
 // ---------------------------------------------------------------------------
 
+// Cap for the live-referrals list. The dashboard is realtime-driven (any
+// insert/update/delete triggers a full refetch), which rules out cursor-style
+// pagination without redesigning the sync model. In real use the number of
+// non-deleted referrals in flight sits well under this cap; we log a warning
+// if we ever hit it so we know when to migrate to a paged/windowed feed.
+const REFERRALS_LIST_HARD_CAP = 500;
+
 export const listReferralsForList = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
   .handler(async ({ context }): Promise<DecryptedReferral[]> => {
@@ -357,8 +364,14 @@ export const listReferralsForList = createServerFn({ method: "GET" })
       .select("*")
       .is("deleted_at", null)
       .order("referral_received_at", { ascending: false })
-      .limit(500);
+      .limit(REFERRALS_LIST_HARD_CAP);
     if (error) throw safeError("referrals.list", error, "Failed to load referrals.");
+    if ((data?.length ?? 0) >= REFERRALS_LIST_HARD_CAP) {
+      console.warn(
+        `[referrals.list] hit hard cap of ${REFERRALS_LIST_HARD_CAP} live rows — ` +
+          `results are truncated. Add pagination before the active queue can exceed this.`,
+      );
+    }
     return (data ?? []).map((r) => decryptReferralRow(r as any));
   });
 
