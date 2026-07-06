@@ -88,7 +88,7 @@ export const startPasskeyRegistration = createServerFn({ method: "POST" })
       transports: (c.transports ?? []) as AuthenticatorTransport[],
     }));
 
-    const options = await generateRegistrationOptions({
+    const options = await (await loadWebauthnServer()).generateRegistrationOptions({
       rpName: RP_NAME,
       rpID,
       userID: new TextEncoder().encode(context.userId),
@@ -142,7 +142,7 @@ export const verifyPasskeyRegistration = createServerFn({ method: "POST" })
       throw new Error("Registration challenge expired — please try again");
     }
 
-    const verification = await verifyRegistrationResponse({
+    const verification = await (await loadWebauthnServer()).verifyRegistrationResponse({
       response: data.response,
       expectedChallenge: challengeRow.challenge,
       expectedOrigin: origin,
@@ -217,7 +217,7 @@ export const startPasskeyAuthentication = createServerFn({ method: "POST" })
       };
     }
 
-    const options = await generateAuthenticationOptions({
+    const options = await (await loadWebauthnServer()).generateAuthenticationOptions({
       rpID,
       userVerification: "required",
       allowCredentials,
@@ -313,7 +313,7 @@ export const verifyPasskeyAuthentication = createServerFn({ method: "POST" })
         credRow.public_key as unknown as string,
       );
 
-      const verification = await verifyAuthenticationResponse({
+      const verification = await (await loadWebauthnServer()).verifyAuthenticationResponse({
         response: data.response,
         expectedChallenge: challengeRow.challenge,
         expectedOrigin: origin,
