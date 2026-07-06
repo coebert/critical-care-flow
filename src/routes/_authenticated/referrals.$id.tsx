@@ -643,7 +643,7 @@ function ReferralDetail() {
         {ref.hospital_number ?? "Referral"} · {ref.age ?? "?"}/{ref.sex ?? "?"}
       </h1>
       <p className="text-sm text-muted-foreground mb-2">
-        Received {format(new Date(ref.referral_received_at), "PPpp")}
+        Received {format(new Date(ref.referral_received_at), "dd/MM/yyyy, HH:mm:ss")}
       </p>
       <div className="flex gap-2 mb-4 md:hidden">
         <Button
@@ -734,7 +734,7 @@ function ReferralDetail() {
                   <div key={p.id} className="border rounded-md p-3 bg-destructive/5">
                     <div className="flex items-center justify-between gap-2 mb-2 flex-wrap">
                       <div className="text-sm font-medium">
-                        Declined {when ? format(new Date(when), "PPp") : "date unknown"}
+                        Declined {when ? format(new Date(when), "dd/MM/yyyy, HH:mm") : "date unknown"}
                         {p.referring_specialty ? ` · ${p.referring_specialty}` : ""}
                       </div>
                       <Link
@@ -1447,10 +1447,10 @@ function NoteItem({
           {authorName}
           <E2EBadge status={note._e2eStatus} />
         </span>
-        <span className="text-[11px] text-muted-foreground" title={format(new Date(note.created_at), "PPpp")}>
-          {format(new Date(note.created_at), "d MMM yyyy, HH:mm")} · {formatDistanceToNow(new Date(note.created_at), { addSuffix: true })}
+        <span className="text-[11px] text-muted-foreground" title={format(new Date(note.created_at), "dd/MM/yyyy, HH:mm:ss")}>
+          {format(new Date(note.created_at), "dd/MM/yyyy HH:mm")} · {formatDistanceToNow(new Date(note.created_at), { addSuffix: true })}
           {edited && (
-            <span className="ml-1 italic" title={`Edited ${format(new Date(edited), "PPpp")}`}>(edited)</span>
+            <span className="ml-1 italic" title={`Edited ${format(new Date(edited), "dd/MM/yyyy, HH:mm:ss")}`}>(edited)</span>
           )}
         </span>
       </div>
@@ -1715,7 +1715,7 @@ function NoteHistoryButton({ noteId }: { noteId: string }) {
               <div className="flex items-baseline justify-between gap-3 mb-1">
                 <span className="text-xs font-medium capitalize">{e.action} · {e.user_name}</span>
                 <span className="text-[11px] text-muted-foreground">
-                  {format(new Date(e.created_at), "d MMM yyyy, HH:mm:ss")}
+                  {format(new Date(e.created_at), "dd/MM/yyyy HH:mm:ss")}
                 </span>
               </div>
               {e.action === "update" && e.diff?.before?.body !== undefined && (
@@ -1776,7 +1776,7 @@ function formatAuditValue(field: string, value: string | number | boolean | null
   if (typeof value === "boolean") return value ? "Yes" : "No";
   if (DATE_FIELDS.has(field) && typeof value === "string") {
     const d = new Date(value);
-    if (!isNaN(d.getTime())) return format(d, "dd MMM yyyy HH:mm");
+    if (!isNaN(d.getTime())) return format(d, "dd/MM/yyyy HH:mm");
   }
   return String(value);
 }
@@ -1801,9 +1801,9 @@ function AuditEntry({ entry }: { entry: ReferralAuditEntry }) {
         </div>
         <span
           className="text-xs text-muted-foreground"
-          title={format(when, "dd MMM yyyy HH:mm:ss")}
+          title={format(when, "dd/MM/yyyy HH:mm:ss")}
         >
-          {format(when, "dd MMM yyyy HH:mm")} · {formatDistanceToNow(when, { addSuffix: true })}
+          {format(when, "dd/MM/yyyy HH:mm")} · {formatDistanceToNow(when, { addSuffix: true })}
         </span>
       </div>
 

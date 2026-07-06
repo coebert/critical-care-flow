@@ -213,11 +213,11 @@ function PostopBookingsList() {
                     <div className="flex items-center gap-1 text-muted-foreground justify-end">
                       <CalendarClock className="w-3.5 h-3.5" />
                       {b.proposed_surgery_date
-                        ? format(parseISO(b.proposed_surgery_date), "PP")
+                        ? format(parseISO(b.proposed_surgery_date), "dd/MM/yyyy")
                         : "Date TBC"}
                     </div>
                     <div className="text-xs text-muted-foreground">
-                      Booked {format(parseISO(b.created_at), "PP")}
+                      Booked {format(parseISO(b.created_at), "dd/MM/yyyy")}
                       {b.created_by_name ? ` by ${b.created_by_name}` : ""}
                     </div>
                   </div>

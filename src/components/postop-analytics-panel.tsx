@@ -65,7 +65,7 @@ export function PostopAnalyticsPanel() {
     });
     return Array.from(map.entries()).map(([key, count]) => ({
       key,
-      date: format(new Date(key), "dd MMM"),
+      date: format(new Date(key), "dd/MM/yyyy"),
       count,
     }));
   }, [filtered, dayKeys]);
@@ -75,7 +75,7 @@ export function PostopAnalyticsPanel() {
     const map = new Map<string, Record<string, number | string>>(
       dayKeys.map((k) => [
         k,
-        { key: k, date: format(new Date(k), "dd MMM"), ...Object.fromEntries(levels.map((l) => [LEVEL_LABELS[l], 0])) },
+        { key: k, date: format(new Date(k), "dd/MM/yyyy"), ...Object.fromEntries(levels.map((l) => [LEVEL_LABELS[l], 0])) },
       ])
     );
     filtered.forEach((b) => {
@@ -175,7 +175,7 @@ export function PostopAnalyticsPanel() {
     const rows = filtered.filter((b) => dayKeyOf(b) === key &&
       (!extraLabel || LEVEL_LABELS[b.predicted_level as string] === extraLabel));
     setDrill({
-      title: `${extraLabel ? `${extraLabel} · ` : ""}${format(new Date(key), "dd MMM yyyy")} — ${rows.length} booking${rows.length === 1 ? "" : "s"}`,
+      title: `${extraLabel ? `${extraLabel} · ` : ""}${format(new Date(key), "dd/MM/yyyy")} — ${rows.length} booking${rows.length === 1 ? "" : "s"}`,
       rows,
     });
   };
@@ -200,7 +200,7 @@ export function PostopAnalyticsPanel() {
     <div>
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-6">
         <p className="text-sm text-muted-foreground">
-          {format(from, "dd MMM yyyy")} – {format(to, "dd MMM yyyy")} · {days} day{days === 1 ? "" : "s"} · {filtered.length} bookings
+          {format(from, "dd/MM/yyyy")} – {format(to, "dd/MM/yyyy")} · {days} day{days === 1 ? "" : "s"} · {filtered.length} bookings
         </p>
         <div className="flex gap-2 flex-wrap items-center">
           {[30, 90, 180, 365].map((d) => (
@@ -225,8 +225,8 @@ export function PostopAnalyticsPanel() {
                 <CalendarIcon className="mr-2 h-4 w-4" />
                 {range.from
                   ? range.to
-                    ? `${format(range.from, "dd MMM yy")} – ${format(range.to, "dd MMM yy")}`
-                    : format(range.from, "dd MMM yy")
+                    ? `${format(range.from, "dd/MM/yyyy")} – ${format(range.to, "dd/MM/yyyy")}`
+                    : format(range.from, "dd/MM/yyyy")
                   : "Pick a date range"}
               </Button>
             </PopoverTrigger>
@@ -449,13 +449,13 @@ export function PostopAnalyticsPanel() {
                     const h = arrivalHoursOf(b);
                     return (
                       <tr key={b.id} className="border-b last:border-0 hover:bg-muted/40">
-                        <td className="py-2 pr-3 whitespace-nowrap">{format(new Date(b.created_at), "dd MMM yy HH:mm")}</td>
+                        <td className="py-2 pr-3 whitespace-nowrap">{format(new Date(b.created_at), "dd/MM/yyyy HH:mm")}</td>
                         <td className="py-2 pr-3">{b.age ?? "—"}</td>
                         <td className="py-2 pr-3">{b.sex ?? "—"}</td>
                         <td className="py-2 pr-3">{b.bmi != null ? Number(b.bmi).toFixed(1) : "—"}</td>
                         <td className="py-2 pr-3">{LEVEL_LABELS[b.predicted_level as string] ?? "—"}</td>
                         <td className="py-2 pr-3 whitespace-nowrap">
-                          {(b as any).arrived_at ? format(new Date((b as any).arrived_at), "dd MMM yy HH:mm") : "—"}
+                          {(b as any).arrived_at ? format(new Date((b as any).arrived_at), "dd/MM/yyyy HH:mm") : "—"}
                         </td>
                         <td className="py-2 pr-3">{h != null ? fmtH(h) : "—"}</td>
                         <td className="py-2 pr-3">

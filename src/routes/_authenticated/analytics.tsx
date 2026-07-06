@@ -142,7 +142,7 @@ function AnalyticsPage() {
       const k = format(startOfDay(new Date(r.referral_received_at)), "yyyy-MM-dd");
       if (map.has(k)) map.set(k, (map.get(k) ?? 0) + 1);
     });
-    return Array.from(map.entries()).map(([date, count]) => ({ key: date, date: format(new Date(date), "dd MMM"), count }));
+    return Array.from(map.entries()).map(([date, count]) => ({ key: date, date: format(new Date(date), "dd/MM/yyyy"), count }));
   }, [filtered, dayKeys]);
 
   const combinedPerDay = useMemo(() => {
@@ -158,7 +158,7 @@ function AnalyticsPage() {
     });
     return dayKeys.map((k) => ({
       key: k,
-      date: format(new Date(k), "dd MMM"),
+      date: format(new Date(k), "dd/MM/yyyy"),
       referrals: refMap.get(k) ?? 0,
       bookings: bookMap.get(k) ?? 0,
     }));
@@ -211,7 +211,7 @@ function AnalyticsPage() {
     });
     return Array.from(map.entries()).map(([date, count]) => ({
       key: date,
-      date: format(new Date(date), "dd MMM"),
+      date: format(new Date(date), "dd/MM/yyyy"),
       count,
     }));
   }, [pediatricFiltered, dayKeys]);
@@ -314,7 +314,7 @@ function AnalyticsPage() {
     const map = new Map<string, Record<string, number | string>>(
       dayKeys.map((k) => [
         k,
-        { date: format(new Date(k), "dd MMM"), ...Object.fromEntries(admittedConsultants.map((c) => [c, 0])) },
+        { date: format(new Date(k), "dd/MM/yyyy"), ...Object.fromEntries(admittedConsultants.map((c) => [c, 0])) },
       ])
     );
     admittedWithConsultant.forEach((r) => {
@@ -385,8 +385,8 @@ function AnalyticsPage() {
       : complianceBucket === "week" ? eachWeekOfInterval({ start: from, end: to }, { weekStartsOn: 1 })
       : eachMonthOfInterval({ start: from, end: to });
     const labelFmt =
-      complianceBucket === "day" ? "dd MMM"
-      : complianceBucket === "week" ? "'W'II · dd MMM"
+      complianceBucket === "day" ? "dd/MM/yyyy"
+      : complianceBucket === "week" ? "'W'II · dd/MM/yyyy"
       : "MMM yyyy";
     type Bucket = { seen: number[]; arrival: number[] };
     const map = new Map<string, Bucket>();
@@ -445,7 +445,7 @@ function AnalyticsPage() {
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-6">
         <div className="min-w-0">
           <p className="text-sm text-muted-foreground">
-            {format(from, "dd MMM yyyy")} – {format(to, "dd MMM yyyy")} · {days} day{days === 1 ? "" : "s"} · {filtered.length} referrals
+            {format(from, "dd/MM/yyyy")} – {format(to, "dd/MM/yyyy")} · {days} day{days === 1 ? "" : "s"} · {filtered.length} referrals
           </p>
         </div>
         <div className="flex gap-2 flex-wrap items-center">
@@ -471,8 +471,8 @@ function AnalyticsPage() {
                 <CalendarIcon className="mr-2 h-4 w-4" />
                 {range.from
                   ? range.to
-                    ? `${format(range.from, "dd MMM yy")} – ${format(range.to, "dd MMM yy")}`
-                    : format(range.from, "dd MMM yy")
+                    ? `${format(range.from, "dd/MM/yyyy")} – ${format(range.to, "dd/MM/yyyy")}`
+                    : format(range.from, "dd/MM/yyyy")
                   : "Pick a date range"}
               </Button>
             </PopoverTrigger>
