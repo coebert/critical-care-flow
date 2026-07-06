@@ -98,21 +98,32 @@ function UsersPanel() {
   const list = useServerFn(listUsers);
   const setRole = useServerFn(setUserRole);
   const [users, setUsers] = useState<any[]>([]);
+  const [page, setPage] = useState(1);
+  const [hasMore, setHasMore] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const PER_PAGE = 50;
 
-  const reload = async () => {
-    setLoading(true);
+  const loadPage = async (nextPage: number, append: boolean) => {
+    const setBusy = append ? setLoadingMore : setLoading;
+    setBusy(true);
     try {
-      const data = await list({});
-      setUsers(data as any[]);
-    } finally { setLoading(false); }
+      const res = await list({ data: { page: nextPage, perPage: PER_PAGE } });
+      setUsers((cur) => (append ? [...cur, ...res.users] : res.users));
+      setHasMore(res.hasMore);
+      setPage(nextPage);
+    } finally {
+      setBusy(false);
+    }
   };
-  useEffect(() => { reload(); }, []);
+
+  useEffect(() => { void loadPage(1, false); }, []);
 
   const toggle = async (user_id: string, role: "admin" | "clinician", grant: boolean) => {
     try {
       await setRole({ data: { user_id, role, grant } });
-      await reload();
+      // Refresh from page 1 to keep counts and order consistent.
+      await loadPage(1, false);
     } catch (err: any) {
       toast.error(err.message ?? "Failed");
     }
@@ -144,6 +155,13 @@ function UsersPanel() {
             ))}
           </tbody>
         </table></div>
+      )}
+      {hasMore && !loading && (
+        <div className="mt-3 flex justify-center">
+          <Button size="sm" variant="outline" disabled={loadingMore} onClick={() => loadPage(page + 1, true)}>
+            {loadingMore ? "Loading…" : "Load more"}
+          </Button>
+        </div>
       )}
     </Card>
   );
