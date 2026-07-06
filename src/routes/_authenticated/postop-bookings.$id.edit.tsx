@@ -283,6 +283,22 @@ function EditPostopBookingPage() {
             </div>
           </Card>
 
+          <Card className="p-4 sm:p-6 space-y-2 border-amber-400/60 bg-amber-50/40 dark:bg-amber-950/20">
+            <div className="flex items-center justify-between gap-4">
+              <div>
+                <Label htmlFor="is-test" className="text-sm font-medium cursor-pointer">
+                  Test / demonstration booking
+                </Label>
+                <p className="text-xs text-muted-foreground">
+                  Mark this booking as a test entry (not a real patient). Test
+                  bookings are shown with a badge and are excluded from analytics.
+                </p>
+              </div>
+              <Switch id="is-test" checked={isTest} onCheckedChange={setIsTest} />
+            </div>
+          </Card>
+
+
           <div className="flex gap-2 justify-end">
             <Button type="button" variant="ghost" asChild disabled={saving}>
               <Link to="/postop-bookings">Cancel</Link>
