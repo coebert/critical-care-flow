@@ -120,6 +120,39 @@ export async function registerPasskey(deviceLabel?: string): Promise<void> {
 
 
 export const NO_PASSKEY_REGISTERED = "NO_PASSKEY_REGISTERED";
+export const PASSKEY_UNAUTHORIZED = "PASSKEY_UNAUTHORIZED";
+
+/**
+ * Detect an "unauthorized" WebAuthn failure — either the caller's session
+ * expired (server middleware throws a 401 Response / "Unauthorized") or the
+ * server refused a credential that doesn't belong to the current account
+ * (ownership guards in verifyPasskeyRegistration / verifyPasskeyAuthentication).
+ * The UI uses this to show a clear message AND to refresh the credential
+ * list so any locally cached row that no longer exists server-side is
+ * reconciled.
+ */
+export function isUnauthorizedPasskeyError(err: unknown): boolean {
+  if (!err) return false;
+  // TanStack server-fn middleware may surface a raw Response.
+  if (typeof Response !== "undefined" && err instanceof Response) {
+    return err.status === 401 || err.status === 403;
+  }
+  const anyErr = err as { status?: number; code?: string; message?: string; name?: string };
+  if (anyErr.status === 401 || anyErr.status === 403) return true;
+  if (anyErr.code === PASSKEY_UNAUTHORIZED) return true;
+  const msg = (anyErr.message ?? "").toLowerCase();
+  if (!msg) return false;
+  return (
+    msg.includes("unauthorized") ||
+    msg.includes("not authenticated") ||
+    msg.includes("missing authenticated user") ||
+    msg.includes("owner mismatch") ||
+    msg.includes("does not belong to this account") ||
+    msg.includes("not recognised for this account")
+  );
+}
+
+
 
 /** Sign in with a passkey for the given email. Hydrates the Supabase session. */
 export async function signInWithPasskey(email: string): Promise<void> {
