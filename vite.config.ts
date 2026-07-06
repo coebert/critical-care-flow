@@ -12,4 +12,15 @@ export default defineConfig({
     // nitro/vite builds from this
     server: { entry: "server" },
   },
+  vite: {
+    resolve: {
+      alias: {
+        // Some WebAuthn verification dependencies require tslib's CommonJS
+        // entry. In the published Worker bundle that can interop as an empty
+        // default export and crash SSR with missing decorator helpers. Force
+        // the ESM helper module so named helpers are always present.
+        tslib: "tslib/tslib.es6.mjs",
+      },
+    },
+  },
 });
