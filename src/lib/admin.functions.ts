@@ -65,7 +65,7 @@ export type ListUsersPage = {
     email: string;
     created_at: string;
     last_sign_in_at: string | null;
-    profile: any;
+    profile: Tables<"profiles"> | null;
     roles: string[];
   }>;
   page: number;
