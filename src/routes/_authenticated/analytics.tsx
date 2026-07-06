@@ -93,6 +93,7 @@ export const Route = createFileRoute("/_authenticated/analytics")({
     });
     void context.queryClient.prefetchQuery(icnarcTargetsQueryOptions);
   },
+  errorComponent: ({ error }) => <RouteErrorFallback error={error} label="Analytics" />,
   component: () => (
     <AdminOnly redirectTo="/postop-bookings">
       <AnalyticsPage />
