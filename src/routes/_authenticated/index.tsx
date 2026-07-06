@@ -1,6 +1,7 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useEffect, useState, useMemo, useCallback } from "react";
 import { useServerFn } from "@tanstack/react-start";
+import { queryOptions, useQueryClient, useSuspenseQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -14,6 +15,19 @@ import { ADMISSION_URGENCY_LABELS, ADMISSION_URGENCY_BADGE, ADMISSION_URGENCY_OP
 import { toast } from "sonner";
 
 type Referral = Tables<"referrals"> & DecryptedReferral;
+
+// Cache key for the live referrals list. Kept as a stable tuple so the
+// realtime subscription can invalidate it without importing the options.
+export const REFERRALS_LIST_QUERY_KEY = ["referrals", "list"] as const;
+
+const referralsListQueryOptions = queryOptions({
+  queryKey: REFERRALS_LIST_QUERY_KEY,
+  // Server fn invocations work identically from loader and component.
+  queryFn: () => listReferralsForList(),
+  // Realtime drives invalidation; a small staleTime dedupes bursts.
+  staleTime: 5_000,
+});
+
 
 
 function formatElapsed(ms: number): string {
