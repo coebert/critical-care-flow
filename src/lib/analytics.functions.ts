@@ -64,6 +64,16 @@ const rangeSchema = z
     message: "from must be <= to",
   });
 
+// Analytics only needs non-PHI columns. Explicitly project them so we never
+// pull ciphertext (`*_enc`) or the hospital-number hash into an analytics
+// payload — cheaper on the wire and impossible to leak downstream.
+const REFERRAL_ANALYTICS_COLUMNS =
+  "id,age,sex,current_ward,dnacpr_respect,referring_specialty," +
+  "referral_received_at,first_seen_at,decision_at,arrived_on_unit_at," +
+  "status,decline_reason,admission_urgency,consultant_to_consultant_only," +
+  "accepting_consultant,discussed_with_consultant,is_test," +
+  "deleted_at,deleted_by,created_at,created_by,updated_at";
+
 export const getReferralsAnalytics = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
   .inputValidator((d: unknown) => rangeSchema.parse(d))
@@ -72,7 +82,7 @@ export const getReferralsAnalytics = createServerFn({ method: "GET" })
     try {
       const { data: rows, error } = await context.supabase
         .from("referrals")
-        .select("*")
+        .select(REFERRAL_ANALYTICS_COLUMNS)
         // Belt-and-braces: exclude any row marked as removed via either the
         // deleted_at timestamp OR the deleted_by attribution. A partially
         // written soft-delete (e.g. deleted_by set but deleted_at missing
