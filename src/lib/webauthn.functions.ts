@@ -278,9 +278,7 @@ export const startPasskeyAuthentication = createServerFn({ method: "POST" })
   });
 
 export const verifyPasskeyAuthentication = createServerFn({ method: "POST" })
-  .inputValidator(
-    (input: { email: string; response: AuthenticationResponseJSON }) => input,
-  )
+  .inputValidator((input: unknown) => authVerifyInputSchema.parse(input))
   .handler(async ({ data }) => {
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const { rpID, origin } = getRpAndOrigin();
