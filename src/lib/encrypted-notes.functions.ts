@@ -185,6 +185,7 @@ export const updateEncryptedNote = createServerFn({ method: "POST" })
         body_nonce: b64,
         enc_version: z.number().int().min(1).max(255),
         wrapped_keys: z.array(wrappedKeySchema).min(1).max(500),
+        allow_reduced_recipients: z.boolean().optional().default(false),
       })
       .parse(d),
   )
@@ -196,6 +197,15 @@ export const updateEncryptedNote = createServerFn({ method: "POST" })
       .eq("id", data.id)
       .maybeSingle();
     if (!existing) throw new Error("Note not found");
+
+    // Same server-side coverage check as add — edits must not silently drop
+    // colleagues or exclude teammates who enrolled between the client's
+    // directory cache and this submit.
+    await assertRecipientCoverage({
+      authorId: userId,
+      requestedRecipientIds: data.wrapped_keys.map((w) => w.recipient_user_id),
+      allowReducedRecipients: !!data.allow_reduced_recipients,
+    });
 
     const { data: row, error } = await supabase
       .from("referral_notes")
