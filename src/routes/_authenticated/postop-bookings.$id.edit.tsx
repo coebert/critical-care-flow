@@ -66,6 +66,7 @@ function EditPostopBookingPage() {
   const [surgeryDate, setSurgeryDate] = useState("");
   const [arrivedAt, setArrivedAt] = useState("");
   const [specialty, setSpecialty] = useState<SurgicalSpecialty | "">("");
+  const [isTest, setIsTest] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
