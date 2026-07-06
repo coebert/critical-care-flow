@@ -3,30 +3,10 @@ import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { safeError } from "./safe-error";
 import type { Tables } from "@/integrations/supabase/types";
-
-
-/**
- * Exported for unit tests. In production `context` is provided by the
- * `requireSupabaseAuth` middleware and always carries `supabase` (RLS-
- * scoped as the caller) plus `userId`. The RPC `has_role` is a security-
- * definer function, so RLS on `user_roles` cannot mask the caller's role.
- */
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-export async function assertAdmin(context: any) {
-  const { data, error } = await context.supabase.rpc("has_role", {
-    _user_id: context.userId,
-    _role: "admin",
-  });
-  if (error) throw safeError("analytics.assertAdmin", error, "Permission check failed.");
-  if (!data) {
-    // Surfaced to the client as a 403-style "Forbidden" state.
-    throw safeError(
-      "analytics.assertAdmin",
-      new Error("forbidden"),
-      "Forbidden: analytics are restricted to administrators.",
-    );
-  }
-}
+// Re-export so existing unit tests importing `assertAdmin` from this module
+// keep working after the guard was consolidated into `auth-guards.ts`.
+export { assertAdmin } from "./auth-guards";
+import { assertAdmin } from "./auth-guards";
 
 /**
  * Runtime guard: verifies that every row returned by an analytics query has
