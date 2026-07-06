@@ -12,8 +12,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Textarea } from "@/components/ui/textarea";
 
 import { NoteItem } from "@/components/note-item";
-import { NoteRecipientPicker } from "@/components/note-recipient-picker";
-import { NoteRecipientChipRow } from "@/components/note-recipient-chip-row";
+import { NoteComposer, validateNoteBody } from "@/components/note-composer";
 import { ConfirmReducedRecipientsDialog } from "@/components/confirm-reduced-recipients-dialog";
 import { NoteMissingRecipientsAlert } from "@/components/note-missing-recipients-alert";
 import { NotePartialCoverageAlert } from "@/components/note-partial-coverage-alert";
