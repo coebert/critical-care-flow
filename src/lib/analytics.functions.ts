@@ -20,6 +20,34 @@ async function assertAdmin(context: any) {
   }
 }
 
+/**
+ * Runtime guard: verifies that every row returned by an analytics query has
+ * `is_test === false`. If any row slips through with `is_test !== false`
+ * (a query that forgot the filter, a nullable column, or a schema drift),
+ * the offending rows are logged, dropped from the result, and — in
+ * development — the request fails loudly so the regression is caught
+ * before it reaches a dashboard.
+ */
+function assertExcludesTestRows<T extends { is_test?: unknown }>(
+  label: string,
+  rows: T[],
+): T[] {
+  const leaked = rows.filter((r) => r.is_test !== false);
+  if (leaked.length > 0) {
+    console.error(
+      `[analytics] ${label}: query returned ${leaked.length} row(s) with is_test !== false — filter missing or broken`,
+      { sampleIds: leaked.slice(0, 5).map((r: any) => r?.id ?? null) },
+    );
+    if (process.env.NODE_ENV !== "production") {
+      throw new Error(
+        `analytics.${label}: ${leaked.length} row(s) leaked past the is_test=false filter`,
+      );
+    }
+    return rows.filter((r) => r.is_test === false);
+  }
+  return rows;
+}
+
 const rangeSchema = z
   .object({
     from: z.string().datetime(),
@@ -51,7 +79,7 @@ export const getReferralsAnalytics = createServerFn({ method: "GET" })
         .lte("referral_received_at", data.to)
         .limit(5000);
       if (error) throw error;
-      return rows ?? [];
+      return assertExcludesTestRows("getReferralsAnalytics", rows ?? []);
     } catch (err) {
       throw safeError("analytics.getReferralsAnalytics", err, "Could not load referrals analytics.");
     }
@@ -86,8 +114,9 @@ export const getPostopAnalytics = createServerFn({ method: "GET" })
       if (data.to) query = query.lte("created_at", data.to);
       const { data: rows, error } = await query;
       if (error) throw error;
+      const safeRows = assertExcludesTestRows("getPostopAnalytics", rows ?? []);
       const { decryptRow } = await import("./postop-bookings-crypto.server");
-      return ((rows ?? []) as Array<Record<string, any>>).map(decryptRow) as Array<Record<string, any>>;
+      return (safeRows as Array<Record<string, any>>).map(decryptRow) as Array<Record<string, any>>;
     } catch (err) {
       throw safeError("analytics.getPostopAnalytics", err, "Could not load post-op analytics.");
     }
