@@ -32,7 +32,7 @@ Owner completes in the DTAC response document.
 | --- | --- | --- |
 | DPIA | `docs/dpia.md` (Phase 2) | Pending owner input |
 | ROPA | `docs/ropa.md` (Phase 2) | Pending owner input |
-| Public privacy notice | `/privacy` route (Phase 2) | Pending |
+| Public privacy notice | `/privacy` route (Phase 2) | Complete |
 | Cookie statement | `/cookies` route (Phase 2) | Pending |
 | Data-subject rights (SAR / erasure) | `/profile` actions (Phase 2) | Pending |
 | Data retention & purge | Retention cron job (Phase 2) | Pending |
