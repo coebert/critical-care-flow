@@ -66,6 +66,9 @@ export type DecryptedReferral = Tables<"referrals"> & {
   reason_for_referral: string | null;
   /** Names of encrypted fields that failed to decrypt for this row, if any. */
   _decryption_failed_fields?: string[];
+  /** Display name of the clinician who created this referral, joined in
+   *  server-side to avoid a client-side N+1 profile lookup. */
+  creator_name?: string | null;
 };
 
 export type DecryptedReferralNote = Tables<"referral_notes"> & {
