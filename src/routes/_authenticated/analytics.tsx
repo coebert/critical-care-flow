@@ -490,6 +490,25 @@ function AnalyticsPage() {
         </div>
       </div>
 
+      <div className="flex flex-wrap gap-2 mb-4 items-center">
+        <span className="text-xs uppercase text-muted-foreground mr-1">Age group</span>
+        <Button
+          size="sm"
+          variant={pediatricFilter === "all" ? "default" : "outline"}
+          onClick={() => setPediatricFilter("all")}
+        >
+          All ages
+        </Button>
+        <Button
+          size="sm"
+          variant={pediatricFilter === "pediatric" ? "default" : "outline"}
+          onClick={() => setPediatricFilter("pediatric")}
+        >
+          <Baby className="w-4 h-4 mr-1" />
+          Pediatric (≤16)
+        </Button>
+      </div>
+
       <div className="grid md:grid-cols-3 lg:grid-cols-5 gap-4 mb-6">
         <Kpi label="Total referrals" value={filtered.length.toString()} />
         <Kpi label="Mean / 24h" value={meanPer24h.toFixed(1)} />
