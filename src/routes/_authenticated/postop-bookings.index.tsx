@@ -2,6 +2,7 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { useServerFn } from "@tanstack/react-start";
 import { listPostopBookings, deletePostopBooking, restorePostopBooking } from "@/lib/postop-bookings.functions";
+import { tzTooltip } from "@/lib/format-timestamp";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Switch } from "@/components/ui/switch";
@@ -210,13 +211,13 @@ function PostopBookingsList() {
                 </div>
                 <div className="flex items-start gap-3 shrink-0">
                   <div className="text-sm text-right">
-                    <div className="flex items-center gap-1 text-muted-foreground justify-end">
+                    <div className="flex items-center gap-1 text-muted-foreground justify-end" title={b.proposed_surgery_date ? tzTooltip(b.proposed_surgery_date) : undefined}>
                       <CalendarClock className="w-3.5 h-3.5" />
                       {b.proposed_surgery_date
                         ? format(parseISO(b.proposed_surgery_date), "dd/MM/yyyy")
                         : "Date TBC"}
                     </div>
-                    <div className="text-xs text-muted-foreground">
+                    <div className="text-xs text-muted-foreground" title={tzTooltip(b.created_at)}>
                       Booked {format(parseISO(b.created_at), "dd/MM/yyyy")}
                       {b.created_by_name ? ` by ${b.created_by_name}` : ""}
                     </div>

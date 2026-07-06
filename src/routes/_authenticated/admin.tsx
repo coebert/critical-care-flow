@@ -2,6 +2,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { useServerFn } from "@tanstack/react-start";
 import { inviteClinician, listUsers, setUserRole, getAuditLog } from "@/lib/admin.functions";
+import { tzTooltip } from "@/lib/format-timestamp";
 
 import { useRole } from "@/hooks/use-auth";
 import { Card } from "@/components/ui/card";
@@ -131,7 +132,7 @@ function UsersPanel() {
                 <td className="py-2">{u.profile?.full_name ?? "—"}</td>
                 <td>{u.email}</td>
                 <td className="space-x-1">{u.roles.map((r: string) => <Badge key={r} variant="outline" className="capitalize">{r}</Badge>)}</td>
-                <td>{u.last_sign_in_at ? format(new Date(u.last_sign_in_at), "dd/MM/yyyy HH:mm") : "—"}</td>
+                <td title={u.last_sign_in_at ? tzTooltip(u.last_sign_in_at) : undefined}>{u.last_sign_in_at ? format(new Date(u.last_sign_in_at), "dd/MM/yyyy HH:mm") : "—"}</td>
                 <td className="text-right space-x-2">
                   {u.roles.includes("admin") ? (
                     <Button size="sm" variant="outline" onClick={() => toggle(u.id, "admin", false)}>Remove admin</Button>
@@ -167,7 +168,7 @@ function AuditPanel() {
           <tbody>
             {rows.map((r) => (
               <tr key={r.id} className="border-t">
-                <td className="py-1.5 whitespace-nowrap">{format(new Date(r.created_at), "dd/MM/yyyy HH:mm:ss")}</td>
+                <td className="py-1.5 whitespace-nowrap" title={tzTooltip(r.created_at)}>{format(new Date(r.created_at), "dd/MM/yyyy HH:mm:ss")}</td>
                 <td className="capitalize">{r.action}</td>
                 <td>{r.entity}</td>
                 <td className="font-mono text-xs">{r.entity_id?.slice(0, 8) ?? "—"}</td>

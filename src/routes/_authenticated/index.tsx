@@ -8,6 +8,7 @@ import { Badge } from "@/components/ui/badge";
 import { Plus, Search, RotateCcw, Trash2, MapPin, Baby, HelpCircle } from "lucide-react";
 import type { Tables } from "@/integrations/supabase/types";
 import { format, formatDistanceToNow, parseISO } from "date-fns";
+import { tzTooltip } from "@/lib/format-timestamp";
 import { listDeletedReferrals, listReferralsForList, restoreReferral, RESTORE_WINDOW_DAYS, type DecryptedReferral } from "@/lib/referrals.functions";
 import { ADMISSION_URGENCY_LABELS, ADMISSION_URGENCY_BADGE, ADMISSION_URGENCY_OPTIONS, type AdmissionUrgency } from "@/lib/admission-urgency";
 import { toast } from "sonner";
@@ -629,7 +630,7 @@ function ReferralsList() {
                   }
                 }}
               >
-                <td className="px-3 py-2 whitespace-nowrap">
+                <td className="px-3 py-2 whitespace-nowrap" title={tzTooltip(r.referral_received_at)}>
                   {format(new Date(r.referral_received_at), "dd/MM/yyyy HH:mm")}
                 </td>
                 <td className="px-3 py-2">
@@ -714,7 +715,7 @@ function ReferralsList() {
           >
             <div className="flex flex-col gap-2 mb-2">
               <div className="flex items-center justify-between gap-2">
-                <span className="text-xs text-muted-foreground shrink-0">
+                <span className="text-xs text-muted-foreground shrink-0" title={tzTooltip(r.referral_received_at)}>
                   {format(new Date(r.referral_received_at), "dd/MM/yyyy HH:mm")}
                 </span>
                 <div className="flex items-center gap-1.5">
