@@ -220,33 +220,8 @@ function ReferralsList() {
 
 
 
-  // Resolve clinician names for the "Taken by" column.
-  useEffect(() => {
-    const missing = Array.from(
-      new Set(
-        rows
-          .map((r) => r.created_by)
-          .filter((id): id is string => !!id && !(id in clinicianNames)),
-      ),
-    );
-    if (missing.length === 0) return;
-    let cancelled = false;
-    supabase
-      .from("profiles")
-      .select("id, full_name")
-      .in("id", missing)
-      .then(({ data }) => {
-        if (cancelled || !data) return;
-        setClinicianNames((cur) => {
-          const next = { ...cur };
-          for (const p of data) next[p.id] = p.full_name ?? "";
-          return next;
-        });
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [rows, clinicianNames]);
+
+
 
   const topWards = useMemo(() => {
     const counts = new Map<string, number>();
