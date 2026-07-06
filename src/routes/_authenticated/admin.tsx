@@ -1,8 +1,9 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, redirect } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { useServerFn } from "@tanstack/react-start";
 import { inviteClinician, listUsers, setUserRole, getAuditLog } from "@/lib/admin.functions";
 import { tzTooltip } from "@/lib/format-timestamp";
+import { supabase } from "@/integrations/supabase/client";
 
 import { useRole } from "@/hooks/use-auth";
 import { Card } from "@/components/ui/card";
@@ -16,13 +17,31 @@ import { format } from "date-fns";
 
 export const Route = createFileRoute("/_authenticated/admin")({
   head: () => ({ meta: [{ title: "Admin — SDH Critical Care" }, { name: "robots", content: "noindex" }] }),
+  // Route-level defence-in-depth: gate the page before the component even
+  // mounts. `_authenticated` already ensures a signed-in user; here we also
+  // require the admin role via has_role() so a non-admin can't hit the
+  // route directly and briefly see any admin UI shell before useRole()
+  // finishes its lookup.
+  beforeLoad: async () => {
+    const { data: userRes } = await supabase.auth.getUser();
+    const uid = userRes.user?.id;
+    if (!uid) throw redirect({ to: "/auth" });
+    const { data: isAdmin } = await supabase.rpc("has_role", {
+      _user_id: uid,
+      _role: "admin",
+    });
+    if (!isAdmin) throw redirect({ to: "/" });
+  },
   component: AdminPage,
 });
 
 function AdminPage() {
+  // Route beforeLoad has already asserted admin; useRole here is only used
+  // by nested widgets that also want to render conditionally.
   const { hasRole, loading } = useRole("admin");
   if (loading) return <div className="p-6 text-muted-foreground">Loading…</div>;
   if (!hasRole) return <div className="p-6"><Card className="p-6 max-w-md"><h1 className="font-semibold mb-2">Admin only</h1><p className="text-sm text-muted-foreground">You don't have permission to view this page.</p></Card></div>;
+
 
   return (
     <div className="p-4 sm:p-6 max-w-6xl mx-auto">
