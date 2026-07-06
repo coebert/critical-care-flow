@@ -236,7 +236,17 @@ function AuthedShell() {
   );
 }
 
-function NavItem({ to, icon, children, collapsed }: { to: string; icon: React.ReactNode; children: React.ReactNode; collapsed?: boolean }) {
+function NavItem({
+  to,
+  icon,
+  label,
+  collapsed,
+}: {
+  to: string;
+  icon: React.ReactNode;
+  label: string;
+  collapsed?: boolean;
+}) {
   return (
     <Link
       to={to}
@@ -247,11 +257,11 @@ function NavItem({ to, icon, children, collapsed }: { to: string; icon: React.Re
       // TanStack Router's default prefix match can activate a link for any
       // descendant path that begins with `to`.
       activeOptions={{ exact: true }}
-      title={collapsed ? String(children) : undefined}
-      aria-label={collapsed ? String(children) : undefined}
+      title={collapsed ? label : undefined}
+      aria-label={collapsed ? label : undefined}
     >
       {icon}
-      {!collapsed && <span className="truncate">{children}</span>}
+      {!collapsed && <span className="truncate">{label}</span>}
     </Link>
   );
 }
