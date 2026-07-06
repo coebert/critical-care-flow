@@ -347,13 +347,18 @@ export const verifyPasskeyAuthentication = createServerFn({ method: "POST" })
         throw new Error("Passkey verification failed");
       }
 
+      // Counter/last-used bump: scope by BOTH row id AND the credential's
+      // owning user_id so an admin-client update can never mutate a row
+      // that doesn't belong to the account we just verified.
       await supabaseAdmin
         .from("webauthn_credentials")
         .update({
           counter: verification.authenticationInfo.newCounter,
           last_used_at: new Date().toISOString(),
         })
-        .eq("id", credRow.id);
+        .eq("id", credRow.id)
+        .eq("user_id", credRow.user_id);
+
 
       await supabaseAdmin
         .from("webauthn_challenges")
