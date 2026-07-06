@@ -20,10 +20,10 @@ Owner completes in the DTAC response document.
 
 | Item | Artefact | Status |
 | --- | --- | --- |
-| Named Clinical Safety Officer | `docs/clinical-safety-case.md` (Phase 3) | Pending owner input |
+| Named Clinical Safety Officer | `docs/clinical-safety-case.md` (Phase 3) | Holding placard — `/clinical-safety` |
 | Hazard log | `docs/hazard-log.md` (Phase 3) | Pending owner input |
 | Clinical safety case | `docs/clinical-safety-case.md` (Phase 3) | Pending owner input |
-| In-app safety-issue reporting | `/clinical-safety` route (Phase 3) | Pending |
+| In-app safety-issue reporting | `/clinical-safety` route (Phase 3) | Holding placard live |
 | Known-issues / field-safety notices page | Admin-editable page (Phase 3) | Pending |
 
 ## Section C4 — Data protection (UK GDPR / DPA 2018)
