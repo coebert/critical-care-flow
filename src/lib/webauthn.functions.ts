@@ -2,16 +2,23 @@ import { createServerFn } from "@tanstack/react-start";
 import { getRequest } from "@tanstack/react-start/server";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { safeError } from "@/lib/safe-error";
-import {
-  generateRegistrationOptions,
-  verifyRegistrationResponse,
-  generateAuthenticationOptions,
-  verifyAuthenticationResponse,
-} from "@simplewebauthn/server";
+// NOTE: @simplewebauthn/server transitively pulls in @peculiar/x509 →
+// tsyringe → tslib decorator helpers. Evaluating that graph at module
+// scope crashes on Cloudflare Workers with
+//   TypeError: Cannot destructure property '__extends' of
+//   '__toESM(...).default' as it is undefined
+// during the SSR of any route whose bundle imports this file (auth page,
+// passkey list, etc.), which takes down every request with a 500. We only
+// need the runtime functions inside handler bodies, so lazy-load them
+// there and keep only the erased `type` imports at module scope.
 import type {
   AuthenticationResponseJSON,
   RegistrationResponseJSON,
 } from "@simplewebauthn/server";
+
+async function loadWebauthnServer() {
+  return await import("@simplewebauthn/server");
+}
 
 const RP_NAME = "SDH Critical Care";
 
@@ -81,7 +88,7 @@ export const startPasskeyRegistration = createServerFn({ method: "POST" })
       transports: (c.transports ?? []) as AuthenticatorTransport[],
     }));
 
-    const options = await generateRegistrationOptions({
+    const options = await (await loadWebauthnServer()).generateRegistrationOptions({
       rpName: RP_NAME,
       rpID,
       userID: new TextEncoder().encode(context.userId),
@@ -135,7 +142,7 @@ export const verifyPasskeyRegistration = createServerFn({ method: "POST" })
       throw new Error("Registration challenge expired — please try again");
     }
 
-    const verification = await verifyRegistrationResponse({
+    const verification = await (await loadWebauthnServer()).verifyRegistrationResponse({
       response: data.response,
       expectedChallenge: challengeRow.challenge,
       expectedOrigin: origin,
@@ -177,7 +184,7 @@ export const verifyPasskeyRegistration = createServerFn({ method: "POST" })
  * the product spec requires routing users straight into enrolment.
  */
 export type StartPasskeyAuthResult =
-  | { status: "ok"; options: Awaited<ReturnType<typeof generateAuthenticationOptions>> }
+  | { status: "ok"; options: Awaited<ReturnType<typeof import("@simplewebauthn/server").generateAuthenticationOptions>> }
   | { status: "no_credentials"; code: "NO_PASSKEY_REGISTERED"; message: string };
 
 export const startPasskeyAuthentication = createServerFn({ method: "POST" })
@@ -210,7 +217,7 @@ export const startPasskeyAuthentication = createServerFn({ method: "POST" })
       };
     }
 
-    const options = await generateAuthenticationOptions({
+    const options = await (await loadWebauthnServer()).generateAuthenticationOptions({
       rpID,
       userVerification: "required",
       allowCredentials,
@@ -306,7 +313,7 @@ export const verifyPasskeyAuthentication = createServerFn({ method: "POST" })
         credRow.public_key as unknown as string,
       );
 
-      const verification = await verifyAuthenticationResponse({
+      const verification = await (await loadWebauthnServer()).verifyAuthenticationResponse({
         response: data.response,
         expectedChallenge: challengeRow.challenge,
         expectedOrigin: origin,
