@@ -385,8 +385,8 @@ function AnalyticsPage() {
       : complianceBucket === "week" ? eachWeekOfInterval({ start: from, end: to }, { weekStartsOn: 1 })
       : eachMonthOfInterval({ start: from, end: to });
     const labelFmt =
-      complianceBucket === "day" ? "dd MMM"
-      : complianceBucket === "week" ? "'W'II · dd MMM"
+      complianceBucket === "day" ? "dd/MM/yyyy"
+      : complianceBucket === "week" ? "'W'II · dd/MM/yyyy"
       : "MMM yyyy";
     type Bucket = { seen: number[]; arrival: number[] };
     const map = new Map<string, Bucket>();
@@ -445,7 +445,7 @@ function AnalyticsPage() {
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-6">
         <div className="min-w-0">
           <p className="text-sm text-muted-foreground">
-            {format(from, "dd MMM yyyy")} – {format(to, "dd MMM yyyy")} · {days} day{days === 1 ? "" : "s"} · {filtered.length} referrals
+            {format(from, "dd/MM/yyyy")} – {format(to, "dd/MM/yyyy")} · {days} day{days === 1 ? "" : "s"} · {filtered.length} referrals
           </p>
         </div>
         <div className="flex gap-2 flex-wrap items-center">
@@ -471,8 +471,8 @@ function AnalyticsPage() {
                 <CalendarIcon className="mr-2 h-4 w-4" />
                 {range.from
                   ? range.to
-                    ? `${format(range.from, "dd MMM yy")} – ${format(range.to, "dd MMM yy")}`
-                    : format(range.from, "dd MMM yy")
+                    ? `${format(range.from, "dd/MM/yyyy")} – ${format(range.to, "dd/MM/yyyy")}`
+                    : format(range.from, "dd/MM/yyyy")
                   : "Pick a date range"}
               </Button>
             </PopoverTrigger>
