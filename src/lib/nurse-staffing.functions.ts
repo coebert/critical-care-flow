@@ -58,3 +58,55 @@ export const upsertNurseStaffing = createServerFn({ method: "POST" })
       throw safeError("nurse-staffing.upsert", e, "Failed to save nurse staffing");
     }
   });
+
+import { aggregateNurseCapacitySeries } from "./nurse-capacity-analytics";
+import { assertAdmin } from "./auth-guards";
+
+const analyticsRangeSchema = z.object({
+  from: dateSchema,
+  to: dateSchema,
+});
+
+export const getNurseCapacityAnalytics = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input: z.infer<typeof analyticsRangeSchema>) => analyticsRangeSchema.parse(input))
+  .handler(async ({ context, data }) => {
+    try {
+      assertAdmin(context.claims);
+      // Staffing rows in the requested calendar range.
+      const { data: staffing, error: sErr } = await context.supabase
+        .from("nurse_staffing")
+        .select("shift_date, shift, available_nurses")
+        .gte("shift_date", data.from)
+        .lte("shift_date", data.to);
+      if (sErr) throw sErr;
+
+      // Any stay whose active window overlaps [from, to+1day).
+      const toExclusive = new Date(`${data.to}T00:00:00`);
+      toExclusive.setDate(toExclusive.getDate() + 2); // include night sample of last date
+      const fromInclusive = `${data.from}T00:00:00Z`;
+      const { data: stays, error: oErr } = await context.supabase
+        .from("bed_occupancies")
+        .select("admitted_at, discharged_at, level")
+        .lt("admitted_at", toExclusive.toISOString())
+        .or(`discharged_at.is.null,discharged_at.gte.${fromInclusive}`);
+      if (oErr) throw oErr;
+
+      return aggregateNurseCapacitySeries({
+        from: data.from,
+        to: data.to,
+        stays: (stays ?? []).map((s) => ({
+          admitted_at: s.admitted_at,
+          discharged_at: s.discharged_at,
+          level: s.level,
+        })),
+        staffing: (staffing ?? []).map((r) => ({
+          shift_date: r.shift_date,
+          shift: r.shift as "day" | "night",
+          available_nurses: Number(r.available_nurses),
+        })),
+      });
+    } catch (e) {
+      throw safeError("nurse-staffing.analytics", e, "Failed to load nurse capacity analytics");
+    }
+  });
