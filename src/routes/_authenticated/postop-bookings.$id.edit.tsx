@@ -100,6 +100,10 @@ function EditPostopBookingPage() {
         setArrivedAt(row.arrived_at ? new Date(row.arrived_at).toISOString().slice(0, 16) : "");
         setSpecialty((row.surgical_specialty ?? "") as SurgicalSpecialty | "");
         setIsTest(!!row.is_test);
+        setBookingStatus((row.booking_status ?? "requested") as PostopBookingStatus);
+        setPreopAt(row.preop_signed_off_at ?? null);
+        setIntensivistAt(row.intensivist_reviewed_at ?? null);
+        setConvertedRefId(row.converted_referral_id ?? null);
         setLoading(false);
       })
       .catch((err) => {
