@@ -37,20 +37,51 @@ export const Route = createFileRoute("/_authenticated/bed-board")({
       { name: "description", content: "Live ICU/HDU bed board and capacity snapshot." },
     ],
   }),
-  validateSearch: (s: Record<string, unknown>) => ({
-    source_referral_id: typeof s.source_referral_id === "string" ? s.source_referral_id : undefined,
-    source_postop_booking_id: typeof s.source_postop_booking_id === "string" ? s.source_postop_booking_id : undefined,
-    hospital_number: typeof s.hospital_number === "string" ? s.hospital_number : undefined,
-    patient_initials: typeof s.patient_initials === "string" ? s.patient_initials : undefined,
-    admitting_consultant: typeof s.admitting_consultant === "string" ? s.admitting_consultant : undefined,
-    level: typeof s.level === "number" ? s.level : undefined,
-    source_label: typeof s.source_label === "string" ? s.source_label : undefined,
-    focus_shift: s.focus_shift === "day" || s.focus_shift === "night" ? s.focus_shift : undefined,
-    focus_level:
-      s.focus_level === 3 || s.focus_level === 2 || s.focus_level === 1 ? (s.focus_level as 1 | 2 | 3) : undefined,
-  }),
+  validateSearch: (s: Record<string, unknown>) => {
+    const rawShift = s.focus_shift;
+    const rawLevel = s.focus_level;
+    const shift =
+      rawShift === "day" || rawShift === "night" ? rawShift : undefined;
+    // Accept numeric or numeric-string level (deep links from push payloads
+    // that survive a query-string roundtrip both work).
+    const levelNum =
+      typeof rawLevel === "number"
+        ? rawLevel
+        : typeof rawLevel === "string" && /^[123]$/.test(rawLevel)
+          ? Number(rawLevel)
+          : undefined;
+    const level = levelNum === 1 || levelNum === 2 || levelNum === 3 ? (levelNum as 1 | 2 | 3) : undefined;
+    // Flag when a caller supplied a focus param but it was unusable, or when
+    // they only supplied one half of the shift+level pair. Either case
+    // triggers the graceful fallback banner in the component.
+    const shiftProvided = rawShift !== undefined && rawShift !== null && rawShift !== "";
+    const levelProvided = rawLevel !== undefined && rawLevel !== null && rawLevel !== "";
+    const focus_invalid =
+      (shiftProvided && !shift) ||
+      (levelProvided && !level) ||
+      (shiftProvided && !levelProvided) ||
+      (levelProvided && !shiftProvided);
+    return {
+      source_referral_id: typeof s.source_referral_id === "string" ? s.source_referral_id : undefined,
+      source_postop_booking_id: typeof s.source_postop_booking_id === "string" ? s.source_postop_booking_id : undefined,
+      hospital_number: typeof s.hospital_number === "string" ? s.hospital_number : undefined,
+      patient_initials: typeof s.patient_initials === "string" ? s.patient_initials : undefined,
+      admitting_consultant: typeof s.admitting_consultant === "string" ? s.admitting_consultant : undefined,
+      level: typeof s.level === "number" ? s.level : undefined,
+      source_label: typeof s.source_label === "string" ? s.source_label : undefined,
+      focus_shift: shift,
+      focus_level: level,
+      focus_invalid: focus_invalid || undefined,
+    };
+  },
   component: BedBoardPage,
 });
+
+// Local ICU convention: day shift 08:00-19:59, night shift otherwise.
+function currentShiftFromClock(now = new Date()): "day" | "night" {
+  const h = now.getHours();
+  return h >= 8 && h < 20 ? "day" : "night";
+}
 
 
 function toIsoOrNull(v: string | null): string | null {
