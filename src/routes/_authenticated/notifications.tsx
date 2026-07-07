@@ -404,51 +404,112 @@ function NotificationSettingsPage() {
           </div>
         ))}
 
-        <div className="mt-4 flex flex-wrap items-center gap-3 border-t pt-4">
-          <Button
-            variant="outline"
-            size="sm"
-            disabled={
-              testingCapacity ||
-              !prefsLoaded ||
-              !subscribed ||
-              permission !== "granted" ||
-              !notifyCapacity
-            }
-            onClick={async () => {
-              setTestingCapacity(true);
-              try {
-                const res = await sendTestCapacity({});
-                if (res.ok) {
-                  toast.success(
-                    `Test capacity alert sent to ${res.delivered_count} of ${res.subscription_count} device${res.subscription_count === 1 ? "" : "s"}.`,
-                  );
-                } else if (res.reason === "capacity_alerts_off") {
-                  toast.error("Enable the master capacity switch first.");
-                } else if (res.reason === "no_levels_selected") {
-                  toast.error("Select at least one care level to test.");
-                } else if (res.reason === "no_subscriptions") {
-                  toast.error("No push subscription on this account. Enable notifications first.");
-                } else if (res.reason === "push_not_configured") {
-                  toast.error("Push service is not configured on the server.");
-                } else {
-                  toast.error("No devices received the test push.");
-                }
-              } catch (e: any) {
-                toast.error(e?.message ?? "Could not send test capacity alert.");
-              } finally {
-                setTestingCapacity(false);
+        <div className="mt-4 border-t pt-4 space-y-3">
+          <div>
+            <h3 className="text-sm font-medium">Test deep-link delivery</h3>
+            <p className="text-xs text-muted-foreground mt-0.5">
+              Send a mock capacity push to your enabled devices, then tap the
+              notification to confirm it opens the bed board pre-focused on
+              the shift and care level below.
+            </p>
+          </div>
+
+          <div className="flex flex-wrap items-end gap-3">
+            <div className="flex flex-col gap-1">
+              <Label htmlFor="test-shift" className="text-xs font-medium">Focus shift</Label>
+              <select
+                id="test-shift"
+                className="h-8 rounded-md border bg-background px-2 text-sm"
+                value={testShift}
+                onChange={(e) => setTestShift(e.target.value as "day" | "night")}
+              >
+                <option value="day">Day</option>
+                <option value="night">Night</option>
+              </select>
+            </div>
+            <div className="flex flex-col gap-1">
+              <Label htmlFor="test-level" className="text-xs font-medium">Focus care level</Label>
+              <select
+                id="test-level"
+                className="h-8 rounded-md border bg-background px-2 text-sm"
+                value={testLevel}
+                onChange={(e) => setTestLevel(e.target.value as "auto" | "1" | "2" | "3")}
+              >
+                <option value="auto">Highest enabled</option>
+                <option value="3">Level 3</option>
+                <option value="2">Level 2</option>
+                <option value="1">Level 1 / 0</option>
+              </select>
+            </div>
+            <Link
+              to="/bed-board"
+              search={{
+                focus_shift: testShift,
+                focus_level: testLevel === "auto" ? 3 : (Number(testLevel) as 1 | 2 | 3),
+              }}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center h-8 rounded-md border px-3 text-sm hover:bg-accent"
+            >
+              <ExternalLink className="w-3.5 h-3.5 mr-1" />
+              Preview deep link
+            </Link>
+          </div>
+
+          <div className="flex flex-wrap items-center gap-3">
+            <Button
+              variant="outline"
+              size="sm"
+              disabled={
+                testingCapacity ||
+                !prefsLoaded ||
+                !subscribed ||
+                permission !== "granted" ||
+                !notifyCapacity
               }
-            }}
-          >
-            <Bell className="w-4 h-4 mr-1" />
-            {testingCapacity ? "Sending…" : "Send test capacity notification"}
-          </Button>
-          <p className="text-xs text-muted-foreground">
-            Sends a mock capacity alert to your enabled devices using your selected care levels.
-          </p>
+              onClick={async () => {
+                setTestingCapacity(true);
+                try {
+                  const res = await sendTestCapacity({
+                    data: {
+                      shift: testShift,
+                      level: testLevel === "auto" ? undefined : (Number(testLevel) as 1 | 2 | 3),
+                    },
+                  });
+                  if (res.ok) {
+                    toast.success(
+                      `Test capacity alert sent to ${res.delivered_count} of ${res.subscription_count} device${res.subscription_count === 1 ? "" : "s"}. Tap it to verify it opens ${res.focus_shift} shift · Level ${res.focus_level}${res.focus_level === 1 ? "/0" : ""}.`,
+                    );
+                  } else if (res.reason === "capacity_alerts_off") {
+                    toast.error("Enable the master capacity switch first.");
+                  } else if (res.reason === "no_levels_selected") {
+                    toast.error("Select at least one care level to test.");
+                  } else if (res.reason === "level_not_enabled") {
+                    toast.error("That care level is turned off in your preferences.");
+                  } else if (res.reason === "no_subscriptions") {
+                    toast.error("No push subscription on this account. Enable notifications first.");
+                  } else if (res.reason === "push_not_configured") {
+                    toast.error("Push service is not configured on the server.");
+                  } else {
+                    toast.error("No devices received the test push.");
+                  }
+                } catch (e: any) {
+                  toast.error(e?.message ?? "Could not send test capacity alert.");
+                } finally {
+                  setTestingCapacity(false);
+                }
+              }}
+            >
+              <Bell className="w-4 h-4 mr-1" />
+              {testingCapacity ? "Sending…" : "Send test push with this focus"}
+            </Button>
+            <p className="text-xs text-muted-foreground">
+              After tapping, the bed board should show a highlighted banner for the selected shift and level.
+            </p>
+          </div>
         </div>
       </Card>
+
 
 
     </div>
