@@ -99,7 +99,7 @@ export const listBeds = createServerFn({ method: "GET" })
       .select("*")
       .eq("active", true)
       .order("sort_order", { ascending: true });
-    if (error) throw safeError(error, "Could not load beds");
+    if (error) throw safeError("beds", error, "Could not load beds");
     return data ?? [];
   });
 
@@ -120,10 +120,10 @@ export const getBedBoard = createServerFn({ method: "GET" })
         .is("deleted_at", null)
         .not("status", "in", "(completed,cancelled)"),
     ]);
-    if (bedsRes.error) throw safeError(bedsRes.error, "Could not load beds");
-    if (occRes.error) throw safeError(occRes.error, "Could not load occupancies");
-    if (outRes.error) throw safeError(outRes.error, "Could not load outliers");
-    if (xferRes.error) throw safeError(xferRes.error, "Could not load transfers");
+    if (bedsRes.error) throw safeError("beds", bedsRes.error, "Could not load beds");
+    if (occRes.error) throw safeError("beds", occRes.error, "Could not load occupancies");
+    if (outRes.error) throw safeError("beds", outRes.error, "Could not load outliers");
+    if (xferRes.error) throw safeError("beds", xferRes.error, "Could not load transfers");
     return {
       beds: bedsRes.data ?? [],
       occupancies: occRes.data ?? [],
@@ -141,7 +141,7 @@ export const admitToBed = createServerFn({ method: "POST" })
       .insert({ ...data, created_by: context.userId, updated_by: context.userId })
       .select("*")
       .single();
-    if (error) throw safeError(error, "Could not admit patient (bed may already be occupied)");
+    if (error) throw safeError("beds", error, "Could not admit patient (bed may already be occupied)");
     return row;
   });
 
@@ -156,7 +156,7 @@ export const updateOccupancy = createServerFn({ method: "POST" })
       .eq("id", id)
       .select("*")
       .single();
-    if (error) throw safeError(error, "Could not update occupancy");
+    if (error) throw safeError("beds", error, "Could not update occupancy");
     return row;
   });
 
@@ -174,7 +174,7 @@ export const dischargeOccupancy = createServerFn({ method: "POST" })
       .eq("id", data.id)
       .select("*")
       .single();
-    if (error) throw safeError(error, "Could not discharge patient");
+    if (error) throw safeError("beds", error, "Could not discharge patient");
     return row;
   });
 
@@ -191,7 +191,7 @@ export const moveOccupancy = createServerFn({ method: "POST" })
       .is("discharged_at", null)
       .select("*")
       .single();
-    if (error) throw safeError(error, "Could not move patient (target bed may be occupied)");
+    if (error) throw safeError("beds", error, "Could not move patient (target bed may be occupied)");
     return row;
   });
 
@@ -204,7 +204,7 @@ export const createOutlier = createServerFn({ method: "POST" })
       .insert({ ...data, created_by: context.userId, updated_by: context.userId })
       .select("*")
       .single();
-    if (error) throw safeError(error, "Could not add outlier");
+    if (error) throw safeError("beds", error, "Could not add outlier");
     return row;
   });
 
@@ -219,7 +219,7 @@ export const updateOutlier = createServerFn({ method: "POST" })
       .eq("id", id)
       .select("*")
       .single();
-    if (error) throw safeError(error, "Could not update outlier");
+    if (error) throw safeError("beds", error, "Could not update outlier");
     return row;
   });
 
@@ -233,7 +233,7 @@ export const endOutlier = createServerFn({ method: "POST" })
       .eq("id", data.id)
       .select("*")
       .single();
-    if (error) throw safeError(error, "Could not end outlier");
+    if (error) throw safeError("beds", error, "Could not end outlier");
     return row;
   });
 
@@ -246,7 +246,7 @@ export const createTransferOut = createServerFn({ method: "POST" })
       .insert({ ...data, created_by: context.userId, updated_by: context.userId })
       .select("*")
       .single();
-    if (error) throw safeError(error, "Could not create transfer");
+    if (error) throw safeError("beds", error, "Could not create transfer");
     return row;
   });
 
@@ -265,7 +265,7 @@ export const updateTransferOut = createServerFn({ method: "POST" })
       .eq("id", id)
       .select("*")
       .single();
-    if (error) throw safeError(error, "Could not update transfer");
+    if (error) throw safeError("beds", error, "Could not update transfer");
     return row;
   });
 
@@ -284,7 +284,7 @@ export const cancelTransferOut = createServerFn({ method: "POST" })
       .eq("id", data.id)
       .select("*")
       .single();
-    if (error) throw safeError(error, "Could not cancel transfer");
+    if (error) throw safeError("beds", error, "Could not cancel transfer");
     return row;
   });
 
