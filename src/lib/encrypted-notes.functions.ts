@@ -34,8 +34,18 @@ async function writeAuditE2E(entry: {
   action: string;
   entity_id: string;
   referral_id?: string;
+  author_id?: string;
+  recipient_count?: number;
+  edited_at?: string;
 }) {
   const admin = await getAdmin();
+  // `via_admin_flow` = the actor is editing/deleting a note they did not
+  // author. The referral_notes UPDATE/DELETE policy allows this only for
+  // users with the admin role, so the flag captures the admin-edit path
+  // without an extra role lookup. Timestamps: audit_log.created_at is set
+  // by the DB; `edited_at` is the note's own edit timestamp when relevant.
+  const viaAdminFlow =
+    entry.author_id !== undefined && entry.author_id !== entry.user_id;
   await admin.from("audit_log").insert({
     user_id: entry.user_id,
     action: entry.action,
@@ -43,7 +53,14 @@ async function writeAuditE2E(entry: {
     entity_id: entry.entity_id,
     // Never store plaintext or ciphertext in the audit log — the body
     // was end-to-end encrypted and is not accessible server-side.
-    diff: { referral_id: entry.referral_id, body: "[e2e-encrypted]" } as any,
+    diff: {
+      referral_id: entry.referral_id,
+      body: "[e2e-encrypted]",
+      author_id: entry.author_id ?? null,
+      via_admin_flow: viaAdminFlow,
+      recipient_count: entry.recipient_count ?? null,
+      edited_at: entry.edited_at ?? null,
+    } as any,
   } as any);
 }
 
