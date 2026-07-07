@@ -269,6 +269,8 @@ export function NurseCapacityPanel({
               block={snapshot.day}
               saving={saving}
               onSave={handleSave}
+              focused={focusShift === "day"}
+              focusLevel={focusShift === "day" ? focusLevel : undefined}
             />
             <ShiftRow
               label="Night"
@@ -277,6 +279,8 @@ export function NurseCapacityPanel({
               block={snapshot.night}
               saving={saving}
               onSave={handleSave}
+              focused={focusShift === "night"}
+              focusLevel={focusShift === "night" ? focusLevel : undefined}
             />
           </>
         )}
