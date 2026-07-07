@@ -11,6 +11,7 @@ import { TestPushButton } from "@/components/test-push-button";
 import { readLastTestPushAt } from "@/lib/last-test-push";
 import { useServerFn } from "@tanstack/react-start";
 import { getNotificationPrefs, setNotificationPrefs } from "@/lib/notification-prefs.functions";
+import { sendTestCapacityPush } from "@/lib/test-capacity-push.functions";
 import { toast } from "sonner";
 
 
@@ -82,6 +83,8 @@ function NotificationSettingsPage() {
   const [savingPref, setSavingPref] = useState<PrefKey | null>(null);
   const getPrefs = useServerFn(getNotificationPrefs);
   const savePrefs = useServerFn(setNotificationPrefs);
+  const sendTestCapacity = useServerFn(sendTestCapacityPush);
+  const [testingCapacity, setTestingCapacity] = useState(false);
 
   useEffect(() => {
     setLastTestAt(readLastTestPushAt());
@@ -396,7 +399,53 @@ function NotificationSettingsPage() {
             />
           </div>
         ))}
+
+        <div className="mt-4 flex flex-wrap items-center gap-3 border-t pt-4">
+          <Button
+            variant="outline"
+            size="sm"
+            disabled={
+              testingCapacity ||
+              !prefsLoaded ||
+              !subscribed ||
+              permission !== "granted" ||
+              !notifyCapacity
+            }
+            onClick={async () => {
+              setTestingCapacity(true);
+              try {
+                const res = await sendTestCapacity({});
+                if (res.ok) {
+                  toast.success(
+                    `Test capacity alert sent to ${res.delivered_count} of ${res.subscription_count} device${res.subscription_count === 1 ? "" : "s"}.`,
+                  );
+                } else if (res.reason === "capacity_alerts_off") {
+                  toast.error("Enable the master capacity switch first.");
+                } else if (res.reason === "no_levels_selected") {
+                  toast.error("Select at least one care level to test.");
+                } else if (res.reason === "no_subscriptions") {
+                  toast.error("No push subscription on this account. Enable notifications first.");
+                } else if (res.reason === "push_not_configured") {
+                  toast.error("Push service is not configured on the server.");
+                } else {
+                  toast.error("No devices received the test push.");
+                }
+              } catch (e: any) {
+                toast.error(e?.message ?? "Could not send test capacity alert.");
+              } finally {
+                setTestingCapacity(false);
+              }
+            }}
+          >
+            <Bell className="w-4 h-4 mr-1" />
+            {testingCapacity ? "Sending…" : "Send test capacity notification"}
+          </Button>
+          <p className="text-xs text-muted-foreground">
+            Sends a mock capacity alert to your enabled devices using your selected care levels.
+          </p>
+        </div>
       </Card>
+
 
     </div>
 
