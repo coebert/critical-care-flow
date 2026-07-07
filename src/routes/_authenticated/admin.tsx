@@ -12,6 +12,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
+import { BedsAdminPanel } from "@/components/bed-board/beds-admin-panel";
 import { toast } from "sonner";
 import { format } from "date-fns";
 
