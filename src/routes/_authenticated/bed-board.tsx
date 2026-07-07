@@ -45,6 +45,9 @@ export const Route = createFileRoute("/_authenticated/bed-board")({
     admitting_consultant: typeof s.admitting_consultant === "string" ? s.admitting_consultant : undefined,
     level: typeof s.level === "number" ? s.level : undefined,
     source_label: typeof s.source_label === "string" ? s.source_label : undefined,
+    focus_shift: s.focus_shift === "day" || s.focus_shift === "night" ? s.focus_shift : undefined,
+    focus_level:
+      s.focus_level === 3 || s.focus_level === 2 || s.focus_level === 1 ? (s.focus_level as 1 | 2 | 3) : undefined,
   }),
   component: BedBoardPage,
 });
