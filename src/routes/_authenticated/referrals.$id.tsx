@@ -245,6 +245,7 @@ function ReferralDetail() {
   };
 
   return (
+    <ClinicalAccessGate>
     <div className="p-4 sm:p-6 max-w-5xl mx-auto">
       <div className="flex items-center justify-between gap-2 mb-6 flex-wrap">
         <Button variant="ghost" size="sm" onClick={() => navigate({ to: "/" })}>
