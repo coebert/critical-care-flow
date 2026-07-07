@@ -207,6 +207,11 @@ function ReferralsList() {
         to={search.to}
       />
 
+      <div className="mb-4">
+        <MiniCapacityLink />
+      </div>
+
+
       {showDeleted && (
         <ReferralsDeletedPanel
           rows={deletedRows}
