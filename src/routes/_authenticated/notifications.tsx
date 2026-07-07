@@ -83,6 +83,8 @@ function NotificationSettingsPage() {
   const [savingPref, setSavingPref] = useState<PrefKey | null>(null);
   const getPrefs = useServerFn(getNotificationPrefs);
   const savePrefs = useServerFn(setNotificationPrefs);
+  const sendTestCapacity = useServerFn(sendTestCapacityPush);
+  const [testingCapacity, setTestingCapacity] = useState(false);
 
   useEffect(() => {
     setLastTestAt(readLastTestPushAt());
