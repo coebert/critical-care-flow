@@ -53,11 +53,7 @@ function ReferralsListPending() {
 }
 
 function ReferralsListError({ error }: { error: Error }) {
-  return (
-    <div className="p-6 text-sm text-destructive" role="alert">
-      Failed to load referrals: {error.message}
-    </div>
-  );
+  return <ReferralRouteError error={error} label="Referrals" />;
 }
 
 export const Route = createFileRoute("/_authenticated/")({
