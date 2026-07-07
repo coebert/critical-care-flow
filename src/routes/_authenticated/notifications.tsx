@@ -350,7 +350,56 @@ function NotificationSettingsPage() {
         ))}
       </Card>
 
+      <Card className="p-5">
+        <h2 className="font-medium mb-1">Admission capacity alerts</h2>
+        <p className="text-sm text-muted-foreground mb-4">
+          Push a heads-up when the unit's spare admission capacity for a care
+          level changes materially — from none to available, or from available
+          to none — for the shift now on. Choose which care levels count.
+        </p>
+        <div className="flex items-start justify-between gap-4 py-3 border-b">
+          <div className="min-w-0">
+            <Label htmlFor="pref-capacity" className="text-sm font-medium">
+              Capacity change alerts
+            </Label>
+            <div className="text-xs text-muted-foreground mt-0.5">
+              Master switch. Turn off to silence all capacity alerts regardless of level.
+            </div>
+          </div>
+          <Switch
+            id="pref-capacity"
+            checked={notifyCapacity}
+            disabled={!prefsLoaded || savingPref !== null}
+            onCheckedChange={(v) => togglePref("capacity", v)}
+          />
+        </div>
+        {[
+          { key: "cap_l3" as const, id: "pref-cap-l3", checked: notifyCapL3, label: "Level 3", hint: "Alert when a Level 3 admission slot opens or closes.", border: true },
+          { key: "cap_l2" as const, id: "pref-cap-l2", checked: notifyCapL2, label: "Level 2", hint: "Alert when a Level 2 admission slot opens or closes.", border: true },
+          { key: "cap_l1" as const, id: "pref-cap-l1", checked: notifyCapL1, label: "Level 1 / 0", hint: "Alert when a Level 1 or 0 admission slot opens or closes.", border: false },
+        ].map((row) => (
+          <div
+            key={row.key}
+            className={`flex items-start justify-between gap-4 py-3 ${row.border ? "border-b" : ""}`}
+          >
+            <div className="min-w-0">
+              <Label htmlFor={row.id} className="text-sm font-medium">
+                {row.label}
+              </Label>
+              <div className="text-xs text-muted-foreground mt-0.5">{row.hint}</div>
+            </div>
+            <Switch
+              id={row.id}
+              checked={row.checked}
+              disabled={!prefsLoaded || savingPref !== null || !notifyCapacity}
+              onCheckedChange={(v) => togglePref(row.key, v)}
+            />
+          </div>
+        ))}
+      </Card>
+
     </div>
+
 
   );
 }
