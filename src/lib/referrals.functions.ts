@@ -536,8 +536,13 @@ export const addNote = createServerFn({ method: "POST" })
       action: "create",
       entity: "referral_note",
       entity_id: row.id,
+      referral_id: data.referral_id,
+      author_id: userId,
+      recipient_count: 0,
+      edited_at: null,
       diff: { referral_id: data.referral_id, body: data.body },
     });
+
 
     await fanOutNotifications(
       userId,
