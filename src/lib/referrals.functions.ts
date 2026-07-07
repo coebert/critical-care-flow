@@ -536,7 +536,8 @@ export const listReferralNotesDecrypted = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((d: unknown) => z.object({ referral_id: z.string().uuid() }).parse(d))
   .handler(async ({ data, context }) => {
-    const { supabase } = context;
+    const { supabase, userId } = context;
+    await assertClinicalAccess(supabase, userId);
     const { data: rows, error } = await supabase
       .from("referral_notes")
       .select("*")
