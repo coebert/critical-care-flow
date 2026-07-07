@@ -35,6 +35,8 @@ function ShiftRow({
   block,
   saving,
   onSave,
+  focused,
+  focusLevel,
 }: {
   label: string;
   shift: Shift;
@@ -42,6 +44,8 @@ function ShiftRow({
   block: { spare: number | null; level3_slots: number | null; level2_slots: number | null; level1_slots: number | null };
   saving: boolean;
   onSave: (shift: Shift, value: number) => Promise<void>;
+  focused?: boolean;
+  focusLevel?: 1 | 2 | 3;
 }) {
   const [editing, setEditing] = useState(available == null);
   const [draft, setDraft] = useState<string>(available == null ? "" : String(available));
