@@ -3,13 +3,15 @@ import { z } from "zod";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { PostopAnalyticsPanel } from "@/components/postop-analytics-panel";
 import { ReferralsAnalyticsPanel } from "@/components/analytics/referrals-panel";
+import { NurseCapacityAnalyticsPanel } from "@/components/analytics/nurse-capacity-panel";
 import { icnarcTargetsQueryOptions, initialAnalyticsRange } from "@/components/analytics/queries";
 import { getReferralsAnalytics, getPostopAnalytics } from "@/lib/analytics.functions";
+import { getNurseCapacityAnalytics } from "@/lib/nurse-staffing.functions";
 import { AdminOnly } from "@/components/admin-only";
 import { RouteErrorFallback } from "@/components/route-error-fallback";
 
 const analyticsSearchSchema = z.object({
-  view: z.enum(["referrals", "postop"]).optional(),
+  view: z.enum(["referrals", "postop", "nurse-capacity"]).optional(),
 });
 
 export const Route = createFileRoute("/_authenticated/analytics")({
@@ -28,6 +30,10 @@ export const Route = createFileRoute("/_authenticated/analytics")({
       queryKey: ["analytics", "postop", fromIso, toIso],
       queryFn: () => getPostopAnalytics({ data: { from: fromIso, to: toIso } }),
     });
+    void context.queryClient.prefetchQuery({
+      queryKey: ["analytics", "nurse-capacity", fromIso.slice(0, 10), toIso.slice(0, 10)],
+      queryFn: () => getNurseCapacityAnalytics({ data: { from: fromIso.slice(0, 10), to: toIso.slice(0, 10) } }),
+    });
     void context.queryClient.prefetchQuery(icnarcTargetsQueryOptions);
   },
   errorComponent: ({ error }) => <RouteErrorFallback error={error} label="Analytics" />,
@@ -41,7 +47,8 @@ export const Route = createFileRoute("/_authenticated/analytics")({
 function AnalyticsPage() {
   const search = Route.useSearch();
   const navigate = Route.useNavigate();
-  const tab: "referrals" | "postop" = search.view === "postop" ? "postop" : "referrals";
+  const tab: "referrals" | "postop" | "nurse-capacity" =
+    search.view === "postop" ? "postop" : search.view === "nurse-capacity" ? "nurse-capacity" : "referrals";
 
   return (
     <div className="p-4 sm:p-6 max-w-7xl mx-auto">
@@ -51,18 +58,27 @@ function AnalyticsPage() {
       <Tabs
         value={tab}
         onValueChange={(v) =>
-          navigate({ search: { view: v === "postop" ? "postop" : undefined }, replace: true })
+          navigate({
+            search: {
+              view: v === "referrals" ? undefined : (v as "postop" | "nurse-capacity"),
+            },
+            replace: true,
+          })
         }
       >
         <TabsList className="mb-4">
           <TabsTrigger value="referrals">Referrals</TabsTrigger>
           <TabsTrigger value="postop">Post-op bookings</TabsTrigger>
+          <TabsTrigger value="nurse-capacity">Nurse capacity</TabsTrigger>
         </TabsList>
         <TabsContent value="referrals">
           <ReferralsAnalyticsPanel />
         </TabsContent>
         <TabsContent value="postop">
           <PostopAnalyticsPanel />
+        </TabsContent>
+        <TabsContent value="nurse-capacity">
+          <NurseCapacityAnalyticsPanel />
         </TabsContent>
       </Tabs>
     </div>
