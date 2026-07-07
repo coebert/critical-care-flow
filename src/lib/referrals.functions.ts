@@ -1066,7 +1066,8 @@ export const findReferralsByHospitalNumber = createServerFn({ method: "POST" })
       .parse(d),
   )
   .handler(async ({ data, context }): Promise<DecryptedReferral[]> => {
-    const { supabase } = context;
+    const { supabase, userId } = context;
+    await assertClinicalAccess(supabase, userId);
     const hashed = hashHospitalNumber(data.hospital_number);
     if (!hashed) return [];
     let q = supabase
