@@ -254,7 +254,11 @@ function BedBoardPage() {
             onOccupiedClick={setEditOcc}
           />
           <div className="space-y-4">
-            <NurseCapacityPanel occupancies={occupancies} />
+            <NurseCapacityPanel
+              occupancies={occupancies}
+              focusShift={search.focus_shift as "day" | "night" | undefined}
+              focusLevel={search.focus_level as 1 | 2 | 3 | undefined}
+            />
             <OutliersPanel
               outliers={outliers}
               saving={saving}
