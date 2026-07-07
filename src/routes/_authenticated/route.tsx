@@ -233,6 +233,7 @@ function AuthedShell() {
           <div className="flex items-center gap-1.5 sm:gap-2 shrink-0 justify-end">
             <ShiftToggle />
             {supported && permission === "granted" && subscribed && <TestPushButton />}
+            <AlertToggle />
             <NotificationBell />
           </div>
         </header>
