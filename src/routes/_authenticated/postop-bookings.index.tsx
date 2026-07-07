@@ -152,6 +152,18 @@ function PostopBookingsList() {
               </Label>
             </div>
           )}
+          <Button asChild variant="outline">
+            <Link to="/postop-bookings/planner">
+              <CalendarDays className="w-4 h-4 mr-1" /> Planner
+            </Link>
+          </Button>
+          {isAdmin && (
+            <Button asChild variant="outline">
+              <Link to="/postop-bookings/cancellations">
+                <XCircle className="w-4 h-4 mr-1" /> Cancellations
+              </Link>
+            </Button>
+          )}
           <Button asChild>
             <Link to="/postop-bookings/new">
               <Plus className="w-4 h-4 mr-1" /> New booking
