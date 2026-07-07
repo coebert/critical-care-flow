@@ -226,7 +226,7 @@ export function validateReferralAll(
   input: ReferralFieldInput,
   opts: ReferralValidationOptions = {},
 ): ReferralValidation {
-  const timing = validateReferralTimings(input);
+  const timing = validateReferralTimings(input, opts);
   const decision = validateReferralDecisionFields(input);
   const fieldErrors: Partial<Record<ReferralField, string>> = {
     ...timing.fieldErrors,
