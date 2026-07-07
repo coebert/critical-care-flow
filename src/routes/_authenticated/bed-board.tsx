@@ -214,6 +214,7 @@ function BedBoardPage() {
             onOccupiedClick={setEditOcc}
           />
           <div className="space-y-4">
+            <NurseCapacityPanel occupancies={occupancies} />
             <OutliersPanel
               outliers={outliers}
               saving={saving}
