@@ -222,7 +222,10 @@ export function validateReferralDecisionFields(
  * Combined validator covering both timings and decision/admission fields.
  * Prefer this at every save site so the same rules apply everywhere.
  */
-export function validateReferralAll(input: ReferralFieldInput): ReferralValidation {
+export function validateReferralAll(
+  input: ReferralFieldInput,
+  opts: ReferralValidationOptions = {},
+): ReferralValidation {
   const timing = validateReferralTimings(input);
   const decision = validateReferralDecisionFields(input);
   const fieldErrors: Partial<Record<ReferralField, string>> = {
