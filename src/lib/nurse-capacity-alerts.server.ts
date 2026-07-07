@@ -241,22 +241,29 @@ export async function checkAndAlertNurseCapacity(admin: Admin, now: Date = new D
       notify_capacity_l2: boolean | null;
       notify_capacity_l1: boolean | null;
     };
-    const perUser: Array<{ id: string; body: string }> = [];
+    const levelNum: Record<FlippedLevel, 1 | 2 | 3> = { l3: 3, l2: 2, l1: 1 };
+    const focusUrl = (k: FlippedLevel) =>
+      `/bed-board?focus_shift=${shift}&focus_level=${levelNum[k]}`;
+
+    const perUser: Array<{ id: string; body: string; url: string }> = [];
     for (const p of (profiles ?? []) as Row[]) {
       if (p.notify_capacity === false) continue;
       const userLevels = flipped.filter((k) => (p as any)[prefKey[k]] !== false);
       if (!userLevels.length) continue;
       const summary = messageFor(userLevels, block, prevBlock);
+      // Deep-link to the highest-acuity flipped level the user cares about.
+      const primary = userLevels[0];
       perUser.push({
         id: p.id,
         body: `${shiftLabel} · ${summary}. Spare nurses ${prevSpareText} → ${nextSpareText} (dependency ${snap.dependency}).`,
+        url: focusUrl(primary),
       });
     }
 
     if (!perUser.length) return;
 
     const recipientIds = perUser.map((u) => u.id);
-    const bodyByUser = new Map(perUser.map((u) => [u.id, u.body]));
+    const byUser = new Map(perUser.map((u) => [u.id, u]));
 
     // Persist in-app notifications (referral_id NULL, kind='capacity').
     const notifRows = perUser.map((u) => ({
@@ -267,29 +274,30 @@ export async function checkAndAlertNurseCapacity(admin: Admin, now: Date = new D
     }));
     await admin.from("notifications").insert(notifRows as any);
 
-    // Push fan-out — personalised body per subscription.
+    // Push fan-out — personalised body + deep link per subscription.
     const { data: subs } = await admin
       .from("push_subscriptions")
       .select("user_id, endpoint, p256dh, auth")
       .in("user_id", recipientIds);
     if (subs && subs.length) {
       const goneEndpoints: string[] = [];
-      // Group by body so we send one request per (body, subs) batch.
-      const groups = new Map<string, typeof subs>();
+      // Group by (body, url) so we send one request per unique payload.
+      const groups = new Map<string, { body: string; url: string; subs: typeof subs }>();
       for (const s of subs) {
-        const b = bodyByUser.get(s.user_id);
-        if (!b) continue;
-        const g = groups.get(b) ?? [];
-        g.push(s);
-        groups.set(b, g);
+        const u = byUser.get(s.user_id);
+        if (!u) continue;
+        const key = `${u.url}\n${u.body}`;
+        const g = groups.get(key) ?? { body: u.body, url: u.url, subs: [] as typeof subs };
+        g.subs.push(s);
+        groups.set(key, g);
       }
-      for (const [body, group] of groups) {
+      for (const [, group] of groups) {
         const res = await sendPushToMany(
-          group.map((s) => ({ user_id: s.user_id, endpoint: s.endpoint, p256dh: s.p256dh, auth: s.auth })),
+          group.subs.map((s) => ({ user_id: s.user_id, endpoint: s.endpoint, p256dh: s.p256dh, auth: s.auth })),
           {
             title: `Critical Care — ${shiftLabel} capacity`,
-            body,
-            url: "/bed-board",
+            body: group.body,
+            url: group.url,
             tag: `capacity-${shiftKey}`,
           },
         );
@@ -299,6 +307,7 @@ export async function checkAndAlertNurseCapacity(admin: Admin, now: Date = new D
         await admin.from("push_subscriptions").delete().in("endpoint", goneEndpoints);
       }
     }
+
 
   } catch (e) {
     console.error("[nurse-capacity-alerts] failed", e);
