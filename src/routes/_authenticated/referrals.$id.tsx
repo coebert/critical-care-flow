@@ -42,6 +42,7 @@ import {
 import { ClinicalFields, clinicalFieldsFromRow } from "@/components/referrals/clinical-fields";
 import { OutcomeSelector } from "@/components/referrals/outcome-selector";
 import { validateReferralOutcome, type ReferralOutcome } from "@/lib/referral-outcome";
+import { AdmissionCapacityCallout } from "@/components/referrals/admission-capacity-callout";
 
 
 type Referral = Tables<"referrals"> & DecryptedReferral;
