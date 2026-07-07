@@ -52,6 +52,7 @@ function AdminPage() {
         <TabsList>
           <TabsTrigger value="users">Team members</TabsTrigger>
           <TabsTrigger value="beds">Beds</TabsTrigger>
+          <TabsTrigger value="templates">Templates</TabsTrigger>
           <TabsTrigger value="audit">Audit log</TabsTrigger>
         </TabsList>
         <TabsContent value="users" className="mt-4 space-y-6">
@@ -60,6 +61,9 @@ function AdminPage() {
         </TabsContent>
         <TabsContent value="beds" className="mt-4">
           <BedsAdminPanel />
+        </TabsContent>
+        <TabsContent value="templates" className="mt-4">
+          <MessageTemplatesPanel />
         </TabsContent>
         <TabsContent value="audit" className="mt-4">
           <AuditPanel />
