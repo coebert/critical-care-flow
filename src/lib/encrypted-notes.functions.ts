@@ -282,6 +282,9 @@ export const updateEncryptedNote = createServerFn({ method: "POST" })
       action: "update",
       entity_id: row.id,
       referral_id: existing.referral_id,
+      author_id: existing.author_id,
+      recipient_count: wrappedRows.length,
+      edited_at: (row as any).edited_at ?? null,
     });
     return row;
   });
