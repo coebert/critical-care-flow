@@ -28,7 +28,7 @@ import { ArrowLeft, Save, Trash2, AlertCircle } from "lucide-react";
 import { format } from "date-fns";
 import { tzTooltip } from "@/lib/format-timestamp";
 import { toast } from "sonner";
-import { validateReferralTimings } from "@/lib/referral-validation";
+import { validateReferralAll, validateReferralTimings } from "@/lib/referral-validation";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { ADMISSION_URGENCY_OPTIONS, type AdmissionUrgency } from "@/lib/admission-urgency";
 import { cn } from "@/lib/utils";
