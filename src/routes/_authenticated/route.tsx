@@ -285,6 +285,8 @@ function getPageTitle(pathname: string): string {
   if (pathname === "/postop-bookings") return "Post-op bookings";
   if (pathname.startsWith("/postop-bookings/")) return "Post-op booking";
   if (pathname === "/bed-board") return "Bed board";
+  if (pathname === "/board") return "Board mode";
+  if (pathname === "/board/ward-round") return "Ward round list";
   if (pathname === "/inbox") return "Inbox";
   if (pathname === "/notifications") return "Notifications";
   if (pathname === "/profile") return "Profile";
