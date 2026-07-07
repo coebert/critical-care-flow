@@ -38,37 +38,66 @@ export const Route = createFileRoute("/_authenticated/bed-board")({
     ],
   }),
   validateSearch: (s: Record<string, unknown>) => {
+    // Defensive normalizers: query strings can arrive as arrays (?a=1&a=2),
+    // encoded whitespace ("%20day%20"), mixed case ("Night"), leading zeros
+    // ("03"), decimals ("3.0"), or outright junk ("💥"). Strip everything
+    // down to a trimmed lowercase scalar before matching.
+    const toScalarString = (v: unknown): string | undefined => {
+      if (Array.isArray(v)) return toScalarString(v[0]);
+      if (v == null) return undefined;
+      if (typeof v === "string") {
+        const t = v.trim();
+        return t.length ? t : undefined;
+      }
+      if (typeof v === "number" && Number.isFinite(v)) return String(v);
+      if (typeof v === "boolean") return String(v);
+      return undefined;
+    };
+    const parseShift = (v: unknown): "day" | "night" | undefined => {
+      const s = toScalarString(v)?.toLowerCase();
+      return s === "day" || s === "night" ? s : undefined;
+    };
+    const parseLevel = (v: unknown): 1 | 2 | 3 | undefined => {
+      const s = toScalarString(v);
+      if (!s) return undefined;
+      // Accept "1", "2", "3", "01", "3.0"; reject "1.5", "12", NaN, "L3", etc.
+      const n = Number(s);
+      if (!Number.isFinite(n)) return undefined;
+      const rounded = Math.trunc(n);
+      if (rounded !== n) return undefined;
+      return rounded === 1 || rounded === 2 || rounded === 3 ? (rounded as 1 | 2 | 3) : undefined;
+    };
+    const optString = (v: unknown): string | undefined => {
+      const s = toScalarString(v);
+      return s;
+    };
+    const optIntLevel = (v: unknown): number | undefined => {
+      const n = parseLevel(v);
+      return n;
+    };
+
     const rawShift = s.focus_shift;
     const rawLevel = s.focus_level;
-    const shift =
-      rawShift === "day" || rawShift === "night" ? rawShift : undefined;
-    // Accept numeric or numeric-string level (deep links from push payloads
-    // that survive a query-string roundtrip both work).
-    const levelNum =
-      typeof rawLevel === "number"
-        ? rawLevel
-        : typeof rawLevel === "string" && /^[123]$/.test(rawLevel)
-          ? Number(rawLevel)
-          : undefined;
-    const level = levelNum === 1 || levelNum === 2 || levelNum === 3 ? (levelNum as 1 | 2 | 3) : undefined;
+    const shift = parseShift(rawShift);
+    const level = parseLevel(rawLevel);
     // Flag when a caller supplied a focus param but it was unusable, or when
     // they only supplied one half of the shift+level pair. Either case
     // triggers the graceful fallback banner in the component.
-    const shiftProvided = rawShift !== undefined && rawShift !== null && rawShift !== "";
-    const levelProvided = rawLevel !== undefined && rawLevel !== null && rawLevel !== "";
+    const shiftProvided = toScalarString(rawShift) !== undefined;
+    const levelProvided = toScalarString(rawLevel) !== undefined;
     const focus_invalid =
       (shiftProvided && !shift) ||
       (levelProvided && !level) ||
       (shiftProvided && !levelProvided) ||
       (levelProvided && !shiftProvided);
     return {
-      source_referral_id: typeof s.source_referral_id === "string" ? s.source_referral_id : undefined,
-      source_postop_booking_id: typeof s.source_postop_booking_id === "string" ? s.source_postop_booking_id : undefined,
-      hospital_number: typeof s.hospital_number === "string" ? s.hospital_number : undefined,
-      patient_initials: typeof s.patient_initials === "string" ? s.patient_initials : undefined,
-      admitting_consultant: typeof s.admitting_consultant === "string" ? s.admitting_consultant : undefined,
-      level: typeof s.level === "number" ? s.level : undefined,
-      source_label: typeof s.source_label === "string" ? s.source_label : undefined,
+      source_referral_id: optString(s.source_referral_id),
+      source_postop_booking_id: optString(s.source_postop_booking_id),
+      hospital_number: optString(s.hospital_number),
+      patient_initials: optString(s.patient_initials),
+      admitting_consultant: optString(s.admitting_consultant),
+      level: optIntLevel(s.level),
+      source_label: optString(s.source_label),
       focus_shift: shift,
       focus_level: level,
       focus_invalid: focus_invalid || undefined,
