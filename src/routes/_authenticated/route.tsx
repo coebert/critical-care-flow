@@ -4,7 +4,7 @@ import { useShiftStatus } from "@/hooks/use-shift-status";
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useE2ESession, initKeyStatusCrossTabSync } from "@/hooks/use-e2e-session";
-import { Activity, BarChart3, ListChecks, Shield, LogOut, Plus, Menu, Bell, BellRing, Inbox, PanelLeftClose, PanelLeftOpen, CalendarClock, UserCircle } from "lucide-react";
+import { Activity, BarChart3, ListChecks, Shield, LogOut, Plus, Menu, Bell, BellRing, Inbox, PanelLeftClose, PanelLeftOpen, CalendarClock, UserCircle, Bed as BedIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useAuth, useRole } from "@/hooks/use-auth";
 import { NotificationBell } from "@/components/notification-bell";
@@ -136,6 +136,7 @@ function AuthedShell() {
           <NavItem to="/" icon={<ListChecks className="w-4 h-4" />} collapsed={collapsed} label="Referrals" />
           <NavItem to="/referrals/new" icon={<Plus className="w-4 h-4" />} collapsed={collapsed} label="New referral" />
           <NavItem to="/postop-bookings" icon={<CalendarClock className="w-4 h-4" />} collapsed={collapsed} label="Post-op bookings" />
+          <NavItem to="/bed-board" icon={<BedIcon className="w-4 h-4" />} collapsed={collapsed} label="Bed board" />
           <NavItem to="/inbox" icon={<Inbox className="w-4 h-4" />} collapsed={collapsed} label="Inbox" />
         </NavGroup>
         <NavGroup label="Alerts" collapsed={collapsed}>
@@ -279,6 +280,7 @@ function getPageTitle(pathname: string): string {
   if (pathname.startsWith("/referrals/")) return "Referral";
   if (pathname === "/postop-bookings") return "Post-op bookings";
   if (pathname.startsWith("/postop-bookings/")) return "Post-op booking";
+  if (pathname === "/bed-board") return "Bed board";
   if (pathname === "/inbox") return "Inbox";
   if (pathname === "/notifications") return "Notifications";
   if (pathname === "/profile") return "Profile";
