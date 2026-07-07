@@ -589,6 +589,7 @@ export const addNote = createServerFn({ method: "POST" })
   .handler(async ({ data, context }) => {
     assertNonE2EWritesAllowed("add");
     const { supabase, userId } = context;
+    await assertClinicalAccess(supabase, userId);
     const { data: row, error } = await supabase
       .from("referral_notes")
       .insert({
