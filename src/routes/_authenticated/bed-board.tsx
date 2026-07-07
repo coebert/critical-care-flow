@@ -45,6 +45,9 @@ export const Route = createFileRoute("/_authenticated/bed-board")({
     admitting_consultant: typeof s.admitting_consultant === "string" ? s.admitting_consultant : undefined,
     level: typeof s.level === "number" ? s.level : undefined,
     source_label: typeof s.source_label === "string" ? s.source_label : undefined,
+    focus_shift: s.focus_shift === "day" || s.focus_shift === "night" ? s.focus_shift : undefined,
+    focus_level:
+      s.focus_level === 3 || s.focus_level === 2 || s.focus_level === 1 ? (s.focus_level as 1 | 2 | 3) : undefined,
   }),
   component: BedBoardPage,
 });
@@ -196,6 +199,42 @@ function BedBoardPage() {
         </div>
       )}
 
+      {(search.focus_shift || search.focus_level) && (
+        <div className="mb-4 flex items-center justify-between gap-3 rounded-md border border-primary/40 bg-primary/5 px-3 py-2 text-sm">
+          <div>
+            Reviewing{" "}
+            <span className="font-medium">
+              {search.focus_shift === "night" ? "Night" : "Day"} shift
+            </span>
+            {search.focus_level ? (
+              <>
+                {" · "}
+                <span className="font-medium">
+                  Level {search.focus_level}
+                  {search.focus_level === 1 ? "/0" : ""}
+                </span>{" "}
+                admission capacity
+              </>
+            ) : (
+              <> admission capacity</>
+            )}
+            .
+          </div>
+          <button
+            type="button"
+            className="text-xs text-muted-foreground hover:text-foreground underline underline-offset-2"
+            onClick={() =>
+              navigate({
+                search: { ...search, focus_shift: undefined, focus_level: undefined },
+                replace: true,
+              })
+            }
+          >
+            Clear
+          </button>
+        </div>
+      )}
+
       {isLoading && (
         <div className="text-sm text-muted-foreground">Loading bed board…</div>
       )}
@@ -215,7 +254,11 @@ function BedBoardPage() {
             onOccupiedClick={setEditOcc}
           />
           <div className="space-y-4">
-            <NurseCapacityPanel occupancies={occupancies} />
+            <NurseCapacityPanel
+              occupancies={occupancies}
+              focusShift={search.focus_shift as "day" | "night" | undefined}
+              focusLevel={search.focus_level as 1 | 2 | 3 | undefined}
+            />
             <OutliersPanel
               outliers={outliers}
               saving={saving}

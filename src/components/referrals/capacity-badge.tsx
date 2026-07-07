@@ -58,40 +58,48 @@ export function CapacityBadge() {
 
   const noStaffing = !loading && block.available == null;
 
-  const Level = ({ label, slots }: { label: string; slots: number | null }) => {
+  const Level = ({ label, slots, level }: { label: string; slots: number | null; level: 1 | 2 | 3 }) => {
     const n = slots ?? 0;
     const tone =
       n <= 0
-        ? "bg-destructive/10 text-destructive border-destructive/30"
-        : "bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border-emerald-500/30";
+        ? "bg-destructive/10 text-destructive border-destructive/30 hover:bg-destructive/20"
+        : "bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border-emerald-500/30 hover:bg-emerald-500/20";
     return (
-      <span
-        className={`inline-flex items-center gap-1 rounded-full border px-1.5 py-0.5 text-[11px] font-medium tabular-nums ${tone}`}
-        aria-label={`${label} slots: ${slots ?? "unknown"}`}
+      <Link
+        to="/bed-board"
+        search={{ focus_shift: shift, focus_level: level }}
+        aria-label={`${label} slots: ${slots ?? "unknown"} — review ${shiftLabel} shift Level ${level} on bed board`}
+        className={`inline-flex items-center gap-1 rounded-full border px-1.5 py-0.5 text-[11px] font-medium tabular-nums transition-colors ${tone}`}
       >
         {label}
         <span className="font-semibold">{slots ?? "—"}</span>
-      </span>
+      </Link>
     );
   };
 
   return (
-    <Link
-      to="/bed-board"
-      aria-label="Current admission capacity by level — go to bed board"
-      className="inline-flex items-center gap-2 rounded-full border bg-muted/40 px-2 py-1 text-xs hover:bg-muted transition-colors"
+    <div
+      className="inline-flex items-center gap-2 rounded-full border bg-muted/40 px-2 py-1 text-xs"
+      aria-label="Current admission capacity by level"
     >
-      <Users className="w-3.5 h-3.5 text-muted-foreground" aria-hidden="true" />
-      <span className="text-muted-foreground">{shiftLabel} capacity</span>
+      <Link
+        to="/bed-board"
+        search={{ focus_shift: shift }}
+        aria-label={`Review ${shiftLabel} shift capacity on bed board`}
+        className="inline-flex items-center gap-1.5 text-muted-foreground hover:text-foreground"
+      >
+        <Users className="w-3.5 h-3.5" aria-hidden="true" />
+        <span>{shiftLabel} capacity</span>
+      </Link>
       {loading ? (
         <span className="text-muted-foreground">…</span>
       ) : noStaffing ? (
         <span className="text-muted-foreground">no nurse count</span>
       ) : (
         <>
-          <Level label="L3" slots={block.level3_slots} />
-          <Level label="L2" slots={block.level2_slots} />
-          <Level label="L1/0" slots={block.level1_slots} />
+          <Level label="L3" slots={block.level3_slots} level={3} />
+          <Level label="L2" slots={block.level2_slots} level={2} />
+          <Level label="L1/0" slots={block.level1_slots} level={1} />
           <span className="text-muted-foreground">
             · spare{" "}
             <span
@@ -108,6 +116,6 @@ export function CapacityBadge() {
           </span>
         </>
       )}
-    </Link>
+    </div>
   );
 }

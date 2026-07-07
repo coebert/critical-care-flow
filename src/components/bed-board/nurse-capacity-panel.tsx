@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useServerFn } from "@tanstack/react-start";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
@@ -35,6 +35,8 @@ function ShiftRow({
   block,
   saving,
   onSave,
+  focused,
+  focusLevel,
 }: {
   label: string;
   shift: Shift;
@@ -42,6 +44,8 @@ function ShiftRow({
   block: { spare: number | null; level3_slots: number | null; level2_slots: number | null; level1_slots: number | null };
   saving: boolean;
   onSave: (shift: Shift, value: number) => Promise<void>;
+  focused?: boolean;
+  focusLevel?: 1 | 2 | 3;
 }) {
   const [editing, setEditing] = useState(available == null);
   const [draft, setDraft] = useState<string>(available == null ? "" : String(available));
@@ -60,10 +64,29 @@ function ShiftRow({
     setEditing(false);
   };
 
+  const rowRef = useRef<HTMLDivElement | null>(null);
+  useEffect(() => {
+    if (focused && rowRef.current) {
+      rowRef.current.scrollIntoView({ behavior: "smooth", block: "center" });
+    }
+  }, [focused]);
+
+  const l3Focus = focused && focusLevel === 3;
+  const l2Focus = focused && focusLevel === 2;
+  const l1Focus = focused && focusLevel === 1;
+
   return (
-    <div className="rounded-md border p-3 space-y-2">
+    <div
+      ref={rowRef}
+      className={`rounded-md border p-3 space-y-2 transition-colors ${
+        focused ? "border-primary ring-2 ring-primary/40 bg-primary/5" : ""
+      }`}
+      data-focused={focused ? "true" : undefined}
+    >
       <div className="flex items-center justify-between gap-2">
-        <div className="text-sm font-medium">{label} shift</div>
+        <div className="text-sm font-medium">
+          {label} shift{focused ? <span className="ml-2 text-xs font-normal text-primary">· reviewing</span> : null}
+        </div>
         {!editing && (
           <Button
             variant="ghost"
@@ -136,11 +159,17 @@ function ShiftRow({
           {block.spare != null && block.spare > 0 && (
             <div className="text-xs text-muted-foreground">
               Can admit{" "}
-              <span className="font-medium text-foreground">{block.level3_slots}</span> L3
+              <span className={`font-medium text-foreground ${l3Focus ? "rounded bg-primary/20 px-1 ring-1 ring-primary" : ""}`}>
+                {block.level3_slots}
+              </span>{" "}L3
               {" · "}
-              <span className="font-medium text-foreground">{block.level2_slots}</span> L2
+              <span className={`font-medium text-foreground ${l2Focus ? "rounded bg-primary/20 px-1 ring-1 ring-primary" : ""}`}>
+                {block.level2_slots}
+              </span>{" "}L2
               {" · "}
-              <span className="font-medium text-foreground">{block.level1_slots}</span> L1/L0
+              <span className={`font-medium text-foreground ${l1Focus ? "rounded bg-primary/20 px-1 ring-1 ring-primary" : ""}`}>
+                {block.level1_slots}
+              </span>{" "}L1/L0
             </div>
           )}
           {block.spare != null && block.spare <= 0 && (
@@ -154,7 +183,15 @@ function ShiftRow({
   );
 }
 
-export function NurseCapacityPanel({ occupancies }: { occupancies: Occupancy[] }) {
+export function NurseCapacityPanel({
+  occupancies,
+  focusShift,
+  focusLevel,
+}: {
+  occupancies: Occupancy[];
+  focusShift?: Shift;
+  focusLevel?: 1 | 2 | 3;
+}) {
   const today = todayIsoDate();
   const qc = useQueryClient();
   const fetchStaffing = useServerFn(getNurseStaffingForDate);
@@ -205,7 +242,7 @@ export function NurseCapacityPanel({ occupancies }: { occupancies: Occupancy[] }
         <h3 className="text-sm font-semibold">Nurse capacity — next 24 h</h3>
       </div>
 
-      <div className="p-3 space-y-3">
+      <div id="nurse-capacity" className="p-3 space-y-3">
         <div className="rounded-md bg-muted/40 px-3 py-2">
           <div className="text-xs text-muted-foreground">Current unit dependency</div>
           <div className="flex items-baseline gap-2">
@@ -232,6 +269,8 @@ export function NurseCapacityPanel({ occupancies }: { occupancies: Occupancy[] }
               block={snapshot.day}
               saving={saving}
               onSave={handleSave}
+              focused={focusShift === "day"}
+              focusLevel={focusShift === "day" ? focusLevel : undefined}
             />
             <ShiftRow
               label="Night"
@@ -240,6 +279,8 @@ export function NurseCapacityPanel({ occupancies }: { occupancies: Occupancy[] }
               block={snapshot.night}
               saving={saving}
               onSave={handleSave}
+              focused={focusShift === "night"}
+              focusLevel={focusShift === "night" ? focusLevel : undefined}
             />
           </>
         )}
