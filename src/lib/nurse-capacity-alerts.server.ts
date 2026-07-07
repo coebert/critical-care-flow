@@ -39,21 +39,33 @@ function flagsFromSnap(spare: number | null, level3: number | null, level2: numb
   };
 }
 
-function diffMessage(prev: LevelFlags | null, next: LevelFlags): string | null {
-  const changes: string[] = [];
-  const check = (label: string, p: boolean | undefined, n: boolean) => {
+export type FlippedLevel = "l3" | "l2" | "l1";
+
+export function flippedLevels(prev: LevelFlags | null, next: LevelFlags): FlippedLevel[] {
+  const out: FlippedLevel[] = [];
+  (["l3", "l2", "l1"] as const).forEach((k) => {
+    const p = prev?.[k];
+    const n = next[k];
     if (p === undefined) {
-      if (n) changes.push(`${label} available`);
-      return;
+      if (n) out.push(k);
+    } else if (p !== n) {
+      out.push(k);
     }
-    if (p === n) return;
-    changes.push(n ? `${label} now available` : `${label} no longer available`);
-  };
-  check("Level 3", prev?.l3, next.l3);
-  check("Level 2", prev?.l2, next.l2);
-  check("Level 1", prev?.l1, next.l1);
-  return changes.length ? changes.join(" · ") : null;
+  });
+  return out;
 }
+
+function levelLabel(k: FlippedLevel): string {
+  return k === "l3" ? "Level 3" : k === "l2" ? "Level 2" : "Level 1/0";
+}
+
+function messageFor(levels: FlippedLevel[], next: LevelFlags): string {
+  return levels
+    .map((k) => `${levelLabel(k)} ${next[k] ? "now available" : "no longer available"}`)
+    .join(" · ");
+}
+
+
 
 /**
  * Recompute current spare capacity and, if it flips a per-level available flag
@@ -124,49 +136,89 @@ export async function checkAndAlertNurseCapacity(admin: Admin, now: Date = new D
       { onConflict: "id" },
     );
 
-    const message = diffMessage(prev, next);
-    if (!message) return;
+    const flipped = flippedLevels(prev, next);
+    if (!flipped.length) return;
 
     const shiftLabel = shift === "day" ? "Day shift" : "Night shift";
-    const body = `${shiftLabel}: ${message}. Spare ${block.spare ?? "—"} nurses (dependency ${snap.dependency}).`;
+    const prefKey: Record<FlippedLevel, "notify_capacity_l3" | "notify_capacity_l2" | "notify_capacity_l1"> = {
+      l3: "notify_capacity_l3",
+      l2: "notify_capacity_l2",
+      l1: "notify_capacity_l1",
+    };
 
-    // Recipients: everyone at work with a push subscription. Capacity alerts
-    // are unit-wide, so we don't gate on per-referral notification prefs.
+    // Recipients: everyone at work with capacity alerts on for at least one
+    // of the flipped levels. Per-user preferences narrow both the audience
+    // and the wording of the alert.
     const { data: profiles } = await admin
       .from("profiles")
-      .select("id, is_at_work")
+      .select("id, is_at_work, notify_capacity, notify_capacity_l3, notify_capacity_l2, notify_capacity_l1")
       .eq("is_at_work", true);
-    const recipientIds = (profiles ?? []).map((p) => p.id);
-    if (!recipientIds.length) return;
+
+    type Row = {
+      id: string;
+      notify_capacity: boolean | null;
+      notify_capacity_l3: boolean | null;
+      notify_capacity_l2: boolean | null;
+      notify_capacity_l1: boolean | null;
+    };
+    const perUser: Array<{ id: string; body: string }> = [];
+    for (const p of (profiles ?? []) as Row[]) {
+      if (p.notify_capacity === false) continue;
+      const userLevels = flipped.filter((k) => (p as any)[prefKey[k]] !== false);
+      if (!userLevels.length) continue;
+      const summary = messageFor(userLevels, next);
+      perUser.push({
+        id: p.id,
+        body: `${shiftLabel}: ${summary}. Spare ${block.spare ?? "—"} nurses (dependency ${snap.dependency}).`,
+      });
+    }
+    if (!perUser.length) return;
+
+    const recipientIds = perUser.map((u) => u.id);
+    const bodyByUser = new Map(perUser.map((u) => [u.id, u.body]));
 
     // Persist in-app notifications (referral_id NULL, kind='capacity').
-    const notifRows = recipientIds.map((uid) => ({
-      user_id: uid,
+    const notifRows = perUser.map((u) => ({
+      user_id: u.id,
       referral_id: null as string | null,
       kind: "capacity",
-      message: body,
+      message: u.body,
     }));
     await admin.from("notifications").insert(notifRows as any);
 
-    // Push fan-out.
+    // Push fan-out — personalised body per subscription.
     const { data: subs } = await admin
       .from("push_subscriptions")
       .select("user_id, endpoint, p256dh, auth")
       .in("user_id", recipientIds);
     if (subs && subs.length) {
-      const { goneEndpoints } = await sendPushToMany(
-        subs.map((s) => ({ user_id: s.user_id, endpoint: s.endpoint, p256dh: s.p256dh, auth: s.auth })),
-        {
-          title: "Critical Care — admission capacity",
-          body,
-          url: "/bed-board",
-          tag: `capacity-${shiftKey}`,
-        },
-      );
+      const goneEndpoints: string[] = [];
+      // Group by body so we send one request per (body, subs) batch.
+      const groups = new Map<string, typeof subs>();
+      for (const s of subs) {
+        const b = bodyByUser.get(s.user_id);
+        if (!b) continue;
+        const g = groups.get(b) ?? [];
+        g.push(s);
+        groups.set(b, g);
+      }
+      for (const [body, group] of groups) {
+        const res = await sendPushToMany(
+          group.map((s) => ({ user_id: s.user_id, endpoint: s.endpoint, p256dh: s.p256dh, auth: s.auth })),
+          {
+            title: "Critical Care — admission capacity",
+            body,
+            url: "/bed-board",
+            tag: `capacity-${shiftKey}`,
+          },
+        );
+        goneEndpoints.push(...res.goneEndpoints);
+      }
       if (goneEndpoints.length) {
         await admin.from("push_subscriptions").delete().in("endpoint", goneEndpoints);
       }
     }
+
   } catch (e) {
     console.error("[nurse-capacity-alerts] failed", e);
   }

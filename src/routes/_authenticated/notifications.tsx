@@ -73,8 +73,12 @@ function NotificationSettingsPage() {
   const [notifyStatus, setNotifyStatus] = useState(true);
   const [notifyNew, setNotifyNew] = useState(true);
   const [notifyUpdated, setNotifyUpdated] = useState(true);
+  const [notifyCapacity, setNotifyCapacity] = useState(true);
+  const [notifyCapL3, setNotifyCapL3] = useState(true);
+  const [notifyCapL2, setNotifyCapL2] = useState(true);
+  const [notifyCapL1, setNotifyCapL1] = useState(true);
   const [prefsLoaded, setPrefsLoaded] = useState(false);
-  type PrefKey = "notes" | "status" | "new" | "updated";
+  type PrefKey = "notes" | "status" | "new" | "updated" | "capacity" | "cap_l3" | "cap_l2" | "cap_l1";
   const [savingPref, setSavingPref] = useState<PrefKey | null>(null);
   const getPrefs = useServerFn(getNotificationPrefs);
   const savePrefs = useServerFn(setNotificationPrefs);
@@ -87,6 +91,10 @@ function NotificationSettingsPage() {
         setNotifyStatus(p.notify_status);
         setNotifyNew(p.notify_new_referral);
         setNotifyUpdated(p.notify_updated_referral);
+        setNotifyCapacity(p.notify_capacity);
+        setNotifyCapL3(p.notify_capacity_l3);
+        setNotifyCapL2(p.notify_capacity_l2);
+        setNotifyCapL1(p.notify_capacity_l1);
       })
       .catch(() => {})
       .finally(() => setPrefsLoaded(true));
@@ -99,7 +107,12 @@ function NotificationSettingsPage() {
     status: [notifyStatus, setNotifyStatus, "notify_status"],
     new: [notifyNew, setNotifyNew, "notify_new_referral"],
     updated: [notifyUpdated, setNotifyUpdated, "notify_updated_referral"],
+    capacity: [notifyCapacity, setNotifyCapacity, "notify_capacity"],
+    cap_l3: [notifyCapL3, setNotifyCapL3, "notify_capacity_l3"],
+    cap_l2: [notifyCapL2, setNotifyCapL2, "notify_capacity_l2"],
+    cap_l1: [notifyCapL1, setNotifyCapL1, "notify_capacity_l1"],
   };
+
 
   const togglePref = async (key: PrefKey, next: boolean) => {
     const [prev, setter, field] = prefState[key];
@@ -337,7 +350,56 @@ function NotificationSettingsPage() {
         ))}
       </Card>
 
+      <Card className="p-5">
+        <h2 className="font-medium mb-1">Admission capacity alerts</h2>
+        <p className="text-sm text-muted-foreground mb-4">
+          Push a heads-up when the unit's spare admission capacity for a care
+          level changes materially — from none to available, or from available
+          to none — for the shift now on. Choose which care levels count.
+        </p>
+        <div className="flex items-start justify-between gap-4 py-3 border-b">
+          <div className="min-w-0">
+            <Label htmlFor="pref-capacity" className="text-sm font-medium">
+              Capacity change alerts
+            </Label>
+            <div className="text-xs text-muted-foreground mt-0.5">
+              Master switch. Turn off to silence all capacity alerts regardless of level.
+            </div>
+          </div>
+          <Switch
+            id="pref-capacity"
+            checked={notifyCapacity}
+            disabled={!prefsLoaded || savingPref !== null}
+            onCheckedChange={(v) => togglePref("capacity", v)}
+          />
+        </div>
+        {[
+          { key: "cap_l3" as const, id: "pref-cap-l3", checked: notifyCapL3, label: "Level 3", hint: "Alert when a Level 3 admission slot opens or closes.", border: true },
+          { key: "cap_l2" as const, id: "pref-cap-l2", checked: notifyCapL2, label: "Level 2", hint: "Alert when a Level 2 admission slot opens or closes.", border: true },
+          { key: "cap_l1" as const, id: "pref-cap-l1", checked: notifyCapL1, label: "Level 1 / 0", hint: "Alert when a Level 1 or 0 admission slot opens or closes.", border: false },
+        ].map((row) => (
+          <div
+            key={row.key}
+            className={`flex items-start justify-between gap-4 py-3 ${row.border ? "border-b" : ""}`}
+          >
+            <div className="min-w-0">
+              <Label htmlFor={row.id} className="text-sm font-medium">
+                {row.label}
+              </Label>
+              <div className="text-xs text-muted-foreground mt-0.5">{row.hint}</div>
+            </div>
+            <Switch
+              id={row.id}
+              checked={row.checked}
+              disabled={!prefsLoaded || savingPref !== null || !notifyCapacity}
+              onCheckedChange={(v) => togglePref(row.key, v)}
+            />
+          </div>
+        ))}
+      </Card>
+
     </div>
+
 
   );
 }
