@@ -636,6 +636,14 @@ export const deleteNote = createServerFn({ method: "POST" })
       if (!isAdmin) throw new Error("Forbidden: only the note author or an admin can delete this note.");
     }
 
+    // Count wrapped-key recipients before deletion so the audit record
+    // preserves the fanout size (rows cascade or are removed with the note).
+    const admin = await getAdmin();
+    const { count: recipientCount } = await admin
+      .from("referral_note_keys")
+      .select("recipient_user_id", { count: "exact", head: true })
+      .eq("note_id", data.id);
+
     const { error } = await supabase.from("referral_notes").delete().eq("id", data.id);
     if (error) throw safeError("referrals.deleteNote", error, "Failed to delete note.");
 
@@ -644,10 +652,15 @@ export const deleteNote = createServerFn({ method: "POST" })
       action: "delete",
       entity: "referral_note",
       entity_id: data.id,
+      referral_id: (existing as any).referral_id ?? null,
+      author_id: (existing as any).author_id ?? null,
+      recipient_count: recipientCount ?? 0,
+      edited_at: (existing as any).edited_at ?? null,
       diff: existing as any,
     });
     return { ok: true };
   });
+
 
 
 export const getNoteHistory = createServerFn({ method: "POST" })
