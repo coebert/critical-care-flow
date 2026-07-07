@@ -65,13 +65,15 @@ async function writeAuditE2E(entry: {
     // Never store plaintext or ciphertext in the audit log — the body
     // was end-to-end encrypted and is not accessible server-side.
     diff: {
-      referral_id: entry.referral_id,
+      referral_id: entry.referral_id ?? null,
       body: "[e2e-encrypted]",
+      actor_id: entry.user_id,
       author_id: entry.author_id ?? null,
       via_admin_flow: viaAdminFlow,
       recipient_count: entry.recipient_count ?? null,
       edited_at: entry.edited_at ?? null,
     } as any,
+
   } as any);
 }
 
