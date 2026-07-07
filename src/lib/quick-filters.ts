@@ -24,9 +24,9 @@ export function matchesQuickFilter(r: Referral, key: QuickFilterKey): boolean {
     case "awaiting_bed":
       return r.outcome === "admit_for_admission" && r.status !== "admitted";
     case "accepted_not_arrived":
-      return r.status === "accepted" && !r.arrived_at;
+      return r.status === "accepted" && !r.arrived_on_unit_at;
     case "discussed_pending":
-      return !!r.discussed_with_consultant_at && !r.outcome;
+      return !!(r.discussed_with_consultant && r.discussed_with_consultant.trim()) && !r.outcome;
   }
 }
 
