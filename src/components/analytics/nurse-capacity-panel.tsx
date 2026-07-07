@@ -78,7 +78,7 @@ export function NurseCapacityAnalyticsPanel() {
   return (
     <div className="space-y-4">
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <DateRangePicker value={range} onChange={(r) => r && setRange(r)} />
+        <DateRangePicker range={range} onChange={(r) => setRange(r)} />
         <div className="text-xs text-muted-foreground">
           Dependency is sampled at 12:00 (day) and 24:00 (night) using each patient's current level of care.
         </div>
@@ -97,7 +97,7 @@ export function NurseCapacityAnalyticsPanel() {
         <Kpi
           label="Avg spare capacity"
           value={kpis.avgSpare.toFixed(2)}
-          tone={kpis.avgSpare < 0 ? "danger" : kpis.avgSpare < 1 ? "warn" : "ok"}
+
         />
       </div>
 
