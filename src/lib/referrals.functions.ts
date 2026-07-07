@@ -193,15 +193,23 @@ export const createReferral = createServerFn({ method: "POST" })
   .inputValidator((d: unknown) => refSchema.parse(d))
   .handler(async ({ data, context }) => {
     const { supabase, userId } = context;
-    if (data.status === "declined" && !(data.decline_reason ?? "").trim()) {
-      throw new Error("A reason is required when declining a referral.");
+    const { validateReferralAll } = await import("./referral-validation");
+    const gateCheck = validateReferralAll({
+      status: data.status ?? "pending",
+      referral_received_at: data.referral_received_at ?? new Date().toISOString(),
+      first_seen_at: data.first_seen_at ?? null,
+      decision_at: data.decision_at ?? null,
+      arrived_on_unit_at: data.arrived_on_unit_at ?? null,
+      decline_reason: data.decline_reason ?? null,
+      discussed_with_consultant: data.discussed_with_consultant ?? null,
+      accepting_consultant: data.accepting_consultant ?? null,
+      admission_urgency: data.admission_urgency ?? null,
+    });
+    if (!gateCheck.isValid) {
+      const first = Object.values(gateCheck.fieldErrors)[0] ?? gateCheck.issues[0];
+      throw new Error(first ?? "Referral data failed validation.");
     }
-    if (data.status === "declined" && !(data.discussed_with_consultant ?? "").trim()) {
-      throw new Error("Please record which critical care consultant the referral was discussed with.");
-    }
-    if ((data.status === "admitted" || data.status === "accepted") && !(data.accepting_consultant ?? "").trim()) {
-      throw new Error("An accepting critical care consultant must be selected when a referral is marked Accepted or Admitted.");
-    }
+
     const baseInsert = applyEncryption({
       ...data,
       created_by: userId,
