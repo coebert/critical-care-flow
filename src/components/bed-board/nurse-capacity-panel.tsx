@@ -183,7 +183,15 @@ function ShiftRow({
   );
 }
 
-export function NurseCapacityPanel({ occupancies }: { occupancies: Occupancy[] }) {
+export function NurseCapacityPanel({
+  occupancies,
+  focusShift,
+  focusLevel,
+}: {
+  occupancies: Occupancy[];
+  focusShift?: Shift;
+  focusLevel?: 1 | 2 | 3;
+}) {
   const today = todayIsoDate();
   const qc = useQueryClient();
   const fetchStaffing = useServerFn(getNurseStaffingForDate);
