@@ -114,7 +114,7 @@ function EditPostopBookingPage() {
     return () => {
       cancelled = true;
     };
-  }, [id, load]);
+  }, [id, load, lifecycleRefresh]);
 
   useEffect(() => {
     let cancelled = false;
