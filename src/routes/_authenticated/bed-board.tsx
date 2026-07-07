@@ -199,6 +199,42 @@ function BedBoardPage() {
         </div>
       )}
 
+      {(search.focus_shift || search.focus_level) && (
+        <div className="mb-4 flex items-center justify-between gap-3 rounded-md border border-primary/40 bg-primary/5 px-3 py-2 text-sm">
+          <div>
+            Reviewing{" "}
+            <span className="font-medium">
+              {search.focus_shift === "night" ? "Night" : "Day"} shift
+            </span>
+            {search.focus_level ? (
+              <>
+                {" · "}
+                <span className="font-medium">
+                  Level {search.focus_level}
+                  {search.focus_level === 1 ? "/0" : ""}
+                </span>{" "}
+                admission capacity
+              </>
+            ) : (
+              <> admission capacity</>
+            )}
+            .
+          </div>
+          <button
+            type="button"
+            className="text-xs text-muted-foreground hover:text-foreground underline underline-offset-2"
+            onClick={() =>
+              navigate({
+                search: (prev) => ({ ...prev, focus_shift: undefined, focus_level: undefined }),
+                replace: true,
+              })
+            }
+          >
+            Clear
+          </button>
+        </div>
+      )}
+
       {isLoading && (
         <div className="text-sm text-muted-foreground">Loading bed board…</div>
       )}
