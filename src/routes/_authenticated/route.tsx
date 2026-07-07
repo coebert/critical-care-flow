@@ -70,6 +70,7 @@ function AuthedShell() {
   const pathname = useRouterState({ select: (s) => s.location.pathname });
   const { supported, permission, subscribed } = usePush();
   const { atWork } = useShiftStatus();
+  useNewReferralAlert();
 
   // Kick off a single global key-status fetch as soon as the user is
   // authenticated. Every page then reads from useE2ESession without
