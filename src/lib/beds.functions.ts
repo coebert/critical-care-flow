@@ -176,8 +176,10 @@ export const updateOccupancy = createServerFn({ method: "POST" })
       .select("*")
       .single();
     if (error) throw safeError("beds", error, "Could not update occupancy");
+    await fireCapacityAlert();
     return row;
   });
+
 
 export const dischargeOccupancy = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
