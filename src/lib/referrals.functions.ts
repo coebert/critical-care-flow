@@ -596,12 +596,17 @@ export const updateNote = createServerFn({ method: "POST" })
       action: "update",
       entity: "referral_note",
       entity_id: row.id,
+      referral_id: existing.referral_id,
+      author_id: (existing as any).author_id ?? null,
+      recipient_count: 0,
+      edited_at: (row as any).edited_at ?? null,
       diff: {
         referral_id: existing.referral_id,
         before: { body: beforeBody },
         after: { body: data.body },
       },
     });
+
     return { ...row, body: data.body };
   });
 
