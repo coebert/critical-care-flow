@@ -22,6 +22,7 @@ import { CapacityStrip } from "@/components/bed-board/capacity-strip";
 import { BedGrid } from "@/components/bed-board/bed-grid";
 import { AdmitDialog, EditOccupancyDialog, MoveDialog, type OccupancyFormValue } from "@/components/bed-board/dialogs";
 import { OutliersPanel, TransfersPanel } from "@/components/bed-board/side-panels";
+import { NurseCapacityPanel } from "@/components/bed-board/nurse-capacity-panel";
 
 type Bed = Database["public"]["Tables"]["beds"]["Row"];
 type Occ = Database["public"]["Tables"]["bed_occupancies"]["Row"];
