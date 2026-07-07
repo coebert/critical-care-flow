@@ -23,6 +23,17 @@ import {
   type ResusStatus,
 } from "@/lib/referral-clinical";
 
+export type WardReviewTimeframe = "12h" | "24h" | "48h" | "72h" | "weekly" | "prn";
+
+export const WARD_REVIEW_TIMEFRAME_OPTIONS: { value: WardReviewTimeframe; label: string }[] = [
+  { value: "12h", label: "Within 12 hours" },
+  { value: "24h", label: "Within 24 hours" },
+  { value: "48h", label: "Within 48 hours" },
+  { value: "72h", label: "Within 72 hours" },
+  { value: "weekly", label: "Weekly" },
+  { value: "prn", label: "As needed (PRN)" },
+];
+
 export interface ClinicalFieldsValue {
   news2_score: number | null;
   ceiling_of_care: CeilingOfCare | null;
@@ -34,6 +45,9 @@ export interface ClinicalFieldsValue {
   weight_kg: number | null;
   allergies: string | null;
   resus_status: ResusStatus | null;
+  needs_ward_review: boolean;
+  for_ongoing_ccot_review: boolean;
+  ward_review_timeframe: WardReviewTimeframe | null;
 }
 
 const NONE = "__none";
