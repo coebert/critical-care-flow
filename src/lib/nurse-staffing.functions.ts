@@ -29,7 +29,7 @@ export const getNurseStaffingForDate = createServerFn({ method: "GET" })
       if (error) throw error;
       return rows ?? [];
     } catch (e) {
-      throw safeError(e, "Failed to load nurse staffing");
+      throw safeError("nurse-staffing.list", e, "Failed to load nurse staffing");
     }
   });
 
@@ -55,6 +55,6 @@ export const upsertNurseStaffing = createServerFn({ method: "POST" })
       if (error) throw error;
       return row;
     } catch (e) {
-      throw safeError(e, "Failed to save nurse staffing");
+      throw safeError("nurse-staffing.upsert", e, "Failed to save nurse staffing");
     }
   });
