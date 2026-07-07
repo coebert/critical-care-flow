@@ -36,8 +36,18 @@ export const Route = createFileRoute("/_authenticated/bed-board")({
       { name: "description", content: "Live ICU/HDU bed board and capacity snapshot." },
     ],
   }),
+  validateSearch: (s: Record<string, unknown>) => ({
+    source_referral_id: typeof s.source_referral_id === "string" ? s.source_referral_id : undefined,
+    source_postop_booking_id: typeof s.source_postop_booking_id === "string" ? s.source_postop_booking_id : undefined,
+    hospital_number: typeof s.hospital_number === "string" ? s.hospital_number : undefined,
+    patient_initials: typeof s.patient_initials === "string" ? s.patient_initials : undefined,
+    admitting_consultant: typeof s.admitting_consultant === "string" ? s.admitting_consultant : undefined,
+    level: typeof s.level === "number" ? s.level : undefined,
+    source_label: typeof s.source_label === "string" ? s.source_label : undefined,
+  }),
   component: BedBoardPage,
 });
+
 
 function toIsoOrNull(v: string | null): string | null {
   if (!v) return null;
@@ -46,6 +56,8 @@ function toIsoOrNull(v: string | null): string | null {
 }
 
 function BedBoardPage() {
+  const search = Route.useSearch();
+  const navigate = Route.useNavigate();
   const fetchBoard = useServerFn(getBedBoard);
   const qc = useQueryClient();
   const { data, isLoading, error } = useQuery({
@@ -53,6 +65,7 @@ function BedBoardPage() {
     queryFn: () => fetchBoard(),
     staleTime: 5_000,
   });
+
 
   useEffect(() => {
     const ch = supabase
@@ -128,6 +141,28 @@ function BedBoardPage() {
     }
   };
 
+  const admitPrefill = search.source_referral_id || search.source_postop_booking_id
+    ? {
+        hospital_number: search.hospital_number ?? null,
+        patient_initials: search.patient_initials ?? null,
+        admitting_consultant: search.admitting_consultant ?? null,
+        level: (search.level === 1 || search.level === 2 || search.level === 3 ? search.level : 3) as 1 | 2 | 3,
+      }
+    : undefined;
+  const clearAdmitSource = () =>
+    navigate({
+      search: {
+        source_referral_id: undefined,
+        source_postop_booking_id: undefined,
+        hospital_number: undefined,
+        patient_initials: undefined,
+        admitting_consultant: undefined,
+        level: undefined,
+        source_label: undefined,
+      },
+      replace: true,
+    });
+
   return (
     <div className="p-4 sm:p-6 max-w-7xl mx-auto">
       <div className="mb-6">
@@ -137,6 +172,23 @@ function BedBoardPage() {
 
       <CapacityStrip snapshot={snapshot} />
 
+      {admitPrefill && (
+        <div className="mb-4 flex items-center justify-between gap-3 rounded-md border bg-primary/5 px-3 py-2 text-sm">
+          <div>
+            Admitting from <span className="font-medium">{search.source_label ?? "referral"}</span>
+            {search.patient_initials ? <> · <span className="font-mono">{search.patient_initials}</span></> : null}
+            . Click an empty bed to place the patient.
+          </div>
+          <button
+            type="button"
+            className="text-xs text-muted-foreground hover:text-foreground underline underline-offset-2"
+            onClick={clearAdmitSource}
+          >
+            Cancel
+          </button>
+        </div>
+      )}
+
       {isLoading && (
         <div className="text-sm text-muted-foreground">Loading bed board…</div>
       )}
@@ -145,6 +197,7 @@ function BedBoardPage() {
           Failed to load bed board: {error instanceof Error ? error.message : "unknown"}
         </div>
       )}
+
 
       {!isLoading && !error && (
         <div className="grid lg:grid-cols-[1fr_320px] gap-6">
@@ -178,6 +231,8 @@ function BedBoardPage() {
         open={!!admitBed}
         bed={admitBed}
         saving={saving}
+        initial={admitPrefill}
+        sourceLabel={admitPrefill ? search.source_label ?? "referral" : undefined}
         onOpenChange={(v) => !v && setAdmitBed(null)}
         onSubmit={(value) => {
           if (!admitBed) return;
@@ -200,10 +255,16 @@ function BedBoardPage() {
             predicted_discharge_at: toIsoOrNull(value.predicted_discharge_at),
             predicted_step_down: value.predicted_step_down,
             notes: value.notes,
+            source_referral_id: search.source_referral_id ?? null,
+            source_postop_booking_id: search.source_postop_booking_id ?? null,
           };
-          wrap(() => doAdmit({ data: payload }), "Admitted").then(() => setAdmitBed(null));
+          wrap(() => doAdmit({ data: payload }), "Admitted").then(() => {
+            setAdmitBed(null);
+            if (admitPrefill) clearAdmitSource();
+          });
         }}
       />
+
 
       <EditOccupancyDialog
         open={!!editOcc}

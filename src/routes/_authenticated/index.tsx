@@ -26,6 +26,7 @@ import { ReferralsDrilldownBadges } from "@/components/referrals/referrals-drill
 import { ReferralsFilters } from "@/components/referrals/referrals-filters";
 import { ReferralsDeletedPanel } from "@/components/referrals/referrals-deleted-panel";
 import { ReferralsRows } from "@/components/referrals/referrals-rows";
+import { MiniCapacityLink } from "@/components/bed-board/mini-capacity-link";
 
 // Cache key for the live referrals list. Kept as a stable tuple so the
 // realtime subscription can invalidate it without importing the options.
@@ -205,6 +206,11 @@ function ReferralsList() {
         from={search.from}
         to={search.to}
       />
+
+      <div className="mb-4">
+        <MiniCapacityLink />
+      </div>
+
 
       {showDeleted && (
         <ReferralsDeletedPanel

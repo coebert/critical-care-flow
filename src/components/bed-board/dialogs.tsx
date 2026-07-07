@@ -228,26 +228,32 @@ export function AdmitDialog({
   onOpenChange,
   onSubmit,
   saving,
+  initial,
+  sourceLabel,
 }: {
   open: boolean;
   bed: Bed | null;
   onOpenChange: (v: boolean) => void;
   onSubmit: (v: OccupancyFormValue & { admitted_at: string }) => void;
   saving?: boolean;
+  initial?: Partial<OccupancyFormValue>;
+  sourceLabel?: string;
 }) {
-  const [value, setValue] = useState<OccupancyFormValue>(emptyValue());
+  const [value, setValue] = useState<OccupancyFormValue>({ ...emptyValue(), ...(initial ?? {}) });
   return (
     <Dialog
       open={open}
       onOpenChange={(v) => {
         onOpenChange(v);
-        if (v) setValue(emptyValue());
+        if (v) setValue({ ...emptyValue(), ...(initial ?? {}) });
       }}
     >
       <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>Admit to {bed?.code}</DialogTitle>
-          <DialogDescription>Record who now occupies this bed.</DialogDescription>
+          <DialogDescription>
+            {sourceLabel ? `Prefilled from ${sourceLabel}. ` : ""}Record who now occupies this bed.
+          </DialogDescription>
         </DialogHeader>
         <OccupancyForm value={value} onChange={(p) => setValue((v) => ({ ...v, ...p }))} />
         <DialogFooter>
@@ -265,6 +271,7 @@ export function AdmitDialog({
     </Dialog>
   );
 }
+
 
 export function EditOccupancyDialog({
   open,

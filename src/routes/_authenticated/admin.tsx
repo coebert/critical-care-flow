@@ -12,6 +12,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
+import { BedsAdminPanel } from "@/components/bed-board/beds-admin-panel";
 import { toast } from "sonner";
 import { format } from "date-fns";
 
@@ -49,16 +50,21 @@ function AdminPage() {
       <Tabs defaultValue="users">
         <TabsList>
           <TabsTrigger value="users">Team members</TabsTrigger>
+          <TabsTrigger value="beds">Beds</TabsTrigger>
           <TabsTrigger value="audit">Audit log</TabsTrigger>
         </TabsList>
         <TabsContent value="users" className="mt-4 space-y-6">
           <InvitePanel />
           <UsersPanel />
         </TabsContent>
+        <TabsContent value="beds" className="mt-4">
+          <BedsAdminPanel />
+        </TabsContent>
         <TabsContent value="audit" className="mt-4">
           <AuditPanel />
         </TabsContent>
       </Tabs>
+
 
     </div>
   );
