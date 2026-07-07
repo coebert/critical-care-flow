@@ -72,7 +72,7 @@ export const getNurseCapacityAnalytics = createServerFn({ method: "GET" })
   .inputValidator((input: z.infer<typeof analyticsRangeSchema>) => analyticsRangeSchema.parse(input))
   .handler(async ({ context, data }) => {
     try {
-      assertAdmin(context.claims);
+      await assertAdmin(context);
       // Staffing rows in the requested calendar range.
       const { data: staffing, error: sErr } = await context.supabase
         .from("nurse_staffing")
