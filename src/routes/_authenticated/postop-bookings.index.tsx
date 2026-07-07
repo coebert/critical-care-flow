@@ -48,6 +48,7 @@ type Booking = {
   created_by_name?: string | null;
   deleted_at?: string | null;
   is_test?: boolean | null;
+  booking_status?: PostopBookingStatus;
 };
 
 const LEVEL_LABEL = {
