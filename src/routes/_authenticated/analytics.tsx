@@ -30,6 +30,10 @@ export const Route = createFileRoute("/_authenticated/analytics")({
       queryKey: ["analytics", "postop", fromIso, toIso],
       queryFn: () => getPostopAnalytics({ data: { from: fromIso, to: toIso } }),
     });
+    void context.queryClient.prefetchQuery({
+      queryKey: ["analytics", "nurse-capacity", fromIso.slice(0, 10), toIso.slice(0, 10)],
+      queryFn: () => getNurseCapacityAnalytics({ data: { from: fromIso.slice(0, 10), to: toIso.slice(0, 10) } }),
+    });
     void context.queryClient.prefetchQuery(icnarcTargetsQueryOptions);
   },
   errorComponent: ({ error }) => <RouteErrorFallback error={error} label="Analytics" />,
