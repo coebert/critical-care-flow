@@ -68,6 +68,321 @@ export type Database = {
         }
         Relationships: []
       }
+      bed_occupancies: {
+        Row: {
+          actual_step_down: Database["public"]["Enums"]["bed_step_down"] | null
+          admitted_at: string
+          admitting_consultant: string | null
+          bed_id: string
+          created_at: string
+          created_by: string | null
+          discharged_at: string | null
+          hfno: boolean
+          hospital_number: string | null
+          id: string
+          isolation: Database["public"]["Enums"]["bed_isolation"]
+          isolation_reason: string | null
+          level: number
+          nippv_cpap: boolean
+          notes: string | null
+          patient_initials: string | null
+          predicted_discharge_at: string | null
+          predicted_step_down:
+            | Database["public"]["Enums"]["bed_step_down"]
+            | null
+          renal_replacement: boolean
+          requires_side_room: boolean
+          source_postop_booking_id: string | null
+          source_referral_id: string | null
+          tracheostomy: boolean
+          updated_at: string
+          updated_by: string | null
+          vasopressors: boolean
+          ventilated: boolean
+        }
+        Insert: {
+          actual_step_down?: Database["public"]["Enums"]["bed_step_down"] | null
+          admitted_at?: string
+          admitting_consultant?: string | null
+          bed_id: string
+          created_at?: string
+          created_by?: string | null
+          discharged_at?: string | null
+          hfno?: boolean
+          hospital_number?: string | null
+          id?: string
+          isolation?: Database["public"]["Enums"]["bed_isolation"]
+          isolation_reason?: string | null
+          level?: number
+          nippv_cpap?: boolean
+          notes?: string | null
+          patient_initials?: string | null
+          predicted_discharge_at?: string | null
+          predicted_step_down?:
+            | Database["public"]["Enums"]["bed_step_down"]
+            | null
+          renal_replacement?: boolean
+          requires_side_room?: boolean
+          source_postop_booking_id?: string | null
+          source_referral_id?: string | null
+          tracheostomy?: boolean
+          updated_at?: string
+          updated_by?: string | null
+          vasopressors?: boolean
+          ventilated?: boolean
+        }
+        Update: {
+          actual_step_down?: Database["public"]["Enums"]["bed_step_down"] | null
+          admitted_at?: string
+          admitting_consultant?: string | null
+          bed_id?: string
+          created_at?: string
+          created_by?: string | null
+          discharged_at?: string | null
+          hfno?: boolean
+          hospital_number?: string | null
+          id?: string
+          isolation?: Database["public"]["Enums"]["bed_isolation"]
+          isolation_reason?: string | null
+          level?: number
+          nippv_cpap?: boolean
+          notes?: string | null
+          patient_initials?: string | null
+          predicted_discharge_at?: string | null
+          predicted_step_down?:
+            | Database["public"]["Enums"]["bed_step_down"]
+            | null
+          renal_replacement?: boolean
+          requires_side_room?: boolean
+          source_postop_booking_id?: string | null
+          source_referral_id?: string | null
+          tracheostomy?: boolean
+          updated_at?: string
+          updated_by?: string | null
+          vasopressors?: boolean
+          ventilated?: boolean
+        }
+        Relationships: [
+          {
+            foreignKeyName: "bed_occupancies_bed_id_fkey"
+            columns: ["bed_id"]
+            isOneToOne: false
+            referencedRelation: "beds"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "bed_occupancies_source_postop_booking_id_fkey"
+            columns: ["source_postop_booking_id"]
+            isOneToOne: false
+            referencedRelation: "postop_bookings"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "bed_occupancies_source_referral_id_fkey"
+            columns: ["source_referral_id"]
+            isOneToOne: false
+            referencedRelation: "referrals"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      bed_outliers: {
+        Row: {
+          admitting_consultant: string | null
+          created_at: string
+          created_by: string | null
+          deleted_at: string | null
+          deleted_by: string | null
+          ended_at: string | null
+          hfno: boolean
+          hospital_number: string | null
+          id: string
+          level: number
+          nippv_cpap: boolean
+          notes: string | null
+          patient_initials: string | null
+          reason: string | null
+          renal_replacement: boolean
+          started_at: string
+          updated_at: string
+          updated_by: string | null
+          vasopressors: boolean
+          ventilated: boolean
+          ward: string
+        }
+        Insert: {
+          admitting_consultant?: string | null
+          created_at?: string
+          created_by?: string | null
+          deleted_at?: string | null
+          deleted_by?: string | null
+          ended_at?: string | null
+          hfno?: boolean
+          hospital_number?: string | null
+          id?: string
+          level?: number
+          nippv_cpap?: boolean
+          notes?: string | null
+          patient_initials?: string | null
+          reason?: string | null
+          renal_replacement?: boolean
+          started_at?: string
+          updated_at?: string
+          updated_by?: string | null
+          vasopressors?: boolean
+          ventilated?: boolean
+          ward: string
+        }
+        Update: {
+          admitting_consultant?: string | null
+          created_at?: string
+          created_by?: string | null
+          deleted_at?: string | null
+          deleted_by?: string | null
+          ended_at?: string | null
+          hfno?: boolean
+          hospital_number?: string | null
+          id?: string
+          level?: number
+          nippv_cpap?: boolean
+          notes?: string | null
+          patient_initials?: string | null
+          reason?: string | null
+          renal_replacement?: boolean
+          started_at?: string
+          updated_at?: string
+          updated_by?: string | null
+          vasopressors?: boolean
+          ventilated?: boolean
+          ward?: string
+        }
+        Relationships: []
+      }
+      bed_transfers_out: {
+        Row: {
+          accepted_at: string | null
+          cancel_reason: string | null
+          cancelled_at: string | null
+          completed_at: string | null
+          created_at: string
+          created_by: string | null
+          deleted_at: string | null
+          deleted_by: string | null
+          departed_at: string | null
+          destination_hospital: string
+          destination_specialty: string | null
+          eta_at: string | null
+          id: string
+          kind: Database["public"]["Enums"]["bed_transfer_kind"]
+          notes: string | null
+          occupancy_id: string | null
+          reason: string | null
+          requested_at: string
+          status: Database["public"]["Enums"]["bed_transfer_status"]
+          transport_mode:
+            | Database["public"]["Enums"]["bed_transport_mode"]
+            | null
+          updated_at: string
+          updated_by: string | null
+        }
+        Insert: {
+          accepted_at?: string | null
+          cancel_reason?: string | null
+          cancelled_at?: string | null
+          completed_at?: string | null
+          created_at?: string
+          created_by?: string | null
+          deleted_at?: string | null
+          deleted_by?: string | null
+          departed_at?: string | null
+          destination_hospital: string
+          destination_specialty?: string | null
+          eta_at?: string | null
+          id?: string
+          kind?: Database["public"]["Enums"]["bed_transfer_kind"]
+          notes?: string | null
+          occupancy_id?: string | null
+          reason?: string | null
+          requested_at?: string
+          status?: Database["public"]["Enums"]["bed_transfer_status"]
+          transport_mode?:
+            | Database["public"]["Enums"]["bed_transport_mode"]
+            | null
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Update: {
+          accepted_at?: string | null
+          cancel_reason?: string | null
+          cancelled_at?: string | null
+          completed_at?: string | null
+          created_at?: string
+          created_by?: string | null
+          deleted_at?: string | null
+          deleted_by?: string | null
+          departed_at?: string | null
+          destination_hospital?: string
+          destination_specialty?: string | null
+          eta_at?: string | null
+          id?: string
+          kind?: Database["public"]["Enums"]["bed_transfer_kind"]
+          notes?: string | null
+          occupancy_id?: string | null
+          reason?: string | null
+          requested_at?: string
+          status?: Database["public"]["Enums"]["bed_transfer_status"]
+          transport_mode?:
+            | Database["public"]["Enums"]["bed_transport_mode"]
+            | null
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "bed_transfers_out_occupancy_id_fkey"
+            columns: ["occupancy_id"]
+            isOneToOne: false
+            referencedRelation: "bed_occupancies"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      beds: {
+        Row: {
+          active: boolean
+          code: string
+          created_at: string
+          id: string
+          is_side_room: boolean
+          notes: string | null
+          sort_order: number
+          unit: Database["public"]["Enums"]["bed_unit"]
+          updated_at: string
+        }
+        Insert: {
+          active?: boolean
+          code: string
+          created_at?: string
+          id?: string
+          is_side_room?: boolean
+          notes?: string | null
+          sort_order?: number
+          unit: Database["public"]["Enums"]["bed_unit"]
+          updated_at?: string
+        }
+        Update: {
+          active?: boolean
+          code?: string
+          created_at?: string
+          id?: string
+          is_side_room?: boolean
+          notes?: string | null
+          sort_order?: number
+          unit?: Database["public"]["Enums"]["bed_unit"]
+          updated_at?: string
+        }
+        Relationships: []
+      }
       icnarc_targets: {
         Row: {
           decision_to_arrival_target_min: number
@@ -710,6 +1025,18 @@ export type Database = {
         | "enable"
         | "unlock"
         | "reissue"
+      bed_isolation: "none" | "contact" | "droplet" | "airborne"
+      bed_step_down: "ward" | "hdu" | "home" | "other"
+      bed_transfer_kind: "repat" | "tertiary" | "other"
+      bed_transfer_status:
+        | "requested"
+        | "accepted"
+        | "awaiting_transport"
+        | "in_transit"
+        | "completed"
+        | "cancelled"
+      bed_transport_mode: "land_ambulance" | "air" | "self" | "other"
+      bed_unit: "icu" | "hdu"
       patient_sex: "male" | "female" | "other" | "unknown"
       postop_level: "level_1" | "level_2" | "level_3"
       referral_status: "pending" | "declined" | "admitted" | "accepted"
@@ -858,6 +1185,19 @@ export const Constants = {
         "unlock",
         "reissue",
       ],
+      bed_isolation: ["none", "contact", "droplet", "airborne"],
+      bed_step_down: ["ward", "hdu", "home", "other"],
+      bed_transfer_kind: ["repat", "tertiary", "other"],
+      bed_transfer_status: [
+        "requested",
+        "accepted",
+        "awaiting_transport",
+        "in_transit",
+        "completed",
+        "cancelled",
+      ],
+      bed_transport_mode: ["land_ambulance", "air", "self", "other"],
+      bed_unit: ["icu", "hdu"],
       patient_sex: ["male", "female", "other", "unknown"],
       postop_level: ["level_1", "level_2", "level_3"],
       referral_status: ["pending", "declined", "admitted", "accepted"],
