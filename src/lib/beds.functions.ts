@@ -255,13 +255,13 @@ export const updateTransferOut = createServerFn({ method: "POST" })
   .inputValidator((d: unknown) => updateTransferSchema.parse(d))
   .handler(async ({ data, context }) => {
     const { id, ...patch } = data;
-    const patchWithStamps: Record<string, unknown> = { ...patch, updated_by: context.userId };
-    if (patch.status === "completed" && !patch.completed_at) {
-      patchWithStamps.completed_at = new Date().toISOString();
-    }
+    const completed_at =
+      patch.status === "completed" && !patch.completed_at
+        ? new Date().toISOString()
+        : patch.completed_at;
     const { data: row, error } = await context.supabase
       .from("bed_transfers_out")
-      .update(patchWithStamps)
+      .update({ ...patch, completed_at, updated_by: context.userId })
       .eq("id", id)
       .select("*")
       .single();
