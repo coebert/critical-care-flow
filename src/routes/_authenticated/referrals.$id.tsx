@@ -545,5 +545,6 @@ function ReferralDetail() {
         )}
       </div>
     </div>
+    </ClinicalAccessGate>
   );
 }
