@@ -1,4 +1,4 @@
-import { createFileRoute, Link } from "@tanstack/react-router";
+import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useEffect, useState, useMemo, useCallback } from "react";
 import { useServerFn } from "@tanstack/react-start";
 import { queryOptions, useQueryClient, useSuspenseQuery } from "@tanstack/react-query";
@@ -27,6 +27,8 @@ import { ReferralsFilters } from "@/components/referrals/referrals-filters";
 import { ReferralsDeletedPanel } from "@/components/referrals/referrals-deleted-panel";
 import { ReferralsRows } from "@/components/referrals/referrals-rows";
 import { MiniCapacityLink } from "@/components/bed-board/mini-capacity-link";
+import { QuickFilterChips } from "@/components/referrals/quick-filter-chips";
+import { applyQuickFilter, matchesQuickFilter, type QuickFilterKey } from "@/lib/quick-filters";
 
 // Cache key for the live referrals list. Kept as a stable tuple so the
 // realtime subscription can invalidate it without importing the options.
@@ -65,6 +67,7 @@ export const Route = createFileRoute("/_authenticated/")({
     specialty: typeof search.specialty === "string" ? search.specialty : undefined,
     from: typeof search.from === "string" ? search.from : undefined, // yyyy-MM-dd inclusive
     to: typeof search.to === "string" ? search.to : undefined,       // yyyy-MM-dd inclusive
+    quick: typeof search.quick === "string" ? (search.quick as QuickFilterKey) : undefined,
   }),
   // Prime the referrals list cache before the component mounts. The parent
   // `_authenticated` layout is `ssr: false`, so this runs client-side after
@@ -157,7 +160,7 @@ function ReferralsList() {
 
   const topWards = useMemo(() => computeTopWards(rows), [rows]);
 
-  const filtered = useMemo(
+  const baseFiltered = useMemo(
     () =>
       filterReferrals(rows, {
         hospSearch,
@@ -171,6 +174,19 @@ function ReferralsList() {
       }),
     [rows, hospSearch, q, statusFilter, urgencyFilter, locFilter, dateFilter, pediatricFilter, search.specialty, search.from, search.to],
   );
+
+  const navigate = useNavigate({ from: "/" });
+  const quick: QuickFilterKey = search.quick ?? "all";
+
+  const quickCounts = useMemo(() => ({
+    all: baseFiltered.length,
+    awaiting_review: baseFiltered.filter((r) => matchesQuickFilter(r, "awaiting_review")).length,
+    awaiting_bed: baseFiltered.filter((r) => matchesQuickFilter(r, "awaiting_bed")).length,
+    accepted_not_arrived: baseFiltered.filter((r) => matchesQuickFilter(r, "accepted_not_arrived")).length,
+    discussed_pending: baseFiltered.filter((r) => matchesQuickFilter(r, "discussed_pending")).length,
+  }), [baseFiltered]);
+
+  const filtered = useMemo(() => applyQuickFilter(baseFiltered, quick), [baseFiltered, quick]);
 
   const displayed = useMemo(
     () => sortByTimer(filtered, timerSort, Date.now()),
@@ -220,6 +236,12 @@ function ReferralsList() {
           onRestore={onRestore}
         />
       )}
+
+      <QuickFilterChips
+        value={quick}
+        counts={quickCounts}
+        onChange={(k) => navigate({ search: ((prev: Record<string, unknown>) => ({ ...prev, quick: k === "all" ? undefined : k })) as never })}
+      />
 
       <ReferralsFilters
         hospSearch={hospSearch}

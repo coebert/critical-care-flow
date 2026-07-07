@@ -8,6 +8,8 @@ import { Activity, BarChart3, ListChecks, Shield, LogOut, Plus, Menu, Bell, Bell
 import { Button } from "@/components/ui/button";
 import { useAuth, useRole } from "@/hooks/use-auth";
 import { NotificationBell } from "@/components/notification-bell";
+import { AlertToggle } from "@/components/alert-toggle";
+import { useNewReferralAlert } from "@/hooks/use-new-referral-alert";
 import { ShiftToggle } from "@/components/shift-toggle";
 import { PushPermissionPrompt } from "@/components/push-permission-prompt";
 import { E2EUnlockBanner } from "@/components/e2e-unlock-banner";
@@ -68,6 +70,7 @@ function AuthedShell() {
   const pathname = useRouterState({ select: (s) => s.location.pathname });
   const { supported, permission, subscribed } = usePush();
   const { atWork } = useShiftStatus();
+  useNewReferralAlert();
 
   // Kick off a single global key-status fetch as soon as the user is
   // authenticated. Every page then reads from useE2ESession without
@@ -230,6 +233,7 @@ function AuthedShell() {
           <div className="flex items-center gap-1.5 sm:gap-2 shrink-0 justify-end">
             <ShiftToggle />
             {supported && permission === "granted" && subscribed && <TestPushButton />}
+            <AlertToggle />
             <NotificationBell />
           </div>
         </header>
@@ -281,6 +285,8 @@ function getPageTitle(pathname: string): string {
   if (pathname === "/postop-bookings") return "Post-op bookings";
   if (pathname.startsWith("/postop-bookings/")) return "Post-op booking";
   if (pathname === "/bed-board") return "Bed board";
+  if (pathname === "/board") return "Board mode";
+  if (pathname === "/board/ward-round") return "Ward round list";
   if (pathname === "/inbox") return "Inbox";
   if (pathname === "/notifications") return "Notifications";
   if (pathname === "/profile") return "Profile";
