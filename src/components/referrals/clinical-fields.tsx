@@ -267,6 +267,9 @@ export function ClinicalFields({
         </label>
         {(value.needs_ward_review || value.for_ongoing_ccot_review) && (
           <div className="space-y-1.5">
+            <p className="text-xs text-muted-foreground">
+              Turning off both review options will automatically clear the suggested timeframe.
+            </p>
             <Label>Suggested review timeframe</Label>
             <Select
               value={value.ward_review_timeframe ?? NONE}
