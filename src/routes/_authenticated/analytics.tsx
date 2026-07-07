@@ -47,7 +47,8 @@ export const Route = createFileRoute("/_authenticated/analytics")({
 function AnalyticsPage() {
   const search = Route.useSearch();
   const navigate = Route.useNavigate();
-  const tab: "referrals" | "postop" = search.view === "postop" ? "postop" : "referrals";
+  const tab: "referrals" | "postop" | "nurse-capacity" =
+    search.view === "postop" ? "postop" : search.view === "nurse-capacity" ? "nurse-capacity" : "referrals";
 
   return (
     <div className="p-4 sm:p-6 max-w-7xl mx-auto">
@@ -57,18 +58,27 @@ function AnalyticsPage() {
       <Tabs
         value={tab}
         onValueChange={(v) =>
-          navigate({ search: { view: v === "postop" ? "postop" : undefined }, replace: true })
+          navigate({
+            search: {
+              view: v === "referrals" ? undefined : (v as "postop" | "nurse-capacity"),
+            },
+            replace: true,
+          })
         }
       >
         <TabsList className="mb-4">
           <TabsTrigger value="referrals">Referrals</TabsTrigger>
           <TabsTrigger value="postop">Post-op bookings</TabsTrigger>
+          <TabsTrigger value="nurse-capacity">Nurse capacity</TabsTrigger>
         </TabsList>
         <TabsContent value="referrals">
           <ReferralsAnalyticsPanel />
         </TabsContent>
         <TabsContent value="postop">
           <PostopAnalyticsPanel />
+        </TabsContent>
+        <TabsContent value="nurse-capacity">
+          <NurseCapacityAnalyticsPanel />
         </TabsContent>
       </Tabs>
     </div>
