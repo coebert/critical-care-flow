@@ -273,5 +273,6 @@ function ReferralsList() {
         }
       />
     </div>
+    </ClinicalAccessGate>
   );
 }
