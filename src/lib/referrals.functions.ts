@@ -376,6 +376,7 @@ export const updateReferral = createServerFn({ method: "POST" })
   )
   .handler(async ({ data, context }) => {
     const { supabase, userId } = context;
+    await assertClinicalAccess(supabase, userId);
     const { data: prior } = await supabase
       .from("referrals")
       .select(
