@@ -36,8 +36,18 @@ export const Route = createFileRoute("/_authenticated/bed-board")({
       { name: "description", content: "Live ICU/HDU bed board and capacity snapshot." },
     ],
   }),
+  validateSearch: (s: Record<string, unknown>) => ({
+    source_referral_id: typeof s.source_referral_id === "string" ? s.source_referral_id : undefined,
+    source_postop_booking_id: typeof s.source_postop_booking_id === "string" ? s.source_postop_booking_id : undefined,
+    hospital_number: typeof s.hospital_number === "string" ? s.hospital_number : undefined,
+    patient_initials: typeof s.patient_initials === "string" ? s.patient_initials : undefined,
+    admitting_consultant: typeof s.admitting_consultant === "string" ? s.admitting_consultant : undefined,
+    level: typeof s.level === "number" ? s.level : undefined,
+    source_label: typeof s.source_label === "string" ? s.source_label : undefined,
+  }),
   component: BedBoardPage,
 });
+
 
 function toIsoOrNull(v: string | null): string | null {
   if (!v) return null;
