@@ -8,6 +8,8 @@ import { ReferralAuditTrail } from "@/components/referral-audit-trail";
 import { PriorDeclinedReferrals } from "@/components/prior-declined-referrals";
 import { RouteErrorFallback } from "@/components/route-error-fallback";
 import { Noteboard, referralNotesQueryOptions } from "@/components/noteboard";
+import { TaskList } from "@/components/referrals/task-list";
+import { MessageLog } from "@/components/referrals/message-log";
 import { useAuth, useRole } from "@/hooks/use-auth";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
