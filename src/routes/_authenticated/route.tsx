@@ -143,8 +143,12 @@ function AuthedShell() {
       </div>
       <nav className="flex-1 overflow-y-auto px-2 py-3 text-sm">
         <NavGroup label="Work" collapsed={collapsed}>
-          <NavItem to="/" icon={<ListChecks className="w-4 h-4" />} collapsed={collapsed} label="Referrals" />
-          <NavItem to="/referrals/new" icon={<Plus className="w-4 h-4" />} collapsed={collapsed} label="New referral" />
+          {canAccessReferrals && (
+            <>
+              <NavItem to="/" icon={<ListChecks className="w-4 h-4" />} collapsed={collapsed} label="Referrals" />
+              <NavItem to="/referrals/new" icon={<Plus className="w-4 h-4" />} collapsed={collapsed} label="New referral" />
+            </>
+          )}
           <NavItem to="/postop-bookings" icon={<CalendarClock className="w-4 h-4" />} collapsed={collapsed} label="Post-op bookings" />
           <NavItem to="/bed-board" icon={<BedIcon className="w-4 h-4" />} collapsed={collapsed} label="Bed board" />
           <NavItem to="/inbox" icon={<Inbox className="w-4 h-4" />} collapsed={collapsed} label="Inbox" />
