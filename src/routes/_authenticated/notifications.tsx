@@ -73,8 +73,12 @@ function NotificationSettingsPage() {
   const [notifyStatus, setNotifyStatus] = useState(true);
   const [notifyNew, setNotifyNew] = useState(true);
   const [notifyUpdated, setNotifyUpdated] = useState(true);
+  const [notifyCapacity, setNotifyCapacity] = useState(true);
+  const [notifyCapL3, setNotifyCapL3] = useState(true);
+  const [notifyCapL2, setNotifyCapL2] = useState(true);
+  const [notifyCapL1, setNotifyCapL1] = useState(true);
   const [prefsLoaded, setPrefsLoaded] = useState(false);
-  type PrefKey = "notes" | "status" | "new" | "updated";
+  type PrefKey = "notes" | "status" | "new" | "updated" | "capacity" | "cap_l3" | "cap_l2" | "cap_l1";
   const [savingPref, setSavingPref] = useState<PrefKey | null>(null);
   const getPrefs = useServerFn(getNotificationPrefs);
   const savePrefs = useServerFn(setNotificationPrefs);
@@ -87,6 +91,10 @@ function NotificationSettingsPage() {
         setNotifyStatus(p.notify_status);
         setNotifyNew(p.notify_new_referral);
         setNotifyUpdated(p.notify_updated_referral);
+        setNotifyCapacity(p.notify_capacity);
+        setNotifyCapL3(p.notify_capacity_l3);
+        setNotifyCapL2(p.notify_capacity_l2);
+        setNotifyCapL1(p.notify_capacity_l1);
       })
       .catch(() => {})
       .finally(() => setPrefsLoaded(true));
@@ -99,7 +107,12 @@ function NotificationSettingsPage() {
     status: [notifyStatus, setNotifyStatus, "notify_status"],
     new: [notifyNew, setNotifyNew, "notify_new_referral"],
     updated: [notifyUpdated, setNotifyUpdated, "notify_updated_referral"],
+    capacity: [notifyCapacity, setNotifyCapacity, "notify_capacity"],
+    cap_l3: [notifyCapL3, setNotifyCapL3, "notify_capacity_l3"],
+    cap_l2: [notifyCapL2, setNotifyCapL2, "notify_capacity_l2"],
+    cap_l1: [notifyCapL1, setNotifyCapL1, "notify_capacity_l1"],
   };
+
 
   const togglePref = async (key: PrefKey, next: boolean) => {
     const [prev, setter, field] = prefState[key];
