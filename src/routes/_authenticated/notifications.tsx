@@ -13,6 +13,8 @@ import { useServerFn } from "@tanstack/react-start";
 import { getNotificationPrefs, setNotificationPrefs } from "@/lib/notification-prefs.functions";
 import { sendTestCapacityPush } from "@/lib/test-capacity-push.functions";
 import { toast } from "sonner";
+import { Link } from "@tanstack/react-router";
+import { ExternalLink } from "lucide-react";
 
 
 export const Route = createFileRoute("/_authenticated/notifications")({
