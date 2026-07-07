@@ -24,6 +24,10 @@ import {
   type SurgicalSpecialty,
 } from "@/lib/surgical-specialties";
 import { RouteErrorFallback } from "@/components/route-error-fallback";
+import { PostopStatusBadge } from "@/components/postop/status-badge";
+import { StatusTransitionMenu } from "@/components/postop/status-transition-menu";
+import { PreopSignoffPanel } from "@/components/postop/preop-signoff-panel";
+import type { PostopBookingStatus } from "@/lib/postop-lifecycle";
 
 export const Route = createFileRoute("/_authenticated/postop-bookings/$id/edit")({
   head: () => ({
