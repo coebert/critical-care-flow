@@ -7,6 +7,8 @@ import { deleteReferral, getReferralDetail, logReferralView, updateReferral, typ
 import { ReferralAuditTrail } from "@/components/referral-audit-trail";
 import { PriorDeclinedReferrals } from "@/components/prior-declined-referrals";
 import { RouteErrorFallback } from "@/components/route-error-fallback";
+import { ClinicalAccessGate } from "@/components/clinical-access-gate";
+import { ReferralRouteError } from "@/components/referral-route-error";
 import { Noteboard, referralNotesQueryOptions } from "@/components/noteboard";
 import { TaskList } from "@/components/referrals/task-list";
 import { MessageLog } from "@/components/referrals/message-log";
