@@ -28,6 +28,8 @@ import { ReferralsDeletedPanel } from "@/components/referrals/referrals-deleted-
 import { ReferralsRows } from "@/components/referrals/referrals-rows";
 import { MiniCapacityLink } from "@/components/bed-board/mini-capacity-link";
 import { QuickFilterChips } from "@/components/referrals/quick-filter-chips";
+import { CapacityBadge } from "@/components/referrals/capacity-badge";
+
 import { applyQuickFilter, matchesQuickFilter, type QuickFilterKey } from "@/lib/quick-filters";
 
 // Cache key for the live referrals list. Kept as a stable tuple so the
@@ -203,6 +205,8 @@ function ReferralsList() {
           <p className="text-sm text-muted-foreground">{rows.length} total · live updating</p>
         </div>
         <div className="flex items-center gap-2 flex-wrap">
+          <CapacityBadge />
+
           <Button
             variant={showDeleted ? "default" : "outline"}
             size="sm"
