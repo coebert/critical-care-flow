@@ -240,7 +240,7 @@ function ReferralsList() {
       <QuickFilterChips
         value={quick}
         counts={quickCounts}
-        onChange={(k) => navigate({ search: (prev) => ({ ...prev, quick: k === "all" ? undefined : k }) })}
+        onChange={(k) => navigate({ search: ((prev: Record<string, unknown>) => ({ ...prev, quick: k === "all" ? undefined : k })) as never })}
       />
 
       <ReferralsFilters
