@@ -159,11 +159,17 @@ function ShiftRow({
           {block.spare != null && block.spare > 0 && (
             <div className="text-xs text-muted-foreground">
               Can admit{" "}
-              <span className="font-medium text-foreground">{block.level3_slots}</span> L3
+              <span className={`font-medium text-foreground ${l3Focus ? "rounded bg-primary/20 px-1 ring-1 ring-primary" : ""}`}>
+                {block.level3_slots}
+              </span>{" "}L3
               {" · "}
-              <span className="font-medium text-foreground">{block.level2_slots}</span> L2
+              <span className={`font-medium text-foreground ${l2Focus ? "rounded bg-primary/20 px-1 ring-1 ring-primary" : ""}`}>
+                {block.level2_slots}
+              </span>{" "}L2
               {" · "}
-              <span className="font-medium text-foreground">{block.level1_slots}</span> L1/L0
+              <span className={`font-medium text-foreground ${l1Focus ? "rounded bg-primary/20 px-1 ring-1 ring-primary" : ""}`}>
+                {block.level1_slots}
+              </span>{" "}L1/L0
             </div>
           )}
           {block.spare != null && block.spare <= 0 && (
