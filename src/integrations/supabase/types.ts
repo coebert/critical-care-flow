@@ -531,6 +531,39 @@ export type Database = {
           },
         ]
       }
+      nurse_staffing: {
+        Row: {
+          available_nurses: number
+          created_at: string
+          id: string
+          notes: string | null
+          recorded_by: string | null
+          shift: string
+          shift_date: string
+          updated_at: string
+        }
+        Insert: {
+          available_nurses: number
+          created_at?: string
+          id?: string
+          notes?: string | null
+          recorded_by?: string | null
+          shift: string
+          shift_date: string
+          updated_at?: string
+        }
+        Update: {
+          available_nurses?: number
+          created_at?: string
+          id?: string
+          notes?: string | null
+          recorded_by?: string | null
+          shift?: string
+          shift_date?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       postop_bookings: {
         Row: {
           age: number | null
