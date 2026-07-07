@@ -64,10 +64,29 @@ function ShiftRow({
     setEditing(false);
   };
 
+  const rowRef = useRef<HTMLDivElement | null>(null);
+  useEffect(() => {
+    if (focused && rowRef.current) {
+      rowRef.current.scrollIntoView({ behavior: "smooth", block: "center" });
+    }
+  }, [focused]);
+
+  const l3Focus = focused && focusLevel === 3;
+  const l2Focus = focused && focusLevel === 2;
+  const l1Focus = focused && focusLevel === 1;
+
   return (
-    <div className="rounded-md border p-3 space-y-2">
+    <div
+      ref={rowRef}
+      className={`rounded-md border p-3 space-y-2 transition-colors ${
+        focused ? "border-primary ring-2 ring-primary/40 bg-primary/5" : ""
+      }`}
+      data-focused={focused ? "true" : undefined}
+    >
       <div className="flex items-center justify-between gap-2">
-        <div className="text-sm font-medium">{label} shift</div>
+        <div className="text-sm font-medium">
+          {label} shift{focused ? <span className="ml-2 text-xs font-normal text-primary">· reviewing</span> : null}
+        </div>
         {!editing && (
           <Button
             variant="ghost"
