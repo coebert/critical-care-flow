@@ -194,6 +194,39 @@ function EditPostopBookingPage() {
       )}
 
       {!loading && !loadError && (
+        <>
+          <Card className="p-4 space-y-3">
+            <div className="flex items-center justify-between gap-3 flex-wrap">
+              <div className="flex items-center gap-2">
+                <span className="text-sm text-muted-foreground">Status:</span>
+                <PostopStatusBadge status={bookingStatus} />
+                {convertedRefId && (
+                  <Link
+                    to="/referrals/$id"
+                    params={{ id: convertedRefId }}
+                    className="text-xs text-primary hover:underline"
+                  >
+                    View linked referral →
+                  </Link>
+                )}
+              </div>
+              <StatusTransitionMenu
+                bookingId={id}
+                currentStatus={bookingStatus}
+                proposedSurgeryDate={surgeryDate || null}
+                convertedReferralId={convertedRefId}
+                onChanged={() => setLifecycleRefresh((x) => x + 1)}
+              />
+            </div>
+          </Card>
+
+          <PreopSignoffPanel
+            bookingId={id}
+            preopAt={preopAt}
+            intensivistAt={intensivistAt}
+            onChanged={() => setLifecycleRefresh((x) => x + 1)}
+          />
+
         <form onSubmit={onSubmit} className="space-y-6">
           <Card className="p-4 sm:p-6 space-y-4">
             <h2 className="font-semibold">Patient details</h2>
