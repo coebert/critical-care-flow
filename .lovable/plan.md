@@ -1,94 +1,72 @@
+## Point 6 — Communication (per-referral tasks, templates, referring-team message log)
 
-## Post-op booking operational glue (Point 4)
+Goal: give the coordinator/registrar a per-referral workspace for **tasks, snippet-driven communication, and a record of what was said to the referring team**, without inventing a real external chat surface (referring teams don't have accounts here).
 
-Turn `postop_bookings` from a data-capture form into a live scheduling workflow with lifecycle states, a planner, a cancellation register, and same-day conversion into a referral.
+### 1. Tasks per referral
 
-### 1. Booking lifecycle
+New table `public.referral_tasks`:
+- `id`, `referral_id (fk referrals, cascade)`, `title text`, `details text?`
+- `assigned_role app_role?` (nullable = "anyone")
+- `due_at timestamptz?`
+- `status text` (`open` | `done` | `cancelled`) default `open`
+- `created_by`, `completed_by`, `completed_at`, `created_at`, `updated_at`
+- RLS: any clinician/admin can select/insert/update tasks on non-deleted referrals (mirrors referral_notes policy).
+- Index `(referral_id, status)` and `(status, due_at)` for a "my open SLAs" query later.
 
-Add a `booking_status` enum on `postop_bookings`:
+Server fns in `src/lib/referral-tasks.functions.ts`:
+- `listTasks({ referral_id })`
+- `createTask({ referral_id, title, details?, assigned_role?, due_at? })`
+- `updateTask({ id, patch })` — title/details/due/assigned/status. Auto-stamp `completed_by/at` on transition to `done`.
+- `deleteTask({ id })` — admin only.
 
-- `requested` — new booking, awaiting review
-- `provisionally_confirmed` — pencilled in, capacity permitting
-- `confirmed` — bed guaranteed, anaesthetic sign-off complete
-- `admitted` — patient has arrived on the unit (mirrors existing `arrived_at`)
-- `cancelled` — cancelled with a required `cancellation_reason` enum:
-  - `no_bed`, `patient_unfit`, `surgery_deferred`, `died_pre_op`, `other`
-- Plus `cancellation_notes text`, `cancelled_at timestamptz`, `cancelled_by uuid`.
+UI: `src/components/referrals/task-list.tsx` on the referral page — inline add row, checkbox to complete, badge for overdue (due_at < now, status=open) using existing timer/format helpers.
 
-Also add `preop_signed_off_at` / `preop_signed_off_by` (anaesthetic sign-off) and `intensivist_reviewed_at` / `intensivist_reviewed_by` (consultant intensivist review). Both required before a booking can transition to `confirmed`.
+### 2. Message templates (decline/advice snippets)
 
-Backfill: existing rows with `arrived_at` → `admitted`; otherwise `requested`.
+New table `public.message_templates` (admin-managed, everyone reads):
+- `id`, `title text`, `category text` (`decline` | `advice` | `plan` | `handover`), `body text`, `active bool default true`, `created_by`, `created_at`, `updated_at`.
+- Seed 6 defaults in the migration (ward NIV trial, ceiling of care, etc.).
+- RLS: `SELECT` for authenticated; `INSERT/UPDATE/DELETE` admin-only.
 
-Migration also indexes `(proposed_surgery_date, booking_status)` for planner queries.
+Server fns in `src/lib/message-templates.functions.ts`:
+- `listTemplates({ category? })`
+- `upsertTemplate`, `deleteTemplate` (admin-only via `has_role`).
 
-### 2. Weekly / daily planner view
+UI:
+- `src/components/referrals/template-picker.tsx` — a dropdown that inserts the body into a target textarea (used by note composer and the new outbound-message form).
+- Admin management panel `src/components/admin/message-templates-panel.tsx` mounted on `/admin`.
 
-New route `postop-bookings.planner.tsx`:
+### 3. Referring-team message log
 
-- Week grid (Mon–Sun) — columns are days, rows are bookings ordered by predicted level (L3 first).
-- Per-day header shows **committed beds vs remaining ICU/HDU capacity** using the same `capacity` helpers already used on the bed board.
-- Cancelled/admitted rows are muted; requested/provisional/confirmed are the actionable ones.
-- Day/week toggle; previous/next-week navigation.
-- Click a card → existing edit page.
+New table `public.referral_messages` (record of outbound communication to the referring team — not a live chat surface):
+- `id`, `referral_id`, `channel text` (`phone` | `bleep` | `email` | `secure_msg` | `in_person`), `direction text` (`outbound` | `inbound`), `recipient text?` (name/bleep), `body text`, `template_id uuid?`, `sent_by uuid`, `sent_at timestamptz default now()`, `created_at`.
+- RLS: clinician/admin read+insert on non-deleted referrals; update/delete admin-only.
 
-### 3. Cancellation-because-no-bed register
+Server fns in `src/lib/referral-messages.functions.ts`: `listMessages`, `logMessage`, `deleteMessage` (admin).
 
-New route `postop-bookings.cancellations.tsx` (admin + coordinator):
+UI: `src/components/referrals/message-log.tsx` — chronological list with channel icon + direction chip; "Log message" dialog that accepts channel/direction/recipient/body and a template picker to prefill body.
 
-- Table of every `cancelled` booking with reason, date, specialty, canceller.
-- Filters by reason and date range; counter for `no_bed` (headline KPI).
-- CSV export using existing CSV helpers.
+### 4. Referral page integration
 
-### 4. Auto-conversion to referral
+On `src/routes/_authenticated/referrals.$id.tsx`, add two new sections after the notes area:
+- **Tasks** (task list component)
+- **Communication log** (message log component)
+Template picker also wired into the existing note composer as an "Insert template" button.
 
-Server function `convertBookingToReferral({ id })`:
+### 5. Shared helpers & tests
 
-- Only allowed when `booking_status` in (`confirmed`, `provisionally_confirmed`) AND `proposed_surgery_date <= today`.
-- Creates a referral pre-populated with hospital number, age/sex/weight, `reason_category = post_op`, `reason_notes = proposed_procedure`, `source = elective_admission`, and a `previous_referral_id` link back via a new `origin_booking_id` on referrals.
-- Transitions the booking to `admitted` and stores the new `referral_id` on the booking row.
-- Idempotent: if `referral_id` already exists, returns it.
+- `src/lib/referral-tasks.ts` — status labels, overdue helper.
+- `src/lib/message-templates.ts` — category labels, seed defaults.
+- Tests: `referral-tasks.test.ts` (overdue math, status transitions), `message-templates-authz.test.ts` (admin-only mutation), `referral-messages.test.ts` (log shape validation).
 
-Button appears on the edit page and on the planner card when conditions are met.
+### Out of scope
 
-### 5. Server functions
-
-Extend `src/lib/postop-bookings.functions.ts`:
-
-- `updateBooking` accepts the new fields.
-- New `transitionBookingStatus({ id, next_status, cancellation_reason?, cancellation_notes? })` — enforces valid transitions, requires sign-offs for `confirmed`, requires reason for `cancelled`.
-- New `listBookingsInRange({ from, to })` for the planner.
-- New `listCancellations({ from, to, reason? })` for the register.
-- New `convertBookingToReferral`.
-
-All under `requireSupabaseAuth`; admin-only for `listCancellations`.
-
-### 6. UI pieces
-
-- `src/components/postop/status-badge.tsx` — lifecycle chip with tone per status.
-- `src/components/postop/status-transition-menu.tsx` — dropdown with the valid next-states and a cancel dialog capturing reason.
-- `src/components/postop/planner-week-grid.tsx` — the week view.
-- `src/components/postop/cancellation-table.tsx` — the register table.
-- `src/components/postop/preop-signoff-panel.tsx` — anaesthetic + intensivist sign-off block on the edit page.
-- List view (`postop-bookings.index.tsx`): new status column, filter chip row (`requested`, `provisional`, `confirmed`, `admitted`, `cancelled`), and a Planner / Cancellations link header.
-
-### 7. Shared helpers
-
-- `src/lib/postop-lifecycle.ts` — status enum, valid-transition matrix, `canTransition(current, next, ctx)`, cancellation reason labels, `isEligibleForConversion(booking)`.
-
-### 8. Tests
-
-- `postop-lifecycle.test.ts` — transition matrix (allowed / blocked / requires sign-off / requires reason).
-- `postop-convert-to-referral.test.ts` — eligibility gating and idempotency.
-- Extend existing authz tests to cover the new server fns.
-
-### 9. Out of scope for Point 4
-
-- Elective list integration from theatres PAS (Point 10).
-- Consent workflow (Point 5).
-- SMS/email to the referring team on cancellation (Point 6).
+- Real inbound messaging from referring teams (requires external identity).
+- Notifications from tasks (Point 8 territory).
+- SMS delivery (Point 6 in original clinical list mentions SMS on cancellation — that belongs to a later notifications pass).
 
 ### Size
 
-~1 migration, ~12–14 files, ~800–1000 lines. Additive columns, no breaking changes. All new columns nullable except the enum which defaults to `requested`.
+1 migration, ~14 files, ~700 lines. Additive, no breaking changes.
 
-Implementation order: migration → shared enums/utils → server-fn updates → planner route → cancellation register → conversion button → status badges/menus on list & edit → tests.
+Implementation order: migration → server fns → shared utils → components → route integration → admin panel → tests.
