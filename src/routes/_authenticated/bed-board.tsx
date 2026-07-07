@@ -231,6 +231,8 @@ function BedBoardPage() {
         open={!!admitBed}
         bed={admitBed}
         saving={saving}
+        initial={admitPrefill}
+        sourceLabel={admitPrefill ? search.source_label ?? "referral" : undefined}
         onOpenChange={(v) => !v && setAdmitBed(null)}
         onSubmit={(value) => {
           if (!admitBed) return;
@@ -253,10 +255,16 @@ function BedBoardPage() {
             predicted_discharge_at: toIsoOrNull(value.predicted_discharge_at),
             predicted_step_down: value.predicted_step_down,
             notes: value.notes,
+            source_referral_id: search.source_referral_id ?? null,
+            source_postop_booking_id: search.source_postop_booking_id ?? null,
           };
-          wrap(() => doAdmit({ data: payload }), "Admitted").then(() => setAdmitBed(null));
+          wrap(() => doAdmit({ data: payload }), "Admitted").then(() => {
+            setAdmitBed(null);
+            if (admitPrefill) clearAdmitSource();
+          });
         }}
       />
+
 
       <EditOccupancyDialog
         open={!!editOcc}
