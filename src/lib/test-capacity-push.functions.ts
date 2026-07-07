@@ -78,9 +78,12 @@ export const sendTestCapacityPush = createServerFn({ method: "POST" })
     }
 
     const summary = selected
-      .map((k, i) => `${labelFor(k)}: ${(i + 1)} spare admission${i === 0 ? "" : "s"} available`)
+      .map((k, i) => {
+        const n = i + 1;
+        return `${labelFor(k)}: 0 → ${n} spare admission${n === 1 ? "" : "s"}`;
+      })
       .join(" · ");
-    const body = `Test alert — Day shift: ${summary}. (Preview only, no real change.)`;
+    const body = `Day shift · ${summary}. Spare nurses 0 → ${selected.length} (dependency test). (Preview only, no real change.)`;
 
     const { sendPushToMany } = await import("./push.server");
     const res = await sendPushToMany(
@@ -91,7 +94,8 @@ export const sendTestCapacityPush = createServerFn({ method: "POST" })
         auth: s.auth,
       })),
       {
-        title: "Critical Care — test capacity alert",
+        title: "Critical Care — Day shift capacity (test)",
+
         body,
         url: "/notifications",
         tag: `capacity-test-${userId}`,
