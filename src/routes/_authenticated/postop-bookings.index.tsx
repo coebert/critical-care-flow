@@ -199,6 +199,7 @@ function PostopBookingsList() {
                     <Badge className={LEVEL_CLASS[b.predicted_level]} variant="secondary">
                       {LEVEL_LABEL[b.predicted_level]}
                     </Badge>
+                    {b.booking_status && <PostopStatusBadge status={b.booking_status} />}
                     {b.is_test && (
                       <Badge
                         variant="outline"
