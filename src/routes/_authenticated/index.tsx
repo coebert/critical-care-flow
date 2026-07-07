@@ -31,6 +31,8 @@ import { QuickFilterChips } from "@/components/referrals/quick-filter-chips";
 import { CapacityBadge } from "@/components/referrals/capacity-badge";
 
 import { applyQuickFilter, matchesQuickFilter, type QuickFilterKey } from "@/lib/quick-filters";
+import { ClinicalAccessGate } from "@/components/clinical-access-gate";
+import { ReferralRouteError } from "@/components/referral-route-error";
 
 // Cache key for the live referrals list. Kept as a stable tuple so the
 // realtime subscription can invalidate it without importing the options.
