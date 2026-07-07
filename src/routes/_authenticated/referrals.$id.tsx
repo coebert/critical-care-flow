@@ -437,11 +437,33 @@ function ReferralDetail() {
           )}
         </Card>
 
-        <div className="flex justify-end">
+        <div className="flex flex-wrap gap-2 justify-end">
+          {(ref.status === "accepted" || ref.status === "admitted") && (
+            <Button
+              variant="outline"
+              onClick={() =>
+                navigate({
+                  to: "/bed-board",
+                  search: {
+                    source_referral_id: id,
+                    hospital_number: ref.hospital_number ?? undefined,
+                    patient_initials: undefined,
+                    admitting_consultant: ref.accepting_consultant ?? undefined,
+                    level: undefined,
+                    source_label: `referral ${ref.hospital_number ?? ""}`.trim(),
+                    source_postop_booking_id: undefined,
+                  },
+                })
+              }
+            >
+              Admit to bed…
+            </Button>
+          )}
           <Button onClick={save} disabled={saving || acceptingConsultantMissing || declineConsultantMissing}>
             <Save className="w-4 h-4 mr-1" aria-hidden="true" />{saving ? "Saving…" : "Save changes"}
           </Button>
         </div>
+
 
         <Noteboard referralId={id} />
 
