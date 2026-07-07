@@ -160,7 +160,7 @@ function ReferralsList() {
 
   const topWards = useMemo(() => computeTopWards(rows), [rows]);
 
-  const filtered = useMemo(
+  const baseFiltered = useMemo(
     () =>
       filterReferrals(rows, {
         hospSearch,
@@ -174,6 +174,19 @@ function ReferralsList() {
       }),
     [rows, hospSearch, q, statusFilter, urgencyFilter, locFilter, dateFilter, pediatricFilter, search.specialty, search.from, search.to],
   );
+
+  const navigate = useNavigate({ from: "/" });
+  const quick: QuickFilterKey = search.quick ?? "all";
+
+  const quickCounts = useMemo(() => ({
+    all: baseFiltered.length,
+    awaiting_review: baseFiltered.filter((r) => matchesQuickFilter(r, "awaiting_review")).length,
+    awaiting_bed: baseFiltered.filter((r) => matchesQuickFilter(r, "awaiting_bed")).length,
+    accepted_not_arrived: baseFiltered.filter((r) => matchesQuickFilter(r, "accepted_not_arrived")).length,
+    discussed_pending: baseFiltered.filter((r) => matchesQuickFilter(r, "discussed_pending")).length,
+  }), [baseFiltered]);
+
+  const filtered = useMemo(() => applyQuickFilter(baseFiltered, quick), [baseFiltered, quick]);
 
   const displayed = useMemo(
     () => sortByTimer(filtered, timerSort, Date.now()),
