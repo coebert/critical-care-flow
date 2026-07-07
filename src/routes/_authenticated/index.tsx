@@ -1,4 +1,4 @@
-import { createFileRoute, Link } from "@tanstack/react-router";
+import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useEffect, useState, useMemo, useCallback } from "react";
 import { useServerFn } from "@tanstack/react-start";
 import { queryOptions, useQueryClient, useSuspenseQuery } from "@tanstack/react-query";
