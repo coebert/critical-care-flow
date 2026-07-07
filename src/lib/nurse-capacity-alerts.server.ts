@@ -121,10 +121,13 @@ export async function checkAndAlertNurseCapacity(admin: Admin, now: Date = new D
     const block = shift === "day" ? snap.day : snap.night;
     const next = flagsFromSnap(block.spare, block.level3_slots, block.level2_slots, block.level1_slots);
 
-    // Load previous state.
+    // Load previous state, including per-level last-alerted timestamps used
+    // for short-window deduplication of rapid staffing/capacity flips.
     const { data: prevRow } = await admin
       .from("nurse_capacity_alert_state")
-      .select("shift_key, level3_available, level2_available, level1_available")
+      .select(
+        "shift_key, level3_available, level2_available, level1_available, level3_last_alerted_at, level2_last_alerted_at, level1_last_alerted_at",
+      )
       .eq("id", true)
       .maybeSingle();
 
@@ -137,7 +140,41 @@ export async function checkAndAlertNurseCapacity(admin: Admin, now: Date = new D
           }
         : null;
 
-    // Persist the new state up front (even if we don't notify, to avoid drift).
+    const lastAlertedAt: Record<FlippedLevel, string | null> =
+      prevRow && prevRow.shift_key === shiftKey
+        ? {
+            l3: (prevRow as any).level3_last_alerted_at ?? null,
+            l2: (prevRow as any).level2_last_alerted_at ?? null,
+            l1: (prevRow as any).level1_last_alerted_at ?? null,
+          }
+        : { l3: null, l2: null, l1: null };
+
+    // Dedup window: suppress a per-level alert if we already alerted for
+    // that level within the last DEDUP_WINDOW_MS. Availability state is
+    // still persisted so the next post-window recomputation compares
+    // against the real current situation.
+    const DEDUP_WINDOW_MS = 5 * 60 * 1000;
+    const nowMs = now.getTime();
+    const withinWindow = (iso: string | null) =>
+      !!iso && nowMs - new Date(iso).getTime() < DEDUP_WINDOW_MS;
+
+    const flippedRaw = flippedLevels(prev, next);
+    const flipped = flippedRaw.filter((k) => !withinWindow(lastAlertedAt[k]));
+    const suppressed = flippedRaw.filter((k) => withinWindow(lastAlertedAt[k]));
+    if (suppressed.length) {
+      console.info(
+        `[nurse-capacity-alerts] dedup: suppressed ${suppressed.join(",")} within ${DEDUP_WINDOW_MS}ms`,
+      );
+    }
+
+    // Persist state up front. Bump last_alerted_at only for levels we are
+    // actually about to notify on; keep prior timestamps otherwise so the
+    // dedup window continues to count from the real last alert.
+    const nowIso = new Date(nowMs).toISOString();
+    const l3Alerted = flipped.includes("l3") ? nowIso : lastAlertedAt.l3;
+    const l2Alerted = flipped.includes("l2") ? nowIso : lastAlertedAt.l2;
+    const l1Alerted = flipped.includes("l1") ? nowIso : lastAlertedAt.l1;
+
     await admin.from("nurse_capacity_alert_state").upsert(
       {
         id: true,
@@ -145,13 +182,16 @@ export async function checkAndAlertNurseCapacity(admin: Admin, now: Date = new D
         level3_available: next.l3,
         level2_available: next.l2,
         level1_available: next.l1,
-        updated_at: new Date().toISOString(),
-      },
+        level3_last_alerted_at: l3Alerted,
+        level2_last_alerted_at: l2Alerted,
+        level1_last_alerted_at: l1Alerted,
+        updated_at: nowIso,
+      } as any,
       { onConflict: "id" },
     );
 
-    const flipped = flippedLevels(prev, next);
     if (!flipped.length) return;
+
 
     const shiftLabel = shift === "day" ? "Day shift" : "Night shift";
     const prefKey: Record<FlippedLevel, "notify_capacity_l3" | "notify_capacity_l2" | "notify_capacity_l1"> = {
