@@ -23,6 +23,7 @@ import { Route as AuthenticatedPermissionsRouteImport } from './routes/_authenti
 import { Route as AuthenticatedNotificationsAuditRouteImport } from './routes/_authenticated/notifications-audit'
 import { Route as AuthenticatedNotificationsRouteImport } from './routes/_authenticated/notifications'
 import { Route as AuthenticatedInboxRouteImport } from './routes/_authenticated/inbox'
+import { Route as AuthenticatedBoardRouteImport } from './routes/_authenticated/board'
 import { Route as AuthenticatedBedBoardRouteImport } from './routes/_authenticated/bed-board'
 import { Route as AuthenticatedAnalyticsRouteImport } from './routes/_authenticated/analytics'
 import { Route as AuthenticatedAdminRouteImport } from './routes/_authenticated/admin'
@@ -34,6 +35,7 @@ import { Route as AuthenticatedPostopBookingsNewRouteImport } from './routes/_au
 import { Route as AuthenticatedPostopBookingsCancellationsRouteImport } from './routes/_authenticated/postop-bookings.cancellations'
 import { Route as AuthenticatedPostopBookingsAnalyticsRouteImport } from './routes/_authenticated/postop-bookings.analytics'
 import { Route as AuthenticatedInboxIdRouteImport } from './routes/_authenticated/inbox.$id'
+import { Route as AuthenticatedBoardWardRoundRouteImport } from './routes/_authenticated/board.ward-round'
 import { Route as AuthenticatedPostopBookingsIdEditRouteImport } from './routes/_authenticated/postop-bookings.$id.edit'
 
 const SetupRoute = SetupRouteImport.update({
@@ -108,6 +110,11 @@ const AuthenticatedInboxRoute = AuthenticatedInboxRouteImport.update({
   path: '/inbox',
   getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
+const AuthenticatedBoardRoute = AuthenticatedBoardRouteImport.update({
+  id: '/board',
+  path: '/board',
+  getParentRoute: () => AuthenticatedRouteRoute,
+} as any)
 const AuthenticatedBedBoardRoute = AuthenticatedBedBoardRouteImport.update({
   id: '/bed-board',
   path: '/bed-board',
@@ -170,6 +177,12 @@ const AuthenticatedInboxIdRoute = AuthenticatedInboxIdRouteImport.update({
   path: '/$id',
   getParentRoute: () => AuthenticatedInboxRoute,
 } as any)
+const AuthenticatedBoardWardRoundRoute =
+  AuthenticatedBoardWardRoundRouteImport.update({
+    id: '/ward-round',
+    path: '/ward-round',
+    getParentRoute: () => AuthenticatedBoardRoute,
+  } as any)
 const AuthenticatedPostopBookingsIdEditRoute =
   AuthenticatedPostopBookingsIdEditRouteImport.update({
     id: '/postop-bookings/$id/edit',
@@ -188,12 +201,14 @@ export interface FileRoutesByFullPath {
   '/admin': typeof AuthenticatedAdminRoute
   '/analytics': typeof AuthenticatedAnalyticsRoute
   '/bed-board': typeof AuthenticatedBedBoardRoute
+  '/board': typeof AuthenticatedBoardRouteWithChildren
   '/inbox': typeof AuthenticatedInboxRouteWithChildren
   '/notifications': typeof AuthenticatedNotificationsRoute
   '/notifications-audit': typeof AuthenticatedNotificationsAuditRoute
   '/permissions': typeof AuthenticatedPermissionsRoute
   '/profile': typeof AuthenticatedProfileRoute
   '/push-test': typeof AuthenticatedPushTestRoute
+  '/board/ward-round': typeof AuthenticatedBoardWardRoundRoute
   '/inbox/$id': typeof AuthenticatedInboxIdRoute
   '/postop-bookings/analytics': typeof AuthenticatedPostopBookingsAnalyticsRoute
   '/postop-bookings/cancellations': typeof AuthenticatedPostopBookingsCancellationsRoute
@@ -214,6 +229,7 @@ export interface FileRoutesByTo {
   '/admin': typeof AuthenticatedAdminRoute
   '/analytics': typeof AuthenticatedAnalyticsRoute
   '/bed-board': typeof AuthenticatedBedBoardRoute
+  '/board': typeof AuthenticatedBoardRouteWithChildren
   '/inbox': typeof AuthenticatedInboxRouteWithChildren
   '/notifications': typeof AuthenticatedNotificationsRoute
   '/notifications-audit': typeof AuthenticatedNotificationsAuditRoute
@@ -221,6 +237,7 @@ export interface FileRoutesByTo {
   '/profile': typeof AuthenticatedProfileRoute
   '/push-test': typeof AuthenticatedPushTestRoute
   '/': typeof AuthenticatedIndexRoute
+  '/board/ward-round': typeof AuthenticatedBoardWardRoundRoute
   '/inbox/$id': typeof AuthenticatedInboxIdRoute
   '/postop-bookings/analytics': typeof AuthenticatedPostopBookingsAnalyticsRoute
   '/postop-bookings/cancellations': typeof AuthenticatedPostopBookingsCancellationsRoute
@@ -243,6 +260,7 @@ export interface FileRoutesById {
   '/_authenticated/admin': typeof AuthenticatedAdminRoute
   '/_authenticated/analytics': typeof AuthenticatedAnalyticsRoute
   '/_authenticated/bed-board': typeof AuthenticatedBedBoardRoute
+  '/_authenticated/board': typeof AuthenticatedBoardRouteWithChildren
   '/_authenticated/inbox': typeof AuthenticatedInboxRouteWithChildren
   '/_authenticated/notifications': typeof AuthenticatedNotificationsRoute
   '/_authenticated/notifications-audit': typeof AuthenticatedNotificationsAuditRoute
@@ -250,6 +268,7 @@ export interface FileRoutesById {
   '/_authenticated/profile': typeof AuthenticatedProfileRoute
   '/_authenticated/push-test': typeof AuthenticatedPushTestRoute
   '/_authenticated/': typeof AuthenticatedIndexRoute
+  '/_authenticated/board/ward-round': typeof AuthenticatedBoardWardRoundRoute
   '/_authenticated/inbox/$id': typeof AuthenticatedInboxIdRoute
   '/_authenticated/postop-bookings/analytics': typeof AuthenticatedPostopBookingsAnalyticsRoute
   '/_authenticated/postop-bookings/cancellations': typeof AuthenticatedPostopBookingsCancellationsRoute
@@ -273,12 +292,14 @@ export interface FileRouteTypes {
     | '/admin'
     | '/analytics'
     | '/bed-board'
+    | '/board'
     | '/inbox'
     | '/notifications'
     | '/notifications-audit'
     | '/permissions'
     | '/profile'
     | '/push-test'
+    | '/board/ward-round'
     | '/inbox/$id'
     | '/postop-bookings/analytics'
     | '/postop-bookings/cancellations'
@@ -299,6 +320,7 @@ export interface FileRouteTypes {
     | '/admin'
     | '/analytics'
     | '/bed-board'
+    | '/board'
     | '/inbox'
     | '/notifications'
     | '/notifications-audit'
@@ -306,6 +328,7 @@ export interface FileRouteTypes {
     | '/profile'
     | '/push-test'
     | '/'
+    | '/board/ward-round'
     | '/inbox/$id'
     | '/postop-bookings/analytics'
     | '/postop-bookings/cancellations'
@@ -327,6 +350,7 @@ export interface FileRouteTypes {
     | '/_authenticated/admin'
     | '/_authenticated/analytics'
     | '/_authenticated/bed-board'
+    | '/_authenticated/board'
     | '/_authenticated/inbox'
     | '/_authenticated/notifications'
     | '/_authenticated/notifications-audit'
@@ -334,6 +358,7 @@ export interface FileRouteTypes {
     | '/_authenticated/profile'
     | '/_authenticated/push-test'
     | '/_authenticated/'
+    | '/_authenticated/board/ward-round'
     | '/_authenticated/inbox/$id'
     | '/_authenticated/postop-bookings/analytics'
     | '/_authenticated/postop-bookings/cancellations'
@@ -455,6 +480,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedInboxRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
+    '/_authenticated/board': {
+      id: '/_authenticated/board'
+      path: '/board'
+      fullPath: '/board'
+      preLoaderRoute: typeof AuthenticatedBoardRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
     '/_authenticated/bed-board': {
       id: '/_authenticated/bed-board'
       path: '/bed-board'
@@ -532,6 +564,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedInboxIdRouteImport
       parentRoute: typeof AuthenticatedInboxRoute
     }
+    '/_authenticated/board/ward-round': {
+      id: '/_authenticated/board/ward-round'
+      path: '/ward-round'
+      fullPath: '/board/ward-round'
+      preLoaderRoute: typeof AuthenticatedBoardWardRoundRouteImport
+      parentRoute: typeof AuthenticatedBoardRoute
+    }
     '/_authenticated/postop-bookings/$id/edit': {
       id: '/_authenticated/postop-bookings/$id/edit'
       path: '/postop-bookings/$id/edit'
@@ -541,6 +580,17 @@ declare module '@tanstack/react-router' {
     }
   }
 }
+
+interface AuthenticatedBoardRouteChildren {
+  AuthenticatedBoardWardRoundRoute: typeof AuthenticatedBoardWardRoundRoute
+}
+
+const AuthenticatedBoardRouteChildren: AuthenticatedBoardRouteChildren = {
+  AuthenticatedBoardWardRoundRoute: AuthenticatedBoardWardRoundRoute,
+}
+
+const AuthenticatedBoardRouteWithChildren =
+  AuthenticatedBoardRoute._addFileChildren(AuthenticatedBoardRouteChildren)
 
 interface AuthenticatedInboxRouteChildren {
   AuthenticatedInboxIdRoute: typeof AuthenticatedInboxIdRoute
@@ -557,6 +607,7 @@ interface AuthenticatedRouteRouteChildren {
   AuthenticatedAdminRoute: typeof AuthenticatedAdminRoute
   AuthenticatedAnalyticsRoute: typeof AuthenticatedAnalyticsRoute
   AuthenticatedBedBoardRoute: typeof AuthenticatedBedBoardRoute
+  AuthenticatedBoardRoute: typeof AuthenticatedBoardRouteWithChildren
   AuthenticatedInboxRoute: typeof AuthenticatedInboxRouteWithChildren
   AuthenticatedNotificationsRoute: typeof AuthenticatedNotificationsRoute
   AuthenticatedNotificationsAuditRoute: typeof AuthenticatedNotificationsAuditRoute
@@ -578,6 +629,7 @@ const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedAdminRoute: AuthenticatedAdminRoute,
   AuthenticatedAnalyticsRoute: AuthenticatedAnalyticsRoute,
   AuthenticatedBedBoardRoute: AuthenticatedBedBoardRoute,
+  AuthenticatedBoardRoute: AuthenticatedBoardRouteWithChildren,
   AuthenticatedInboxRoute: AuthenticatedInboxRouteWithChildren,
   AuthenticatedNotificationsRoute: AuthenticatedNotificationsRoute,
   AuthenticatedNotificationsAuditRoute: AuthenticatedNotificationsAuditRoute,

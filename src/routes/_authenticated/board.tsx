@@ -157,7 +157,7 @@ function BedsColumn({ data, now }: { data: BedBoardData | undefined; now: number
                     className={`rounded border p-3 ${occ ? "bg-white/5 border-white/20" : "border-white/10 border-dashed text-white/40"}`}
                   >
                     <div className="flex items-baseline justify-between">
-                      <div className="text-xs uppercase tracking-wider text-white/50">{b.name}</div>
+                      <div className="text-xs uppercase tracking-wider text-white/50">{b.code}</div>
                       {occ && (
                         <div className="text-[10px] px-1.5 py-0.5 rounded bg-white/10">
                           L{occ.level ?? "?"} · d{dayOfStay(occ.admitted_at ?? "", now)}
@@ -223,7 +223,7 @@ function PendingColumn({ rows, now }: { rows: Referral[]; now: number }) {
             <li key={r.id} className="rounded border border-white/15 bg-white/5 p-3">
               <div className="flex items-center justify-between gap-2">
                 <div className="min-w-0">
-                  <div className="text-lg font-semibold truncate">{r.hospital_number ?? r.patient_initials ?? "—"}</div>
+                  <div className="text-lg font-semibold truncate">{r.hospital_number ?? r.patient_initials_last4 ?? "—"}</div>
                   <div className="text-xs text-white/60 truncate">{r.referring_specialty ?? "Unknown"} · {r.current_ward ?? ""}</div>
                 </div>
                 <div className={`text-2xl font-mono tabular-nums ${critical ? "text-red-400" : "text-amber-300"}`}>

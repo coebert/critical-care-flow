@@ -89,7 +89,7 @@ function WardRoundPage() {
             ].filter(Boolean).join(" · ");
             return (
               <tr key={b.id} className="align-top">
-                <td className="border p-1 font-semibold">{b.name}</td>
+                <td className="border p-1 font-semibold">{b.code}</td>
                 <td className="border p-1">
                   <div className="font-medium">{o.hospital_number ?? o.patient_initials ?? "—"}</div>
                   {o.patient_initials && o.hospital_number && (
