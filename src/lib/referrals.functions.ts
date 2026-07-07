@@ -144,16 +144,47 @@ async function writeAudit(entry: {
   entity: string;
   entity_id: string;
   diff?: any;
+  // Optional full-context fields for referral_note audit rows. Passed at every
+  // note create/edit/delete site so the audit stream carries actor identity,
+  // original author identity, recipient count, and edit timestamp — plus a
+  // derived via_admin_flag flag = actor !== author.
+  referral_id?: string;
+  author_id?: string | null;
+  recipient_count?: number | null;
+  edited_at?: string | null;
 }) {
   const admin = await getAdmin();
-  const safeEntry =
-    entry.entity === "referral" && entry.diff && typeof entry.diff === "object"
-      ? { ...entry, diff: redactEncryptedFromDiff(entry.diff as Record<string, unknown>) }
-      : entry.entity === "referral_note" && entry.diff && typeof entry.diff === "object"
-      ? { ...entry, diff: redactNoteDiff(entry.diff as Record<string, unknown>) }
-      : entry;
-  await admin.from("audit_log").insert(safeEntry as any);
+  let workingDiff = entry.diff;
+  if (entry.entity === "referral" && workingDiff && typeof workingDiff === "object") {
+    workingDiff = redactEncryptedFromDiff(workingDiff as Record<string, unknown>);
+  } else if (entry.entity === "referral_note" && workingDiff && typeof workingDiff === "object") {
+    workingDiff = redactNoteDiff(workingDiff as Record<string, unknown>);
+  }
+  if (entry.entity === "referral_note") {
+    const { computeViaAdminFlow } = await import("./encrypted-notes.functions");
+    const authorId = entry.author_id ?? null;
+    workingDiff = {
+      ...(workingDiff && typeof workingDiff === "object" ? workingDiff : {}),
+      actor_id: entry.user_id,
+      author_id: authorId,
+      via_admin_flow: computeViaAdminFlow(entry.user_id, authorId),
+      referral_id:
+        entry.referral_id ??
+        (workingDiff && typeof workingDiff === "object" ? (workingDiff as any).referral_id : undefined) ??
+        null,
+      recipient_count: entry.recipient_count ?? null,
+      edited_at: entry.edited_at ?? null,
+    };
+  }
+  await admin.from("audit_log").insert({
+    user_id: entry.user_id,
+    action: entry.action,
+    entity: entry.entity,
+    entity_id: entry.entity_id,
+    diff: workingDiff,
+  } as any);
 }
+
 
 function redactNoteDiff(diff: Record<string, unknown>): Record<string, unknown> {
   const out: Record<string, unknown> = { ...diff };
