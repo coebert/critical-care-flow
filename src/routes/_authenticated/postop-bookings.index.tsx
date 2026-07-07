@@ -20,8 +20,10 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { toast } from "sonner";
-import { Plus, CalendarClock, Pencil, Trash2 } from "lucide-react";
+import { Plus, CalendarClock, Pencil, Trash2, CalendarDays, XCircle } from "lucide-react";
 import { format, parseISO } from "date-fns";
+import { PostopStatusBadge } from "@/components/postop/status-badge";
+import type { PostopBookingStatus } from "@/lib/postop-lifecycle";
 
 export const Route = createFileRoute("/_authenticated/postop-bookings/")({
   head: () => ({

@@ -29,7 +29,9 @@ import { Route as AuthenticatedAdminRouteImport } from './routes/_authenticated/
 import { Route as AuthenticatedPostopBookingsIndexRouteImport } from './routes/_authenticated/postop-bookings.index'
 import { Route as AuthenticatedReferralsNewRouteImport } from './routes/_authenticated/referrals.new'
 import { Route as AuthenticatedReferralsIdRouteImport } from './routes/_authenticated/referrals.$id'
+import { Route as AuthenticatedPostopBookingsPlannerRouteImport } from './routes/_authenticated/postop-bookings.planner'
 import { Route as AuthenticatedPostopBookingsNewRouteImport } from './routes/_authenticated/postop-bookings.new'
+import { Route as AuthenticatedPostopBookingsCancellationsRouteImport } from './routes/_authenticated/postop-bookings.cancellations'
 import { Route as AuthenticatedPostopBookingsAnalyticsRouteImport } from './routes/_authenticated/postop-bookings.analytics'
 import { Route as AuthenticatedInboxIdRouteImport } from './routes/_authenticated/inbox.$id'
 import { Route as AuthenticatedPostopBookingsIdEditRouteImport } from './routes/_authenticated/postop-bookings.$id.edit'
@@ -139,10 +141,22 @@ const AuthenticatedReferralsIdRoute =
     path: '/referrals/$id',
     getParentRoute: () => AuthenticatedRouteRoute,
   } as any)
+const AuthenticatedPostopBookingsPlannerRoute =
+  AuthenticatedPostopBookingsPlannerRouteImport.update({
+    id: '/postop-bookings/planner',
+    path: '/postop-bookings/planner',
+    getParentRoute: () => AuthenticatedRouteRoute,
+  } as any)
 const AuthenticatedPostopBookingsNewRoute =
   AuthenticatedPostopBookingsNewRouteImport.update({
     id: '/postop-bookings/new',
     path: '/postop-bookings/new',
+    getParentRoute: () => AuthenticatedRouteRoute,
+  } as any)
+const AuthenticatedPostopBookingsCancellationsRoute =
+  AuthenticatedPostopBookingsCancellationsRouteImport.update({
+    id: '/postop-bookings/cancellations',
+    path: '/postop-bookings/cancellations',
     getParentRoute: () => AuthenticatedRouteRoute,
   } as any)
 const AuthenticatedPostopBookingsAnalyticsRoute =
@@ -182,7 +196,9 @@ export interface FileRoutesByFullPath {
   '/push-test': typeof AuthenticatedPushTestRoute
   '/inbox/$id': typeof AuthenticatedInboxIdRoute
   '/postop-bookings/analytics': typeof AuthenticatedPostopBookingsAnalyticsRoute
+  '/postop-bookings/cancellations': typeof AuthenticatedPostopBookingsCancellationsRoute
   '/postop-bookings/new': typeof AuthenticatedPostopBookingsNewRoute
+  '/postop-bookings/planner': typeof AuthenticatedPostopBookingsPlannerRoute
   '/referrals/$id': typeof AuthenticatedReferralsIdRoute
   '/referrals/new': typeof AuthenticatedReferralsNewRoute
   '/postop-bookings/': typeof AuthenticatedPostopBookingsIndexRoute
@@ -207,7 +223,9 @@ export interface FileRoutesByTo {
   '/': typeof AuthenticatedIndexRoute
   '/inbox/$id': typeof AuthenticatedInboxIdRoute
   '/postop-bookings/analytics': typeof AuthenticatedPostopBookingsAnalyticsRoute
+  '/postop-bookings/cancellations': typeof AuthenticatedPostopBookingsCancellationsRoute
   '/postop-bookings/new': typeof AuthenticatedPostopBookingsNewRoute
+  '/postop-bookings/planner': typeof AuthenticatedPostopBookingsPlannerRoute
   '/referrals/$id': typeof AuthenticatedReferralsIdRoute
   '/referrals/new': typeof AuthenticatedReferralsNewRoute
   '/postop-bookings': typeof AuthenticatedPostopBookingsIndexRoute
@@ -234,7 +252,9 @@ export interface FileRoutesById {
   '/_authenticated/': typeof AuthenticatedIndexRoute
   '/_authenticated/inbox/$id': typeof AuthenticatedInboxIdRoute
   '/_authenticated/postop-bookings/analytics': typeof AuthenticatedPostopBookingsAnalyticsRoute
+  '/_authenticated/postop-bookings/cancellations': typeof AuthenticatedPostopBookingsCancellationsRoute
   '/_authenticated/postop-bookings/new': typeof AuthenticatedPostopBookingsNewRoute
+  '/_authenticated/postop-bookings/planner': typeof AuthenticatedPostopBookingsPlannerRoute
   '/_authenticated/referrals/$id': typeof AuthenticatedReferralsIdRoute
   '/_authenticated/referrals/new': typeof AuthenticatedReferralsNewRoute
   '/_authenticated/postop-bookings/': typeof AuthenticatedPostopBookingsIndexRoute
@@ -261,7 +281,9 @@ export interface FileRouteTypes {
     | '/push-test'
     | '/inbox/$id'
     | '/postop-bookings/analytics'
+    | '/postop-bookings/cancellations'
     | '/postop-bookings/new'
+    | '/postop-bookings/planner'
     | '/referrals/$id'
     | '/referrals/new'
     | '/postop-bookings/'
@@ -286,7 +308,9 @@ export interface FileRouteTypes {
     | '/'
     | '/inbox/$id'
     | '/postop-bookings/analytics'
+    | '/postop-bookings/cancellations'
     | '/postop-bookings/new'
+    | '/postop-bookings/planner'
     | '/referrals/$id'
     | '/referrals/new'
     | '/postop-bookings'
@@ -312,7 +336,9 @@ export interface FileRouteTypes {
     | '/_authenticated/'
     | '/_authenticated/inbox/$id'
     | '/_authenticated/postop-bookings/analytics'
+    | '/_authenticated/postop-bookings/cancellations'
     | '/_authenticated/postop-bookings/new'
+    | '/_authenticated/postop-bookings/planner'
     | '/_authenticated/referrals/$id'
     | '/_authenticated/referrals/new'
     | '/_authenticated/postop-bookings/'
@@ -471,11 +497,25 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedReferralsIdRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
+    '/_authenticated/postop-bookings/planner': {
+      id: '/_authenticated/postop-bookings/planner'
+      path: '/postop-bookings/planner'
+      fullPath: '/postop-bookings/planner'
+      preLoaderRoute: typeof AuthenticatedPostopBookingsPlannerRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
     '/_authenticated/postop-bookings/new': {
       id: '/_authenticated/postop-bookings/new'
       path: '/postop-bookings/new'
       fullPath: '/postop-bookings/new'
       preLoaderRoute: typeof AuthenticatedPostopBookingsNewRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/postop-bookings/cancellations': {
+      id: '/_authenticated/postop-bookings/cancellations'
+      path: '/postop-bookings/cancellations'
+      fullPath: '/postop-bookings/cancellations'
+      preLoaderRoute: typeof AuthenticatedPostopBookingsCancellationsRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
     '/_authenticated/postop-bookings/analytics': {
@@ -525,7 +565,9 @@ interface AuthenticatedRouteRouteChildren {
   AuthenticatedPushTestRoute: typeof AuthenticatedPushTestRoute
   AuthenticatedIndexRoute: typeof AuthenticatedIndexRoute
   AuthenticatedPostopBookingsAnalyticsRoute: typeof AuthenticatedPostopBookingsAnalyticsRoute
+  AuthenticatedPostopBookingsCancellationsRoute: typeof AuthenticatedPostopBookingsCancellationsRoute
   AuthenticatedPostopBookingsNewRoute: typeof AuthenticatedPostopBookingsNewRoute
+  AuthenticatedPostopBookingsPlannerRoute: typeof AuthenticatedPostopBookingsPlannerRoute
   AuthenticatedReferralsIdRoute: typeof AuthenticatedReferralsIdRoute
   AuthenticatedReferralsNewRoute: typeof AuthenticatedReferralsNewRoute
   AuthenticatedPostopBookingsIndexRoute: typeof AuthenticatedPostopBookingsIndexRoute
@@ -545,7 +587,11 @@ const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedIndexRoute: AuthenticatedIndexRoute,
   AuthenticatedPostopBookingsAnalyticsRoute:
     AuthenticatedPostopBookingsAnalyticsRoute,
+  AuthenticatedPostopBookingsCancellationsRoute:
+    AuthenticatedPostopBookingsCancellationsRoute,
   AuthenticatedPostopBookingsNewRoute: AuthenticatedPostopBookingsNewRoute,
+  AuthenticatedPostopBookingsPlannerRoute:
+    AuthenticatedPostopBookingsPlannerRoute,
   AuthenticatedReferralsIdRoute: AuthenticatedReferralsIdRoute,
   AuthenticatedReferralsNewRoute: AuthenticatedReferralsNewRoute,
   AuthenticatedPostopBookingsIndexRoute: AuthenticatedPostopBookingsIndexRoute,
