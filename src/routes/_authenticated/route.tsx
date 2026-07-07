@@ -54,6 +54,13 @@ export const Route = createFileRoute("/_authenticated")({
 function AuthedShell() {
   const { user } = useAuth();
   const { hasRole: isAdmin } = useRole("admin");
+  // Referral surfaces (list, new, detail, inbox of referral notifications)
+  // are restricted to critical care team members by RLS + server guards.
+  // Hide the nav links for anyone else so we don't offer a link that leads
+  // to an "access restricted" screen. Admins retain clinical access via the
+  // `has_clinical_access` predicate, so this only hides the entries for
+  // signed-in users with no clinical role.
+  const { hasAccess: canAccessReferrals } = useClinicalAccess();
   const router = useRouter();
   const navigate = useNavigate();
   const [signingOut, setSigningOut] = useState(false);
