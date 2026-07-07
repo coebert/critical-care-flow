@@ -535,24 +535,33 @@ export type Database = {
         Row: {
           id: boolean
           level1_available: boolean | null
+          level1_last_alerted_at: string | null
           level2_available: boolean | null
+          level2_last_alerted_at: string | null
           level3_available: boolean | null
+          level3_last_alerted_at: string | null
           shift_key: string | null
           updated_at: string
         }
         Insert: {
           id?: boolean
           level1_available?: boolean | null
+          level1_last_alerted_at?: string | null
           level2_available?: boolean | null
+          level2_last_alerted_at?: string | null
           level3_available?: boolean | null
+          level3_last_alerted_at?: string | null
           shift_key?: string | null
           updated_at?: string
         }
         Update: {
           id?: boolean
           level1_available?: boolean | null
+          level1_last_alerted_at?: string | null
           level2_available?: boolean | null
+          level2_last_alerted_at?: string | null
           level3_available?: boolean | null
+          level3_last_alerted_at?: string | null
           shift_key?: string | null
           updated_at?: string
         }
