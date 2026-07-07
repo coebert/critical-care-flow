@@ -3,13 +3,15 @@ import { z } from "zod";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { PostopAnalyticsPanel } from "@/components/postop-analytics-panel";
 import { ReferralsAnalyticsPanel } from "@/components/analytics/referrals-panel";
+import { NurseCapacityAnalyticsPanel } from "@/components/analytics/nurse-capacity-panel";
 import { icnarcTargetsQueryOptions, initialAnalyticsRange } from "@/components/analytics/queries";
 import { getReferralsAnalytics, getPostopAnalytics } from "@/lib/analytics.functions";
+import { getNurseCapacityAnalytics } from "@/lib/nurse-staffing.functions";
 import { AdminOnly } from "@/components/admin-only";
 import { RouteErrorFallback } from "@/components/route-error-fallback";
 
 const analyticsSearchSchema = z.object({
-  view: z.enum(["referrals", "postop"]).optional(),
+  view: z.enum(["referrals", "postop", "nurse-capacity"]).optional(),
 });
 
 export const Route = createFileRoute("/_authenticated/analytics")({
