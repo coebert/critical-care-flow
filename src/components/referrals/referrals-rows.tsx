@@ -15,6 +15,9 @@ import {
   statusStyles,
   type Referral,
 } from "@/lib/referrals-list-utils";
+import { computeNews2Tone, news2ToneClasses, ceilingLabel } from "@/lib/referral-clinical";
+import { outcomeLabel } from "@/lib/referral-outcome";
+
 
 const SKELETON_ROWS = 5;
 

@@ -37,6 +37,10 @@ import {
   ReferralExpandableSection,
   type ExpandCommand,
 } from "@/components/referrals/referral-expandable-section";
+import { ClinicalFields, clinicalFieldsFromRow } from "@/components/referrals/clinical-fields";
+import { OutcomeSelector } from "@/components/referrals/outcome-selector";
+import { validateReferralOutcome, type ReferralOutcome } from "@/lib/referral-outcome";
+
 
 type Referral = Tables<"referrals"> & DecryptedReferral;
 
@@ -181,9 +185,22 @@ function ReferralDetail() {
         first_seen_at: ref.first_seen_at, decision_at: ref.decision_at,
         arrived_on_unit_at: ref.arrived_on_unit_at,
         is_test: ref.is_test ?? false,
+        // Point-2 clinical fields
+        news2_score: (ref as any).news2_score ?? null,
+        ceiling_of_care: (ref as any).ceiling_of_care ?? null,
+        reason_category: (ref as any).reason_category ?? null,
+        frailty_score: (ref as any).frailty_score ?? null,
+        anticipated_interventions: (ref as any).anticipated_interventions ?? [],
+        infection_status: (ref as any).infection_status ?? null,
+        infection_organism: (ref as any).infection_organism ?? null,
+        weight_kg: (ref as any).weight_kg == null ? null : Number((ref as any).weight_kg),
+        allergies: (ref as any).allergies ?? null,
+        resus_status: (ref as any).resus_status ?? null,
+        outcome: (ref as any).outcome ?? null,
       };
       await update({ data: { id: ref.id, patch } });
       toast.success("Saved");
+
     } catch (err: any) {
       toast.error(err.message ?? "Save failed");
     } finally {
@@ -361,8 +378,26 @@ function ReferralDetail() {
           <p className="text-xs text-muted-foreground">Timestamps save automatically. Fields marked <span className="text-destructive">*</span> are required for the ICNARC dataset.</p>
         </Card>
 
+        <Card className="p-5 space-y-4">
+          <h2 className="font-semibold">Clinical assessment</h2>
+          <ClinicalFields
+            value={clinicalFieldsFromRow(ref)}
+            onChange={(patch) =>
+              setRef({ ...ref, ...(patch as any) } as Referral)
+            }
+            age={ref.age ?? null}
+          />
+          <div className="pt-2 border-t">
+            <OutcomeSelector
+              value={((ref as any).outcome as ReferralOutcome | null) ?? null}
+              onChange={(v) => setRef({ ...ref, outcome: v } as any)}
+            />
+          </div>
+        </Card>
+
         <Card ref={outcomeRef} className="p-5 space-y-4">
           <h2 className="font-semibold">Outcome</h2>
+
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <Field label="Status">
               <Select value={ref.status} onValueChange={(v) => {

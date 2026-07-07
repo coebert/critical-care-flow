@@ -737,8 +737,11 @@ export type Database = {
             | Database["public"]["Enums"]["admission_urgency"]
             | null
           age: number | null
+          allergies: string | null
+          anticipated_interventions: string[]
           arrived_on_unit_at: string | null
           baseline_function_enc: string | null
+          ceiling_of_care: Database["public"]["Enums"]["ceiling_of_care"] | null
           consultant_to_consultant_only: boolean
           created_at: string
           created_by: string | null
@@ -751,18 +754,33 @@ export type Database = {
           discussed_with_consultant: string | null
           dnacpr_respect: boolean
           first_seen_at: string | null
+          frailty_score: number | null
           hospital_number_enc: string | null
           hospital_number_hash: string | null
           id: string
+          infection_organism: string | null
+          infection_status:
+            | Database["public"]["Enums"]["infection_status"]
+            | null
           is_test: boolean
+          news2_recorded_at: string | null
+          news2_score: number | null
+          outcome: Database["public"]["Enums"]["referral_outcome"] | null
+          outcome_recorded_at: string | null
           past_medical_history_enc: string | null
+          previous_referral_id: string | null
+          reason_category:
+            | Database["public"]["Enums"]["referral_reason_category"]
+            | null
           reason_for_referral_enc: string | null
           referral_received_at: string
           referring_specialty: string | null
+          resus_status: Database["public"]["Enums"]["resus_status"] | null
           sex: Database["public"]["Enums"]["patient_sex"] | null
           status: Database["public"]["Enums"]["referral_status"]
           updated_at: string
           updated_by: string | null
+          weight_kg: number | null
         }
         Insert: {
           accepting_consultant?: string | null
@@ -770,8 +788,13 @@ export type Database = {
             | Database["public"]["Enums"]["admission_urgency"]
             | null
           age?: number | null
+          allergies?: string | null
+          anticipated_interventions?: string[]
           arrived_on_unit_at?: string | null
           baseline_function_enc?: string | null
+          ceiling_of_care?:
+            | Database["public"]["Enums"]["ceiling_of_care"]
+            | null
           consultant_to_consultant_only?: boolean
           created_at?: string
           created_by?: string | null
@@ -784,18 +807,33 @@ export type Database = {
           discussed_with_consultant?: string | null
           dnacpr_respect?: boolean
           first_seen_at?: string | null
+          frailty_score?: number | null
           hospital_number_enc?: string | null
           hospital_number_hash?: string | null
           id?: string
+          infection_organism?: string | null
+          infection_status?:
+            | Database["public"]["Enums"]["infection_status"]
+            | null
           is_test?: boolean
+          news2_recorded_at?: string | null
+          news2_score?: number | null
+          outcome?: Database["public"]["Enums"]["referral_outcome"] | null
+          outcome_recorded_at?: string | null
           past_medical_history_enc?: string | null
+          previous_referral_id?: string | null
+          reason_category?:
+            | Database["public"]["Enums"]["referral_reason_category"]
+            | null
           reason_for_referral_enc?: string | null
           referral_received_at?: string
           referring_specialty?: string | null
+          resus_status?: Database["public"]["Enums"]["resus_status"] | null
           sex?: Database["public"]["Enums"]["patient_sex"] | null
           status?: Database["public"]["Enums"]["referral_status"]
           updated_at?: string
           updated_by?: string | null
+          weight_kg?: number | null
         }
         Update: {
           accepting_consultant?: string | null
@@ -803,8 +841,13 @@ export type Database = {
             | Database["public"]["Enums"]["admission_urgency"]
             | null
           age?: number | null
+          allergies?: string | null
+          anticipated_interventions?: string[]
           arrived_on_unit_at?: string | null
           baseline_function_enc?: string | null
+          ceiling_of_care?:
+            | Database["public"]["Enums"]["ceiling_of_care"]
+            | null
           consultant_to_consultant_only?: boolean
           created_at?: string
           created_by?: string | null
@@ -817,20 +860,43 @@ export type Database = {
           discussed_with_consultant?: string | null
           dnacpr_respect?: boolean
           first_seen_at?: string | null
+          frailty_score?: number | null
           hospital_number_enc?: string | null
           hospital_number_hash?: string | null
           id?: string
+          infection_organism?: string | null
+          infection_status?:
+            | Database["public"]["Enums"]["infection_status"]
+            | null
           is_test?: boolean
+          news2_recorded_at?: string | null
+          news2_score?: number | null
+          outcome?: Database["public"]["Enums"]["referral_outcome"] | null
+          outcome_recorded_at?: string | null
           past_medical_history_enc?: string | null
+          previous_referral_id?: string | null
+          reason_category?:
+            | Database["public"]["Enums"]["referral_reason_category"]
+            | null
           reason_for_referral_enc?: string | null
           referral_received_at?: string
           referring_specialty?: string | null
+          resus_status?: Database["public"]["Enums"]["resus_status"] | null
           sex?: Database["public"]["Enums"]["patient_sex"] | null
           status?: Database["public"]["Enums"]["referral_status"]
           updated_at?: string
           updated_by?: string | null
+          weight_kg?: number | null
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "referrals_previous_referral_id_fkey"
+            columns: ["previous_referral_id"]
+            isOneToOne: false
+            referencedRelation: "referrals"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       user_private_key_material: {
         Row: {
@@ -1037,9 +1103,33 @@ export type Database = {
         | "cancelled"
       bed_transport_mode: "land_ambulance" | "air" | "self" | "other"
       bed_unit: "icu" | "hdu"
+      ceiling_of_care:
+        | "full_escalation"
+        | "no_cpr"
+        | "ward_based"
+        | "symptom_control"
+        | "not_documented"
+      infection_status: "none" | "suspected" | "confirmed" | "unknown"
       patient_sex: "male" | "female" | "other" | "unknown"
       postop_level: "level_1" | "level_2" | "level_3"
+      referral_outcome:
+        | "admit_for_admission"
+        | "review_on_ward"
+        | "advice_given"
+        | "declined"
+      referral_reason_category:
+        | "respiratory_failure"
+        | "sepsis"
+        | "shock"
+        | "post_op"
+        | "neurology"
+        | "trauma"
+        | "gi_bleed"
+        | "metabolic"
+        | "overdose"
+        | "other"
       referral_status: "pending" | "declined" | "admitted" | "accepted"
+      resus_status: "for_cpr" | "dnacpr" | "not_documented"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -1198,9 +1288,36 @@ export const Constants = {
       ],
       bed_transport_mode: ["land_ambulance", "air", "self", "other"],
       bed_unit: ["icu", "hdu"],
+      ceiling_of_care: [
+        "full_escalation",
+        "no_cpr",
+        "ward_based",
+        "symptom_control",
+        "not_documented",
+      ],
+      infection_status: ["none", "suspected", "confirmed", "unknown"],
       patient_sex: ["male", "female", "other", "unknown"],
       postop_level: ["level_1", "level_2", "level_3"],
+      referral_outcome: [
+        "admit_for_admission",
+        "review_on_ward",
+        "advice_given",
+        "declined",
+      ],
+      referral_reason_category: [
+        "respiratory_failure",
+        "sepsis",
+        "shock",
+        "post_op",
+        "neurology",
+        "trauma",
+        "gi_bleed",
+        "metabolic",
+        "overdose",
+        "other",
+      ],
       referral_status: ["pending", "declined", "admitted", "accepted"],
+      resus_status: ["for_cpr", "dnacpr", "not_documented"],
     },
   },
 } as const
