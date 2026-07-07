@@ -1,111 +1,75 @@
-# Bed state & capacity — implementation plan
+## Referral workflow overhaul (Point 2)
 
-This adds a first-class concept of the unit itself: which beds exist, who occupies them, predicted discharges, ward-based level-2 outliers, and outbound transfers/retrievals. It plugs into the existing referrals + post-op booking flows so a coordinator has one place to see "can we accept?".
+Add the clinical fields senior ICU decision-makers actually rely on when triaging a referral, plus a proper outcome taxonomy and re-referral linking.
 
-## Scope (this phase)
+### 1. New clinical fields on `referrals`
 
-1. **Bed register** — the fixed list of ICU/HDU/side-room beds on the unit.
-2. **Bed occupancy** — who is currently in each bed, with clinically-relevant flags.
-3. **Predicted discharges / step-downs** — a per-occupant field feeding a *net available beds in 24 h* number.
-4. **Outlier register** — patients receiving level-2 care outside the unit.
-5. **Transfers out / retrievals** — repat + tertiary transfer tracking.
-6. **Capacity snapshot** — a compact strip shown at the top of Referrals and on a new `/bed-board` route.
-7. **Bed board page** — the coordinator's whiteboard view (also usable in a wall-mounted TV mode later).
+Extend the table (all optional so existing rows stay valid):
 
-Out of scope for this phase (called out so it's not forgotten): ward-round list export, NEWS2 trends, mortality/outcome capture, ceiling-of-care fields on referral, SBAR handover generator — those live in points 2, 3, 5 of the review.
+- **NEWS2**: `news2_score int` (0–20) + `news2_recorded_at timestamptz`. Renders as a colour-coded badge on the list and detail. Small helper `computeNews2Tone(score)` for red/amber/green.
+- **Ceiling of care**: `ceiling_of_care` enum — `full_escalation` | `no_cpr` | `ward_based` | `symptom_control` | `not_documented`. Required field once status leaves `pending`.
+- **Structured reason for referral**: `reason_category` enum (~10 values: `respiratory_failure`, `sepsis`, `shock`, `post_op`, `neurology`, `trauma`, `gi_bleed`, `metabolic`, `overdose`, `other`), plus keep the existing free-text as `reason_notes`.
+- **Frailty**: `frailty_score int` (Rockwell CFS 1–9), nullable — hidden unless age ≥ 65.
+- **Anticipated interventions** (multi): `anticipated_interventions text[]` from a fixed vocabulary (`invasive_ventilation`, `niv_cpap`, `hfno`, `vasopressors`, `rrt`, `neuro_obs`, `arterial_line`, `central_line`, `other`).
+- **Infection control**: `infection_status` enum — `none` | `suspected` | `confirmed` | `unknown`, and `infection_organism text` (free text, capped).
+- **First-class safety fields**: `weight_kg numeric(5,1)`, `allergies text`, `resus_status` enum — `for_cpr` | `dnacpr` | `not_documented`.
+- **Re-referral linking**: `previous_referral_id uuid references public.referrals(id)`. Nullable. On the "new referral" form, if the hospital number matches a recent referral, offer to link.
 
-## Data model
+Migration wraps `ALTER TABLE` + enum creation + backfill defaults + preserve RLS/GRANTs (no policy changes needed — additive columns only). Existing encrypted-field pipeline untouched.
 
-New tables (all in `public`, RLS on, GRANTs to `authenticated` + `service_role`, no `anon`):
+### 2. Outcome taxonomy — three distinct decisions
 
-- **`beds`** — the static register.
-  - `code` (e.g. "ICU-1", "HDU-3"), `unit` enum (`icu` | `hdu`), `is_side_room` bool, `notes`, `active` bool, `sort_order` int.
-  - Seeded via migration with SDH's actual bed list (placeholder count now, editable by admin).
-- **`bed_occupancies`** — one row per admission-to-bed, soft-closed on discharge.
-  - `bed_id`, `hospital_number`, `patient_initials`, `admitting_consultant`, `admitted_at`, `discharged_at` (null = current), `level` (`1|2|3`), flags: `ventilated`, `nippv_cpap`, `hfno`, `vasopressors`, `renal_replacement`, `tracheostomy`, `isolation` enum (`none|contact|droplet|airborne`), `isolation_reason`, `requires_side_room`, `predicted_discharge_at` (nullable timestamptz), `predicted_step_down` enum (`ward|hdu|home|other|null`), `notes`.
-  - Partial unique index on `(bed_id) WHERE discharged_at IS NULL` so a bed can't have two live occupants.
-  - Optional FK `source_referral_id` and `source_postop_booking_id` (both nullable) to link admission back to its origin.
-- **`bed_outliers`** — level-2 patients on the ward.
-  - `hospital_number`, `patient_initials`, `ward`, `admitting_consultant`, `started_at`, `ended_at`, `level` (2 only for now), flags mirror occupancies (organ-support fields), `reason`, `notes`.
-- **`bed_transfers_out`** — repats + tertiary transfers.
-  - `occupancy_id` (FK), `kind` enum (`repat|tertiary|other`), `destination_hospital`, `destination_specialty`, `reason`, `transport_mode` enum (`land_ambulance|air|self|other`), `requested_at`, `accepted_at`, `eta_at`, `departed_at`, `status` enum (`requested|accepted|awaiting_transport|in_transit|completed|cancelled`), `notes`.
+Today `status` conflates decision + workflow state. Add `outcome` enum captured at the point of decision:
 
-Standard `id`, `created_at`, `updated_at`, `created_by`, `updated_by`. `set_updated_at` trigger on all four.
+- `admit_for_admission` — accept & admit (current "accepted"/"admitted" path)
+- `review_on_ward` — "come and review", no bed yet
+- `advice_given` — telephone advice only, referral closes
+- `declined` — as today
 
-## RLS
+`status` stays as the workflow lifecycle (`pending` → `seen` → `decision` → `closed`). The two are related but no longer collapsed. The referral detail form gates required fields per outcome (e.g. advice-given requires `discussed_with_consultant` and `reason_notes`; review_on_ward requires `first_seen_at`).
 
-Clinical data — same posture as `referrals`:
-- SELECT: `has_clinical_access(auth.uid())`.
-- INSERT/UPDATE: `has_clinical_access(auth.uid())`, `created_by = auth.uid()` on insert.
-- DELETE: admin only (soft delete via `deleted_at`/`deleted_by` on `bed_outliers` and `bed_transfers_out`; occupancies are closed with `discharged_at`, not deleted, to preserve the audit trail).
-- `beds`: SELECT for any clinical user; INSERT/UPDATE/DELETE admin only.
+Migration adds `outcome` enum + `outcome_recorded_at`. Old rows are backfilled from `status` (`admitted`/`accepted` → `admit_for_admission`, `declined` → `declined`, everything else → NULL).
 
-## Server functions
+### 3. UI changes
 
-New `src/lib/beds.functions.ts`:
-- `listBeds()` — all active beds, sorted.
-- `getBedBoard()` — beds + current occupancy + outliers + open transfers in one call (used by page + capacity strip).
-- `admitToBed({ bed_id, ...occupancyFields })` — creates an occupancy; optional `source_referral_id` / `source_postop_booking_id`.
-- `updateOccupancy({ id, patch })` — vitals/flags/notes/predicted-discharge edits.
-- `dischargeOccupancy({ id, discharged_at, step_down, actual_destination })`.
-- `moveOccupancy({ id, new_bed_id })` — closes old, opens new, chained in a single RPC for atomicity.
-- `createOutlier / updateOutlier / endOutlier`.
-- `createTransferOut / updateTransferOut / cancelTransferOut`.
+- **`referrals.new.tsx`**: new sections — Clinical (NEWS2, weight, allergies, infection), Decision-making (ceiling of care, resus, frailty when ≥65), Anticipated interventions (checkbox grid), Reason (category + notes). Re-referral banner when HN matches an existing open/recent referral, with "Link to previous referral" button.
+- **`referrals.$id.tsx`**: same field groups; outcome selector replaces the current status dropdown for decision. Save-time validation gates per outcome. Show linked previous-referral chip at the top.
+- **List view** (`_authenticated/index.tsx`): NEWS2 badge, ceiling-of-care chip, and outcome pill on each row. New filter chips: outcome, ceiling, infection.
+- **Prior-declined component**: extended to `PriorReferralsPanel` — shows any linked prior referral chain, not just declines.
 
-All `.middleware([requireSupabaseAuth])` and validate with a small zod schema per fn (mirrors `referrals.functions.ts`).
+### 4. Reusable pieces
 
-Admin-only bed register CRUD lives in `src/lib/admin.functions.ts` alongside the existing admin fns.
+- `src/lib/referral-clinical.ts` — enums, labels, `computeNews2Tone`, `getAnticipatedInterventionLabels`.
+- `src/lib/referral-outcome.ts` — outcome enum, validation rules per outcome, `deriveOutcomeFromLegacyStatus` for the backfill mirror on read.
+- `src/components/referrals/clinical-fields.tsx` — grouped inputs (used by both new + edit forms).
+- `src/components/referrals/outcome-selector.tsx` — the three-way outcome picker with contextual required-field hints.
+- `src/components/referrals/reference-referral-picker.tsx` — HN-match lookup with recent-referral list.
 
-## Derived capacity numbers
+### 5. Server functions
 
-Computed in a shared util `src/lib/bed-capacity.ts` (pure, unit-tested):
-- `beds_by_unit` — total active, per ICU/HDU.
-- `occupied` / `free` per unit.
-- `predicted_free_in_24h` = `free + occupancies where predicted_discharge_at <= now + 24h`.
-- `pending_referrals` — count from existing referrals list (accepted-not-arrived + awaiting-decision).
-- `pending_postop_tomorrow` — count from `postop_bookings` where `proposed_surgery_date` is today/tomorrow and status not cancelled.
-- `outliers_count`, `open_transfers_count`.
+Extend `src/lib/referrals.functions.ts`:
 
-## UI
+- `createReferral` / `updateReferral`: accept the new fields, validate outcome→required fields, persist `previous_referral_id` link.
+- New `findRecentReferralsByHospitalNumber({ hospital_number })` — returns last 5 non-deleted referrals matching HN, used by the new-referral form for the "link to prior" prompt.
 
-New route `src/routes/_authenticated/bed-board.tsx`:
-- Top strip: capacity snapshot (same component used on referrals).
-- Grid of bed cards grouped by unit, sorted by `sort_order`. Each card shows occupant initials + hospital number, admitting consultant, day-of-stay, level pill, organ-support icons (vent/RRT/inotrope/HFNO/NIV/trache), isolation badge, predicted discharge chip.
-- Empty beds show a subtle "+" to open the "Admit to bed" dialog (pre-fills from a referral or booking if opened from those pages).
-- Side panels (collapsible): "Outliers (n)" and "Transfers out (n)" with inline add/edit.
-- Realtime: single Supabase channel on `bed_occupancies`, `bed_outliers`, `bed_transfers_out` invalidates the `getBedBoard` query.
+All new fields go through the existing zod schema layer; no encryption changes because none of the new fields are free-text patient identifiers (reason_notes stays encrypted like existing note fields, infection_organism is short + non-identifying).
 
-New component `src/components/bed-board/capacity-strip.tsx` reused on:
-- `/bed-board` (top of the page).
-- `/` referrals list (above the filters, collapsible on mobile).
+### 6. Tests
 
-New components co-located under `src/components/bed-board/`:
-- `bed-card.tsx`, `bed-grid.tsx`, `admit-dialog.tsx`, `edit-occupancy-dialog.tsx`, `discharge-dialog.tsx`, `move-bed-dialog.tsx`, `outlier-panel.tsx`, `outlier-dialog.tsx`, `transfers-panel.tsx`, `transfer-dialog.tsx`.
+- Unit: `referral-outcome.test.ts` — outcome→required-field matrix.
+- Unit: `referral-clinical.test.ts` — NEWS2 tone thresholds, frailty visibility (age≥65).
+- Unit: `find-recent-referrals.test.ts` — HN normalisation + limit.
 
-## Wiring into existing flows
+### 7. Out of scope for Point 2 (belongs to later points)
 
-- **Referrals list**: capacity strip at the top; on an accepted referral row, a new "Admit to bed" action opens the dialog pre-filled from the referral.
-- **Referral detail (`referrals.$id.tsx`)**: same "Admit to bed" action in the action row; once admitted, shows the linked bed + link back to the bed board.
-- **Post-op booking detail/edit**: same admit action; converts a confirmed booking into a live occupancy.
-- **Sidebar**: add "Bed board" under a new "Work" group heading (matches the existing plan's grouping suggestion).
+- SBAR handover generator (Point 3)
+- Sepsis-6 / clinical decision-support checklists (Point 7)
+- Datix and outcome/mortality capture (Point 5)
 
-## Migrations
+### Estimated size
 
-Single migration file with all four tables in order (`beds`, `bed_occupancies`, `bed_outliers`, `bed_transfers_out`), each followed by its GRANTs → `ALTER TABLE … ENABLE RLS` → policies, then `set_updated_at` triggers, then a seed `INSERT` for a starter set of beds (10 ICU + 6 HDU, editable in admin). No CHECK on time-dependent expressions — the `bed_occupancies` "one live per bed" rule is enforced by the partial unique index, not a CHECK.
+~1 migration, ~10–12 files changed/created, ~700–900 lines total. No breaking changes; all new columns are nullable.
 
-## Tests
+---
 
-Unit tests for `bed-capacity.ts` (edge cases: no beds, all beds occupied, predicted discharges in the past, mixed units). Authz tests mirroring the existing `postop-*-authz.test.ts` pattern for `admitToBed`, `dischargeOccupancy`, `moveOccupancy`, and outlier/transfer CRUD.
-
-## Rollout order (as I build it)
-
-1. Migration (tables, RLS, seed, triggers).
-2. `bed-capacity.ts` + unit tests.
-3. `beds.functions.ts` + authz tests.
-4. `/bed-board` route with grid, admit/edit/discharge/move dialogs.
-5. Outliers + transfers side panels.
-6. Capacity strip on Referrals list.
-7. "Admit to bed" wiring from referral detail and post-op booking detail.
-8. Sidebar entry + minor nav grouping tweak.
-
-Estimated ~600 lines of new SQL/TS across ~15 files. No breaking changes to existing tables or routes.
+**Please confirm** and I will implement in this order: migration → shared enums/utils → server-fn updates → new-referral form → detail form → list view → tests.

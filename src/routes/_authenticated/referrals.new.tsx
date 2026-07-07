@@ -44,6 +44,14 @@ import {
   PriorReferralsDialog,
   type PriorReferral,
 } from "@/components/referrals/prior-referrals-dialog";
+import {
+  ClinicalFields,
+  emptyClinicalFields,
+  type ClinicalFieldsValue,
+} from "@/components/referrals/clinical-fields";
+import { OutcomeSelector } from "@/components/referrals/outcome-selector";
+import { validateReferralOutcome, type ReferralOutcome } from "@/lib/referral-outcome";
+
 
 export const Route = createFileRoute("/_authenticated/referrals/new")({
   head: () => ({ meta: [{ title: "New referral — SDH Critical Care" }] }),
@@ -57,8 +65,15 @@ function NewReferralPage() {
   const [saving, setSaving] = useState(false);
   const { specialties, wards, consultants } = useReferralOptions();
   const [f, setF] = useState<DraftForm>(blankForm);
+  // Clinical-assessment state kept OUT of the persisted draft — although not
+  // directly identifying, these fields are patient-specific and should not
+  // survive across sessions in browser storage.
+  const [clinical, setClinical] = useState<ClinicalFieldsValue>(emptyClinicalFields);
+  const [outcome, setOutcome] = useState<ReferralOutcome | null>(null);
+  const [previousReferralId, setPreviousReferralId] = useState<string | null>(null);
   const [draftRestored, setDraftRestored] = useState(false);
   const [draftSavedAt, setDraftSavedAt] = useState<Date | null>(null);
+
 
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -227,6 +242,16 @@ function NewReferralPage() {
     admission_urgency: f.admission_urgency || null,
   });
 
+  const outcomeCheck = validateReferralOutcome({
+    outcome,
+    ceiling_of_care: clinical.ceiling_of_care,
+    reason_notes: f.reason_for_referral,
+    decline_reason: f.decline_reason,
+    discussed_with_consultant: f.discussed_with_consultant,
+    accepting_consultant: f.accepting_consultant,
+    first_seen_at: f.first_seen_at || null,
+  });
+
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!combined.isValid) {
@@ -235,6 +260,14 @@ function NewReferralPage() {
       toast.error(firstFieldError ?? combined.issues[0] ?? "Please fix the highlighted fields before saving.");
       return;
     }
+    if (!outcomeCheck.isValid) {
+      setShowErrors(true);
+      const first = Object.values(outcomeCheck.fieldErrors)[0];
+      toast.error(first ?? "Please complete the outcome fields.");
+      return;
+    }
+
+
 
 
     setSaving(true);
@@ -247,11 +280,26 @@ function NewReferralPage() {
         decision_at: f.decision_at ? new Date(f.decision_at).toISOString() : null,
         arrived_on_unit_at: f.arrived_on_unit_at ? new Date(f.arrived_on_unit_at).toISOString() : null,
         admission_urgency: f.admission_urgency || null,
+        // Point-2 clinical fields
+        news2_score: clinical.news2_score,
+        news2_recorded_at: clinical.news2_score != null ? new Date().toISOString() : null,
+        ceiling_of_care: clinical.ceiling_of_care,
+        reason_category: clinical.reason_category,
+        frailty_score: clinical.frailty_score,
+        anticipated_interventions: clinical.anticipated_interventions,
+        infection_status: clinical.infection_status,
+        infection_organism: clinical.infection_organism,
+        weight_kg: clinical.weight_kg,
+        allergies: clinical.allergies,
+        resus_status: clinical.resus_status,
+        outcome,
+        previous_referral_id: previousReferralId,
       };
       for (const k of [
         "hospital_number","current_ward","current_bed","past_medical_history",
         "baseline_function","referring_specialty","reason_for_referral","decline_reason","discussed_with_consultant","accepting_consultant",
       ]) if (!payload[k]) payload[k] = null;
+
 
       const res = await create({ data: payload });
       if (typeof window !== "undefined") window.localStorage.removeItem(DRAFT_KEY);
@@ -377,7 +425,43 @@ function NewReferralPage() {
           </div>
         </Section>
 
+        <Section title="Clinical assessment">
+          <ClinicalFields
+            value={clinical}
+            onChange={(patch) => setClinical((cur) => ({ ...cur, ...patch }))}
+            age={f.age ? Number(f.age) : null}
+            errors={showErrors ? (outcomeCheck.fieldErrors as Partial<Record<keyof ClinicalFieldsValue, string>>) : undefined}
+          />
+        </Section>
+
         <Section title="Outcome">
+          <OutcomeSelector value={outcome} onChange={setOutcome} />
+          {priors.length > 0 && (
+            <div className="rounded-md border bg-muted/40 p-3 flex items-center justify-between gap-3">
+              <div className="text-sm">
+                {previousReferralId ? (
+                  <>Linked to previous referral <span className="font-mono text-xs">#{previousReferralId.slice(0, 8)}</span>.</>
+                ) : (
+                  <>This patient has {priors.length} earlier referral{priors.length === 1 ? "" : "s"}. Link this as a re-referral?</>
+                )}
+              </div>
+              {previousReferralId ? (
+                <Button type="button" size="sm" variant="ghost" onClick={() => setPreviousReferralId(null)}>
+                  Unlink
+                </Button>
+              ) : (
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="outline"
+                  onClick={() => setPreviousReferralId((priors[0] as any).id ?? null)}
+                >
+                  Link to most recent
+                </Button>
+              )}
+            </div>
+          )}
+
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <Field label="Status">
               <Select value={f.status} onValueChange={(v) => {

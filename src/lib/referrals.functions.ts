@@ -33,7 +33,40 @@ const refSchema = z.object({
   // Flags a referral entered for testing/demonstration only. Rows with
   // is_test=true are excluded from analytics dashboards.
   is_test: z.boolean().optional(),
+
+  // ---- Point-2 clinical fields ----
+  news2_score: z.number().int().min(0).max(20).nullable().optional(),
+  news2_recorded_at: z.string().nullable().optional(),
+  ceiling_of_care: z
+    .enum(["full_escalation", "no_cpr", "ward_based", "symptom_control", "not_documented"])
+    .nullable()
+    .optional(),
+  reason_category: z
+    .enum([
+      "respiratory_failure", "sepsis", "shock", "post_op",
+      "neurology", "trauma", "gi_bleed", "metabolic", "overdose", "other",
+    ])
+    .nullable()
+    .optional(),
+  frailty_score: z.number().int().min(1).max(9).nullable().optional(),
+  anticipated_interventions: z
+    .array(
+      z.enum([
+        "invasive_ventilation", "niv_cpap", "hfno", "vasopressors",
+        "rrt", "neuro_obs", "arterial_line", "central_line", "other",
+      ]),
+    )
+    .optional(),
+  infection_status: z.enum(["none", "suspected", "confirmed", "unknown"]).nullable().optional(),
+  infection_organism: z.string().trim().max(200).nullable().optional(),
+  weight_kg: z.number().positive().max(400).nullable().optional(),
+  allergies: z.string().trim().max(1000).nullable().optional(),
+  resus_status: z.enum(["for_cpr", "dnacpr", "not_documented"]).nullable().optional(),
+  previous_referral_id: z.string().uuid().nullable().optional(),
+  outcome: z.enum(["admit_for_admission", "review_on_ward", "advice_given", "declined"]).nullable().optional(),
+  outcome_recorded_at: z.string().nullable().optional(),
 });
+
 
 import { getAdmin } from "./server-utils";
 

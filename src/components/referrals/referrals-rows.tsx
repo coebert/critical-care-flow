@@ -15,6 +15,9 @@ import {
   statusStyles,
   type Referral,
 } from "@/lib/referrals-list-utils";
+import { computeNews2Tone, news2ToneClasses, ceilingLabel } from "@/lib/referral-clinical";
+import { outcomeLabel } from "@/lib/referral-outcome";
+
 
 const SKELETON_ROWS = 5;
 
@@ -135,11 +138,27 @@ export function ReferralsRows({ rows, loading, timerSort, onToggleTimerSort }: P
                         </span>
                       )}
                       <span>{r.age ?? "?"} / {r.sex ?? "?"}</span>
+                      {(r as any).news2_score != null && (
+                        <span
+                          className={`inline-flex items-center rounded border px-1.5 py-0 text-[10px] font-semibold ${news2ToneClasses(computeNews2Tone((r as any).news2_score))}`}
+                          title={`NEWS2 ${(r as any).news2_score}`}
+                        >
+                          N2·{(r as any).news2_score}
+                        </span>
+                      )}
                     </div>
                   </td>
                   <td className="px-3 py-2">{r.current_ward ?? "—"} {r.current_bed ? `· ${r.current_bed}` : ""}</td>
                   <td className="px-3 py-2">{r.referring_specialty ?? "—"}</td>
-                  <td className="px-3 py-2 max-w-xs truncate">{r.reason_for_referral ?? "—"}</td>
+                  <td className="px-3 py-2 max-w-xs">
+                    <div className="truncate">{r.reason_for_referral ?? "—"}</div>
+                    {(r as any).ceiling_of_care && (
+                      <div className="text-[10px] text-muted-foreground truncate" title={ceilingLabel((r as any).ceiling_of_care) ?? undefined}>
+                        Ceiling: {ceilingLabel((r as any).ceiling_of_care)}
+                      </div>
+                    )}
+                  </td>
+
                   <td className="px-3 py-2"><ReferralTimer r={r} /></td>
                   <td className="px-3 py-2">
                     {r.admission_urgency ? (
@@ -152,12 +171,18 @@ export function ReferralsRows({ rows, loading, timerSort, onToggleTimerSort }: P
                   </td>
                   <td className="px-3 py-2">
                     <Badge variant="outline" className={`capitalize ${statusStyles[r.status]}`}>{r.status}</Badge>
+                    {(r as any).outcome && (
+                      <div className="text-[10px] text-muted-foreground mt-1 whitespace-nowrap">
+                        {outcomeLabel((r as any).outcome)}
+                      </div>
+                    )}
                     {r.status === "admitted" && (r as any).accepting_consultant && (
                       <div className="text-xs text-muted-foreground mt-1 whitespace-nowrap">
                         Accepted by {(r as any).accepting_consultant}
                       </div>
                     )}
                   </td>
+
                   <td className="px-3 py-2 whitespace-nowrap">
                     {r.creator_name
                       ? r.creator_name
