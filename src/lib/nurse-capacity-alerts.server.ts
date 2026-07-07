@@ -180,7 +180,7 @@ export async function checkAndAlertNurseCapacity(admin: Admin, now: Date = new D
       if (p.notify_capacity === false) continue;
       const userLevels = flipped.filter((k) => (p as any)[prefKey[k]] !== false);
       if (!userLevels.length) continue;
-      const summary = messageFor(userLevels, next);
+      const summary = messageFor(userLevels, next, block);
       perUser.push({
         id: p.id,
         body: `${shiftLabel}: ${summary}. Spare ${block.spare ?? "—"} nurses (dependency ${snap.dependency}).`,
