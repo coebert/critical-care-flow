@@ -59,9 +59,23 @@ function levelLabel(k: FlippedLevel): string {
   return k === "l3" ? "Level 3" : k === "l2" ? "Level 2" : "Level 1/0";
 }
 
-function messageFor(levels: FlippedLevel[], next: LevelFlags): string {
+function slotsFor(k: FlippedLevel, block: { level3_slots: number | null; level2_slots: number | null; level1_slots: number | null }): number {
+  const raw = k === "l3" ? block.level3_slots : k === "l2" ? block.level2_slots : block.level1_slots;
+  return Math.max(0, raw ?? 0);
+}
+
+function messageFor(
+  levels: FlippedLevel[],
+  next: LevelFlags,
+  block: { level3_slots: number | null; level2_slots: number | null; level1_slots: number | null },
+): string {
   return levels
-    .map((k) => `${levelLabel(k)} ${next[k] ? "now available" : "no longer available"}`)
+    .map((k) => {
+      const slots = slotsFor(k, block);
+      return next[k]
+        ? `${levelLabel(k)}: ${slots} spare admission${slots === 1 ? "" : "s"} available`
+        : `${levelLabel(k)}: no spare admissions`;
+    })
     .join(" · ");
 }
 
@@ -166,7 +180,7 @@ export async function checkAndAlertNurseCapacity(admin: Admin, now: Date = new D
       if (p.notify_capacity === false) continue;
       const userLevels = flipped.filter((k) => (p as any)[prefKey[k]] !== false);
       if (!userLevels.length) continue;
-      const summary = messageFor(userLevels, next);
+      const summary = messageFor(userLevels, next, block);
       perUser.push({
         id: p.id,
         body: `${shiftLabel}: ${summary}. Spare ${block.spare ?? "—"} nurses (dependency ${snap.dependency}).`,
