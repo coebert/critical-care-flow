@@ -171,12 +171,18 @@ export function ReferralsRows({ rows, loading, timerSort, onToggleTimerSort }: P
                   </td>
                   <td className="px-3 py-2">
                     <Badge variant="outline" className={`capitalize ${statusStyles[r.status]}`}>{r.status}</Badge>
+                    {(r as any).outcome && (
+                      <div className="text-[10px] text-muted-foreground mt-1 whitespace-nowrap">
+                        {outcomeLabel((r as any).outcome)}
+                      </div>
+                    )}
                     {r.status === "admitted" && (r as any).accepting_consultant && (
                       <div className="text-xs text-muted-foreground mt-1 whitespace-nowrap">
                         Accepted by {(r as any).accepting_consultant}
                       </div>
                     )}
                   </td>
+
                   <td className="px-3 py-2 whitespace-nowrap">
                     {r.creator_name
                       ? r.creator_name
