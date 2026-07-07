@@ -7,7 +7,7 @@ import { listReferralsForList } from "@/lib/referrals.functions";
 import type { Referral } from "@/lib/referrals-list-utils";
 import { formatElapsed } from "@/lib/referrals-list-utils";
 import { dayOfStay } from "@/lib/bed-capacity";
-import { X, Printer } from "lucide-react";
+import { X, Printer, Sun, Moon } from "lucide-react";
 
 export const Route = createFileRoute("/_authenticated/board")({
   head: () => ({
@@ -15,6 +15,99 @@ export const Route = createFileRoute("/_authenticated/board")({
   }),
   component: BoardPage,
 });
+
+type Theme = "dark" | "light";
+const THEME_KEY = "sdh-board-theme";
+
+function useBoardTheme(): [Theme, (t: Theme) => void] {
+  const [theme, setTheme] = useState<Theme>("dark");
+  useEffect(() => {
+    try {
+      const stored = window.localStorage.getItem(THEME_KEY);
+      if (stored === "light" || stored === "dark") setTheme(stored);
+    } catch { /* ignore */ }
+  }, []);
+  const update = (t: Theme) => {
+    setTheme(t);
+    try { window.localStorage.setItem(THEME_KEY, t); } catch { /* ignore */ }
+  };
+  return [theme, update];
+}
+
+// Palette per theme. Keeps JSX readable and avoids `dark:` variants that
+// depend on the app-wide theme class (the board is a fixed overlay).
+type Palette = {
+  root: string;
+  border: string; // main dividers
+  borderSoft: string;
+  borderDashed: string;
+  eyebrow: string; // small uppercase labels
+  muted: string;
+  subtle: string;
+  cardFilled: string; // occupied bed card
+  cardEmpty: string; // free bed card
+  pill: string; // small L/day pill on beds
+  chip: string; // pending referral card
+  capOk: string;
+  capFull: string;
+  flagDefault: string;
+  flagRed: string;
+  flagOrange: string;
+  flagBlue: string;
+  timerWarn: string;
+  timerCritical: string;
+  exit: string;
+  toggle: string;
+};
+
+const PALETTES: Record<Theme, Palette> = {
+  dark: {
+    root: "bg-black text-white",
+    border: "border-white/10",
+    borderSoft: "border-white/15",
+    borderDashed: "border-white/10 border-dashed text-white/40",
+    eyebrow: "text-white/50",
+    muted: "text-white/60",
+    subtle: "text-white/50",
+    cardFilled: "bg-white/5 border-white/20",
+    cardEmpty: "text-white/50",
+    pill: "bg-white/10",
+    chip: "border-white/15 bg-white/5",
+    capOk: "bg-emerald-600/30 text-emerald-100",
+    capFull: "bg-red-600/30 text-red-100",
+    flagDefault: "bg-white/15 text-white/90",
+    flagRed: "bg-red-500/40 text-red-100",
+    flagOrange: "bg-orange-500/40 text-orange-100",
+    flagBlue: "bg-blue-500/40 text-blue-100",
+    timerWarn: "text-amber-300",
+    timerCritical: "text-red-400",
+    exit: "text-white/60 hover:text-white",
+    toggle: "border-white/20 text-white/80 hover:bg-white/10",
+  },
+  light: {
+    root: "bg-white text-slate-900",
+    border: "border-slate-200",
+    borderSoft: "border-slate-300",
+    borderDashed: "border-slate-300 border-dashed text-slate-400",
+    eyebrow: "text-slate-500",
+    muted: "text-slate-600",
+    subtle: "text-slate-500",
+    cardFilled: "bg-slate-50 border-slate-300",
+    cardEmpty: "text-slate-400",
+    pill: "bg-slate-200 text-slate-700",
+    chip: "border-slate-200 bg-slate-50",
+    capOk: "bg-emerald-100 text-emerald-800",
+    capFull: "bg-red-100 text-red-800",
+    flagDefault: "bg-slate-200 text-slate-800",
+    flagRed: "bg-red-200 text-red-900",
+    flagOrange: "bg-orange-200 text-orange-900",
+    flagBlue: "bg-blue-200 text-blue-900",
+    timerWarn: "text-amber-700",
+    timerCritical: "text-red-700",
+    exit: "text-slate-600 hover:text-slate-900",
+    toggle: "border-slate-300 text-slate-700 hover:bg-slate-100",
+  },
+};
 
 function useClock() {
   const [now, setNow] = useState(() => new Date());
@@ -28,6 +121,8 @@ function useClock() {
 function BoardPage() {
   const navigate = useNavigate();
   const now = useClock();
+  const [theme, setTheme] = useBoardTheme();
+  const p = PALETTES[theme];
 
   const bedBoard = useQuery({
     queryKey: ["board", "bed-board"],
@@ -46,7 +141,6 @@ function BoardPage() {
   });
 
   useEffect(() => {
-    // Realtime nudge — no data payload needed, just re-fetch.
     const ch = supabase
       .channel("board-refresh")
       .on("postgres_changes", { event: "*", schema: "public", table: "referrals" }, () => referrals.refetch())
@@ -68,38 +162,47 @@ function BoardPage() {
   pending.sort((a, b) => new Date(a.referral_received_at).getTime() - new Date(b.referral_received_at).getTime());
 
   return (
-    <div className="fixed inset-0 z-50 bg-black text-white flex flex-col overflow-hidden">
+    <div className={`fixed inset-0 z-50 flex flex-col overflow-hidden ${p.root}`}>
       {/* Top bar */}
-      <div className="flex items-center justify-between px-6 py-3 border-b border-white/10">
+      <div className={`flex items-center justify-between px-6 py-3 border-b ${p.border}`}>
         <div className="flex items-center gap-6">
           <div>
-            <div className="text-xs uppercase tracking-widest text-white/50">SDH Critical Care</div>
+            <div className={`text-xs uppercase tracking-widest ${p.eyebrow}`}>SDH Critical Care</div>
             <div className="text-2xl font-semibold">Live Board</div>
           </div>
           {cap && (
             <div className="flex items-center gap-4 text-lg">
-              <CapCell label="ICU" a={cap.icu.occupied} b={cap.icu.total} />
-              <CapCell label="HDU" a={cap.hdu.occupied} b={cap.hdu.total} />
-              <div className="text-white/80">
-                <span className="text-white/50 text-sm mr-1">Outliers</span>{cap.outliers_count}
+              <CapCell label="ICU" a={cap.icu.occupied} b={cap.icu.total} p={p} />
+              <CapCell label="HDU" a={cap.hdu.occupied} b={cap.hdu.total} p={p} />
+              <div className={p.muted}>
+                <span className={`${p.eyebrow} text-sm mr-1`}>Outliers</span>{cap.outliers_count}
               </div>
-              <div className="text-white/80">
-                <span className="text-white/50 text-sm mr-1">Transfers</span>{cap.open_transfers_count}
+              <div className={p.muted}>
+                <span className={`${p.eyebrow} text-sm mr-1`}>Transfers</span>{cap.open_transfers_count}
               </div>
-              <div className="text-white/80">
-                <span className="text-white/50 text-sm mr-1">Pending referrals</span>{pending.length}
+              <div className={p.muted}>
+                <span className={`${p.eyebrow} text-sm mr-1`}>Pending referrals</span>{pending.length}
               </div>
             </div>
           )}
         </div>
         <div className="flex items-center gap-6">
           <div className="text-4xl font-mono tabular-nums">{now.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}</div>
-          <Link to="/board/ward-round" className="text-white/60 hover:text-white text-sm underline flex items-center gap-1">
+          <button
+            onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
+            className={`text-sm rounded-md border px-2 py-1 flex items-center gap-1.5 ${p.toggle}`}
+            aria-label={`Switch to ${theme === "dark" ? "light" : "dark"} mode`}
+            title={`Switch to ${theme === "dark" ? "light" : "dark"} mode`}
+          >
+            {theme === "dark" ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
+            {theme === "dark" ? "Light" : "Dark"}
+          </button>
+          <Link to="/board/ward-round" className={`${p.exit} text-sm underline flex items-center gap-1`}>
             <Printer className="w-4 h-4" /> Ward round
           </Link>
           <button
             onClick={() => navigate({ to: "/bed-board" })}
-            className="text-white/60 hover:text-white text-sm underline flex items-center gap-1"
+            className={`${p.exit} text-sm underline flex items-center gap-1`}
             aria-label="Exit board mode"
           >
             <X className="w-4 h-4" /> Exit
@@ -109,22 +212,22 @@ function BoardPage() {
 
       {/* Body */}
       <div className="flex-1 grid grid-cols-1 lg:grid-cols-[2fr_1fr] overflow-hidden">
-        <div className="overflow-auto border-r border-white/10">
-          <BedsColumn data={bedBoard.data} now={now.getTime()} />
+        <div className={`overflow-auto border-r ${p.border}`}>
+          <BedsColumn data={bedBoard.data} now={now.getTime()} p={p} />
         </div>
         <div className="overflow-auto">
-          <PendingColumn rows={pending} now={now.getTime()} />
+          <PendingColumn rows={pending} now={now.getTime()} p={p} />
         </div>
       </div>
     </div>
   );
 }
 
-function CapCell({ label, a, b }: { label: string; a: number; b: number }) {
+function CapCell({ label, a, b, p }: { label: string; a: number; b: number; p: Palette }) {
   const full = a >= b;
   return (
-    <div className={`px-3 py-1 rounded ${full ? "bg-red-600/30 text-red-100" : "bg-emerald-600/30 text-emerald-100"}`}>
-      <span className="text-xs uppercase tracking-wider mr-2 text-white/70">{label}</span>
+    <div className={`px-3 py-1 rounded ${full ? p.capFull : p.capOk}`}>
+      <span className={`text-xs uppercase tracking-wider mr-2 ${p.eyebrow}`}>{label}</span>
       <span className="font-mono tabular-nums text-xl">{a}/{b}</span>
     </div>
   );
@@ -132,8 +235,8 @@ function CapCell({ label, a, b }: { label: string; a: number; b: number }) {
 
 type BedBoardData = Awaited<ReturnType<typeof getBedBoard>>;
 
-function BedsColumn({ data, now }: { data: BedBoardData | undefined; now: number }) {
-  if (!data) return <div className="p-6 text-white/50">Loading beds…</div>;
+function BedsColumn({ data, now, p }: { data: BedBoardData | undefined; now: number; p: Palette }) {
+  if (!data) return <div className={`p-6 ${p.subtle}`}>Loading beds…</div>;
   const { beds, occupancies } = data;
   const live = occupancies.filter((o) => !o.discharged_at);
   const byBed = new Map(live.map((o) => [o.bed_id, o]));
@@ -147,19 +250,19 @@ function BedsColumn({ data, now }: { data: BedBoardData | undefined; now: number
         const unitBeds = beds.filter((b) => b.active && b.unit === unit);
         return (
           <div key={unit}>
-            <h2 className="text-sm uppercase tracking-widest text-white/50 mb-2">{label} · {unitBeds.length} beds</h2>
+            <h2 className={`text-sm uppercase tracking-widest mb-2 ${p.eyebrow}`}>{label} · {unitBeds.length} beds</h2>
             <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-2">
               {unitBeds.map((b) => {
                 const occ = byBed.get(b.id);
                 return (
                   <div
                     key={b.id}
-                    className={`rounded border p-3 ${occ ? "bg-white/5 border-white/20" : "border-white/10 border-dashed text-white/40"}`}
+                    className={`rounded border p-3 ${occ ? p.cardFilled : p.borderDashed}`}
                   >
                     <div className="flex items-baseline justify-between">
-                      <div className="text-xs uppercase tracking-wider text-white/50">{b.code}</div>
+                      <div className={`text-xs uppercase tracking-wider ${p.eyebrow}`}>{b.code}</div>
                       {occ && (
-                        <div className="text-[10px] px-1.5 py-0.5 rounded bg-white/10">
+                        <div className={`text-[10px] px-1.5 py-0.5 rounded ${p.pill}`}>
                           L{occ.level ?? "?"} · d{dayOfStay(occ.admitted_at ?? "", now)}
                         </div>
                       )}
@@ -169,24 +272,24 @@ function BedsColumn({ data, now }: { data: BedBoardData | undefined; now: number
                         <div className="mt-1 text-lg font-semibold truncate">
                           {occ.hospital_number ?? occ.patient_initials ?? "—"}
                         </div>
-                        <div className="text-xs text-white/60 truncate">{occ.admitting_consultant ?? ""}</div>
+                        <div className={`text-xs truncate ${p.muted}`}>{occ.admitting_consultant ?? ""}</div>
                         <div className="mt-1 flex gap-1 text-[10px]">
-                          {occ.ventilated && <Flag>V</Flag>}
-                          {occ.nippv_cpap && <Flag>N</Flag>}
-                          {occ.hfno && <Flag>H</Flag>}
-                          {occ.vasopressors && <Flag tone="orange">P</Flag>}
-                          {occ.renal_replacement && <Flag tone="blue">R</Flag>}
-                          {occ.tracheostomy && <Flag>T</Flag>}
-                          {occ.isolation && occ.isolation !== "none" && <Flag tone="red">ISO</Flag>}
+                          {occ.ventilated && <Flag p={p}>V</Flag>}
+                          {occ.nippv_cpap && <Flag p={p}>N</Flag>}
+                          {occ.hfno && <Flag p={p}>H</Flag>}
+                          {occ.vasopressors && <Flag p={p} tone="orange">P</Flag>}
+                          {occ.renal_replacement && <Flag p={p} tone="blue">R</Flag>}
+                          {occ.tracheostomy && <Flag p={p}>T</Flag>}
+                          {occ.isolation && occ.isolation !== "none" && <Flag p={p} tone="red">ISO</Flag>}
                         </div>
                         {occ.predicted_discharge_at && (
-                          <div className="mt-1 text-[10px] text-emerald-300/80">
+                          <div className="mt-1 text-[10px] text-emerald-600 dark:text-emerald-300/80">
                             ↗ {new Date(occ.predicted_discharge_at).toLocaleDateString([], { day: "2-digit", month: "short" })}
                           </div>
                         )}
                       </>
                     ) : (
-                      <div className="mt-2 text-sm text-white/50">Free</div>
+                      <div className={`mt-2 text-sm ${p.cardEmpty}`}>Free</div>
                     )}
                   </div>
                 );
@@ -199,20 +302,20 @@ function BedsColumn({ data, now }: { data: BedBoardData | undefined; now: number
   );
 }
 
-function Flag({ children, tone }: { children: React.ReactNode; tone?: "red" | "orange" | "blue" }) {
+function Flag({ children, tone, p }: { children: React.ReactNode; tone?: "red" | "orange" | "blue"; p: Palette }) {
   const cls =
-    tone === "red" ? "bg-red-500/40 text-red-100" :
-    tone === "orange" ? "bg-orange-500/40 text-orange-100" :
-    tone === "blue" ? "bg-blue-500/40 text-blue-100" :
-    "bg-white/15 text-white/90";
+    tone === "red" ? p.flagRed :
+    tone === "orange" ? p.flagOrange :
+    tone === "blue" ? p.flagBlue :
+    p.flagDefault;
   return <span className={`px-1 py-0.5 rounded ${cls}`}>{children}</span>;
 }
 
-function PendingColumn({ rows, now }: { rows: Referral[]; now: number }) {
+function PendingColumn({ rows, now, p }: { rows: Referral[]; now: number; p: Palette }) {
   return (
     <div className="p-4">
-      <h2 className="text-sm uppercase tracking-widest text-white/50 mb-2">Pending referrals · {rows.length}</h2>
-      {rows.length === 0 && <div className="text-white/40">No pending referrals.</div>}
+      <h2 className={`text-sm uppercase tracking-widest mb-2 ${p.eyebrow}`}>Pending referrals · {rows.length}</h2>
+      {rows.length === 0 && <div className={p.cardEmpty}>No pending referrals.</div>}
       <ul className="space-y-2">
         {rows.map((r) => {
           const waitMs = r.status === "pending"
@@ -220,13 +323,13 @@ function PendingColumn({ rows, now }: { rows: Referral[]; now: number }) {
             : now - new Date(r.decision_at ?? r.updated_at ?? r.referral_received_at).getTime();
           const critical = waitMs > 4 * 60 * 60 * 1000;
           return (
-            <li key={r.id} className="rounded border border-white/15 bg-white/5 p-3">
+            <li key={r.id} className={`rounded border p-3 ${p.chip}`}>
               <div className="flex items-center justify-between gap-2">
                 <div className="min-w-0">
                   <div className="text-lg font-semibold truncate">{r.hospital_number ?? "—"}</div>
-                  <div className="text-xs text-white/60 truncate">{r.referring_specialty ?? "Unknown"} · {r.current_ward ?? ""}</div>
+                  <div className={`text-xs truncate ${p.muted}`}>{r.referring_specialty ?? "Unknown"} · {r.current_ward ?? ""}</div>
                 </div>
-                <div className={`text-2xl font-mono tabular-nums ${critical ? "text-red-400" : "text-amber-300"}`}>
+                <div className={`text-2xl font-mono tabular-nums ${critical ? p.timerCritical : p.timerWarn}`}>
                   {formatElapsed(waitMs)}
                 </div>
               </div>
