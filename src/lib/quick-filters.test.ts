@@ -13,12 +13,12 @@ function make(overrides: Partial<Referral>): Referral {
 
 describe("quick-filters", () => {
   const rows: Referral[] = [
-    make({ id: "a", status: "pending", outcome: null, arrived_at: null } as Partial<Referral>),
+    make({ id: "a", status: "pending", outcome: null, arrived_on_unit_at: null } as Partial<Referral>),
     make({ id: "b", status: "pending", outcome: "admit_for_admission" } as Partial<Referral>),
-    make({ id: "c", status: "accepted", outcome: "admit_for_admission", arrived_at: null } as Partial<Referral>),
-    make({ id: "d", status: "accepted", outcome: "admit_for_admission", arrived_at: "2026-01-01T00:00:00Z" } as Partial<Referral>),
+    make({ id: "c", status: "accepted", outcome: "admit_for_admission", arrived_on_unit_at: null } as Partial<Referral>),
+    make({ id: "d", status: "accepted", outcome: "admit_for_admission", arrived_on_unit_at: "2026-01-01T00:00:00Z" } as Partial<Referral>),
     make({ id: "e", status: "admitted", outcome: "admit_for_admission" } as Partial<Referral>),
-    make({ id: "f", status: "pending", outcome: null, discussed_with_consultant_at: "2026-01-01T00:00:00Z" } as Partial<Referral>),
+    make({ id: "f", status: "pending", outcome: null, discussed_with_consultant: "Dr Smith" } as Partial<Referral>),
   ];
 
   it("all returns everything", () => {
