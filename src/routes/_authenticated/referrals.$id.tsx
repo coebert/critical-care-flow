@@ -502,6 +502,10 @@ function ReferralDetail() {
 
         <Noteboard referralId={id} />
 
+        <TaskList referralId={id} />
+
+        <MessageLog referralId={id} />
+
         <ReferralAuditTrail referralId={id} />
 
         {canDelete && (
