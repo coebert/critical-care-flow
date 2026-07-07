@@ -74,6 +74,11 @@ function EditPostopBookingPage() {
   const [arrivedAt, setArrivedAt] = useState("");
   const [specialty, setSpecialty] = useState<SurgicalSpecialty | "">("");
   const [isTest, setIsTest] = useState(false);
+  const [bookingStatus, setBookingStatus] = useState<PostopBookingStatus>("requested");
+  const [preopAt, setPreopAt] = useState<string | null>(null);
+  const [intensivistAt, setIntensivistAt] = useState<string | null>(null);
+  const [convertedRefId, setConvertedRefId] = useState<string | null>(null);
+  const [lifecycleRefresh, setLifecycleRefresh] = useState(0);
 
   useEffect(() => {
     let cancelled = false;
