@@ -50,16 +50,21 @@ function AdminPage() {
       <Tabs defaultValue="users">
         <TabsList>
           <TabsTrigger value="users">Team members</TabsTrigger>
+          <TabsTrigger value="beds">Beds</TabsTrigger>
           <TabsTrigger value="audit">Audit log</TabsTrigger>
         </TabsList>
         <TabsContent value="users" className="mt-4 space-y-6">
           <InvitePanel />
           <UsersPanel />
         </TabsContent>
+        <TabsContent value="beds" className="mt-4">
+          <BedsAdminPanel />
+        </TabsContent>
         <TabsContent value="audit" className="mt-4">
           <AuditPanel />
         </TabsContent>
       </Tabs>
+
 
     </div>
   );
