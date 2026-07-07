@@ -380,6 +380,7 @@ function EditPostopBookingPage() {
           </div>
 
         </form>
+        </>
       )}
 
       <Card className="p-4 sm:p-6 space-y-3">
