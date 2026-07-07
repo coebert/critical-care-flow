@@ -503,6 +503,14 @@ export type Database = {
           age: number | null
           arrived_at: string | null
           bmi: number | null
+          booking_status: Database["public"]["Enums"]["postop_booking_status"]
+          cancellation_notes: string | null
+          cancellation_reason:
+            | Database["public"]["Enums"]["postop_cancellation_reason"]
+            | null
+          cancelled_at: string | null
+          cancelled_by: string | null
+          converted_referral_id: string | null
           created_at: string
           created_by: string
           deleted_at: string | null
@@ -511,10 +519,14 @@ export type Database = {
           hospital_number_enc: string | null
           hospital_number_hash: string | null
           id: string
+          intensivist_reviewed_at: string | null
+          intensivist_reviewed_by: string | null
           is_test: boolean
           past_medical_history_enc: string | null
           past_surgical_history_enc: string | null
           predicted_level: Database["public"]["Enums"]["postop_level"]
+          preop_signed_off_at: string | null
+          preop_signed_off_by: string | null
           proposed_procedure_enc: string | null
           proposed_surgery_date: string | null
           reason_for_bed_enc: string | null
@@ -529,6 +541,14 @@ export type Database = {
           age?: number | null
           arrived_at?: string | null
           bmi?: number | null
+          booking_status?: Database["public"]["Enums"]["postop_booking_status"]
+          cancellation_notes?: string | null
+          cancellation_reason?:
+            | Database["public"]["Enums"]["postop_cancellation_reason"]
+            | null
+          cancelled_at?: string | null
+          cancelled_by?: string | null
+          converted_referral_id?: string | null
           created_at?: string
           created_by?: string
           deleted_at?: string | null
@@ -537,10 +557,14 @@ export type Database = {
           hospital_number_enc?: string | null
           hospital_number_hash?: string | null
           id?: string
+          intensivist_reviewed_at?: string | null
+          intensivist_reviewed_by?: string | null
           is_test?: boolean
           past_medical_history_enc?: string | null
           past_surgical_history_enc?: string | null
           predicted_level: Database["public"]["Enums"]["postop_level"]
+          preop_signed_off_at?: string | null
+          preop_signed_off_by?: string | null
           proposed_procedure_enc?: string | null
           proposed_surgery_date?: string | null
           reason_for_bed_enc?: string | null
@@ -555,6 +579,14 @@ export type Database = {
           age?: number | null
           arrived_at?: string | null
           bmi?: number | null
+          booking_status?: Database["public"]["Enums"]["postop_booking_status"]
+          cancellation_notes?: string | null
+          cancellation_reason?:
+            | Database["public"]["Enums"]["postop_cancellation_reason"]
+            | null
+          cancelled_at?: string | null
+          cancelled_by?: string | null
+          converted_referral_id?: string | null
           created_at?: string
           created_by?: string
           deleted_at?: string | null
@@ -563,10 +595,14 @@ export type Database = {
           hospital_number_enc?: string | null
           hospital_number_hash?: string | null
           id?: string
+          intensivist_reviewed_at?: string | null
+          intensivist_reviewed_by?: string | null
           is_test?: boolean
           past_medical_history_enc?: string | null
           past_surgical_history_enc?: string | null
           predicted_level?: Database["public"]["Enums"]["postop_level"]
+          preop_signed_off_at?: string | null
+          preop_signed_off_by?: string | null
           proposed_procedure_enc?: string | null
           proposed_surgery_date?: string | null
           reason_for_bed_enc?: string | null
@@ -577,7 +613,15 @@ export type Database = {
           updated_by?: string | null
           weight_kg?: number | null
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "postop_bookings_converted_referral_id_fkey"
+            columns: ["converted_referral_id"]
+            isOneToOne: false
+            referencedRelation: "referrals"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       profiles: {
         Row: {
@@ -765,6 +809,7 @@ export type Database = {
           is_test: boolean
           news2_recorded_at: string | null
           news2_score: number | null
+          origin_booking_id: string | null
           outcome: Database["public"]["Enums"]["referral_outcome"] | null
           outcome_recorded_at: string | null
           past_medical_history_enc: string | null
@@ -818,6 +863,7 @@ export type Database = {
           is_test?: boolean
           news2_recorded_at?: string | null
           news2_score?: number | null
+          origin_booking_id?: string | null
           outcome?: Database["public"]["Enums"]["referral_outcome"] | null
           outcome_recorded_at?: string | null
           past_medical_history_enc?: string | null
@@ -871,6 +917,7 @@ export type Database = {
           is_test?: boolean
           news2_recorded_at?: string | null
           news2_score?: number | null
+          origin_booking_id?: string | null
           outcome?: Database["public"]["Enums"]["referral_outcome"] | null
           outcome_recorded_at?: string | null
           past_medical_history_enc?: string | null
@@ -889,6 +936,13 @@ export type Database = {
           weight_kg?: number | null
         }
         Relationships: [
+          {
+            foreignKeyName: "referrals_origin_booking_id_fkey"
+            columns: ["origin_booking_id"]
+            isOneToOne: false
+            referencedRelation: "postop_bookings"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "referrals_previous_referral_id_fkey"
             columns: ["previous_referral_id"]
@@ -1111,6 +1165,18 @@ export type Database = {
         | "not_documented"
       infection_status: "none" | "suspected" | "confirmed" | "unknown"
       patient_sex: "male" | "female" | "other" | "unknown"
+      postop_booking_status:
+        | "requested"
+        | "provisionally_confirmed"
+        | "confirmed"
+        | "admitted"
+        | "cancelled"
+      postop_cancellation_reason:
+        | "no_bed"
+        | "patient_unfit"
+        | "surgery_deferred"
+        | "died_pre_op"
+        | "other"
       postop_level: "level_1" | "level_2" | "level_3"
       referral_outcome:
         | "admit_for_admission"
@@ -1297,6 +1363,20 @@ export const Constants = {
       ],
       infection_status: ["none", "suspected", "confirmed", "unknown"],
       patient_sex: ["male", "female", "other", "unknown"],
+      postop_booking_status: [
+        "requested",
+        "provisionally_confirmed",
+        "confirmed",
+        "admitted",
+        "cancelled",
+      ],
+      postop_cancellation_reason: [
+        "no_bed",
+        "patient_unfit",
+        "surgery_deferred",
+        "died_pre_op",
+        "other",
+      ],
       postop_level: ["level_1", "level_2", "level_3"],
       referral_outcome: [
         "admit_for_admission",
