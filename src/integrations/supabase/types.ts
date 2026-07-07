@@ -407,6 +407,39 @@ export type Database = {
         }
         Relationships: []
       }
+      message_templates: {
+        Row: {
+          active: boolean
+          body: string
+          category: string
+          created_at: string
+          created_by: string | null
+          id: string
+          title: string
+          updated_at: string
+        }
+        Insert: {
+          active?: boolean
+          body: string
+          category: string
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          title: string
+          updated_at?: string
+        }
+        Update: {
+          active?: boolean
+          body?: string
+          category?: string
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          title?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       notification_deliveries: {
         Row: {
           actor_id: string | null
@@ -698,6 +731,60 @@ export type Database = {
         }
         Relationships: []
       }
+      referral_messages: {
+        Row: {
+          body: string
+          channel: string
+          created_at: string
+          direction: string
+          id: string
+          recipient: string | null
+          referral_id: string
+          sent_at: string
+          sent_by: string
+          template_id: string | null
+        }
+        Insert: {
+          body: string
+          channel: string
+          created_at?: string
+          direction?: string
+          id?: string
+          recipient?: string | null
+          referral_id: string
+          sent_at?: string
+          sent_by?: string
+          template_id?: string | null
+        }
+        Update: {
+          body?: string
+          channel?: string
+          created_at?: string
+          direction?: string
+          id?: string
+          recipient?: string | null
+          referral_id?: string
+          sent_at?: string
+          sent_by?: string
+          template_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "referral_messages_referral_id_fkey"
+            columns: ["referral_id"]
+            isOneToOne: false
+            referencedRelation: "referrals"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "referral_messages_template_id_fkey"
+            columns: ["template_id"]
+            isOneToOne: false
+            referencedRelation: "message_templates"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       referral_note_keys: {
         Row: {
           created_at: string
@@ -767,6 +854,59 @@ export type Database = {
         Relationships: [
           {
             foreignKeyName: "referral_notes_referral_id_fkey"
+            columns: ["referral_id"]
+            isOneToOne: false
+            referencedRelation: "referrals"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      referral_tasks: {
+        Row: {
+          assigned_role: Database["public"]["Enums"]["app_role"] | null
+          completed_at: string | null
+          completed_by: string | null
+          created_at: string
+          created_by: string
+          details: string | null
+          due_at: string | null
+          id: string
+          referral_id: string
+          status: string
+          title: string
+          updated_at: string
+        }
+        Insert: {
+          assigned_role?: Database["public"]["Enums"]["app_role"] | null
+          completed_at?: string | null
+          completed_by?: string | null
+          created_at?: string
+          created_by?: string
+          details?: string | null
+          due_at?: string | null
+          id?: string
+          referral_id: string
+          status?: string
+          title: string
+          updated_at?: string
+        }
+        Update: {
+          assigned_role?: Database["public"]["Enums"]["app_role"] | null
+          completed_at?: string | null
+          completed_by?: string | null
+          created_at?: string
+          created_by?: string
+          details?: string | null
+          due_at?: string | null
+          id?: string
+          referral_id?: string
+          status?: string
+          title?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "referral_tasks_referral_id_fkey"
             columns: ["referral_id"]
             isOneToOne: false
             referencedRelation: "referrals"
