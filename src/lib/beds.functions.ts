@@ -159,8 +159,10 @@ export const admitToBed = createServerFn({ method: "POST" })
       .select("*")
       .single();
     if (error) throw safeError("beds", error, "Could not admit patient (bed may already be occupied)");
+    await fireCapacityAlert();
     return row;
   });
+
 
 export const updateOccupancy = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
