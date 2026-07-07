@@ -317,7 +317,7 @@ export const updateReferral = createServerFn({ method: "POST" })
       discussed_with_consultant: pickPatched("discussed_with_consultant") ?? null,
       accepting_consultant: pickPatched("accepting_consultant") ?? null,
       admission_urgency: pickPatched("admission_urgency") ?? null,
-    });
+    }, { ignorePastCap: true });
     if (!updateCheck.isValid) {
       const first = Object.values(updateCheck.fieldErrors)[0] ?? updateCheck.issues[0];
       throw new Error(first ?? "Referral data failed validation.");
