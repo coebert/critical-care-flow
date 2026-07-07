@@ -39,21 +39,33 @@ function flagsFromSnap(spare: number | null, level3: number | null, level2: numb
   };
 }
 
-function diffMessage(prev: LevelFlags | null, next: LevelFlags): string | null {
-  const changes: string[] = [];
-  const check = (label: string, p: boolean | undefined, n: boolean) => {
+export type FlippedLevel = "l3" | "l2" | "l1";
+
+export function flippedLevels(prev: LevelFlags | null, next: LevelFlags): FlippedLevel[] {
+  const out: FlippedLevel[] = [];
+  (["l3", "l2", "l1"] as const).forEach((k) => {
+    const p = prev?.[k];
+    const n = next[k];
     if (p === undefined) {
-      if (n) changes.push(`${label} available`);
-      return;
+      if (n) out.push(k);
+    } else if (p !== n) {
+      out.push(k);
     }
-    if (p === n) return;
-    changes.push(n ? `${label} now available` : `${label} no longer available`);
-  };
-  check("Level 3", prev?.l3, next.l3);
-  check("Level 2", prev?.l2, next.l2);
-  check("Level 1", prev?.l1, next.l1);
-  return changes.length ? changes.join(" · ") : null;
+  });
+  return out;
 }
+
+function levelLabel(k: FlippedLevel): string {
+  return k === "l3" ? "Level 3" : k === "l2" ? "Level 2" : "Level 1/0";
+}
+
+function messageFor(levels: FlippedLevel[], next: LevelFlags): string {
+  return levels
+    .map((k) => `${levelLabel(k)} ${next[k] ? "now available" : "no longer available"}`)
+    .join(" · ");
+}
+
+
 
 /**
  * Recompute current spare capacity and, if it flips a per-level available flag
