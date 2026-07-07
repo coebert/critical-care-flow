@@ -53,7 +53,17 @@ export const upsertNurseStaffing = createServerFn({ method: "POST" })
         .select("id, shift_date, shift, available_nurses, notes, recorded_by, updated_at")
         .single();
       if (error) throw error;
+      try {
+        const [{ supabaseAdmin }, { checkAndAlertNurseCapacity }] = await Promise.all([
+          import("@/integrations/supabase/client.server"),
+          import("./nurse-capacity-alerts.server"),
+        ]);
+        await checkAndAlertNurseCapacity(supabaseAdmin);
+      } catch (alertErr) {
+        console.error("[nurse-staffing] capacity alert hook failed", alertErr);
+      }
       return row;
+
     } catch (e) {
       throw safeError("nurse-staffing.upsert", e, "Failed to save nurse staffing");
     }
