@@ -1,75 +1,94 @@
-## Referral workflow overhaul (Point 2)
 
-Add the clinical fields senior ICU decision-makers actually rely on when triaging a referral, plus a proper outcome taxonomy and re-referral linking.
+## Post-op booking operational glue (Point 4)
 
-### 1. New clinical fields on `referrals`
+Turn `postop_bookings` from a data-capture form into a live scheduling workflow with lifecycle states, a planner, a cancellation register, and same-day conversion into a referral.
 
-Extend the table (all optional so existing rows stay valid):
+### 1. Booking lifecycle
 
-- **NEWS2**: `news2_score int` (0–20) + `news2_recorded_at timestamptz`. Renders as a colour-coded badge on the list and detail. Small helper `computeNews2Tone(score)` for red/amber/green.
-- **Ceiling of care**: `ceiling_of_care` enum — `full_escalation` | `no_cpr` | `ward_based` | `symptom_control` | `not_documented`. Required field once status leaves `pending`.
-- **Structured reason for referral**: `reason_category` enum (~10 values: `respiratory_failure`, `sepsis`, `shock`, `post_op`, `neurology`, `trauma`, `gi_bleed`, `metabolic`, `overdose`, `other`), plus keep the existing free-text as `reason_notes`.
-- **Frailty**: `frailty_score int` (Rockwell CFS 1–9), nullable — hidden unless age ≥ 65.
-- **Anticipated interventions** (multi): `anticipated_interventions text[]` from a fixed vocabulary (`invasive_ventilation`, `niv_cpap`, `hfno`, `vasopressors`, `rrt`, `neuro_obs`, `arterial_line`, `central_line`, `other`).
-- **Infection control**: `infection_status` enum — `none` | `suspected` | `confirmed` | `unknown`, and `infection_organism text` (free text, capped).
-- **First-class safety fields**: `weight_kg numeric(5,1)`, `allergies text`, `resus_status` enum — `for_cpr` | `dnacpr` | `not_documented`.
-- **Re-referral linking**: `previous_referral_id uuid references public.referrals(id)`. Nullable. On the "new referral" form, if the hospital number matches a recent referral, offer to link.
+Add a `booking_status` enum on `postop_bookings`:
 
-Migration wraps `ALTER TABLE` + enum creation + backfill defaults + preserve RLS/GRANTs (no policy changes needed — additive columns only). Existing encrypted-field pipeline untouched.
+- `requested` — new booking, awaiting review
+- `provisionally_confirmed` — pencilled in, capacity permitting
+- `confirmed` — bed guaranteed, anaesthetic sign-off complete
+- `admitted` — patient has arrived on the unit (mirrors existing `arrived_at`)
+- `cancelled` — cancelled with a required `cancellation_reason` enum:
+  - `no_bed`, `patient_unfit`, `surgery_deferred`, `died_pre_op`, `other`
+- Plus `cancellation_notes text`, `cancelled_at timestamptz`, `cancelled_by uuid`.
 
-### 2. Outcome taxonomy — three distinct decisions
+Also add `preop_signed_off_at` / `preop_signed_off_by` (anaesthetic sign-off) and `intensivist_reviewed_at` / `intensivist_reviewed_by` (consultant intensivist review). Both required before a booking can transition to `confirmed`.
 
-Today `status` conflates decision + workflow state. Add `outcome` enum captured at the point of decision:
+Backfill: existing rows with `arrived_at` → `admitted`; otherwise `requested`.
 
-- `admit_for_admission` — accept & admit (current "accepted"/"admitted" path)
-- `review_on_ward` — "come and review", no bed yet
-- `advice_given` — telephone advice only, referral closes
-- `declined` — as today
+Migration also indexes `(proposed_surgery_date, booking_status)` for planner queries.
 
-`status` stays as the workflow lifecycle (`pending` → `seen` → `decision` → `closed`). The two are related but no longer collapsed. The referral detail form gates required fields per outcome (e.g. advice-given requires `discussed_with_consultant` and `reason_notes`; review_on_ward requires `first_seen_at`).
+### 2. Weekly / daily planner view
 
-Migration adds `outcome` enum + `outcome_recorded_at`. Old rows are backfilled from `status` (`admitted`/`accepted` → `admit_for_admission`, `declined` → `declined`, everything else → NULL).
+New route `postop-bookings.planner.tsx`:
 
-### 3. UI changes
+- Week grid (Mon–Sun) — columns are days, rows are bookings ordered by predicted level (L3 first).
+- Per-day header shows **committed beds vs remaining ICU/HDU capacity** using the same `capacity` helpers already used on the bed board.
+- Cancelled/admitted rows are muted; requested/provisional/confirmed are the actionable ones.
+- Day/week toggle; previous/next-week navigation.
+- Click a card → existing edit page.
 
-- **`referrals.new.tsx`**: new sections — Clinical (NEWS2, weight, allergies, infection), Decision-making (ceiling of care, resus, frailty when ≥65), Anticipated interventions (checkbox grid), Reason (category + notes). Re-referral banner when HN matches an existing open/recent referral, with "Link to previous referral" button.
-- **`referrals.$id.tsx`**: same field groups; outcome selector replaces the current status dropdown for decision. Save-time validation gates per outcome. Show linked previous-referral chip at the top.
-- **List view** (`_authenticated/index.tsx`): NEWS2 badge, ceiling-of-care chip, and outcome pill on each row. New filter chips: outcome, ceiling, infection.
-- **Prior-declined component**: extended to `PriorReferralsPanel` — shows any linked prior referral chain, not just declines.
+### 3. Cancellation-because-no-bed register
 
-### 4. Reusable pieces
+New route `postop-bookings.cancellations.tsx` (admin + coordinator):
 
-- `src/lib/referral-clinical.ts` — enums, labels, `computeNews2Tone`, `getAnticipatedInterventionLabels`.
-- `src/lib/referral-outcome.ts` — outcome enum, validation rules per outcome, `deriveOutcomeFromLegacyStatus` for the backfill mirror on read.
-- `src/components/referrals/clinical-fields.tsx` — grouped inputs (used by both new + edit forms).
-- `src/components/referrals/outcome-selector.tsx` — the three-way outcome picker with contextual required-field hints.
-- `src/components/referrals/reference-referral-picker.tsx` — HN-match lookup with recent-referral list.
+- Table of every `cancelled` booking with reason, date, specialty, canceller.
+- Filters by reason and date range; counter for `no_bed` (headline KPI).
+- CSV export using existing CSV helpers.
+
+### 4. Auto-conversion to referral
+
+Server function `convertBookingToReferral({ id })`:
+
+- Only allowed when `booking_status` in (`confirmed`, `provisionally_confirmed`) AND `proposed_surgery_date <= today`.
+- Creates a referral pre-populated with hospital number, age/sex/weight, `reason_category = post_op`, `reason_notes = proposed_procedure`, `source = elective_admission`, and a `previous_referral_id` link back via a new `origin_booking_id` on referrals.
+- Transitions the booking to `admitted` and stores the new `referral_id` on the booking row.
+- Idempotent: if `referral_id` already exists, returns it.
+
+Button appears on the edit page and on the planner card when conditions are met.
 
 ### 5. Server functions
 
-Extend `src/lib/referrals.functions.ts`:
+Extend `src/lib/postop-bookings.functions.ts`:
 
-- `createReferral` / `updateReferral`: accept the new fields, validate outcome→required fields, persist `previous_referral_id` link.
-- New `findRecentReferralsByHospitalNumber({ hospital_number })` — returns last 5 non-deleted referrals matching HN, used by the new-referral form for the "link to prior" prompt.
+- `updateBooking` accepts the new fields.
+- New `transitionBookingStatus({ id, next_status, cancellation_reason?, cancellation_notes? })` — enforces valid transitions, requires sign-offs for `confirmed`, requires reason for `cancelled`.
+- New `listBookingsInRange({ from, to })` for the planner.
+- New `listCancellations({ from, to, reason? })` for the register.
+- New `convertBookingToReferral`.
 
-All new fields go through the existing zod schema layer; no encryption changes because none of the new fields are free-text patient identifiers (reason_notes stays encrypted like existing note fields, infection_organism is short + non-identifying).
+All under `requireSupabaseAuth`; admin-only for `listCancellations`.
 
-### 6. Tests
+### 6. UI pieces
 
-- Unit: `referral-outcome.test.ts` — outcome→required-field matrix.
-- Unit: `referral-clinical.test.ts` — NEWS2 tone thresholds, frailty visibility (age≥65).
-- Unit: `find-recent-referrals.test.ts` — HN normalisation + limit.
+- `src/components/postop/status-badge.tsx` — lifecycle chip with tone per status.
+- `src/components/postop/status-transition-menu.tsx` — dropdown with the valid next-states and a cancel dialog capturing reason.
+- `src/components/postop/planner-week-grid.tsx` — the week view.
+- `src/components/postop/cancellation-table.tsx` — the register table.
+- `src/components/postop/preop-signoff-panel.tsx` — anaesthetic + intensivist sign-off block on the edit page.
+- List view (`postop-bookings.index.tsx`): new status column, filter chip row (`requested`, `provisional`, `confirmed`, `admitted`, `cancelled`), and a Planner / Cancellations link header.
 
-### 7. Out of scope for Point 2 (belongs to later points)
+### 7. Shared helpers
 
-- SBAR handover generator (Point 3)
-- Sepsis-6 / clinical decision-support checklists (Point 7)
-- Datix and outcome/mortality capture (Point 5)
+- `src/lib/postop-lifecycle.ts` — status enum, valid-transition matrix, `canTransition(current, next, ctx)`, cancellation reason labels, `isEligibleForConversion(booking)`.
 
-### Estimated size
+### 8. Tests
 
-~1 migration, ~10–12 files changed/created, ~700–900 lines total. No breaking changes; all new columns are nullable.
+- `postop-lifecycle.test.ts` — transition matrix (allowed / blocked / requires sign-off / requires reason).
+- `postop-convert-to-referral.test.ts` — eligibility gating and idempotency.
+- Extend existing authz tests to cover the new server fns.
 
----
+### 9. Out of scope for Point 4
 
-**Please confirm** and I will implement in this order: migration → shared enums/utils → server-fn updates → new-referral form → detail form → list view → tests.
+- Elective list integration from theatres PAS (Point 10).
+- Consent workflow (Point 5).
+- SMS/email to the referring team on cancellation (Point 6).
+
+### Size
+
+~1 migration, ~12–14 files, ~800–1000 lines. Additive columns, no breaking changes. All new columns nullable except the enum which defaults to `requested`.
+
+Implementation order: migration → shared enums/utils → server-fn updates → planner route → cancellation register → conversion button → status badges/menus on list & edit → tests.

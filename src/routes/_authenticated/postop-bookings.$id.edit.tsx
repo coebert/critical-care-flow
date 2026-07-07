@@ -24,6 +24,10 @@ import {
   type SurgicalSpecialty,
 } from "@/lib/surgical-specialties";
 import { RouteErrorFallback } from "@/components/route-error-fallback";
+import { PostopStatusBadge } from "@/components/postop/status-badge";
+import { StatusTransitionMenu } from "@/components/postop/status-transition-menu";
+import { PreopSignoffPanel } from "@/components/postop/preop-signoff-panel";
+import type { PostopBookingStatus } from "@/lib/postop-lifecycle";
 
 export const Route = createFileRoute("/_authenticated/postop-bookings/$id/edit")({
   head: () => ({
@@ -70,6 +74,11 @@ function EditPostopBookingPage() {
   const [arrivedAt, setArrivedAt] = useState("");
   const [specialty, setSpecialty] = useState<SurgicalSpecialty | "">("");
   const [isTest, setIsTest] = useState(false);
+  const [bookingStatus, setBookingStatus] = useState<PostopBookingStatus>("requested");
+  const [preopAt, setPreopAt] = useState<string | null>(null);
+  const [intensivistAt, setIntensivistAt] = useState<string | null>(null);
+  const [convertedRefId, setConvertedRefId] = useState<string | null>(null);
+  const [lifecycleRefresh, setLifecycleRefresh] = useState(0);
 
   useEffect(() => {
     let cancelled = false;
@@ -91,6 +100,10 @@ function EditPostopBookingPage() {
         setArrivedAt(row.arrived_at ? new Date(row.arrived_at).toISOString().slice(0, 16) : "");
         setSpecialty((row.surgical_specialty ?? "") as SurgicalSpecialty | "");
         setIsTest(!!row.is_test);
+        setBookingStatus((row.booking_status ?? "requested") as PostopBookingStatus);
+        setPreopAt(row.preop_signed_off_at ?? null);
+        setIntensivistAt(row.intensivist_reviewed_at ?? null);
+        setConvertedRefId(row.converted_referral_id ?? null);
         setLoading(false);
       })
       .catch((err) => {
@@ -101,7 +114,7 @@ function EditPostopBookingPage() {
     return () => {
       cancelled = true;
     };
-  }, [id, load]);
+  }, [id, load, lifecycleRefresh]);
 
   useEffect(() => {
     let cancelled = false;
@@ -181,6 +194,39 @@ function EditPostopBookingPage() {
       )}
 
       {!loading && !loadError && (
+        <>
+          <Card className="p-4 space-y-3">
+            <div className="flex items-center justify-between gap-3 flex-wrap">
+              <div className="flex items-center gap-2">
+                <span className="text-sm text-muted-foreground">Status:</span>
+                <PostopStatusBadge status={bookingStatus} />
+                {convertedRefId && (
+                  <Link
+                    to="/referrals/$id"
+                    params={{ id: convertedRefId }}
+                    className="text-xs text-primary hover:underline"
+                  >
+                    View linked referral →
+                  </Link>
+                )}
+              </div>
+              <StatusTransitionMenu
+                bookingId={id}
+                currentStatus={bookingStatus}
+                proposedSurgeryDate={surgeryDate || null}
+                convertedReferralId={convertedRefId}
+                onChanged={() => setLifecycleRefresh((x) => x + 1)}
+              />
+            </div>
+          </Card>
+
+          <PreopSignoffPanel
+            bookingId={id}
+            preopAt={preopAt}
+            intensivistAt={intensivistAt}
+            onChanged={() => setLifecycleRefresh((x) => x + 1)}
+          />
+
         <form onSubmit={onSubmit} className="space-y-6">
           <Card className="p-4 sm:p-6 space-y-4">
             <h2 className="font-semibold">Patient details</h2>
@@ -334,6 +380,7 @@ function EditPostopBookingPage() {
           </div>
 
         </form>
+        </>
       )}
 
       <Card className="p-4 sm:p-6 space-y-3">

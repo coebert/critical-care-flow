@@ -20,8 +20,10 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { toast } from "sonner";
-import { Plus, CalendarClock, Pencil, Trash2 } from "lucide-react";
+import { Plus, CalendarClock, Pencil, Trash2, CalendarDays, XCircle } from "lucide-react";
 import { format, parseISO } from "date-fns";
+import { PostopStatusBadge } from "@/components/postop/status-badge";
+import type { PostopBookingStatus } from "@/lib/postop-lifecycle";
 
 export const Route = createFileRoute("/_authenticated/postop-bookings/")({
   head: () => ({
@@ -46,6 +48,7 @@ type Booking = {
   created_by_name?: string | null;
   deleted_at?: string | null;
   is_test?: boolean | null;
+  booking_status?: PostopBookingStatus;
 };
 
 const LEVEL_LABEL = {
@@ -149,6 +152,18 @@ function PostopBookingsList() {
               </Label>
             </div>
           )}
+          <Button asChild variant="outline">
+            <Link to="/postop-bookings/planner">
+              <CalendarDays className="w-4 h-4 mr-1" /> Planner
+            </Link>
+          </Button>
+          {isAdmin && (
+            <Button asChild variant="outline">
+              <Link to="/postop-bookings/cancellations">
+                <XCircle className="w-4 h-4 mr-1" /> Cancellations
+              </Link>
+            </Button>
+          )}
           <Button asChild>
             <Link to="/postop-bookings/new">
               <Plus className="w-4 h-4 mr-1" /> New booking
@@ -184,6 +199,7 @@ function PostopBookingsList() {
                     <Badge className={LEVEL_CLASS[b.predicted_level]} variant="secondary">
                       {LEVEL_LABEL[b.predicted_level]}
                     </Badge>
+                    {b.booking_status && <PostopStatusBadge status={b.booking_status} />}
                     {b.is_test && (
                       <Badge
                         variant="outline"
