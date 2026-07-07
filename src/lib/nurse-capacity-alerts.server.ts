@@ -64,20 +64,27 @@ function slotsFor(k: FlippedLevel, block: { level3_slots: number | null; level2_
   return Math.max(0, raw ?? 0);
 }
 
+function formatCount(n: number): string {
+  return n === 0 ? "no spare admissions" : `${n} spare admission${n === 1 ? "" : "s"}`;
+}
+
 function messageFor(
   levels: FlippedLevel[],
-  next: LevelFlags,
-  block: { level3_slots: number | null; level2_slots: number | null; level1_slots: number | null },
+  nextBlock: { level3_slots: number | null; level2_slots: number | null; level1_slots: number | null },
+  prevBlock: { level3_slots: number | null; level2_slots: number | null; level1_slots: number | null } | null,
 ): string {
   return levels
     .map((k) => {
-      const slots = slotsFor(k, block);
-      return next[k]
-        ? `${levelLabel(k)}: ${slots} spare admission${slots === 1 ? "" : "s"} available`
-        : `${levelLabel(k)}: no spare admissions`;
+      const nextN = slotsFor(k, nextBlock);
+      const prevN = prevBlock ? slotsFor(k, prevBlock) : null;
+      const after = formatCount(nextN);
+      if (prevN === null) return `${levelLabel(k)}: now ${after}`;
+      const before = prevN === 0 ? "no spare admissions" : `${prevN}`;
+      return `${levelLabel(k)}: ${before} → ${after}`;
     })
     .join(" · ");
 }
+
 
 
 
