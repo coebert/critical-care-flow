@@ -147,22 +147,23 @@ function ReferralDetail() {
     (ref.status === "admitted" || ref.status === "accepted") && !(ref.accepting_consultant ?? "").trim();
 
   const save = async () => {
-    if (!timing.isValid) {
-      toast.error("Please fix the highlighted timing issues before saving.");
+    const combined = validateReferralAll({
+      status: ref.status,
+      referral_received_at: ref.referral_received_at,
+      first_seen_at: ref.first_seen_at,
+      decision_at: ref.decision_at,
+      arrived_on_unit_at: ref.arrived_on_unit_at,
+      decline_reason: ref.decline_reason,
+      discussed_with_consultant: ref.discussed_with_consultant,
+      accepting_consultant: ref.accepting_consultant,
+      admission_urgency: ref.admission_urgency,
+    });
+    if (!combined.isValid) {
+      const firstFieldError = Object.values(combined.fieldErrors)[0];
+      toast.error(firstFieldError ?? combined.issues[0] ?? "Please fix the highlighted fields before saving.");
       return;
     }
-    if (declineReasonMissing) {
-      toast.error("A reason is required when declining a referral.");
-      return;
-    }
-    if (declineConsultantMissing) {
-      toast.error("Please record which critical care consultant the referral was discussed with.");
-      return;
-    }
-    if (acceptingConsultantMissing) {
-      toast.error("Please select the accepting critical care consultant before marking this referral as Accepted or Admitted.");
-      return;
-    }
+
     setSaving(true);
     try {
       const patch: any = {
