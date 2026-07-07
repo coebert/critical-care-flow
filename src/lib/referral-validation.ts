@@ -58,7 +58,16 @@ const trimmed = (v: string | null | undefined): string => (v ?? "").trim();
 /** Maximum age (in days) allowed for `referral_received_at`. */
 export const MAX_REFERRAL_AGE_DAYS = 30;
 
-export function validateReferralTimings(input: ReferralTimingInput): TimingValidation {
+export type ReferralValidationOptions = {
+  /** Skip the MAX_REFERRAL_AGE_DAYS past-cap check on referral_received_at.
+   *  Set on update handlers so editing an older referral doesn't fail. */
+  ignorePastCap?: boolean;
+};
+
+export function validateReferralTimings(
+  input: ReferralTimingInput,
+  opts: ReferralValidationOptions = {},
+): TimingValidation {
   const fieldErrors: Partial<Record<TimingField, string>> = {};
   const issues: string[] = [];
   const now = new Date();
@@ -73,9 +82,10 @@ export function validateReferralTimings(input: ReferralTimingInput): TimingValid
 
   // Required fields per ICNARC dataset
   if (!received) fieldErrors.referral_received_at = "Required — when the referral was received.";
-  else if (received < pastCap) {
+  else if (!opts.ignorePastCap && received < pastCap) {
     fieldErrors.referral_received_at = `Received time is more than ${MAX_REFERRAL_AGE_DAYS} days ago — please check the date.`;
   }
+
   if (input.status !== "pending") {
     if (!firstSeen) fieldErrors.first_seen_at = "Required once the patient has been reviewed.";
     if (!decision) fieldErrors.decision_at = "Required once a decision has been made.";
