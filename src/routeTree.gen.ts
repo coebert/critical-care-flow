@@ -20,6 +20,7 @@ import { Route as AuthenticatedIndexRouteImport } from './routes/_authenticated/
 import { Route as AuthenticatedPushTestRouteImport } from './routes/_authenticated/push-test'
 import { Route as AuthenticatedProfileRouteImport } from './routes/_authenticated/profile'
 import { Route as AuthenticatedPermissionsRouteImport } from './routes/_authenticated/permissions'
+import { Route as AuthenticatedNotificationsAuditRouteImport } from './routes/_authenticated/notifications-audit'
 import { Route as AuthenticatedNotificationsRouteImport } from './routes/_authenticated/notifications'
 import { Route as AuthenticatedInboxRouteImport } from './routes/_authenticated/inbox'
 import { Route as AuthenticatedAnalyticsRouteImport } from './routes/_authenticated/analytics'
@@ -85,6 +86,12 @@ const AuthenticatedPermissionsRoute =
   AuthenticatedPermissionsRouteImport.update({
     id: '/permissions',
     path: '/permissions',
+    getParentRoute: () => AuthenticatedRouteRoute,
+  } as any)
+const AuthenticatedNotificationsAuditRoute =
+  AuthenticatedNotificationsAuditRouteImport.update({
+    id: '/notifications-audit',
+    path: '/notifications-audit',
     getParentRoute: () => AuthenticatedRouteRoute,
   } as any)
 const AuthenticatedNotificationsRoute =
@@ -162,6 +169,7 @@ export interface FileRoutesByFullPath {
   '/analytics': typeof AuthenticatedAnalyticsRoute
   '/inbox': typeof AuthenticatedInboxRouteWithChildren
   '/notifications': typeof AuthenticatedNotificationsRoute
+  '/notifications-audit': typeof AuthenticatedNotificationsAuditRoute
   '/permissions': typeof AuthenticatedPermissionsRoute
   '/profile': typeof AuthenticatedProfileRoute
   '/push-test': typeof AuthenticatedPushTestRoute
@@ -184,6 +192,7 @@ export interface FileRoutesByTo {
   '/analytics': typeof AuthenticatedAnalyticsRoute
   '/inbox': typeof AuthenticatedInboxRouteWithChildren
   '/notifications': typeof AuthenticatedNotificationsRoute
+  '/notifications-audit': typeof AuthenticatedNotificationsAuditRoute
   '/permissions': typeof AuthenticatedPermissionsRoute
   '/profile': typeof AuthenticatedProfileRoute
   '/push-test': typeof AuthenticatedPushTestRoute
@@ -209,6 +218,7 @@ export interface FileRoutesById {
   '/_authenticated/analytics': typeof AuthenticatedAnalyticsRoute
   '/_authenticated/inbox': typeof AuthenticatedInboxRouteWithChildren
   '/_authenticated/notifications': typeof AuthenticatedNotificationsRoute
+  '/_authenticated/notifications-audit': typeof AuthenticatedNotificationsAuditRoute
   '/_authenticated/permissions': typeof AuthenticatedPermissionsRoute
   '/_authenticated/profile': typeof AuthenticatedProfileRoute
   '/_authenticated/push-test': typeof AuthenticatedPushTestRoute
@@ -235,6 +245,7 @@ export interface FileRouteTypes {
     | '/analytics'
     | '/inbox'
     | '/notifications'
+    | '/notifications-audit'
     | '/permissions'
     | '/profile'
     | '/push-test'
@@ -257,6 +268,7 @@ export interface FileRouteTypes {
     | '/analytics'
     | '/inbox'
     | '/notifications'
+    | '/notifications-audit'
     | '/permissions'
     | '/profile'
     | '/push-test'
@@ -281,6 +293,7 @@ export interface FileRouteTypes {
     | '/_authenticated/analytics'
     | '/_authenticated/inbox'
     | '/_authenticated/notifications'
+    | '/_authenticated/notifications-audit'
     | '/_authenticated/permissions'
     | '/_authenticated/profile'
     | '/_authenticated/push-test'
@@ -383,6 +396,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedPermissionsRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
+    '/_authenticated/notifications-audit': {
+      id: '/_authenticated/notifications-audit'
+      path: '/notifications-audit'
+      fullPath: '/notifications-audit'
+      preLoaderRoute: typeof AuthenticatedNotificationsAuditRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
     '/_authenticated/notifications': {
       id: '/_authenticated/notifications'
       path: '/notifications'
@@ -479,6 +499,7 @@ interface AuthenticatedRouteRouteChildren {
   AuthenticatedAnalyticsRoute: typeof AuthenticatedAnalyticsRoute
   AuthenticatedInboxRoute: typeof AuthenticatedInboxRouteWithChildren
   AuthenticatedNotificationsRoute: typeof AuthenticatedNotificationsRoute
+  AuthenticatedNotificationsAuditRoute: typeof AuthenticatedNotificationsAuditRoute
   AuthenticatedPermissionsRoute: typeof AuthenticatedPermissionsRoute
   AuthenticatedProfileRoute: typeof AuthenticatedProfileRoute
   AuthenticatedPushTestRoute: typeof AuthenticatedPushTestRoute
@@ -496,6 +517,7 @@ const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedAnalyticsRoute: AuthenticatedAnalyticsRoute,
   AuthenticatedInboxRoute: AuthenticatedInboxRouteWithChildren,
   AuthenticatedNotificationsRoute: AuthenticatedNotificationsRoute,
+  AuthenticatedNotificationsAuditRoute: AuthenticatedNotificationsAuditRoute,
   AuthenticatedPermissionsRoute: AuthenticatedPermissionsRoute,
   AuthenticatedProfileRoute: AuthenticatedProfileRoute,
   AuthenticatedPushTestRoute: AuthenticatedPushTestRoute,

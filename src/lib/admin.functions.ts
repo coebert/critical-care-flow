@@ -229,6 +229,96 @@ export const getAuditLog = createServerFn({ method: "POST" })
     };
   });
 
+// -----------------------------------------------------------------------------
+// Notification delivery audit
+// -----------------------------------------------------------------------------
+
+const deliveryAuditInputSchema = z
+  .object({
+    limit: z.number().int().min(1).max(200).optional(),
+    offset: z.number().int().min(0).max(10_000).optional(),
+    channel: z.enum(["inapp", "push"]).optional(),
+    status: z.enum(["generated", "sent", "failed", "gone"]).optional(),
+  })
+  .default({});
+
+export type NotificationDeliveryRow = {
+  id: string;
+  notification_id: string | null;
+  recipient_id: string;
+  recipient_name: string | null;
+  actor_id: string | null;
+  actor_name: string | null;
+  referral_id: string | null;
+  kind: string;
+  channel: "inapp" | "push";
+  status: "generated" | "sent" | "failed" | "gone";
+  endpoint: string | null;
+  error: string | null;
+  generated_at: string;
+  delivered_at: string | null;
+};
+
+export type NotificationDeliveryAuditPage = {
+  rows: NotificationDeliveryRow[];
+  hasMore: boolean;
+  nextOffset: number;
+};
+
+export const getNotificationDeliveryAudit = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input: unknown) => deliveryAuditInputSchema.parse(input ?? {}))
+  .handler(async ({ data, context }): Promise<NotificationDeliveryAuditPage> => {
+    await assertAdmin(context);
+    // Admins can see every delivery record (the recipient RLS policy would
+    // otherwise hide rows addressed to other users). Access is gated above.
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const limit = data.limit ?? 100;
+    const offset = data.offset ?? 0;
+
+    let q = supabaseAdmin
+      .from("notification_deliveries")
+      .select(
+        "id, notification_id, recipient_id, actor_id, referral_id, kind, channel, status, endpoint, error, generated_at, delivered_at",
+      )
+      .order("generated_at", { ascending: false })
+      .range(offset, offset + limit);
+    if (data.channel) q = q.eq("channel", data.channel);
+    if (data.status) q = q.eq("status", data.status);
+    const { data: rows, error } = await q;
+    if (error) throw safeError("admin.getNotificationDeliveryAudit", error, "Failed to load delivery audit.");
+
+    const list = rows ?? [];
+    const hasMore = list.length > limit;
+    const page = list.slice(0, limit);
+
+    // Hydrate actor/recipient display names in a single profile lookup.
+    const userIds = Array.from(
+      new Set(
+        page
+          .flatMap((r) => [r.recipient_id, r.actor_id])
+          .filter((v): v is string => !!v),
+      ),
+    );
+    const nameById = new Map<string, string | null>();
+    if (userIds.length) {
+      const { data: profiles } = await supabaseAdmin
+        .from("profiles")
+        .select("id, full_name")
+        .in("id", userIds);
+      for (const p of profiles ?? []) nameById.set((p as any).id, (p as any).full_name);
+    }
+
+    const hydrated: NotificationDeliveryRow[] = page.map((r) => ({
+      ...(r as any),
+      recipient_name: nameById.get((r as any).recipient_id) ?? null,
+      actor_name: (r as any).actor_id ? (nameById.get((r as any).actor_id) ?? null) : null,
+    }));
+
+    return { rows: hydrated, hasMore, nextOffset: offset + limit };
+  });
+
+
 export const updateIcnarcTargets = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((d: unknown) =>
