@@ -65,6 +65,15 @@ const refSchema = z.object({
   previous_referral_id: z.string().uuid().nullable().optional(),
   outcome: z.enum(["admit_for_admission", "review_on_ward", "advice_given", "declined"]).nullable().optional(),
   outcome_recorded_at: z.string().nullable().optional(),
+
+  // Ongoing-review flags — set by critical care when a patient should be
+  // followed up on the ward or kept on the CCOT review list.
+  needs_ward_review: z.boolean().optional(),
+  for_ongoing_ccot_review: z.boolean().optional(),
+  ward_review_timeframe: z
+    .enum(["12h", "24h", "48h", "72h", "weekly", "prn"])
+    .nullable()
+    .optional(),
 });
 
 
