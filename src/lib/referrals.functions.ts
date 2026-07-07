@@ -261,11 +261,35 @@ async function fanOutNotifications(
 }
 
 
+/**
+ * Server-side defence-in-depth: verify the calling user is an active
+ * member of the critical care team ('admin' or 'clinician' role) before
+ * touching any referral surface. RLS also enforces this via
+ * `public.has_clinical_access(uuid)`, but relying on RLS alone means a
+ * non-clinical user gets silent empty lists on reads and cryptic
+ * "row violates row-level security" errors on writes. Calling this
+ * helper first turns those into a clear 403 that the UI can surface.
+ *
+ * Throws an Error whose message we deliberately mirror as
+ * "Forbidden: clinical access required" everywhere so log analysis and
+ * UI messaging stay consistent.
+ */
+async function assertClinicalAccess(
+  supabase: import("@supabase/supabase-js").SupabaseClient<Database>,
+  userId: string,
+): Promise<void> {
+  const { data, error } = await supabase.rpc("has_clinical_access", { _user_id: userId });
+  if (error) throw safeError("referrals.authz", error, "Permission check failed.");
+  if (!data) throw new Error("Forbidden: clinical access required");
+}
+
+
 export const createReferral = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((d: unknown) => refSchema.parse(d))
   .handler(async ({ data, context }) => {
     const { supabase, userId } = context;
+    await assertClinicalAccess(supabase, userId);
     const { validateReferralAll } = await import("./referral-validation");
     const gateCheck = validateReferralAll({
       status: data.status ?? "pending",
