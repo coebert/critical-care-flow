@@ -87,6 +87,8 @@ function NotificationSettingsPage() {
   const savePrefs = useServerFn(setNotificationPrefs);
   const sendTestCapacity = useServerFn(sendTestCapacityPush);
   const [testingCapacity, setTestingCapacity] = useState(false);
+  const [testShift, setTestShift] = useState<"day" | "night">("day");
+  const [testLevel, setTestLevel] = useState<"auto" | "1" | "2" | "3">("auto");
 
   useEffect(() => {
     setLastTestAt(readLastTestPushAt());
