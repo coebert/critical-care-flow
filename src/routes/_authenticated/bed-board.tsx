@@ -141,6 +141,28 @@ function BedBoardPage() {
     }
   };
 
+  const admitPrefill = search.source_referral_id || search.source_postop_booking_id
+    ? {
+        hospital_number: search.hospital_number ?? null,
+        patient_initials: search.patient_initials ?? null,
+        admitting_consultant: search.admitting_consultant ?? null,
+        level: (search.level === 1 || search.level === 2 || search.level === 3 ? search.level : 3) as 1 | 2 | 3,
+      }
+    : undefined;
+  const clearAdmitSource = () =>
+    navigate({
+      search: {
+        source_referral_id: undefined,
+        source_postop_booking_id: undefined,
+        hospital_number: undefined,
+        patient_initials: undefined,
+        admitting_consultant: undefined,
+        level: undefined,
+        source_label: undefined,
+      },
+      replace: true,
+    });
+
   return (
     <div className="p-4 sm:p-6 max-w-7xl mx-auto">
       <div className="mb-6">
@@ -150,6 +172,23 @@ function BedBoardPage() {
 
       <CapacityStrip snapshot={snapshot} />
 
+      {admitPrefill && (
+        <div className="mb-4 flex items-center justify-between gap-3 rounded-md border bg-primary/5 px-3 py-2 text-sm">
+          <div>
+            Admitting from <span className="font-medium">{search.source_label ?? "referral"}</span>
+            {search.patient_initials ? <> · <span className="font-mono">{search.patient_initials}</span></> : null}
+            . Click an empty bed to place the patient.
+          </div>
+          <button
+            type="button"
+            className="text-xs text-muted-foreground hover:text-foreground underline underline-offset-2"
+            onClick={clearAdmitSource}
+          >
+            Cancel
+          </button>
+        </div>
+      )}
+
       {isLoading && (
         <div className="text-sm text-muted-foreground">Loading bed board…</div>
       )}
@@ -158,6 +197,7 @@ function BedBoardPage() {
           Failed to load bed board: {error instanceof Error ? error.message : "unknown"}
         </div>
       )}
+
 
       {!isLoading && !error && (
         <div className="grid lg:grid-cols-[1fr_320px] gap-6">
