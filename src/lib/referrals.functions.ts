@@ -520,7 +520,8 @@ export const getReferralDetail = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((d: unknown) => z.object({ id: z.string().uuid() }).parse(d))
   .handler(async ({ data, context }) => {
-    const { supabase } = context;
+    const { supabase, userId } = context;
+    await assertClinicalAccess(supabase, userId);
     const { data: row, error } = await supabase
       .from("referrals")
       .select("*")
