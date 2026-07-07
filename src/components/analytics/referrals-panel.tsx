@@ -302,6 +302,53 @@ export function ReferralsAnalyticsPanel() {
     [admittedConsultants, admittedConsultantCounts]
   );
 
+  // ---- Ongoing review metrics ----
+  const WARD_REVIEW_TIMEFRAMES = ["12h", "24h", "48h", "72h", "weekly", "prn"] as const;
+  type WardReviewTimeframe = typeof WARD_REVIEW_TIMEFRAMES[number];
+
+  const ongoingReviewFiltered = useMemo(
+    () => filtered.filter((r: any) => r.needs_ward_review === true || r.for_ongoing_ccot_review === true),
+    [filtered]
+  );
+
+  const ongoingWardOnly = useMemo(
+    () => filtered.filter((r: any) => r.needs_ward_review === true).length,
+    [filtered]
+  );
+  const ongoingCcotOnly = useMemo(
+    () => filtered.filter((r: any) => r.for_ongoing_ccot_review === true).length,
+    [filtered]
+  );
+
+  const ongoingReviewPerDay = useMemo(() => {
+    const ward = new Map<string, number>(dayKeys.map((k) => [k, 0]));
+    const ccot = new Map<string, number>(dayKeys.map((k) => [k, 0]));
+    filtered.forEach((r: any) => {
+      const k = format(startOfDay(new Date(r.referral_received_at)), "yyyy-MM-dd");
+      if (r.needs_ward_review === true && ward.has(k)) ward.set(k, (ward.get(k) ?? 0) + 1);
+      if (r.for_ongoing_ccot_review === true && ccot.has(k)) ccot.set(k, (ccot.get(k) ?? 0) + 1);
+    });
+    return dayKeys.map((k) => ({
+      key: k,
+      date: format(new Date(k), "dd/MM/yyyy"),
+      ward: ward.get(k) ?? 0,
+      ccot: ccot.get(k) ?? 0,
+    }));
+  }, [filtered, dayKeys]);
+
+  const byWardReviewTimeframe = useMemo(() => {
+    const map = new Map<string, number>(WARD_REVIEW_TIMEFRAMES.map((t) => [t, 0]));
+    let none = 0;
+    ongoingReviewFiltered.forEach((r: any) => {
+      const t = r.ward_review_timeframe as WardReviewTimeframe | null;
+      if (t && map.has(t)) map.set(t, (map.get(t) ?? 0) + 1);
+      else none += 1;
+    });
+    const rows = WARD_REVIEW_TIMEFRAMES.map((t) => ({ timeframe: t, count: map.get(t) ?? 0 }));
+    if (none > 0) rows.push({ timeframe: "unset" as any, count: none });
+    return rows;
+  }, [ongoingReviewFiltered]);
+
   const minutesSamples = (sel: (r: Referral) => [string | null, string | null]) =>
     filtered
       .map(sel)
