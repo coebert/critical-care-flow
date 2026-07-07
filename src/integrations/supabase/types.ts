@@ -723,6 +723,10 @@ export type Database = {
           id: string
           is_at_work: boolean
           job_title: string | null
+          notify_capacity: boolean
+          notify_capacity_l1: boolean
+          notify_capacity_l2: boolean
+          notify_capacity_l3: boolean
           notify_new_referral: boolean
           notify_notes: boolean
           notify_status: boolean
@@ -736,6 +740,10 @@ export type Database = {
           id: string
           is_at_work?: boolean
           job_title?: string | null
+          notify_capacity?: boolean
+          notify_capacity_l1?: boolean
+          notify_capacity_l2?: boolean
+          notify_capacity_l3?: boolean
           notify_new_referral?: boolean
           notify_notes?: boolean
           notify_status?: boolean
@@ -749,6 +757,10 @@ export type Database = {
           id?: string
           is_at_work?: boolean
           job_title?: string | null
+          notify_capacity?: boolean
+          notify_capacity_l1?: boolean
+          notify_capacity_l2?: boolean
+          notify_capacity_l3?: boolean
           notify_new_referral?: boolean
           notify_notes?: boolean
           notify_status?: boolean
