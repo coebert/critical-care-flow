@@ -97,7 +97,7 @@ export const sendTestCapacityPush = createServerFn({ method: "POST" })
         title: "Critical Care — Day shift capacity (test)",
 
         body,
-        url: "/notifications",
+        url: `/bed-board?focus_shift=day&focus_level=${selected[0] === "l3" ? 3 : selected[0] === "l2" ? 2 : 1}`,
         tag: `capacity-test-${userId}`,
       },
     );
