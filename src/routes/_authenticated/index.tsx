@@ -205,6 +205,8 @@ function ReferralsList() {
           <p className="text-sm text-muted-foreground">{rows.length} total · live updating</p>
         </div>
         <div className="flex items-center gap-2 flex-wrap">
+          <CapacityBadge />
+
           <Button
             variant={showDeleted ? "default" : "outline"}
             size="sm"
