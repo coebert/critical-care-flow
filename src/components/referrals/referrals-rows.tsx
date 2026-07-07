@@ -138,11 +138,27 @@ export function ReferralsRows({ rows, loading, timerSort, onToggleTimerSort }: P
                         </span>
                       )}
                       <span>{r.age ?? "?"} / {r.sex ?? "?"}</span>
+                      {(r as any).news2_score != null && (
+                        <span
+                          className={`inline-flex items-center rounded border px-1.5 py-0 text-[10px] font-semibold ${news2ToneClasses(computeNews2Tone((r as any).news2_score))}`}
+                          title={`NEWS2 ${(r as any).news2_score}`}
+                        >
+                          N2·{(r as any).news2_score}
+                        </span>
+                      )}
                     </div>
                   </td>
                   <td className="px-3 py-2">{r.current_ward ?? "—"} {r.current_bed ? `· ${r.current_bed}` : ""}</td>
                   <td className="px-3 py-2">{r.referring_specialty ?? "—"}</td>
-                  <td className="px-3 py-2 max-w-xs truncate">{r.reason_for_referral ?? "—"}</td>
+                  <td className="px-3 py-2 max-w-xs">
+                    <div className="truncate">{r.reason_for_referral ?? "—"}</div>
+                    {(r as any).ceiling_of_care && (
+                      <div className="text-[10px] text-muted-foreground truncate" title={ceilingLabel((r as any).ceiling_of_care) ?? undefined}>
+                        Ceiling: {ceilingLabel((r as any).ceiling_of_care)}
+                      </div>
+                    )}
+                  </td>
+
                   <td className="px-3 py-2"><ReferralTimer r={r} /></td>
                   <td className="px-3 py-2">
                     {r.admission_urgency ? (
