@@ -56,6 +56,8 @@ function toIsoOrNull(v: string | null): string | null {
 }
 
 function BedBoardPage() {
+  const search = Route.useSearch();
+  const navigate = Route.useNavigate();
   const fetchBoard = useServerFn(getBedBoard);
   const qc = useQueryClient();
   const { data, isLoading, error } = useQuery({
@@ -63,6 +65,7 @@ function BedBoardPage() {
     queryFn: () => fetchBoard(),
     staleTime: 5_000,
   });
+
 
   useEffect(() => {
     const ch = supabase
