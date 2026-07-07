@@ -302,6 +302,53 @@ export function ReferralsAnalyticsPanel() {
     [admittedConsultants, admittedConsultantCounts]
   );
 
+  // ---- Ongoing review metrics ----
+  const WARD_REVIEW_TIMEFRAMES = ["12h", "24h", "48h", "72h", "weekly", "prn"] as const;
+  type WardReviewTimeframe = typeof WARD_REVIEW_TIMEFRAMES[number];
+
+  const ongoingReviewFiltered = useMemo(
+    () => filtered.filter((r: any) => r.needs_ward_review === true || r.for_ongoing_ccot_review === true),
+    [filtered]
+  );
+
+  const ongoingWardOnly = useMemo(
+    () => filtered.filter((r: any) => r.needs_ward_review === true).length,
+    [filtered]
+  );
+  const ongoingCcotOnly = useMemo(
+    () => filtered.filter((r: any) => r.for_ongoing_ccot_review === true).length,
+    [filtered]
+  );
+
+  const ongoingReviewPerDay = useMemo(() => {
+    const ward = new Map<string, number>(dayKeys.map((k) => [k, 0]));
+    const ccot = new Map<string, number>(dayKeys.map((k) => [k, 0]));
+    filtered.forEach((r: any) => {
+      const k = format(startOfDay(new Date(r.referral_received_at)), "yyyy-MM-dd");
+      if (r.needs_ward_review === true && ward.has(k)) ward.set(k, (ward.get(k) ?? 0) + 1);
+      if (r.for_ongoing_ccot_review === true && ccot.has(k)) ccot.set(k, (ccot.get(k) ?? 0) + 1);
+    });
+    return dayKeys.map((k) => ({
+      key: k,
+      date: format(new Date(k), "dd/MM/yyyy"),
+      ward: ward.get(k) ?? 0,
+      ccot: ccot.get(k) ?? 0,
+    }));
+  }, [filtered, dayKeys]);
+
+  const byWardReviewTimeframe = useMemo(() => {
+    const map = new Map<string, number>(WARD_REVIEW_TIMEFRAMES.map((t) => [t, 0]));
+    let none = 0;
+    ongoingReviewFiltered.forEach((r: any) => {
+      const t = r.ward_review_timeframe as WardReviewTimeframe | null;
+      if (t && map.has(t)) map.set(t, (map.get(t) ?? 0) + 1);
+      else none += 1;
+    });
+    const rows = WARD_REVIEW_TIMEFRAMES.map((t) => ({ timeframe: t, count: map.get(t) ?? 0 }));
+    if (none > 0) rows.push({ timeframe: "unset" as any, count: none });
+    return rows;
+  }, [ongoingReviewFiltered]);
+
   const minutesSamples = (sel: (r: Referral) => [string | null, string | null]) =>
     filtered
       .map(sel)
@@ -920,6 +967,69 @@ export function ReferralsAnalyticsPanel() {
               ))}
             </ul>
           )}
+        </Card>
+
+        <Card className="p-5 md:col-span-2">
+          <div className="flex items-baseline justify-between mb-1 gap-3 flex-wrap">
+            <h2 className="font-semibold">Ongoing review flags over time</h2>
+            <span className="text-xs text-muted-foreground">
+              {ongoingReviewFiltered.length} referral{ongoingReviewFiltered.length === 1 ? "" : "s"} flagged · ward: {ongoingWardOnly} · CCOT: {ongoingCcotOnly}
+            </span>
+          </div>
+          <p className="text-xs text-muted-foreground mb-3">
+            Daily count of referrals flagged for ongoing ward review and for ongoing CCOT review (a referral can appear in both).
+          </p>
+          <div className="h-64">
+            {ongoingReviewFiltered.length === 0 ? (
+              <div className="h-full flex items-center justify-center text-sm text-muted-foreground">
+                No referrals flagged for ongoing review in this period.
+              </div>
+            ) : (
+              <ResponsiveContainer width="100%" height="100%">
+                <AreaChart data={ongoingReviewPerDay}>
+                  <CartesianGrid strokeDasharray="3 3" opacity={0.3} />
+                  <XAxis dataKey="date" fontSize={11} />
+                  <YAxis allowDecimals={false} fontSize={11} />
+                  <Tooltip />
+                  <Legend wrapperStyle={{ fontSize: 11 }} />
+                  <Area type="monotone" dataKey="ward" name="Ward review" stroke="var(--chart-1)" fill="var(--chart-1)" fillOpacity={0.5} />
+                  <Area type="monotone" dataKey="ccot" name="CCOT review" stroke="var(--chart-4)" fill="var(--chart-4)" fillOpacity={0.5} />
+                </AreaChart>
+              </ResponsiveContainer>
+            )}
+          </div>
+        </Card>
+
+        <Card className="p-5">
+          <h2 className="font-semibold mb-1">Suggested review timeframe</h2>
+          <p className="text-xs text-muted-foreground mb-3">
+            Breakdown of the next-review cadence set on flagged referrals. "unset" = flagged but no timeframe chosen.
+          </p>
+          <div className="h-64">
+            {ongoingReviewFiltered.length === 0 ? (
+              <div className="h-full flex items-center justify-center text-sm text-muted-foreground">
+                No flagged referrals to break down.
+              </div>
+            ) : (
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={byWardReviewTimeframe}>
+                  <CartesianGrid strokeDasharray="3 3" opacity={0.3} />
+                  <XAxis dataKey="timeframe" fontSize={11} />
+                  <YAxis allowDecimals={false} fontSize={11} />
+                  <Tooltip />
+                  <Bar dataKey="count" fill="var(--chart-2)" radius={[4, 4, 0, 0]} />
+                </BarChart>
+              </ResponsiveContainer>
+            )}
+          </div>
+          <ul className="mt-3 grid grid-cols-2 gap-x-4 gap-y-1 text-sm">
+            {byWardReviewTimeframe.map((t) => (
+              <li key={t.timeframe} className="flex justify-between">
+                <span className="text-muted-foreground">{t.timeframe}</span>
+                <span className="font-medium">{t.count}</span>
+              </li>
+            ))}
+          </ul>
         </Card>
       </div>
     </div>

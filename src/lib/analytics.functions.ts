@@ -53,6 +53,7 @@ const REFERRAL_ANALYTICS_COLUMNS =
   "referral_received_at,first_seen_at,decision_at,arrived_on_unit_at," +
   "status,decline_reason,admission_urgency,consultant_to_consultant_only," +
   "accepting_consultant,discussed_with_consultant,is_test," +
+  "needs_ward_review,ward_review_timeframe,for_ongoing_ccot_review," +
   "deleted_at,deleted_by,created_at,created_by,updated_at";
 
 // Server returns the same row shape the analytics UI already consumes
