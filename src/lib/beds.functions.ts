@@ -196,8 +196,10 @@ export const dischargeOccupancy = createServerFn({ method: "POST" })
       .select("*")
       .single();
     if (error) throw safeError("beds", error, "Could not discharge patient");
+    await fireCapacityAlert();
     return row;
   });
+
 
 export const moveOccupancy = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
