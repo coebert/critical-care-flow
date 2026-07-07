@@ -144,16 +144,47 @@ async function writeAudit(entry: {
   entity: string;
   entity_id: string;
   diff?: any;
+  // Optional full-context fields for referral_note audit rows. Passed at every
+  // note create/edit/delete site so the audit stream carries actor identity,
+  // original author identity, recipient count, and edit timestamp — plus a
+  // derived via_admin_flag flag = actor !== author.
+  referral_id?: string;
+  author_id?: string | null;
+  recipient_count?: number | null;
+  edited_at?: string | null;
 }) {
   const admin = await getAdmin();
-  const safeEntry =
-    entry.entity === "referral" && entry.diff && typeof entry.diff === "object"
-      ? { ...entry, diff: redactEncryptedFromDiff(entry.diff as Record<string, unknown>) }
-      : entry.entity === "referral_note" && entry.diff && typeof entry.diff === "object"
-      ? { ...entry, diff: redactNoteDiff(entry.diff as Record<string, unknown>) }
-      : entry;
-  await admin.from("audit_log").insert(safeEntry as any);
+  let workingDiff = entry.diff;
+  if (entry.entity === "referral" && workingDiff && typeof workingDiff === "object") {
+    workingDiff = redactEncryptedFromDiff(workingDiff as Record<string, unknown>);
+  } else if (entry.entity === "referral_note" && workingDiff && typeof workingDiff === "object") {
+    workingDiff = redactNoteDiff(workingDiff as Record<string, unknown>);
+  }
+  if (entry.entity === "referral_note") {
+    const { computeViaAdminFlow } = await import("./encrypted-notes.functions");
+    const authorId = entry.author_id ?? null;
+    workingDiff = {
+      ...(workingDiff && typeof workingDiff === "object" ? workingDiff : {}),
+      actor_id: entry.user_id,
+      author_id: authorId,
+      via_admin_flow: computeViaAdminFlow(entry.user_id, authorId),
+      referral_id:
+        entry.referral_id ??
+        (workingDiff && typeof workingDiff === "object" ? (workingDiff as any).referral_id : undefined) ??
+        null,
+      recipient_count: entry.recipient_count ?? null,
+      edited_at: entry.edited_at ?? null,
+    };
+  }
+  await admin.from("audit_log").insert({
+    user_id: entry.user_id,
+    action: entry.action,
+    entity: entry.entity,
+    entity_id: entry.entity_id,
+    diff: workingDiff,
+  } as any);
 }
+
 
 function redactNoteDiff(diff: Record<string, unknown>): Record<string, unknown> {
   const out: Record<string, unknown> = { ...diff };
@@ -505,8 +536,13 @@ export const addNote = createServerFn({ method: "POST" })
       action: "create",
       entity: "referral_note",
       entity_id: row.id,
+      referral_id: data.referral_id,
+      author_id: userId,
+      recipient_count: 0,
+      edited_at: null,
       diff: { referral_id: data.referral_id, body: data.body },
     });
+
 
     await fanOutNotifications(
       userId,
@@ -560,12 +596,17 @@ export const updateNote = createServerFn({ method: "POST" })
       action: "update",
       entity: "referral_note",
       entity_id: row.id,
+      referral_id: existing.referral_id,
+      author_id: (existing as any).author_id ?? null,
+      recipient_count: 0,
+      edited_at: (row as any).edited_at ?? null,
       diff: {
         referral_id: existing.referral_id,
         before: { body: beforeBody },
         after: { body: data.body },
       },
     });
+
     return { ...row, body: data.body };
   });
 
@@ -595,6 +636,14 @@ export const deleteNote = createServerFn({ method: "POST" })
       if (!isAdmin) throw new Error("Forbidden: only the note author or an admin can delete this note.");
     }
 
+    // Count wrapped-key recipients before deletion so the audit record
+    // preserves the fanout size (rows cascade or are removed with the note).
+    const admin = await getAdmin();
+    const { count: recipientCount } = await admin
+      .from("referral_note_keys")
+      .select("recipient_user_id", { count: "exact", head: true })
+      .eq("note_id", data.id);
+
     const { error } = await supabase.from("referral_notes").delete().eq("id", data.id);
     if (error) throw safeError("referrals.deleteNote", error, "Failed to delete note.");
 
@@ -603,10 +652,15 @@ export const deleteNote = createServerFn({ method: "POST" })
       action: "delete",
       entity: "referral_note",
       entity_id: data.id,
+      referral_id: (existing as any).referral_id ?? null,
+      author_id: (existing as any).author_id ?? null,
+      recipient_count: recipientCount ?? 0,
+      edited_at: (existing as any).edited_at ?? null,
       diff: existing as any,
     });
     return { ok: true };
   });
+
 
 
 export const getNoteHistory = createServerFn({ method: "POST" })
