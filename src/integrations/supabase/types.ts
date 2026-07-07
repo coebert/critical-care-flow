@@ -531,6 +531,33 @@ export type Database = {
           },
         ]
       }
+      nurse_capacity_alert_state: {
+        Row: {
+          id: boolean
+          level1_available: boolean | null
+          level2_available: boolean | null
+          level3_available: boolean | null
+          shift_key: string | null
+          updated_at: string
+        }
+        Insert: {
+          id?: boolean
+          level1_available?: boolean | null
+          level2_available?: boolean | null
+          level3_available?: boolean | null
+          shift_key?: string | null
+          updated_at?: string
+        }
+        Update: {
+          id?: boolean
+          level1_available?: boolean | null
+          level2_available?: boolean | null
+          level3_available?: boolean | null
+          shift_key?: string | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
       nurse_staffing: {
         Row: {
           available_nurses: number

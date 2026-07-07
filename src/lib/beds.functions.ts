@@ -5,6 +5,20 @@ import { safeError } from "./safe-error";
 import { assertAdmin } from "./auth-guards";
 import { computeCapacity, type CapacitySnapshot } from "./bed-capacity";
 
+async function fireCapacityAlert(): Promise<void> {
+  try {
+    const [{ supabaseAdmin }, { checkAndAlertNurseCapacity }] = await Promise.all([
+      import("@/integrations/supabase/client.server"),
+      import("./nurse-capacity-alerts.server"),
+    ]);
+    await checkAndAlertNurseCapacity(supabaseAdmin);
+  } catch (e) {
+    console.error("[beds] capacity alert hook failed", e);
+  }
+}
+
+
+
 
 // ---- Schemas ----
 
@@ -145,8 +159,10 @@ export const admitToBed = createServerFn({ method: "POST" })
       .select("*")
       .single();
     if (error) throw safeError("beds", error, "Could not admit patient (bed may already be occupied)");
+    await fireCapacityAlert();
     return row;
   });
+
 
 export const updateOccupancy = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
@@ -160,8 +176,10 @@ export const updateOccupancy = createServerFn({ method: "POST" })
       .select("*")
       .single();
     if (error) throw safeError("beds", error, "Could not update occupancy");
+    await fireCapacityAlert();
     return row;
   });
+
 
 export const dischargeOccupancy = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
@@ -178,8 +196,10 @@ export const dischargeOccupancy = createServerFn({ method: "POST" })
       .select("*")
       .single();
     if (error) throw safeError("beds", error, "Could not discharge patient");
+    await fireCapacityAlert();
     return row;
   });
+
 
 export const moveOccupancy = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
