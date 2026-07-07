@@ -29,6 +29,21 @@ async function fanOutForNote(userId: string, referralId: string) {
   );
 }
 
+/**
+ * Pure helper — exported for unit tests. `via_admin_flow` is true when the
+ * editing/deleting actor is NOT the original note author. The referral_notes
+ * UPDATE/DELETE policy only permits a non-author actor when they hold the
+ * admin role, so the flag captures the admin-edit path without an extra
+ * role lookup. Author self-edits (including an admin editing their own
+ * note, e.g. an admin re-encrypt of a note they authored) return false.
+ * When author_id is unknown (undefined), we conservatively return false so
+ * the flag never over-reports admin action.
+ */
+export function computeViaAdminFlow(actorUserId: string, authorId: string | null | undefined): boolean {
+  if (authorId === undefined || authorId === null) return false;
+  return authorId !== actorUserId;
+}
+
 async function writeAuditE2E(entry: {
   user_id: string;
   action: string;
@@ -39,13 +54,9 @@ async function writeAuditE2E(entry: {
   edited_at?: string;
 }) {
   const admin = await getAdmin();
-  // `via_admin_flow` = the actor is editing/deleting a note they did not
-  // author. The referral_notes UPDATE/DELETE policy allows this only for
-  // users with the admin role, so the flag captures the admin-edit path
-  // without an extra role lookup. Timestamps: audit_log.created_at is set
-  // by the DB; `edited_at` is the note's own edit timestamp when relevant.
-  const viaAdminFlow =
-    entry.author_id !== undefined && entry.author_id !== entry.user_id;
+  // Timestamps: audit_log.created_at is set by the DB; `edited_at` is the
+  // note's own edit timestamp when relevant.
+  const viaAdminFlow = computeViaAdminFlow(entry.user_id, entry.author_id);
   await admin.from("audit_log").insert({
     user_id: entry.user_id,
     action: entry.action,
@@ -63,6 +74,7 @@ async function writeAuditE2E(entry: {
     } as any,
   } as any);
 }
+
 
 const wrappedKeySchema = z.object({
   recipient_user_id: z.string().uuid(),
