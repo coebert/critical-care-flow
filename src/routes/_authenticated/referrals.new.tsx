@@ -573,5 +573,6 @@ function NewReferralPage() {
         priors={priors}
       />
     </div>
+    </ClinicalAccessGate>
   );
 }
