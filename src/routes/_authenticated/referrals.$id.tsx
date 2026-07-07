@@ -400,6 +400,7 @@ function ReferralDetail() {
 
         <Card ref={outcomeRef} className="p-5 space-y-4">
           <h2 className="font-semibold">Outcome</h2>
+          <AdmissionCapacityCallout />
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <Field label="Status">
