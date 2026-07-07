@@ -287,7 +287,7 @@ export async function checkAndAlertNurseCapacity(admin: Admin, now: Date = new D
         const res = await sendPushToMany(
           group.map((s) => ({ user_id: s.user_id, endpoint: s.endpoint, p256dh: s.p256dh, auth: s.auth })),
           {
-            title: "Critical Care — admission capacity",
+            title: `Critical Care — ${shiftLabel} capacity`,
             body,
             url: "/bed-board",
             tag: `capacity-${shiftKey}`,
