@@ -133,7 +133,7 @@ export async function checkAndAlertNurseCapacity(admin: Admin, now: Date = new D
     const { data: prevRow } = await admin
       .from("nurse_capacity_alert_state")
       .select(
-        "shift_key, level3_available, level2_available, level1_available, level3_last_alerted_at, level2_last_alerted_at, level1_last_alerted_at",
+        "shift_key, level3_available, level2_available, level1_available, level3_slots, level2_slots, level1_slots, spare, level3_last_alerted_at, level2_last_alerted_at, level1_last_alerted_at",
       )
       .eq("id", true)
       .maybeSingle();
@@ -146,6 +146,17 @@ export async function checkAndAlertNurseCapacity(admin: Admin, now: Date = new D
             l1: !!prevRow.level1_available,
           }
         : null;
+
+    const prevBlock: { level3_slots: number | null; level2_slots: number | null; level1_slots: number | null; spare: number | null } | null =
+      prevRow && prevRow.shift_key === shiftKey
+        ? {
+            level3_slots: (prevRow as any).level3_slots ?? null,
+            level2_slots: (prevRow as any).level2_slots ?? null,
+            level1_slots: (prevRow as any).level1_slots ?? null,
+            spare: (prevRow as any).spare ?? null,
+          }
+        : null;
+
 
     const lastAlertedAt: Record<FlippedLevel, string | null> =
       prevRow && prevRow.shift_key === shiftKey
