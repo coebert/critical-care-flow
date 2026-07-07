@@ -306,10 +306,33 @@ function EditPostopBookingPage() {
             <Button type="button" variant="ghost" asChild disabled={saving}>
               <Link to="/postop-bookings">Cancel</Link>
             </Button>
+            <Button
+              type="button"
+              variant="outline"
+              disabled={saving}
+              onClick={() =>
+                navigate({
+                  to: "/bed-board",
+                  search: {
+                    source_postop_booking_id: id,
+                    hospital_number: hospitalNumber || undefined,
+                    admitting_consultant: undefined,
+                    patient_initials: undefined,
+                    level:
+                      level === "level_2" ? 2 : level === "level_3" ? 3 : level === "level_1" ? 1 : undefined,
+                    source_label: `post-op booking ${hospitalNumber ?? ""}`.trim(),
+                    source_referral_id: undefined,
+                  },
+                })
+              }
+            >
+              Admit to bed…
+            </Button>
             <Button type="submit" disabled={saving}>
               {saving ? "Saving…" : "Save changes"}
             </Button>
           </div>
+
         </form>
       )}
 
