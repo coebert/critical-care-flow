@@ -67,6 +67,7 @@ export const Route = createFileRoute("/_authenticated/")({
     specialty: typeof search.specialty === "string" ? search.specialty : undefined,
     from: typeof search.from === "string" ? search.from : undefined, // yyyy-MM-dd inclusive
     to: typeof search.to === "string" ? search.to : undefined,       // yyyy-MM-dd inclusive
+    quick: typeof search.quick === "string" ? (search.quick as QuickFilterKey) : undefined,
   }),
   // Prime the referrals list cache before the component mounts. The parent
   // `_authenticated` layout is `ssr: false`, so this runs client-side after
