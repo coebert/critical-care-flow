@@ -11,6 +11,7 @@ import { TestPushButton } from "@/components/test-push-button";
 import { readLastTestPushAt } from "@/lib/last-test-push";
 import { useServerFn } from "@tanstack/react-start";
 import { getNotificationPrefs, setNotificationPrefs } from "@/lib/notification-prefs.functions";
+import { sendTestCapacityPush } from "@/lib/test-capacity-push.functions";
 import { toast } from "sonner";
 
 
