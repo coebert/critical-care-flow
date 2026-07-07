@@ -237,6 +237,12 @@ function ReferralsList() {
         />
       )}
 
+      <QuickFilterChips
+        value={quick}
+        counts={quickCounts}
+        onChange={(k) => navigate({ search: (prev) => ({ ...prev, quick: k === "all" ? undefined : k }) })}
+      />
+
       <ReferralsFilters
         hospSearch={hospSearch}
         onHospSearchChange={setHospSearch}
