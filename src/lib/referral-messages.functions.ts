@@ -54,7 +54,7 @@ export const deleteMessage = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((d: unknown) => z.object({ id: z.string().uuid() }).parse(d))
   .handler(async ({ data, context }) => {
-    await assertAdmin(context.supabase, context.userId);
+    await assertAdmin(context);
     const { error } = await context.supabase.from("referral_messages").delete().eq("id", data.id);
     if (error) throw safeError("messages", error, "Could not delete message");
     return { ok: true };

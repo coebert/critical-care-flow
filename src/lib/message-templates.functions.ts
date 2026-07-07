@@ -32,7 +32,7 @@ export const upsertTemplate = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((d: unknown) => upsertSchema.parse(d))
   .handler(async ({ data, context }) => {
-    await assertAdmin(context.supabase, context.userId);
+    await assertAdmin(context);
     const payload = {
       title: data.title,
       category: data.category,
@@ -62,7 +62,7 @@ export const deleteTemplate = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((d: unknown) => z.object({ id: z.string().uuid() }).parse(d))
   .handler(async ({ data, context }) => {
-    await assertAdmin(context.supabase, context.userId);
+    await assertAdmin(context);
     const { error } = await context.supabase.from("message_templates").delete().eq("id", data.id);
     if (error) throw safeError("templates", error, "Could not delete template");
     return { ok: true };
