@@ -64,20 +64,27 @@ function slotsFor(k: FlippedLevel, block: { level3_slots: number | null; level2_
   return Math.max(0, raw ?? 0);
 }
 
+function formatCount(n: number): string {
+  return n === 0 ? "no spare admissions" : `${n} spare admission${n === 1 ? "" : "s"}`;
+}
+
 function messageFor(
   levels: FlippedLevel[],
-  next: LevelFlags,
-  block: { level3_slots: number | null; level2_slots: number | null; level1_slots: number | null },
+  nextBlock: { level3_slots: number | null; level2_slots: number | null; level1_slots: number | null },
+  prevBlock: { level3_slots: number | null; level2_slots: number | null; level1_slots: number | null } | null,
 ): string {
   return levels
     .map((k) => {
-      const slots = slotsFor(k, block);
-      return next[k]
-        ? `${levelLabel(k)}: ${slots} spare admission${slots === 1 ? "" : "s"} available`
-        : `${levelLabel(k)}: no spare admissions`;
+      const nextN = slotsFor(k, nextBlock);
+      const prevN = prevBlock ? slotsFor(k, prevBlock) : null;
+      const after = formatCount(nextN);
+      if (prevN === null) return `${levelLabel(k)}: now ${after}`;
+      const before = prevN === 0 ? "no spare admissions" : `${prevN}`;
+      return `${levelLabel(k)}: ${before} → ${after}`;
     })
     .join(" · ");
 }
+
 
 
 
@@ -126,7 +133,7 @@ export async function checkAndAlertNurseCapacity(admin: Admin, now: Date = new D
     const { data: prevRow } = await admin
       .from("nurse_capacity_alert_state")
       .select(
-        "shift_key, level3_available, level2_available, level1_available, level3_last_alerted_at, level2_last_alerted_at, level1_last_alerted_at",
+        "shift_key, level3_available, level2_available, level1_available, level3_slots, level2_slots, level1_slots, spare, level3_last_alerted_at, level2_last_alerted_at, level1_last_alerted_at",
       )
       .eq("id", true)
       .maybeSingle();
@@ -139,6 +146,17 @@ export async function checkAndAlertNurseCapacity(admin: Admin, now: Date = new D
             l1: !!prevRow.level1_available,
           }
         : null;
+
+    const prevBlock: { level3_slots: number | null; level2_slots: number | null; level1_slots: number | null; spare: number | null } | null =
+      prevRow && prevRow.shift_key === shiftKey
+        ? {
+            level3_slots: (prevRow as any).level3_slots ?? null,
+            level2_slots: (prevRow as any).level2_slots ?? null,
+            level1_slots: (prevRow as any).level1_slots ?? null,
+            spare: (prevRow as any).spare ?? null,
+          }
+        : null;
+
 
     const lastAlertedAt: Record<FlippedLevel, string | null> =
       prevRow && prevRow.shift_key === shiftKey
@@ -182,6 +200,10 @@ export async function checkAndAlertNurseCapacity(admin: Admin, now: Date = new D
         level3_available: next.l3,
         level2_available: next.l2,
         level1_available: next.l1,
+        level3_slots: slotsFor("l3", block),
+        level2_slots: slotsFor("l2", block),
+        level1_slots: slotsFor("l1", block),
+        spare: block.spare,
         level3_last_alerted_at: l3Alerted,
         level2_last_alerted_at: l2Alerted,
         level1_last_alerted_at: l1Alerted,
@@ -199,6 +221,10 @@ export async function checkAndAlertNurseCapacity(admin: Admin, now: Date = new D
       l2: "notify_capacity_l2",
       l1: "notify_capacity_l1",
     };
+
+    const prevSpareText =
+      prevBlock && prevBlock.spare != null ? `${prevBlock.spare}` : "—";
+    const nextSpareText = block.spare != null ? `${block.spare}` : "—";
 
     // Recipients: everyone at work with capacity alerts on for at least one
     // of the flipped levels. Per-user preferences narrow both the audience
@@ -220,12 +246,13 @@ export async function checkAndAlertNurseCapacity(admin: Admin, now: Date = new D
       if (p.notify_capacity === false) continue;
       const userLevels = flipped.filter((k) => (p as any)[prefKey[k]] !== false);
       if (!userLevels.length) continue;
-      const summary = messageFor(userLevels, next, block);
+      const summary = messageFor(userLevels, block, prevBlock);
       perUser.push({
         id: p.id,
-        body: `${shiftLabel}: ${summary}. Spare ${block.spare ?? "—"} nurses (dependency ${snap.dependency}).`,
+        body: `${shiftLabel} · ${summary}. Spare nurses ${prevSpareText} → ${nextSpareText} (dependency ${snap.dependency}).`,
       });
     }
+
     if (!perUser.length) return;
 
     const recipientIds = perUser.map((u) => u.id);
@@ -260,7 +287,7 @@ export async function checkAndAlertNurseCapacity(admin: Admin, now: Date = new D
         const res = await sendPushToMany(
           group.map((s) => ({ user_id: s.user_id, endpoint: s.endpoint, p256dh: s.p256dh, auth: s.auth })),
           {
-            title: "Critical Care — admission capacity",
+            title: `Critical Care — ${shiftLabel} capacity`,
             body,
             url: "/bed-board",
             tag: `capacity-${shiftKey}`,
