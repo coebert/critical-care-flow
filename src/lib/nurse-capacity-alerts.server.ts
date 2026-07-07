@@ -200,6 +200,10 @@ export async function checkAndAlertNurseCapacity(admin: Admin, now: Date = new D
         level3_available: next.l3,
         level2_available: next.l2,
         level1_available: next.l1,
+        level3_slots: slotsFor("l3", block),
+        level2_slots: slotsFor("l2", block),
+        level1_slots: slotsFor("l1", block),
+        spare: block.spare,
         level3_last_alerted_at: l3Alerted,
         level2_last_alerted_at: l2Alerted,
         level1_last_alerted_at: l1Alerted,
@@ -217,6 +221,10 @@ export async function checkAndAlertNurseCapacity(admin: Admin, now: Date = new D
       l2: "notify_capacity_l2",
       l1: "notify_capacity_l1",
     };
+
+    const prevSpareText =
+      prevBlock && prevBlock.spare != null ? `${prevBlock.spare}` : "—";
+    const nextSpareText = block.spare != null ? `${block.spare}` : "—";
 
     // Recipients: everyone at work with capacity alerts on for at least one
     // of the flipped levels. Per-user preferences narrow both the audience
@@ -238,12 +246,13 @@ export async function checkAndAlertNurseCapacity(admin: Admin, now: Date = new D
       if (p.notify_capacity === false) continue;
       const userLevels = flipped.filter((k) => (p as any)[prefKey[k]] !== false);
       if (!userLevels.length) continue;
-      const summary = messageFor(userLevels, next, block);
+      const summary = messageFor(userLevels, block, prevBlock);
       perUser.push({
         id: p.id,
-        body: `${shiftLabel}: ${summary}. Spare ${block.spare ?? "—"} nurses (dependency ${snap.dependency}).`,
+        body: `${shiftLabel} · ${summary}. Spare nurses ${prevSpareText} → ${nextSpareText} (dependency ${snap.dependency}).`,
       });
     }
+
     if (!perUser.length) return;
 
     const recipientIds = perUser.map((u) => u.id);
