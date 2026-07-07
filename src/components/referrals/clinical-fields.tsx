@@ -23,6 +23,17 @@ import {
   type ResusStatus,
 } from "@/lib/referral-clinical";
 
+export type WardReviewTimeframe = "12h" | "24h" | "48h" | "72h" | "weekly" | "prn";
+
+export const WARD_REVIEW_TIMEFRAME_OPTIONS: { value: WardReviewTimeframe; label: string }[] = [
+  { value: "12h", label: "Within 12 hours" },
+  { value: "24h", label: "Within 24 hours" },
+  { value: "48h", label: "Within 48 hours" },
+  { value: "72h", label: "Within 72 hours" },
+  { value: "weekly", label: "Weekly" },
+  { value: "prn", label: "As needed (PRN)" },
+];
+
 export interface ClinicalFieldsValue {
   news2_score: number | null;
   ceiling_of_care: CeilingOfCare | null;
@@ -34,6 +45,9 @@ export interface ClinicalFieldsValue {
   weight_kg: number | null;
   allergies: string | null;
   resus_status: ResusStatus | null;
+  needs_ward_review: boolean;
+  for_ongoing_ccot_review: boolean;
+  ward_review_timeframe: WardReviewTimeframe | null;
 }
 
 const NONE = "__none";
@@ -210,6 +224,69 @@ export function ClinicalFields({
           })}
         </div>
       </fieldset>
+
+      <fieldset className="rounded-md border p-3 space-y-3">
+        <legend className="text-xs font-medium px-1">Ongoing review</legend>
+        <label className="flex items-start gap-2 text-sm cursor-pointer">
+          <Checkbox
+            checked={value.needs_ward_review}
+            onCheckedChange={(c) => {
+              const next = c === true;
+              set("needs_ward_review", next);
+              // Clear the timeframe when both review flags are off — the
+              // DB check constraint requires at least one to be true.
+              if (!next && !value.for_ongoing_ccot_review && value.ward_review_timeframe) {
+                set("ward_review_timeframe", null);
+              }
+            }}
+          />
+          <span>
+            <span className="font-medium">Needs ongoing ward review</span>
+            <span className="block text-xs text-muted-foreground">
+              Ward team should re-review at the suggested interval.
+            </span>
+          </span>
+        </label>
+        <label className="flex items-start gap-2 text-sm cursor-pointer">
+          <Checkbox
+            checked={value.for_ongoing_ccot_review}
+            onCheckedChange={(c) => {
+              const next = c === true;
+              set("for_ongoing_ccot_review", next);
+              if (!next && !value.needs_ward_review && value.ward_review_timeframe) {
+                set("ward_review_timeframe", null);
+              }
+            }}
+          />
+          <span>
+            <span className="font-medium">For ongoing CCOT review</span>
+            <span className="block text-xs text-muted-foreground">
+              Keep on the Critical Care Outreach Team review list.
+            </span>
+          </span>
+        </label>
+        {(value.needs_ward_review || value.for_ongoing_ccot_review) && (
+          <div className="space-y-1.5">
+            <Label>Suggested review timeframe</Label>
+            <Select
+              value={value.ward_review_timeframe ?? NONE}
+              onValueChange={(v) =>
+                set("ward_review_timeframe", v === NONE ? null : (v as WardReviewTimeframe))
+              }
+            >
+              <SelectTrigger>
+                <SelectValue placeholder="Select…" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value={NONE}>—</SelectItem>
+                {WARD_REVIEW_TIMEFRAME_OPTIONS.map((o) => (
+                  <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+        )}
+      </fieldset>
     </div>
   );
 }
@@ -226,10 +303,15 @@ export function emptyClinicalFields(): ClinicalFieldsValue {
     weight_kg: null,
     allergies: null,
     resus_status: null,
+    needs_ward_review: false,
+    for_ongoing_ccot_review: false,
+    ward_review_timeframe: null,
   };
 }
 
 export function clinicalFieldsFromRow(row: any): ClinicalFieldsValue {
+  const timeframe = row?.ward_review_timeframe;
+  const validTimeframes: WardReviewTimeframe[] = ["12h", "24h", "48h", "72h", "weekly", "prn"];
   return {
     news2_score: row?.news2_score ?? null,
     ceiling_of_care: (row?.ceiling_of_care as CeilingOfCare | null) ?? null,
@@ -243,5 +325,9 @@ export function clinicalFieldsFromRow(row: any): ClinicalFieldsValue {
     weight_kg: row?.weight_kg == null ? null : Number(row.weight_kg),
     allergies: row?.allergies ?? null,
     resus_status: (row?.resus_status as ResusStatus | null) ?? null,
+    needs_ward_review: row?.needs_ward_review === true,
+    for_ongoing_ccot_review: row?.for_ongoing_ccot_review === true,
+    ward_review_timeframe: validTimeframes.includes(timeframe) ? timeframe : null,
   };
 }
+

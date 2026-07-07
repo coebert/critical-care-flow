@@ -292,6 +292,9 @@ function NewReferralPage() {
         weight_kg: clinical.weight_kg,
         allergies: clinical.allergies,
         resus_status: clinical.resus_status,
+        needs_ward_review: clinical.needs_ward_review,
+        for_ongoing_ccot_review: clinical.for_ongoing_ccot_review,
+        ward_review_timeframe: clinical.ward_review_timeframe,
         outcome,
         previous_referral_id: previousReferralId,
       };

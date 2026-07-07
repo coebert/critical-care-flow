@@ -1031,6 +1031,7 @@ export type Database = {
           discussed_with_consultant: string | null
           dnacpr_respect: boolean
           first_seen_at: string | null
+          for_ongoing_ccot_review: boolean
           frailty_score: number | null
           hospital_number_enc: string | null
           hospital_number_hash: string | null
@@ -1040,6 +1041,7 @@ export type Database = {
             | Database["public"]["Enums"]["infection_status"]
             | null
           is_test: boolean
+          needs_ward_review: boolean
           news2_recorded_at: string | null
           news2_score: number | null
           origin_booking_id: string | null
@@ -1058,6 +1060,7 @@ export type Database = {
           status: Database["public"]["Enums"]["referral_status"]
           updated_at: string
           updated_by: string | null
+          ward_review_timeframe: string | null
           weight_kg: number | null
         }
         Insert: {
@@ -1085,6 +1088,7 @@ export type Database = {
           discussed_with_consultant?: string | null
           dnacpr_respect?: boolean
           first_seen_at?: string | null
+          for_ongoing_ccot_review?: boolean
           frailty_score?: number | null
           hospital_number_enc?: string | null
           hospital_number_hash?: string | null
@@ -1094,6 +1098,7 @@ export type Database = {
             | Database["public"]["Enums"]["infection_status"]
             | null
           is_test?: boolean
+          needs_ward_review?: boolean
           news2_recorded_at?: string | null
           news2_score?: number | null
           origin_booking_id?: string | null
@@ -1112,6 +1117,7 @@ export type Database = {
           status?: Database["public"]["Enums"]["referral_status"]
           updated_at?: string
           updated_by?: string | null
+          ward_review_timeframe?: string | null
           weight_kg?: number | null
         }
         Update: {
@@ -1139,6 +1145,7 @@ export type Database = {
           discussed_with_consultant?: string | null
           dnacpr_respect?: boolean
           first_seen_at?: string | null
+          for_ongoing_ccot_review?: boolean
           frailty_score?: number | null
           hospital_number_enc?: string | null
           hospital_number_hash?: string | null
@@ -1148,6 +1155,7 @@ export type Database = {
             | Database["public"]["Enums"]["infection_status"]
             | null
           is_test?: boolean
+          needs_ward_review?: boolean
           news2_recorded_at?: string | null
           news2_score?: number | null
           origin_booking_id?: string | null
@@ -1166,6 +1174,7 @@ export type Database = {
           status?: Database["public"]["Enums"]["referral_status"]
           updated_at?: string
           updated_by?: string | null
+          ward_review_timeframe?: string | null
           weight_kg?: number | null
         }
         Relationships: [

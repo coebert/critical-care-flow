@@ -199,6 +199,9 @@ function ReferralDetail() {
         weight_kg: (ref as any).weight_kg == null ? null : Number((ref as any).weight_kg),
         allergies: (ref as any).allergies ?? null,
         resus_status: (ref as any).resus_status ?? null,
+        needs_ward_review: (ref as any).needs_ward_review ?? false,
+        for_ongoing_ccot_review: (ref as any).for_ongoing_ccot_review ?? false,
+        ward_review_timeframe: (ref as any).ward_review_timeframe ?? null,
         outcome: (ref as any).outcome ?? null,
       };
       await update({ data: { id: ref.id, patch } });
