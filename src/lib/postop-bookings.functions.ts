@@ -574,3 +574,318 @@ export const getPostopBookingHistory = createServerFn({ method: "POST" })
       throw safeError("getPostopBookingHistory", err, "Could not load booking history");
     }
   });
+
+// ---------------------------------------------------------------------------
+// Point-4: lifecycle, planner, cancellations, convert-to-referral
+// ---------------------------------------------------------------------------
+
+import {
+  POSTOP_BOOKING_STATUSES,
+  POSTOP_CANCELLATION_REASONS,
+  canTransition,
+  isEligibleForConversion,
+  type PostopBookingStatus,
+} from "./postop-lifecycle";
+
+const statusSchema = z.enum(POSTOP_BOOKING_STATUSES);
+const reasonSchema = z.enum(POSTOP_CANCELLATION_REASONS);
+
+/** Transition a booking's status through the workflow. */
+export const transitionBookingStatus = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d) =>
+    z
+      .object({
+        id: z.string().uuid(),
+        next_status: statusSchema,
+        cancellation_reason: reasonSchema.nullable().optional(),
+        cancellation_notes: z.string().trim().max(1000).nullable().optional(),
+      })
+      .parse(d),
+  )
+  .handler(async ({ data, context }) => {
+    try {
+      const { data: prev, error: readErr } = await context.supabase
+        .from("postop_bookings")
+        .select(
+          "id, created_by, deleted_at, booking_status, preop_signed_off_at, intensivist_reviewed_at",
+        )
+        .eq("id", data.id)
+        .maybeSingle();
+      if (readErr) throw readErr;
+      if (!prev || (prev as any).deleted_at) throw new Error("Booking not found");
+
+      const { data: isAdmin } = await context.supabase.rpc("has_role", {
+        _user_id: context.userId,
+        _role: "admin",
+      });
+      if ((prev as any).created_by !== context.userId && !isAdmin) {
+        throw new Error("Only the booking creator or an admin can change status");
+      }
+
+      const decision = canTransition(
+        (prev as any).booking_status as PostopBookingStatus,
+        data.next_status,
+        {
+          preop_signed_off_at: (prev as any).preop_signed_off_at ?? null,
+          intensivist_reviewed_at: (prev as any).intensivist_reviewed_at ?? null,
+          cancellation_reason: data.cancellation_reason ?? null,
+        },
+      );
+      if (!decision.ok) throw new Error(decision.reason);
+
+      const patch: Record<string, unknown> = { booking_status: data.next_status };
+      if (data.next_status === "cancelled") {
+        patch.cancellation_reason = data.cancellation_reason ?? null;
+        patch.cancellation_notes = data.cancellation_notes ?? null;
+        patch.cancelled_at = new Date().toISOString();
+        patch.cancelled_by = context.userId;
+      }
+
+      const { error } = await context.supabase
+        .from("postop_bookings")
+        .update(patch as any)
+        .eq("id", data.id);
+      if (error) throw error;
+
+      await writeAudit({
+        user_id: context.userId,
+        action: "update",
+        entity_id: data.id,
+        diff: {
+          booking_status: {
+            from: (prev as any).booking_status,
+            to: data.next_status,
+          },
+          ...(data.next_status === "cancelled"
+            ? { cancellation_reason: { from: null, to: data.cancellation_reason ?? null } }
+            : {}),
+        },
+      });
+      return { id: data.id, booking_status: data.next_status };
+    } catch (err) {
+      throw safeError("transitionBookingStatus", err, "Could not change booking status");
+    }
+  });
+
+/** Record anaesthetic pre-op sign-off and/or intensivist review. */
+export const signOffBooking = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d) =>
+    z
+      .object({
+        id: z.string().uuid(),
+        kind: z.enum(["preop", "intensivist"]),
+        clear: z.boolean().optional(),
+      })
+      .parse(d),
+  )
+  .handler(async ({ data, context }) => {
+    try {
+      const stamp = data.clear ? null : new Date().toISOString();
+      const by = data.clear ? null : context.userId;
+      const patch =
+        data.kind === "preop"
+          ? { preop_signed_off_at: stamp, preop_signed_off_by: by }
+          : { intensivist_reviewed_at: stamp, intensivist_reviewed_by: by };
+      const { error } = await context.supabase
+        .from("postop_bookings")
+        .update(patch as any)
+        .eq("id", data.id);
+      if (error) throw error;
+      await writeAudit({
+        user_id: context.userId,
+        action: "update",
+        entity_id: data.id,
+        diff: patch as Record<string, unknown>,
+      });
+      return { id: data.id };
+    } catch (err) {
+      throw safeError("signOffBooking", err, "Could not record sign-off");
+    }
+  });
+
+/** Planner query — bookings whose surgery date is within [from, to] inclusive. */
+export const listBookingsInRange = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d) =>
+    z
+      .object({
+        from: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+        to: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+      })
+      .parse(d),
+  )
+  .handler(async ({ data, context }) => {
+    try {
+      const { data: rows, error } = await context.supabase
+        .from("postop_bookings")
+        .select("*")
+        .gte("proposed_surgery_date", data.from)
+        .lte("proposed_surgery_date", data.to)
+        .is("deleted_at", null)
+        .order("proposed_surgery_date", { ascending: true })
+        .limit(500);
+      if (error) throw error;
+      const { decryptRow } = await loadCrypto();
+      return ((rows ?? []) as Array<Record<string, any>>).map(decryptRow);
+    } catch (err) {
+      throw safeError("listBookingsInRange", err, "Could not load planner data");
+    }
+  });
+
+/** Admin-only cancellation register. */
+export const listCancellations = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d) =>
+    z
+      .object({
+        from: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
+        to: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
+        reason: reasonSchema.optional(),
+      })
+      .parse(d ?? {}),
+  )
+  .handler(async ({ data, context }) => {
+    try {
+      const { data: isAdmin } = await context.supabase.rpc("has_role", {
+        _user_id: context.userId,
+        _role: "admin",
+      });
+      if (!isAdmin) throw new Error("Admin access required");
+
+      let q = context.supabase
+        .from("postop_bookings")
+        .select("*")
+        .eq("booking_status", "cancelled")
+        .is("deleted_at", null)
+        .order("cancelled_at", { ascending: false })
+        .limit(1000);
+      if (data.from) q = q.gte("cancelled_at", `${data.from}T00:00:00`);
+      if (data.to) q = q.lte("cancelled_at", `${data.to}T23:59:59`);
+      if (data.reason) q = q.eq("cancellation_reason", data.reason);
+      const { data: rows, error } = await q;
+      if (error) throw error;
+      const { decryptRow } = await loadCrypto();
+      const decrypted = ((rows ?? []) as Array<Record<string, any>>).map(decryptRow);
+
+      // Attach canceller display name.
+      const admin = await getAdmin();
+      const ids = Array.from(
+        new Set(
+          decrypted
+            .map((r) => r.cancelled_by ?? r.created_by)
+            .filter(Boolean) as string[],
+        ),
+      );
+      const nameById: Record<string, string> = {};
+      if (ids.length) {
+        const { data: profs } = await admin
+          .from("profiles")
+          .select("id, full_name")
+          .in("id", ids);
+        profs?.forEach((p: any) => {
+          nameById[p.id] = p.full_name ?? "Clinician";
+        });
+      }
+      return decrypted.map((r) => ({
+        ...r,
+        cancelled_by_name: r.cancelled_by ? nameById[r.cancelled_by] ?? "Clinician" : null,
+      }));
+    } catch (err) {
+      throw safeError("listCancellations", err, "Could not load cancellations");
+    }
+  });
+
+/** Convert a same-day post-op booking into a live referral (idempotent). */
+export const convertBookingToReferral = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d) => z.object({ id: z.string().uuid() }).parse(d))
+  .handler(async ({ data, context }) => {
+    try {
+      const { data: rawRow, error: readErr } = await context.supabase
+        .from("postop_bookings")
+        .select("*")
+        .eq("id", data.id)
+        .maybeSingle();
+      if (readErr) throw readErr;
+      if (!rawRow) throw new Error("Booking not found");
+
+      const { decryptRow } = await loadCrypto();
+      const row = decryptRow(rawRow as Record<string, any>) as Record<string, any>;
+
+      if (row.converted_referral_id) {
+        return { referral_id: row.converted_referral_id as string, reused: true };
+      }
+      if (
+        !isEligibleForConversion({
+          booking_status: row.booking_status,
+          proposed_surgery_date: row.proposed_surgery_date,
+          converted_referral_id: row.converted_referral_id,
+          deleted_at: row.deleted_at,
+        })
+      ) {
+        throw new Error(
+          "This booking is not yet eligible for conversion — needs to be confirmed and on/near the surgery date.",
+        );
+      }
+
+      const { encryptString, hashHospitalNumber } = await import("./crypto.server");
+
+      const reasonNotesPlain = row.proposed_procedure
+        ? `Post-op admission after: ${row.proposed_procedure}`
+        : "Post-op admission";
+
+      const insert: Record<string, unknown> = {
+        created_by: context.userId,
+        age: row.age ?? null,
+        sex: row.sex ?? null,
+        weight_kg: row.weight_kg ?? null,
+        status: "accepted",
+        outcome: "admit_for_admission",
+        reason_category: "post_op",
+        origin_booking_id: row.id,
+        referral_received_at: new Date().toISOString(),
+        decision_at: new Date().toISOString(),
+      };
+      if (row.hospital_number) {
+        insert.hospital_number_enc = encryptString(row.hospital_number);
+        insert.hospital_number_hash = hashHospitalNumber(row.hospital_number);
+      }
+      if (reasonNotesPlain) {
+        insert.reason_for_referral_enc = encryptString(reasonNotesPlain);
+      }
+
+      const { data: newRef, error: insErr } = await context.supabase
+        .from("referrals")
+        .insert(insert as any)
+        .select("id")
+        .single();
+      if (insErr) throw insErr;
+
+      // Link back + move the booking to admitted.
+      const { error: updErr } = await context.supabase
+        .from("postop_bookings")
+        .update({
+          converted_referral_id: (newRef as any).id,
+          booking_status: "admitted",
+          arrived_at: new Date().toISOString(),
+        } as any)
+        .eq("id", data.id);
+      if (updErr) throw updErr;
+
+      await writeAudit({
+        user_id: context.userId,
+        action: "update",
+        entity_id: data.id,
+        diff: {
+          converted_referral_id: { from: null, to: (newRef as any).id },
+          booking_status: { from: row.booking_status, to: "admitted" },
+        },
+      });
+
+      return { referral_id: (newRef as any).id as string, reused: false };
+    } catch (err) {
+      throw safeError("convertBookingToReferral", err, "Could not convert booking");
+    }
+  });
