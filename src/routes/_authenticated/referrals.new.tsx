@@ -21,7 +21,7 @@ import { ComboboxAdd } from "@/components/combobox-add";
 import { useReferralOptions } from "@/hooks/use-referral-options";
 import { toast } from "sonner";
 import { format } from "date-fns";
-import { validateReferralTimings } from "@/lib/referral-validation";
+import { validateReferralAll, validateReferralTimings } from "@/lib/referral-validation";
 import {
   ADMISSION_URGENCY_OPTIONS,
   type AdmissionUrgency,
@@ -211,20 +211,31 @@ function NewReferralPage() {
   const acceptingConsultantMissing =
     (f.status === "admitted" || f.status === "accepted") && !f.accepting_consultant.trim();
 
+  const combined = validateReferralAll({
+    status: f.status,
+    referral_received_at: f.referral_received_at
+      ? new Date(f.referral_received_at).toISOString()
+      : null,
+    first_seen_at: f.first_seen_at ? new Date(f.first_seen_at).toISOString() : null,
+    decision_at: f.decision_at ? new Date(f.decision_at).toISOString() : null,
+    arrived_on_unit_at: f.arrived_on_unit_at
+      ? new Date(f.arrived_on_unit_at).toISOString()
+      : null,
+    decline_reason: f.decline_reason,
+    discussed_with_consultant: f.discussed_with_consultant,
+    accepting_consultant: f.accepting_consultant,
+    admission_urgency: f.admission_urgency || null,
+  });
+
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!timing.isValid || declineReasonMissing || declineConsultantMissing || acceptingConsultantMissing) {
+    if (!combined.isValid) {
       setShowErrors(true);
-      const msg = acceptingConsultantMissing && timing.isValid && !declineReasonMissing && !declineConsultantMissing
-        ? "Please select the accepting critical care consultant before marking this referral as Accepted or Admitted."
-        : declineConsultantMissing && timing.isValid && !declineReasonMissing && !acceptingConsultantMissing
-        ? "Please record which critical care consultant the referral was discussed with."
-        : declineReasonMissing && timing.isValid && !acceptingConsultantMissing && !declineConsultantMissing
-        ? "A reason is required when declining a referral."
-        : "Please fix the highlighted fields before saving.";
-      toast.error(msg);
+      const firstFieldError = Object.values(combined.fieldErrors)[0];
+      toast.error(firstFieldError ?? combined.issues[0] ?? "Please fix the highlighted fields before saving.");
       return;
     }
+
 
     setSaving(true);
     try {

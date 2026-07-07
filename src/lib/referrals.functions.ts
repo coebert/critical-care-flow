@@ -193,15 +193,23 @@ export const createReferral = createServerFn({ method: "POST" })
   .inputValidator((d: unknown) => refSchema.parse(d))
   .handler(async ({ data, context }) => {
     const { supabase, userId } = context;
-    if (data.status === "declined" && !(data.decline_reason ?? "").trim()) {
-      throw new Error("A reason is required when declining a referral.");
+    const { validateReferralAll } = await import("./referral-validation");
+    const gateCheck = validateReferralAll({
+      status: data.status ?? "pending",
+      referral_received_at: data.referral_received_at ?? new Date().toISOString(),
+      first_seen_at: data.first_seen_at ?? null,
+      decision_at: data.decision_at ?? null,
+      arrived_on_unit_at: data.arrived_on_unit_at ?? null,
+      decline_reason: data.decline_reason ?? null,
+      discussed_with_consultant: data.discussed_with_consultant ?? null,
+      accepting_consultant: data.accepting_consultant ?? null,
+      admission_urgency: data.admission_urgency ?? null,
+    });
+    if (!gateCheck.isValid) {
+      const first = Object.values(gateCheck.fieldErrors)[0] ?? gateCheck.issues[0];
+      throw new Error(first ?? "Referral data failed validation.");
     }
-    if (data.status === "declined" && !(data.discussed_with_consultant ?? "").trim()) {
-      throw new Error("Please record which critical care consultant the referral was discussed with.");
-    }
-    if ((data.status === "admitted" || data.status === "accepted") && !(data.accepting_consultant ?? "").trim()) {
-      throw new Error("An accepting critical care consultant must be selected when a referral is marked Accepted or Admitted.");
-    }
+
     const baseInsert = applyEncryption({
       ...data,
       created_by: userId,
@@ -273,7 +281,9 @@ export const updateReferral = createServerFn({ method: "POST" })
     const { supabase, userId } = context;
     const { data: prior } = await supabase
       .from("referrals")
-      .select("status, decline_reason, accepting_consultant, discussed_with_consultant, created_by, deleted_at")
+      .select(
+        "status, decline_reason, accepting_consultant, discussed_with_consultant, admission_urgency, referral_received_at, first_seen_at, decision_at, arrived_on_unit_at, created_by, deleted_at",
+      )
       .eq("id", data.id)
       .maybeSingle();
 
@@ -293,29 +303,26 @@ export const updateReferral = createServerFn({ method: "POST" })
       throw new Error("Only the creator or an admin can restore this referral");
     }
 
+    const pickPatched = <K extends keyof typeof data.patch>(k: K) =>
+      (data.patch as any)[k] !== undefined ? (data.patch as any)[k] : (prior as any)?.[k];
 
-    const finalStatus = data.patch.status ?? prior?.status;
-    const finalReason =
-      data.patch.decline_reason !== undefined
-        ? data.patch.decline_reason
-        : prior?.decline_reason;
-    if (finalStatus === "declined" && !(finalReason ?? "").trim()) {
-      throw new Error("A reason is required when declining a referral.");
+    const { validateReferralAll } = await import("./referral-validation");
+    const updateCheck = validateReferralAll({
+      status: pickPatched("status") ?? "pending",
+      referral_received_at: pickPatched("referral_received_at") ?? null,
+      first_seen_at: pickPatched("first_seen_at") ?? null,
+      decision_at: pickPatched("decision_at") ?? null,
+      arrived_on_unit_at: pickPatched("arrived_on_unit_at") ?? null,
+      decline_reason: pickPatched("decline_reason") ?? null,
+      discussed_with_consultant: pickPatched("discussed_with_consultant") ?? null,
+      accepting_consultant: pickPatched("accepting_consultant") ?? null,
+      admission_urgency: pickPatched("admission_urgency") ?? null,
+    }, { ignorePastCap: true });
+    if (!updateCheck.isValid) {
+      const first = Object.values(updateCheck.fieldErrors)[0] ?? updateCheck.issues[0];
+      throw new Error(first ?? "Referral data failed validation.");
     }
-    const finalDiscussed =
-      data.patch.discussed_with_consultant !== undefined
-        ? data.patch.discussed_with_consultant
-        : (prior as any)?.discussed_with_consultant;
-    if (finalStatus === "declined" && !(finalDiscussed ?? "").trim()) {
-      throw new Error("Please record which critical care consultant the referral was discussed with.");
-    }
-    const finalConsultant =
-      data.patch.accepting_consultant !== undefined
-        ? data.patch.accepting_consultant
-        : (prior as any)?.accepting_consultant;
-    if ((finalStatus === "admitted" || finalStatus === "accepted") && !(finalConsultant ?? "").trim()) {
-      throw new Error("An accepting critical care consultant must be selected when a referral is marked Accepted or Admitted.");
-    }
+
 
     const patchEncrypted = applyEncryption({ ...data.patch, updated_by: userId });
 
