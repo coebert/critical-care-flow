@@ -184,6 +184,8 @@ export const addEncryptedNote = createServerFn({ method: "POST" })
       action: "create",
       entity_id: row.id,
       referral_id: data.referral_id,
+      author_id: userId,
+      recipient_count: wrappedRows.length,
     });
     await fanOutForNote(userId, data.referral_id);
     return row;
