@@ -3,6 +3,8 @@ import { useEffect, useState } from "react";
 import { useServerFn } from "@tanstack/react-start";
 import { createReferral, findReferralsByHospitalNumber } from "@/lib/referrals.functions";
 import { RouteErrorFallback } from "@/components/route-error-fallback";
+import { ClinicalAccessGate } from "@/components/clinical-access-gate";
+import { ReferralRouteError } from "@/components/referral-route-error";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -55,7 +57,7 @@ import { validateReferralOutcome, type ReferralOutcome } from "@/lib/referral-ou
 
 export const Route = createFileRoute("/_authenticated/referrals/new")({
   head: () => ({ meta: [{ title: "New referral — SDH Critical Care" }] }),
-  errorComponent: ({ error }) => <RouteErrorFallback error={error} label="New referral" />,
+  errorComponent: ({ error }) => <ReferralRouteError error={error} label="New referral" />,
   component: NewReferralPage,
 });
 
@@ -316,6 +318,7 @@ function NewReferralPage() {
   };
 
   return (
+    <ClinicalAccessGate>
     <div className="p-4 sm:p-6 max-w-3xl mx-auto">
       <div className="flex items-end justify-between mb-6 gap-4 flex-wrap">
         <h1 className="text-2xl font-semibold tracking-tight">New referral</h1>
@@ -570,5 +573,6 @@ function NewReferralPage() {
         priors={priors}
       />
     </div>
+    </ClinicalAccessGate>
   );
 }

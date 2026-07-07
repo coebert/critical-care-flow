@@ -31,6 +31,8 @@ import { QuickFilterChips } from "@/components/referrals/quick-filter-chips";
 import { CapacityBadge } from "@/components/referrals/capacity-badge";
 
 import { applyQuickFilter, matchesQuickFilter, type QuickFilterKey } from "@/lib/quick-filters";
+import { ClinicalAccessGate } from "@/components/clinical-access-gate";
+import { ReferralRouteError } from "@/components/referral-route-error";
 
 // Cache key for the live referrals list. Kept as a stable tuple so the
 // realtime subscription can invalidate it without importing the options.
@@ -51,11 +53,7 @@ function ReferralsListPending() {
 }
 
 function ReferralsListError({ error }: { error: Error }) {
-  return (
-    <div className="p-6 text-sm text-destructive" role="alert">
-      Failed to load referrals: {error.message}
-    </div>
-  );
+  return <ReferralRouteError error={error} label="Referrals" />;
 }
 
 export const Route = createFileRoute("/_authenticated/")({
@@ -198,6 +196,7 @@ function ReferralsList() {
   );
 
   return (
+    <ClinicalAccessGate>
     <div className="p-4 sm:p-6 max-w-7xl mx-auto">
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-6">
         <div className="min-w-0">
@@ -274,5 +273,6 @@ function ReferralsList() {
         }
       />
     </div>
+    </ClinicalAccessGate>
   );
 }

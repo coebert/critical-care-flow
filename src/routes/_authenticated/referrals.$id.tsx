@@ -7,6 +7,8 @@ import { deleteReferral, getReferralDetail, logReferralView, updateReferral, typ
 import { ReferralAuditTrail } from "@/components/referral-audit-trail";
 import { PriorDeclinedReferrals } from "@/components/prior-declined-referrals";
 import { RouteErrorFallback } from "@/components/route-error-fallback";
+import { ClinicalAccessGate } from "@/components/clinical-access-gate";
+import { ReferralRouteError } from "@/components/referral-route-error";
 import { Noteboard, referralNotesQueryOptions } from "@/components/noteboard";
 import { TaskList } from "@/components/referrals/task-list";
 import { MessageLog } from "@/components/referrals/message-log";
@@ -63,7 +65,7 @@ export const Route = createFileRoute("/_authenticated/referrals/$id")({
     context.queryClient.ensureQueryData(referralNotesQueryOptions(params.id));
     return context.queryClient.ensureQueryData(referralDetailQueryOptions(params.id));
   },
-  errorComponent: ({ error }) => <RouteErrorFallback error={error} label="Referral" />,
+  errorComponent: ({ error }) => <ReferralRouteError error={error} label="Referral" />,
   component: ReferralDetail,
 });
 
@@ -243,6 +245,7 @@ function ReferralDetail() {
   };
 
   return (
+    <ClinicalAccessGate>
     <div className="p-4 sm:p-6 max-w-5xl mx-auto">
       <div className="flex items-center justify-between gap-2 mb-6 flex-wrap">
         <Button variant="ghost" size="sm" onClick={() => navigate({ to: "/" })}>
@@ -542,5 +545,6 @@ function ReferralDetail() {
         )}
       </div>
     </div>
+    </ClinicalAccessGate>
   );
 }

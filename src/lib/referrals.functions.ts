@@ -4,7 +4,7 @@ import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { encryptString, decryptString, hashHospitalNumber } from "./crypto.server";
 import { decideReferralRestore, decideReferralUpdate } from "./referral-restore-authz";
-import type { Tables } from "@/integrations/supabase/types";
+import type { Database, Tables } from "@/integrations/supabase/types";
 
 const refSchema = z.object({
   age: z.number().int().min(0).max(130).nullable().optional(),
@@ -261,11 +261,35 @@ async function fanOutNotifications(
 }
 
 
+/**
+ * Server-side defence-in-depth: verify the calling user is an active
+ * member of the critical care team ('admin' or 'clinician' role) before
+ * touching any referral surface. RLS also enforces this via
+ * `public.has_clinical_access(uuid)`, but relying on RLS alone means a
+ * non-clinical user gets silent empty lists on reads and cryptic
+ * "row violates row-level security" errors on writes. Calling this
+ * helper first turns those into a clear 403 that the UI can surface.
+ *
+ * Throws an Error whose message we deliberately mirror as
+ * "Forbidden: clinical access required" everywhere so log analysis and
+ * UI messaging stay consistent.
+ */
+async function assertClinicalAccess(
+  supabase: import("@supabase/supabase-js").SupabaseClient<Database>,
+  userId: string,
+): Promise<void> {
+  const { data, error } = await supabase.rpc("has_clinical_access", { _user_id: userId });
+  if (error) throw safeError("referrals.authz", error, "Permission check failed.");
+  if (!data) throw new Error("Forbidden: clinical access required");
+}
+
+
 export const createReferral = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((d: unknown) => refSchema.parse(d))
   .handler(async ({ data, context }) => {
     const { supabase, userId } = context;
+    await assertClinicalAccess(supabase, userId);
     const { validateReferralAll } = await import("./referral-validation");
     const gateCheck = validateReferralAll({
       status: data.status ?? "pending",
@@ -352,6 +376,7 @@ export const updateReferral = createServerFn({ method: "POST" })
   )
   .handler(async ({ data, context }) => {
     const { supabase, userId } = context;
+    await assertClinicalAccess(supabase, userId);
     const { data: prior } = await supabase
       .from("referrals")
       .select(
@@ -451,7 +476,8 @@ const REFERRALS_LIST_HARD_CAP = 500;
 export const listReferralsForList = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
   .handler(async ({ context }): Promise<DecryptedReferral[]> => {
-    const { supabase } = context;
+    const { supabase, userId } = context;
+    await assertClinicalAccess(supabase, userId);
     const { data, error } = await supabase
       .from("referrals")
       .select("*")
@@ -494,7 +520,8 @@ export const getReferralDetail = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((d: unknown) => z.object({ id: z.string().uuid() }).parse(d))
   .handler(async ({ data, context }) => {
-    const { supabase } = context;
+    const { supabase, userId } = context;
+    await assertClinicalAccess(supabase, userId);
     const { data: row, error } = await supabase
       .from("referrals")
       .select("*")
@@ -509,7 +536,8 @@ export const listReferralNotesDecrypted = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((d: unknown) => z.object({ referral_id: z.string().uuid() }).parse(d))
   .handler(async ({ data, context }) => {
-    const { supabase } = context;
+    const { supabase, userId } = context;
+    await assertClinicalAccess(supabase, userId);
     const { data: rows, error } = await supabase
       .from("referral_notes")
       .select("*")
@@ -561,6 +589,7 @@ export const addNote = createServerFn({ method: "POST" })
   .handler(async ({ data, context }) => {
     assertNonE2EWritesAllowed("add");
     const { supabase, userId } = context;
+    await assertClinicalAccess(supabase, userId);
     const { data: row, error } = await supabase
       .from("referral_notes")
       .insert({
@@ -608,6 +637,7 @@ export const updateNote = createServerFn({ method: "POST" })
   .handler(async ({ data, context }) => {
     assertNonE2EWritesAllowed("update");
     const { supabase, userId } = context;
+    await assertClinicalAccess(supabase, userId);
     const { data: existing } = await supabase
       .from("referral_notes")
       .select("id, body_enc, referral_id, author_id")
@@ -1036,7 +1066,8 @@ export const findReferralsByHospitalNumber = createServerFn({ method: "POST" })
       .parse(d),
   )
   .handler(async ({ data, context }): Promise<DecryptedReferral[]> => {
-    const { supabase } = context;
+    const { supabase, userId } = context;
+    await assertClinicalAccess(supabase, userId);
     const hashed = hashHospitalNumber(data.hospital_number);
     if (!hashed) return [];
     let q = supabase

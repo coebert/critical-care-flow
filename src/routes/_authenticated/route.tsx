@@ -6,7 +6,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useE2ESession, initKeyStatusCrossTabSync } from "@/hooks/use-e2e-session";
 import { Activity, BarChart3, ListChecks, Shield, LogOut, Plus, Menu, Bell, BellRing, Inbox, PanelLeftClose, PanelLeftOpen, CalendarClock, UserCircle, Bed as BedIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { useAuth, useRole } from "@/hooks/use-auth";
+import { useAuth, useRole, useClinicalAccess } from "@/hooks/use-auth";
 import { NotificationBell } from "@/components/notification-bell";
 import { AlertToggle } from "@/components/alert-toggle";
 import { useNewReferralAlert } from "@/hooks/use-new-referral-alert";
@@ -54,6 +54,13 @@ export const Route = createFileRoute("/_authenticated")({
 function AuthedShell() {
   const { user } = useAuth();
   const { hasRole: isAdmin } = useRole("admin");
+  // Referral surfaces (list, new, detail, inbox of referral notifications)
+  // are restricted to critical care team members by RLS + server guards.
+  // Hide the nav links for anyone else so we don't offer a link that leads
+  // to an "access restricted" screen. Admins retain clinical access via the
+  // `has_clinical_access` predicate, so this only hides the entries for
+  // signed-in users with no clinical role.
+  const { hasAccess: canAccessReferrals } = useClinicalAccess();
   const router = useRouter();
   const navigate = useNavigate();
   const [signingOut, setSigningOut] = useState(false);
@@ -136,8 +143,12 @@ function AuthedShell() {
       </div>
       <nav className="flex-1 overflow-y-auto px-2 py-3 text-sm">
         <NavGroup label="Work" collapsed={collapsed}>
-          <NavItem to="/" icon={<ListChecks className="w-4 h-4" />} collapsed={collapsed} label="Referrals" />
-          <NavItem to="/referrals/new" icon={<Plus className="w-4 h-4" />} collapsed={collapsed} label="New referral" />
+          {canAccessReferrals && (
+            <>
+              <NavItem to="/" icon={<ListChecks className="w-4 h-4" />} collapsed={collapsed} label="Referrals" />
+              <NavItem to="/referrals/new" icon={<Plus className="w-4 h-4" />} collapsed={collapsed} label="New referral" />
+            </>
+          )}
           <NavItem to="/postop-bookings" icon={<CalendarClock className="w-4 h-4" />} collapsed={collapsed} label="Post-op bookings" />
           <NavItem to="/bed-board" icon={<BedIcon className="w-4 h-4" />} collapsed={collapsed} label="Bed board" />
           <NavItem to="/inbox" icon={<Inbox className="w-4 h-4" />} collapsed={collapsed} label="Inbox" />
