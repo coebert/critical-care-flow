@@ -242,7 +242,7 @@ export function NurseCapacityPanel({
         <h3 className="text-sm font-semibold">Nurse capacity — next 24 h</h3>
       </div>
 
-      <div className="p-3 space-y-3">
+      <div id="nurse-capacity" className="p-3 space-y-3">
         <div className="rounded-md bg-muted/40 px-3 py-2">
           <div className="text-xs text-muted-foreground">Current unit dependency</div>
           <div className="flex items-baseline gap-2">
