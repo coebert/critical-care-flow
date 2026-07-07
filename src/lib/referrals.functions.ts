@@ -476,7 +476,8 @@ const REFERRALS_LIST_HARD_CAP = 500;
 export const listReferralsForList = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
   .handler(async ({ context }): Promise<DecryptedReferral[]> => {
-    const { supabase } = context;
+    const { supabase, userId } = context;
+    await assertClinicalAccess(supabase, userId);
     const { data, error } = await supabase
       .from("referrals")
       .select("*")
