@@ -225,7 +225,7 @@ function BedBoardPage() {
             className="text-xs text-muted-foreground hover:text-foreground underline underline-offset-2"
             onClick={() =>
               navigate({
-                search: (prev) => ({ ...prev, focus_shift: undefined, focus_level: undefined }),
+                search: { ...search, focus_shift: undefined, focus_level: undefined },
                 replace: true,
               })
             }
