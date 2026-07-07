@@ -48,8 +48,14 @@ export const Route = createFileRoute("/_authenticated/analytics")({
 function AnalyticsPage() {
   const search = Route.useSearch();
   const navigate = Route.useNavigate();
-  const tab: "referrals" | "postop" | "nurse-capacity" =
-    search.view === "postop" ? "postop" : search.view === "nurse-capacity" ? "nurse-capacity" : "referrals";
+  const tab: "referrals" | "postop" | "nurse-capacity" | "capacity-alerts" =
+    search.view === "postop"
+      ? "postop"
+      : search.view === "nurse-capacity"
+      ? "nurse-capacity"
+      : search.view === "capacity-alerts"
+      ? "capacity-alerts"
+      : "referrals";
 
   return (
     <div className="p-4 sm:p-6 max-w-7xl mx-auto">
@@ -61,7 +67,10 @@ function AnalyticsPage() {
         onValueChange={(v) =>
           navigate({
             search: {
-              view: v === "referrals" ? undefined : (v as "postop" | "nurse-capacity"),
+              view:
+                v === "referrals"
+                  ? undefined
+                  : (v as "postop" | "nurse-capacity" | "capacity-alerts"),
             },
             replace: true,
           })
@@ -71,6 +80,7 @@ function AnalyticsPage() {
           <TabsTrigger value="referrals">Referrals</TabsTrigger>
           <TabsTrigger value="postop">Post-op bookings</TabsTrigger>
           <TabsTrigger value="nurse-capacity">Nurse capacity</TabsTrigger>
+          <TabsTrigger value="capacity-alerts">Capacity alerts</TabsTrigger>
         </TabsList>
         <TabsContent value="referrals">
           <ReferralsAnalyticsPanel />
@@ -80,6 +90,9 @@ function AnalyticsPage() {
         </TabsContent>
         <TabsContent value="nurse-capacity">
           <NurseCapacityAnalyticsPanel />
+        </TabsContent>
+        <TabsContent value="capacity-alerts">
+          <CapacityAlertHistoryPanel />
         </TabsContent>
       </Tabs>
     </div>
