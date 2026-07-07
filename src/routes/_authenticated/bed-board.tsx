@@ -303,8 +303,14 @@ function BedBoardPage() {
           <div className="space-y-4">
             <NurseCapacityPanel
               occupancies={occupancies}
-              focusShift={search.focus_shift as "day" | "night" | undefined}
-              focusLevel={search.focus_level as 1 | 2 | 3 | undefined}
+              focusShift={
+                search.focus_shift ??
+                (search.focus_level || search.focus_invalid ? currentShiftFromClock() : undefined)
+              }
+              focusLevel={
+                search.focus_level ??
+                (search.focus_shift || search.focus_invalid ? 3 : undefined)
+              }
             />
             <OutliersPanel
               outliers={outliers}
