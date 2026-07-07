@@ -57,7 +57,7 @@ import { validateReferralOutcome, type ReferralOutcome } from "@/lib/referral-ou
 
 export const Route = createFileRoute("/_authenticated/referrals/new")({
   head: () => ({ meta: [{ title: "New referral — SDH Critical Care" }] }),
-  errorComponent: ({ error }) => <RouteErrorFallback error={error} label="New referral" />,
+  errorComponent: ({ error }) => <ReferralRouteError error={error} label="New referral" />,
   component: NewReferralPage,
 });
 
