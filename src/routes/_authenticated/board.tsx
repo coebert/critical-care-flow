@@ -8,6 +8,7 @@ import type { Referral } from "@/lib/referrals-list-utils";
 import { formatElapsed } from "@/lib/referrals-list-utils";
 import { dayOfStay } from "@/lib/bed-capacity";
 import { X, Printer, Sun, Moon } from "lucide-react";
+import { WardableBadge } from "@/components/bed-board/wardable-badge";
 
 export const Route = createFileRoute("/_authenticated/board")({
   head: () => ({
@@ -302,12 +303,7 @@ function BedsColumn({ data, now, p }: { data: BedBoardData | undefined; now: num
                           {occ.tracheostomy && <Flag p={p}>T</Flag>}
                           {occ.isolation && occ.isolation !== "none" && <Flag p={p} tone="red">ISO</Flag>}
                           {(occ as { wardable?: boolean }).wardable && (
-                            <span
-                              className="px-1 py-0.5 rounded bg-emerald-500/40 text-emerald-100 font-semibold"
-                              title="Wardable — ready for a ward bed"
-                            >
-                              WARDABLE
-                            </span>
+                            <WardableBadge className="text-[10px]" />
                           )}
                         </div>
                         {occ.predicted_discharge_at && (
