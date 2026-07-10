@@ -170,6 +170,7 @@ function BedBoardPage() {
   );
 
   const liveBedIds = useMemo(() => new Set(occupancies.map((o) => o.bed_id)), [occupancies]);
+  const liveOccupancyIds = useMemo(() => new Set(occupancies.map((o) => o.id)), [occupancies]);
 
   // Dialog state
   const [admitBed, setAdmitBed] = useState<Bed | null>(null);
@@ -351,6 +352,7 @@ function BedBoardPage() {
             <TransfersPanel
               transfers={transfers}
               authors={transferAuthors}
+              liveOccupancyIds={liveOccupancyIds}
               saving={saving}
               onCreate={(v) => wrap(() => doCreateTransfer({ data: v }), "Transfer created")}
               onAdvance={(id, next) =>
