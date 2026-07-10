@@ -285,6 +285,32 @@ function BedBoardPage() {
         </div>
       </div>
 
+      {arrivedFromSource && (
+        <div className="mb-4 flex items-center justify-between gap-3 rounded-md border border-primary/40 bg-primary/5 px-3 py-2 text-sm">
+          <div>
+            Arrived from{" "}
+            <span className="font-medium">{search.source_label ?? "referral"}</span>
+            {search.patient_initials ? (
+              <>
+                {" · "}
+                <span className="font-mono">{search.patient_initials}</span>
+              </>
+            ) : null}
+            . Admissions are now recorded in{" "}
+            <span className="font-medium">ICU Handover Hub</span>; place the
+            patient there and the bed will appear here on the next refresh.
+          </div>
+          <button
+            type="button"
+            className="text-xs text-muted-foreground hover:text-foreground underline underline-offset-2"
+            onClick={clearSource}
+          >
+            Dismiss
+          </button>
+        </div>
+      )}
+
+
       {lastOk && (
         <div
           className="flex flex-wrap items-center gap-2 mb-4"
