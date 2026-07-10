@@ -262,7 +262,10 @@ function BedsColumn({ data, now, p }: { data: BedBoardData | undefined; now: num
                     <div className="flex items-baseline justify-between">
                       <div className={`text-xs uppercase tracking-wider ${p.eyebrow}`}>{b.code}</div>
                       {occ && (
-                        <div className={`text-[10px] px-1.5 py-0.5 rounded ${p.pill}`}>
+                        <div
+                          className={`text-[10px] px-1.5 py-0.5 rounded font-semibold ${LEVEL_PILL[occ.level ?? -1] ?? p.pill}`}
+                          title={LEVEL_TITLE[occ.level ?? -1] ?? `Level ${occ.level ?? "?"}`}
+                        >
                           L{occ.level ?? "?"} · d{dayOfStay(occ.admitted_at ?? "", now)}
                         </div>
                       )}
@@ -281,7 +284,14 @@ function BedsColumn({ data, now, p }: { data: BedBoardData | undefined; now: num
                           {occ.renal_replacement && <Flag p={p} tone="blue">R</Flag>}
                           {occ.tracheostomy && <Flag p={p}>T</Flag>}
                           {occ.isolation && occ.isolation !== "none" && <Flag p={p} tone="red">ISO</Flag>}
-                          {(occ as { wardable?: boolean }).wardable && <Flag p={p}>WARDABLE</Flag>}
+                          {(occ as { wardable?: boolean }).wardable && (
+                            <span
+                              className="px-1 py-0.5 rounded bg-emerald-500/40 text-emerald-100 font-semibold"
+                              title="Wardable — ready for a ward bed"
+                            >
+                              WARDABLE
+                            </span>
+                          )}
                         </div>
                         {occ.predicted_discharge_at && (
                           <div className="mt-1 text-[10px] text-emerald-600 dark:text-emerald-300/80">
