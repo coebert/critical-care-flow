@@ -107,6 +107,15 @@ export const createTask = createServerFn({ method: "POST" })
       .select("*")
       .single();
     if (error) throw safeError("tasks", error, "Could not create task");
+    if (row.assigned_role === "admin" || row.assigned_role === "clinician") {
+      await fanOutTaskAssignment({
+        actorId: context.userId,
+        referralId: row.referral_id,
+        taskTitle: row.title,
+        assignedRole: row.assigned_role,
+        action: "created",
+      });
+    }
     return row;
   });
 
