@@ -396,6 +396,33 @@ export type Database = {
         }
         Relationships: []
       }
+      bridge_reconcile_locks: {
+        Row: {
+          from_ts: string
+          id: string
+          locked_at: string
+          locked_by: string | null
+          resource: string
+          to_ts: string
+        }
+        Insert: {
+          from_ts: string
+          id?: string
+          locked_at?: string
+          locked_by?: string | null
+          resource: string
+          to_ts: string
+        }
+        Update: {
+          from_ts?: string
+          id?: string
+          locked_at?: string
+          locked_by?: string | null
+          resource?: string
+          to_ts?: string
+        }
+        Relationships: []
+      }
       bridge_sync_attempts: {
         Row: {
           attempted_at: string

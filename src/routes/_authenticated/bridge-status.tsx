@@ -759,14 +759,28 @@ function ReconcilePanel({
       setLastWasDryRun(res.dry_run);
       const pulled = res.results.reduce((n, r) => n + r.pulled, 0);
       const pushed = res.results.reduce((n, r) => n + r.pushed, 0);
-      const errors = res.results.filter((r) => r.error).length;
+      const errors = res.results.filter((r) => r.error && !r.locked).length;
+      const lockedCount = res.results.filter((r) => r.locked).length;
       const prefix = res.dry_run ? "Dry-run: would" : "Reconciled";
       const msg = `${prefix} ${pulled} pulled / ${pushed} pushed across ${res.results.length} bed tables`;
-      if (errors === 0) toast.success(msg);
-      else toast.warning(`${msg} (${errors} with errors)`);
+      if (lockedCount === res.results.length) {
+        toast.warning("Reconcile already running", {
+          description:
+            "Another admin is backfilling this exact window. Try again once it completes.",
+        });
+      } else if (lockedCount > 0) {
+        toast.warning(
+          `${msg} — ${lockedCount} table(s) skipped (already running)`,
+        );
+      } else if (errors === 0) {
+        toast.success(msg);
+      } else {
+        toast.warning(`${msg} (${errors} with errors)`);
+      }
       // Dry-runs don't change anything, so no need to refresh sibling panels.
       if (!res.dry_run) onDone();
     },
+
     onError: (err: unknown) => {
       toast.error("Reconciliation failed", {
         description: (err as Error).message,
@@ -893,7 +907,21 @@ function ReconcilePanel({
                   no writes
                 </Badge>
               )}
+              {lastResults.some((r) => r.locked) && (
+                <Badge variant="destructive" className="text-[10px]">
+                  {lastResults.filter((r) => r.locked).length} locked
+                </Badge>
+              )}
             </div>
+            {lastResults.some((r) => r.locked) && (
+              <div className="mb-3 rounded-md border border-destructive/40 bg-destructive/5 px-3 py-2 text-xs text-destructive">
+                Another reconciliation is already running for this window on
+                the locked table(s). Wait for it to finish, pick a different
+                window, or retry after ~10&nbsp;minutes if you believe the
+                previous run crashed.
+              </div>
+            )}
+
             <Table>
               <TableHeader>
                 <TableRow>
@@ -924,7 +952,17 @@ function ReconcilePanel({
                       {r.skipped}
                     </TableCell>
                     <TableCell className="align-top">
-                      {r.error ? (
+                      {r.locked ? (
+                        <div className="flex flex-col gap-1">
+                          <Badge variant="outline" className="w-fit">
+                            Locked
+                          </Badge>
+                          <span className="text-[11px] text-muted-foreground">
+                            Held since{" "}
+                            {r.locked_since ? relative(r.locked_since) : "—"}
+                          </span>
+                        </div>
+                      ) : r.error ? (
                         <span
                           className="text-xs text-destructive truncate block max-w-[32ch]"
                           title={r.error}
@@ -934,6 +972,7 @@ function ReconcilePanel({
                       ) : (
                         <Badge variant="secondary">OK</Badge>
                       )}
+
                       {lastWasDryRun &&
                         ((r.pulled_ids?.length ?? 0) > 0 ||
                           (r.pushed_ids?.length ?? 0) > 0) && (
