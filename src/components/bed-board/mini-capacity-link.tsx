@@ -53,8 +53,8 @@ export function MiniCapacityLink() {
     >
       <BedIcon className="w-4 h-4 text-muted-foreground" aria-hidden="true" />
       <span className="font-medium">Capacity</span>
-      <span className={chip(icu.free, icu.total)}>ICU {icu.free}/{icu.total}</span>
-      <span className={chip(hdu.free, hdu.total)}>HDU {hdu.free}/{hdu.total}</span>
+      <span className={chip(icu.free, icu.total)}>Radnor {icu.free}/{icu.total}</span>
+      {hdu.total > 0 && <span className={chip(hdu.free, hdu.total)}>HDU {hdu.free}/{hdu.total}</span>}
       {outliers_count > 0 && (
         <span className="text-xs text-muted-foreground">· {outliers_count} outlier{outliers_count === 1 ? "" : "s"}</span>
       )}
