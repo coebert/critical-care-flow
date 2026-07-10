@@ -340,6 +340,7 @@ export function Noteboard({ referralId: id }: NoteboardProps) {
           directory={directoryWithSelf}
           currentUserId={user?.id}
           isAdmin={isAdmin}
+          isViewer={isViewer}
           totalNotes={notes.length}
           onSave={async (n, body, recipients) => {
             if (n.body_ciphertext) {
