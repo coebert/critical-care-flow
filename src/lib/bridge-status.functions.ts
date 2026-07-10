@@ -109,11 +109,7 @@ export const getBridgeStatus = createServerFn({ method: "GET" })
 export const runBridgeSyncNow = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .handler(async ({ context }) => {
-    const { data: isAdmin } = await context.supabase.rpc("has_role", {
-      _user_id: context.userId,
-      _role: "admin",
-    });
-    if (!isAdmin) throw new Error("admin_required");
+    await assertAdmin(context);
 
     const url = `${process.env.SUPABASE_URL?.replace(
       /\.supabase\.co$/,
