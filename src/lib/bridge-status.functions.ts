@@ -33,14 +33,9 @@ const RESOURCES: { key: string; table: string }[] = [
 export const getBridgeStatus = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
   .handler(async ({ context }): Promise<BridgeStatusSummary> => {
-    // Admin-only. Non-admins get an explicit error the route surfaces.
-    const { data: isAdmin } = await context.supabase.rpc("has_role", {
-      _user_id: context.userId,
-      _role: "admin",
-    });
-    if (!isAdmin) {
-      throw new Error("admin_required");
-    }
+    // Server-side admin gate: blocks non-admins even if the route is hit
+    // directly, and the RPC/URL is invoked by anyone with a valid session.
+    await assertAdmin(context);
 
     const { supabaseAdmin } = await import(
       "@/integrations/supabase/client.server"
