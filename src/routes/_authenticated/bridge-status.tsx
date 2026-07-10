@@ -19,6 +19,7 @@ import { AlertCircle, CheckCircle2, RefreshCcw, Beaker } from "lucide-react";
 import {
   getBridgeStatus,
   runBridgeSyncNow,
+  runBridgeSyncBedsOnly,
   sendBridgeTestPayload,
   getBridgeSyncAttempts,
   getBedBoardVerification,
