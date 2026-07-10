@@ -1,4 +1,4 @@
-import { useState, type ReactNode } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -305,15 +305,16 @@ export function EditOccupancyDialog({
   saving?: boolean;
   extraActions?: ReactNode;
 }) {
-  const [value, setValue] = useState<OccupancyFormValue>(emptyValue());
+  const [value, setValue] = useState<OccupancyFormValue>(() =>
+    occupancy ? fromOcc(occupancy) : emptyValue(),
+  );
+  // Keep the form synced whenever the dialog opens or the occupancy changes;
+  // Radix does not fire onOpenChange when `open` is flipped by the parent.
+  useEffect(() => {
+    if (open && occupancy) setValue(fromOcc(occupancy));
+  }, [open, occupancy]);
   return (
-    <Dialog
-      open={open}
-      onOpenChange={(v) => {
-        onOpenChange(v);
-        if (v && occupancy) setValue(fromOcc(occupancy));
-      }}
-    >
+    <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>{bedCode} — {occupancy?.patient_initials || "Patient"}</DialogTitle>
