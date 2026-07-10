@@ -1,66 +1,59 @@
-# Background bed reconciliation with realtime progress
+## Goal
 
-Current reconcile runs inline in the admin's request — for a wide window it blocks the UI and can hit the Worker request timeout. This moves the work to a queued job that a cron/hook-triggered worker processes, and streams per-table progress to the panel via Realtime.
+Populate the bed board's occupancy cells directly from the partner ICU Handover Hub's `/api/public/bridge/beds` payload, instead of pulling per-table `bed_occupancies` (which the partner doesn't expose).
 
-## What you'll see change
+## What the partner actually returns
 
-- Reconcile panel no longer waits for the whole run. Clicking "Run reconcile" (or "Dry-run") enqueues a job and immediately shows a live progress card with:
-  - Overall job status (queued → running → complete / failed / cancelled)
-  - Per-table row (status, pulled / pushed / skipped counts updating live, error, "locked" if the window is held)
-  - Cancel button (queued or running)
-- Last 5 jobs history table under the panel.
-- Large windows behave the same as small — nothing to hang the page.
+`GET https://icu-compass-care.lovable.app/api/public/bridge/beds` returns:
 
-## New database objects
+```text
+{
+  unit, side_rooms: [labels],
+  bed_board: [{ bed, is_side_room, occupied, occupant: {
+    id, full_name, hospital_number, age, status, bed,
+    admission_date, tep_in_place, dnacpr_decision,
+    outstanding_tasks, updated_at
+  } | null }],
+  unassigned: [occupants],
+  stats: { total_beds, occupied, available, unassigned }
+}
+```
 
-- Enum `bridge_reconcile_job_status`: `queued | running | complete | failed | cancelled`
-- Enum `bridge_reconcile_item_status`: `pending | running | complete | error | locked | skipped`
-- Table `bridge_reconcile_jobs`: window, dry_run flag, status, requested_by, timestamps, error
-- Table `bridge_reconcile_job_items`: per-resource row (job_id, resource, status, pulled, pushed, skipped, pulled_ids/pushed_ids jsonb, error, locked_since, started/finished_at, updated_at) — unique (job_id, resource)
-- Both tables: `GRANT SELECT` to authenticated + admin-only RLS SELECT, `GRANT ALL` to service_role, added to `supabase_realtime` publication with `REPLICA IDENTITY FULL` so UPDATEs stream.
-- `AFTER INSERT` trigger on `bridge_reconcile_jobs` posts to the worker hook via `net.http_post` so a fresh job starts within a second (no need to wait for cron).
+There is **no** clinical acuity (level, ventilated, HFNO, vasopressors, isolation, side-room requirement, predicted step-down/discharge). There are no outliers and no transfers.
 
-## New worker route
+## Approach
 
-`src/routes/api/public/hooks/bridge-reconcile-worker.ts` (POST, `apikey` header verified against `SUPABASE_PUBLISHABLE_KEY`):
+1. **New server function `getPartnerBedBoard`** (`src/lib/beds.functions.ts`):
+   - Calls the partner endpoint server-side with the existing HMAC scheme (`HANDOVER_API_SECRET`, `x-timestamp`, `x-actor`, `x-signature`), acting as a `system` actor.
+   - Returns the parsed payload plus a `fetchedAt` timestamp.
+   - Falls back to `{ error }` on partner failure so the UI can surface it.
 
-1. Recover stale runs: any job in `running` with `started_at` older than 10 min → set back to `queued`.
-2. Claim one job with `UPDATE ... WHERE status='queued' ORDER BY created_at LIMIT 1 RETURNING *` — atomic pick.
-3. For each item (pending, alphabetical FK-safe order):
-   - Re-check job status; bail if `cancelled`.
-   - Mark item `running`, stamp `started_at`.
-   - Reuse existing `bridge_reconcile_locks` acquire/release (skipped for dry-run).
-   - Run pull+upsert / push (or ID-only for dry-run) using the shared `sync.pullResource` / `sync.pushOne` helpers, updating `pulled`/`pushed`/`skipped` and `updated_at` on the item after every partner call (Realtime pushes each update to the UI).
-   - On finish: item `complete` / `error` / `locked`; audit log written for real runs.
-4. Job `complete` (or `failed` if unhandled error) with `finished_at`. Also fires audit inserts as today.
+2. **Adapter** turning the payload into the shape existing components already accept, so we don't rewrite `BedGrid`/`CapacityStrip`:
+   - Map each partner `bed_board[i]` into a synthesized `Bed` (id = `partner:${label}`, code = label, is_side_room, unit inferred, active true, sort_order = index) and a synthesized `Occupancy` when occupied (id = occupant.id, bed_id matches, patient_initials from initials of `full_name`, hospital_number, admitted_at = admission_date, level = null, all acuity fields null/false).
+   - `outliers` and `transfers` become empty arrays (partner doesn't expose them).
 
-## New server functions
+3. **Rewire `src/routes/_authenticated/bed-board.tsx`**:
+   - Swap `useServerFn(getBedBoard)` → `useServerFn(getPartnerBedBoard)`.
+   - Pass adapted data into `BedGrid` unchanged.
+   - Hide the local-write UI paths that can't round-trip to partner: Admit / Edit / Discharge / Move dialogs, Outliers panel, Transfers panel, Nurse Capacity panel (all depend on acuity or on writing to local tables the partner doesn't own). Replace with a read-only occupant popover on click showing `full_name`, `hospital_number`, `age`, `admission_date`, `tep_in_place`, `dnacpr_decision`, `outstanding_tasks`, `updated_at`.
+   - Drop the Realtime subscription (partner tables aren't in our DB); keep the 20s polling refetch and refetch-on-focus.
+   - Show `unassigned` occupants in a small list under the grid.
+   - Replace `CapacityStrip` with a simplified strip driven by partner `stats` (total/occupied/available/unassigned), since we can't compute acuity-based capacity.
 
-- `enqueueBedReconciliation({ from, to, dryRun })` — admin only. Validates window (same rules as current, 30-day cap). Inserts job + one item per bed resource (`pending`). Returns `{ jobId }`. Trigger kicks the worker.
-- `cancelBedReconciliationJob({ jobId })` — admin only. Updates job to `cancelled` if still `queued`/`running`; the worker checks between items.
-- `listBedReconciliationJobs({ limit = 5 })` — admin only, returns recent jobs + aggregated item counts.
-- `getBedReconciliationJob({ jobId })` — admin only, returns job + items (initial paint before Realtime kicks in).
+4. **Capacity callouts elsewhere** (`getCapacitySnapshot`, `admission-capacity-callout`, `capacity-badge`) keep reading local tables for now — out of scope. A short note in the file header explains they'll return zeroed capacity until the partner exposes acuity data.
 
-The old synchronous `runBedReconciliation` is retired.
+5. **Leave writes and sync alone**: `admitToBed`, `updateOccupancy`, etc. remain exported (still used by referrals/postop flows) but the bed board no longer surfaces them. The pg_cron bridge sync for `bed_occupancies` / `bed_outliers` / `bed_transfers_out` stays; when the partner adds those endpoints later, that sync populates local tables and we can revert the UI.
 
-## pg_cron
+## Technical details
 
-Every minute the worker hook is polled as a backstop (in case the trigger's `net.http_post` fails or a job was requeued by the stale-run recovery). `apikey` header uses the anon key per the stack convention.
+- Partner fetch uses `node:crypto` `createHmac` with `HANDOVER_API_SECRET` (already configured). Timestamp is unix seconds, actor JSON is `{"id":"bridge-consumer","role":"system"}`, body is `""` for GET.
+- `PARTNER_BRIDGE_URL` is already configured — use it as the base URL and append `/beds`.
+- Response cached for 5s in the server fn to avoid hammering the partner from concurrent tabs.
+- Add `Cache-Control: no-store` to the fetch to bypass any CDN caching.
+- Synthesized bed IDs are strings prefixed `partner:` so downstream code that expects UUIDs doesn't accidentally query the local DB with them (BedGrid only uses id/code for keys).
+- Types: introduce a `PartnerBedBoard` type in `src/lib/beds.functions.ts` and adapt inside the component via a small `useMemo`.
 
-## UI changes (`bridge-status.tsx` — `ReconcilePanel`)
+## Out of scope
 
-- Buttons call `enqueueBedReconciliation` and immediately switch to "Active job" view.
-- `useQuery` seeds job + items; `supabase.channel(...)` subscribes to `postgres_changes` on both tables filtered by `job_id`, invalidating/patching local state on every event; teardown on unmount.
-- Progress table shows per-resource counts live, with a small spinner on `running`, "Locked" badge if held, error text, and completion timestamp.
-- "Cancel" wires to `cancelBedReconciliationJob`. Panel refreshes verification/status/audit-log siblings via `onDone` when job reaches a terminal state.
-- Job history section below shows last 5 runs (window, dry-run flag, totals, duration, status).
-
-## Files touched
-
-- New migration
-- `src/routes/api/public/hooks/bridge-reconcile-worker.ts` (new)
-- `src/lib/bridge-status.functions.ts` (server fns replaced/added)
-- `src/routes/_authenticated/bridge-status.tsx` (ReconcilePanel rewrite, add history)
-- `src/routeTree.gen.ts` (auto)
-- `src/integrations/supabase/types.ts` (auto-regenerated by migration)
-- `supabase--insert` for the pg_cron backstop schedule
+- Restoring acuity, outliers, transfers, nurse-capacity, and admit/discharge flows on the bed board. These need the partner to expose the missing tables (see `docs/partner-bridge-handoff.md`), then a revert of the read-only mode.
+- Changing how referrals and postop-bookings surface admission capacity. Those keep the local-DB path.

@@ -1,229 +1,221 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import { useServerFn } from "@tanstack/react-start";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { toast } from "sonner";
 import {
-  getBedBoard,
-  admitToBed,
-  updateOccupancy,
-  dischargeOccupancy,
-  moveOccupancy,
-  createOutlier,
-  endOutlier,
-  createTransferOut,
-  updateTransferOut,
-  cancelTransferOut,
-} from "@/lib/beds.functions";
-import { supabase } from "@/integrations/supabase/client";
-import type { Database } from "@/integrations/supabase/types";
-import { computeCapacity } from "@/lib/bed-capacity";
-import { CapacityStrip } from "@/components/bed-board/capacity-strip";
-import { BedGrid } from "@/components/bed-board/bed-grid";
-import { AdmitDialog, EditOccupancyDialog, MoveDialog, type OccupancyFormValue } from "@/components/bed-board/dialogs";
-import { OutliersPanel, TransfersPanel } from "@/components/bed-board/side-panels";
-import { NurseCapacityPanel } from "@/components/bed-board/nurse-capacity-panel";
-import { RealtimeHealthBadge } from "@/components/bed-board/realtime-health-badge";
+  Activity,
+  AlertTriangle,
+  Bed as BedIcon,
+  RefreshCcw,
+  ShieldCheck,
+  UserRound,
+} from "lucide-react";
+import { formatDistanceToNowStrict } from "date-fns";
+import {
+  getPartnerBedBoard,
+  type PartnerBedSlot,
+  type PartnerOccupant,
+} from "@/lib/partner-bed-board.functions";
+import { Card } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 
-type Bed = Database["public"]["Tables"]["beds"]["Row"];
-type Occ = Database["public"]["Tables"]["bed_occupancies"]["Row"];
-type Transfer = Database["public"]["Tables"]["bed_transfers_out"]["Row"];
-
-const QK = ["bed-board"] as const;
+const QK = ["partner-bed-board"] as const;
 
 export const Route = createFileRoute("/_authenticated/bed-board")({
   head: () => ({
     meta: [
       { title: "Bed board — SDH Critical Care" },
-      { name: "description", content: "Live ICU/HDU bed board and capacity snapshot." },
+      {
+        name: "description",
+        content:
+          "Live ICU/HDU bed board sourced from the ICU Handover Hub.",
+      },
     ],
   }),
+  // Preserved for backwards compatibility with callers that still deep-link
+  // referral/postop context or nurse-capacity alerts. This page no longer
+  // owns the admit flow (writes go through ICU Handover Hub), so we display
+  // a lightweight breadcrumb banner instead of a prefilled dialog.
   validateSearch: (s: Record<string, unknown>) => {
-    // Defensive normalizers: query strings can arrive as arrays (?a=1&a=2),
-    // encoded whitespace ("%20day%20"), mixed case ("Night"), leading zeros
-    // ("03"), decimals ("3.0"), or outright junk ("💥"). Strip everything
-    // down to a trimmed lowercase scalar before matching.
-    const toScalarString = (v: unknown): string | undefined => {
-      if (Array.isArray(v)) return toScalarString(v[0]);
-      if (v == null) return undefined;
-      if (typeof v === "string") {
-        const t = v.trim();
-        return t.length ? t : undefined;
-      }
-      if (typeof v === "number" && Number.isFinite(v)) return String(v);
-      if (typeof v === "boolean") return String(v);
-      return undefined;
-    };
+    const str = (v: unknown): string | undefined =>
+      typeof v === "string" && v.trim().length ? v.trim() : undefined;
     const parseShift = (v: unknown): "day" | "night" | undefined => {
-      const s = toScalarString(v)?.toLowerCase();
-      return s === "day" || s === "night" ? s : undefined;
+      const t = str(v)?.toLowerCase();
+      return t === "day" || t === "night" ? t : undefined;
     };
     const parseLevel = (v: unknown): 1 | 2 | 3 | undefined => {
-      const s = toScalarString(v);
-      if (!s) return undefined;
-      // Accept "1", "2", "3", "01", "3.0"; reject "1.5", "12", NaN, "L3", etc.
-      const n = Number(s);
-      if (!Number.isFinite(n)) return undefined;
-      const rounded = Math.trunc(n);
-      if (rounded !== n) return undefined;
-      return rounded === 1 || rounded === 2 || rounded === 3 ? (rounded as 1 | 2 | 3) : undefined;
+      const t = str(v);
+      if (!t) return undefined;
+      const n = Number(t);
+      if (!Number.isFinite(n) || Math.trunc(n) !== n) return undefined;
+      return n === 1 || n === 2 || n === 3 ? (n as 1 | 2 | 3) : undefined;
     };
-    const optString = (v: unknown): string | undefined => {
-      const s = toScalarString(v);
-      return s;
-    };
-    const optIntLevel = (v: unknown): number | undefined => {
-      const n = parseLevel(v);
-      return n;
-    };
-
-    const rawShift = s.focus_shift;
-    const rawLevel = s.focus_level;
-    const shift = parseShift(rawShift);
-    const level = parseLevel(rawLevel);
-    // Flag when a caller supplied a focus param but it was unusable, or when
-    // they only supplied one half of the shift+level pair. Either case
-    // triggers the graceful fallback banner in the component.
-    const shiftProvided = toScalarString(rawShift) !== undefined;
-    const levelProvided = toScalarString(rawLevel) !== undefined;
-    const focus_invalid =
-      (shiftProvided && !shift) ||
-      (levelProvided && !level) ||
-      (shiftProvided && !levelProvided) ||
-      (levelProvided && !shiftProvided);
     return {
-      source_referral_id: optString(s.source_referral_id),
-      source_postop_booking_id: optString(s.source_postop_booking_id),
-      hospital_number: optString(s.hospital_number),
-      patient_initials: optString(s.patient_initials),
-      admitting_consultant: optString(s.admitting_consultant),
-      level: optIntLevel(s.level),
-      source_label: optString(s.source_label),
-      focus_shift: shift,
-      focus_level: level,
-      focus_invalid: focus_invalid || undefined,
+      source_referral_id: str(s.source_referral_id),
+      source_postop_booking_id: str(s.source_postop_booking_id),
+      hospital_number: str(s.hospital_number),
+      patient_initials: str(s.patient_initials),
+      admitting_consultant: str(s.admitting_consultant),
+      level: parseLevel(s.level),
+      source_label: str(s.source_label),
+      focus_shift: parseShift(s.focus_shift),
+      focus_level: parseLevel(s.focus_level),
     };
   },
   component: BedBoardPage,
 });
 
-// Local ICU convention: day shift 08:00-19:59, night shift otherwise.
-function currentShiftFromClock(now = new Date()): "day" | "night" {
-  const h = now.getHours();
-  return h >= 8 && h < 20 ? "day" : "night";
+function formatUpdated(iso: string | null | undefined): string {
+  if (!iso) return "—";
+  const d = new Date(iso);
+  if (!isFinite(d.getTime())) return "—";
+  return formatDistanceToNowStrict(d, { addSuffix: true });
 }
 
+function dayOfStay(iso: string | null | undefined): number | null {
+  if (!iso) return null;
+  const t = Date.parse(iso);
+  if (!isFinite(t)) return null;
+  return Math.max(1, Math.floor((Date.now() - t) / 86_400_000) + 1);
+}
 
-function toIsoOrNull(v: string | null): string | null {
-  if (!v) return null;
-  const d = new Date(v);
-  return isFinite(d.getTime()) ? d.toISOString() : null;
+function BedCard({
+  slot,
+  onOccupiedClick,
+}: {
+  slot: PartnerBedSlot;
+  onOccupiedClick: (o: PartnerOccupant) => void;
+}) {
+  const occ = slot.occupant;
+  if (!slot.occupied || !occ) {
+    return (
+      <Card
+        className="p-3 flex flex-col justify-between min-h-24 border-dashed bg-muted/20"
+        aria-label={`Empty bed ${slot.bed}`}
+      >
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-1.5 text-sm font-semibold text-muted-foreground">
+            <BedIcon className="w-4 h-4" aria-hidden="true" />
+            {slot.bed}
+          </div>
+          {slot.is_side_room && (
+            <Badge variant="outline" className="text-[10px]">
+              Side room
+            </Badge>
+          )}
+        </div>
+        <div className="text-center text-xs text-muted-foreground">Empty</div>
+      </Card>
+    );
+  }
+  const day = dayOfStay(occ.admission_date);
+  return (
+    <Card
+      className="p-3 min-h-24 hover:bg-accent/40 cursor-pointer transition"
+      onClick={() => onOccupiedClick(occ)}
+      role="button"
+      tabIndex={0}
+      aria-label={`Bed ${slot.bed} — ${occ.full_name ?? "occupied"}`}
+      onKeyDown={(e) =>
+        (e.key === "Enter" || e.key === " ") && onOccupiedClick(occ)
+      }
+    >
+      <div className="flex items-center justify-between gap-2">
+        <div className="flex items-center gap-1.5 text-sm font-semibold">
+          <BedIcon className="w-4 h-4" aria-hidden="true" />
+          {slot.bed}
+        </div>
+        <div className="flex items-center gap-1">
+          {slot.is_side_room && (
+            <Badge variant="outline" className="text-[10px]">
+              Side room
+            </Badge>
+          )}
+          {occ.tep_in_place && (
+            <Badge
+              variant="outline"
+              className="text-[10px] gap-1"
+              title="Treatment Escalation Plan in place"
+            >
+              <ShieldCheck className="w-3 h-3" aria-hidden="true" />
+              TEP
+            </Badge>
+          )}
+        </div>
+      </div>
+      <div className="mt-1 text-sm truncate font-medium">
+        {occ.full_name || "—"}
+      </div>
+      <div className="text-xs text-muted-foreground truncate">
+        {occ.hospital_number ? `${occ.hospital_number}` : "—"}
+        {occ.age != null ? ` · ${occ.age}y` : ""}
+        {day != null ? ` · Day ${day}` : ""}
+      </div>
+      {occ.dnacpr_decision && (
+        <div className="mt-1 text-[11px] text-amber-700 dark:text-amber-400 truncate">
+          DNACPR: {occ.dnacpr_decision}
+        </div>
+      )}
+    </Card>
+  );
+}
+
+function StatBlock({
+  label,
+  value,
+  tone,
+}: {
+  label: string;
+  value: number;
+  tone?: "ok" | "warn" | "bad" | "muted";
+}) {
+  const toneClass =
+    tone === "bad"
+      ? "bg-destructive/10 text-destructive border-destructive/30"
+      : tone === "warn"
+        ? "bg-amber-500/10 text-amber-700 dark:text-amber-400 border-amber-500/30"
+        : tone === "ok"
+          ? "bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border-emerald-500/30"
+          : "bg-muted text-muted-foreground";
+  return (
+    <div
+      className={`flex items-center gap-2 rounded-md border px-3 py-1.5 ${toneClass}`}
+    >
+      <div className="text-sm font-semibold">{label}</div>
+      <div className="text-sm tabular-nums">{value}</div>
+    </div>
+  );
 }
 
 function BedBoardPage() {
   const search = Route.useSearch();
   const navigate = Route.useNavigate();
-  const fetchBoard = useServerFn(getBedBoard);
+  const fetchBoard = useServerFn(getPartnerBedBoard);
   const qc = useQueryClient();
-  const { data, isLoading, error } = useQuery({
+  const { data, isLoading, isFetching, error, refetch } = useQuery({
     queryKey: QK,
     queryFn: () => fetchBoard(),
     staleTime: 5_000,
-    // Safety net: ICU Handover data arrives via the pull-based bridge sync
-    // (pg_cron ~every 2 min), so Realtime on beds/bed_occupancies only fires
-    // once the sync worker has written. Poll and refetch on focus so the
-    // board catches up even if a Realtime event is missed.
+    // Partner data is a live snapshot pulled on demand; poll and refetch on
+    // focus to stay close to real time without hammering the partner.
     refetchInterval: 20_000,
     refetchIntervalInBackground: false,
     refetchOnWindowFocus: true,
   });
 
+  const [selected, setSelected] = useState<PartnerOccupant | null>(null);
 
-  useEffect(() => {
-    const ch = supabase
-      .channel("bed-board")
-      .on("postgres_changes", { event: "*", schema: "public", table: "bed_occupancies" }, () =>
-        qc.invalidateQueries({ queryKey: QK }),
-      )
-      .on("postgres_changes", { event: "*", schema: "public", table: "bed_outliers" }, () =>
-        qc.invalidateQueries({ queryKey: QK }),
-      )
-      .on("postgres_changes", { event: "*", schema: "public", table: "bed_transfers_out" }, () =>
-        qc.invalidateQueries({ queryKey: QK }),
-      )
-      .on("postgres_changes", { event: "*", schema: "public", table: "beds" }, () =>
-        qc.invalidateQueries({ queryKey: QK }),
-      )
-      .subscribe();
-    return () => {
-      supabase.removeChannel(ch);
-    };
-  }, [qc]);
-
-  const beds = data?.beds ?? [];
-  const occupancies = data?.occupancies ?? [];
-  const outliers = data?.outliers ?? [];
-  const transfers = data?.transfers ?? [];
-  const transferAuthors = data?.transferAuthors ?? {};
-
-  const snapshot = useMemo(
-    () =>
-      computeCapacity({
-        beds,
-        occupancies,
-        outliers_count: outliers.length,
-        open_transfers_count: transfers.length,
-      }),
-    [beds, occupancies, outliers.length, transfers.length],
-  );
-
-  const liveBedIds = useMemo(() => new Set(occupancies.map((o) => o.bed_id)), [occupancies]);
-  const liveOccupancyIds = useMemo(() => new Set(occupancies.map((o) => o.id)), [occupancies]);
-
-  // Dialog state
-  const [admitBed, setAdmitBed] = useState<Bed | null>(null);
-  const [editOcc, setEditOcc] = useState<Occ | null>(null);
-  const [moveOcc, setMoveOcc] = useState<Occ | null>(null);
-  const [saving, setSaving] = useState(false);
-
-  const editBedCode =
-    editOcc ? beds.find((b) => b.id === editOcc.bed_id)?.code ?? "" : "";
-
-  // Server fn hooks
-  const doAdmit = useServerFn(admitToBed);
-  const doUpdate = useServerFn(updateOccupancy);
-  const doDischarge = useServerFn(dischargeOccupancy);
-  const doMove = useServerFn(moveOccupancy);
-  const doCreateOutlier = useServerFn(createOutlier);
-  const doEndOutlier = useServerFn(endOutlier);
-  const doCreateTransfer = useServerFn(createTransferOut);
-  const doUpdateTransfer = useServerFn(updateTransferOut);
-  const doCancelTransfer = useServerFn(cancelTransferOut);
-
-  const refresh = () => qc.invalidateQueries({ queryKey: QK });
-
-  const wrap = async <T,>(op: () => Promise<T>, ok: string) => {
-    setSaving(true);
-    try {
-      await op();
-      toast.success(ok);
-      refresh();
-    } catch (e) {
-      toast.error(e instanceof Error ? e.message : "Something went wrong");
-    } finally {
-      setSaving(false);
-    }
-  };
-
-  const admitPrefill = search.source_referral_id || search.source_postop_booking_id
-    ? {
-        hospital_number: search.hospital_number ?? null,
-        patient_initials: search.patient_initials ?? null,
-        admitting_consultant: search.admitting_consultant ?? null,
-        level: (search.level === 1 || search.level === 2 || search.level === 3 ? search.level : 3) as 1 | 2 | 3,
-      }
-    : undefined;
-  const clearAdmitSource = () =>
+  const arrivedFromSource =
+    search.source_referral_id || search.source_postop_booking_id;
+  const clearSource = () =>
     navigate({
       search: {
         source_referral_id: undefined,
@@ -233,250 +225,288 @@ function BedBoardPage() {
         admitting_consultant: undefined,
         level: undefined,
         source_label: undefined,
+        focus_shift: search.focus_shift,
+        focus_level: search.focus_level,
       },
       replace: true,
     });
 
+  // If we get an ok:false response, surface it as an error banner but keep the
+  // prior successful payload rendered so the board doesn't blank out on a
+  // transient partner blip.
+  const lastOk = data && data.ok ? data : null;
+  const partnerError = data && !data.ok ? data.error : null;
+
+  useEffect(() => {
+    // No local Realtime subscription: the partner data is fetched over HTTP,
+    // and their DB is not in our Supabase project. The polling above is the
+    // only refresh mechanism.
+    return () => {
+      qc.cancelQueries({ queryKey: QK });
+    };
+  }, [qc]);
+
   return (
     <div className="p-4 sm:p-6 max-w-7xl mx-auto">
-      <div className="mb-6 flex items-start justify-between gap-4 flex-wrap">
+      <div className="mb-4 flex items-start justify-between gap-4 flex-wrap">
         <div>
           <h1 className="text-2xl font-semibold tracking-tight">Bed board</h1>
-          <p className="text-sm text-muted-foreground">Live occupancy, outliers and transfers.</p>
+          <p className="text-sm text-muted-foreground">
+            Live snapshot from ICU Handover Hub
+            {lastOk ? (
+              <>
+                {" "}
+                · updated {formatUpdated(lastOk.fetched_at)}
+              </>
+            ) : null}
+            .
+          </p>
         </div>
         <div className="flex items-center gap-2 text-sm">
-          <RealtimeHealthBadge />
-          <Link to="/board" className="rounded-md border px-3 py-1.5 hover:bg-accent">TV / whiteboard mode</Link>
-          <Link to="/board/ward-round" className="rounded-md border px-3 py-1.5 hover:bg-accent">Ward round list</Link>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => refetch()}
+            disabled={isFetching}
+            className="gap-1"
+          >
+            <RefreshCcw
+              className={`w-4 h-4 ${isFetching ? "animate-spin" : ""}`}
+              aria-hidden="true"
+            />
+            Refresh
+          </Button>
+          <Link
+            to="/board"
+            className="rounded-md border px-3 py-1.5 hover:bg-accent"
+          >
+            TV / whiteboard mode
+          </Link>
         </div>
       </div>
 
-      <CapacityStrip snapshot={snapshot} />
-
-      {admitPrefill && (
-        <div className="mb-4 flex items-center justify-between gap-3 rounded-md border bg-primary/5 px-3 py-2 text-sm">
+      {arrivedFromSource && (
+        <div className="mb-4 flex items-center justify-between gap-3 rounded-md border border-primary/40 bg-primary/5 px-3 py-2 text-sm">
           <div>
-            Admitting from <span className="font-medium">{search.source_label ?? "referral"}</span>
-            {search.patient_initials ? <> · <span className="font-mono">{search.patient_initials}</span></> : null}
-            . Click an empty bed to place the patient.
+            Arrived from{" "}
+            <span className="font-medium">{search.source_label ?? "referral"}</span>
+            {search.patient_initials ? (
+              <>
+                {" · "}
+                <span className="font-mono">{search.patient_initials}</span>
+              </>
+            ) : null}
+            . Admissions are now recorded in{" "}
+            <span className="font-medium">ICU Handover Hub</span>; place the
+            patient there and the bed will appear here on the next refresh.
           </div>
           <button
             type="button"
             className="text-xs text-muted-foreground hover:text-foreground underline underline-offset-2"
-            onClick={clearAdmitSource}
+            onClick={clearSource}
           >
-            Cancel
+            Dismiss
           </button>
         </div>
       )}
 
-      {(() => {
-        // Graceful fallback: derive effective focus values from whatever was
-        // provided. Missing shift falls back to the shift active on the clock
-        // now; missing level falls back to Level 3 (most acute). If nothing
-        // usable was supplied and nothing was requested, render no banner.
-        const anyRequested = search.focus_shift || search.focus_level || search.focus_invalid;
-        if (!anyRequested) return null;
-        const effectiveShift: "day" | "night" =
-          search.focus_shift ?? currentShiftFromClock();
-        const effectiveLevel: 1 | 2 | 3 = search.focus_level ?? 3;
-        return (
-          <div className="mb-4 flex items-center justify-between gap-3 rounded-md border border-primary/40 bg-primary/5 px-3 py-2 text-sm">
-            <div>
-              Reviewing{" "}
-              <span className="font-medium">
-                {effectiveShift === "night" ? "Night" : "Day"} shift
-              </span>
-              {" · "}
-              <span className="font-medium">
-                Level {effectiveLevel}
-                {effectiveLevel === 1 ? "/0" : ""}
-              </span>{" "}
-              admission capacity.
-              {search.focus_invalid && (
-                <span className="ml-2 text-xs text-muted-foreground">
-                  Deep link was incomplete or invalid — showing{" "}
-                  {!search.focus_shift ? "current shift" : "Level 3"} by default.
-                </span>
-              )}
-            </div>
-            <button
-              type="button"
-              className="text-xs text-muted-foreground hover:text-foreground underline underline-offset-2"
-              onClick={() =>
-                navigate({
-                  search: {
-                    ...search,
-                    focus_shift: undefined,
-                    focus_level: undefined,
-                    focus_invalid: undefined,
-                  },
-                  replace: true,
-                })
-              }
-            >
-              Clear
-            </button>
+
+      {lastOk && (
+        <div
+          className="flex flex-wrap items-center gap-2 mb-4"
+          role="status"
+          aria-label="Unit capacity"
+        >
+          <StatBlock label={lastOk.unit} value={lastOk.stats.total_beds} tone="muted" />
+          <StatBlock
+            label="Occupied"
+            value={lastOk.stats.occupied}
+            tone={
+              lastOk.stats.available === 0
+                ? "bad"
+                : lastOk.stats.available <= 1
+                  ? "warn"
+                  : "ok"
+            }
+          />
+          <StatBlock
+            label="Free"
+            value={lastOk.stats.available}
+            tone={
+              lastOk.stats.available === 0
+                ? "bad"
+                : lastOk.stats.available <= 1
+                  ? "warn"
+                  : "ok"
+            }
+          />
+          {lastOk.stats.unassigned > 0 && (
+            <Badge variant="outline" className="gap-1">
+              <AlertTriangle className="w-3.5 h-3.5" aria-hidden="true" />
+              {lastOk.stats.unassigned} unassigned
+            </Badge>
+          )}
+        </div>
+      )}
+
+      {partnerError && (
+        <div
+          className="mb-4 rounded-md border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-sm text-amber-900 dark:text-amber-200"
+          role="alert"
+        >
+          <div className="flex items-center gap-2 font-medium">
+            <AlertTriangle className="w-4 h-4" aria-hidden="true" />
+            Bed board did not refresh
           </div>
-        );
-      })()}
+          <div className="text-xs mt-1 break-words">{partnerError}</div>
+          {lastOk && (
+            <div className="text-xs mt-1 text-muted-foreground">
+              Showing last successful snapshot from{" "}
+              {formatUpdated(lastOk.fetched_at)}.
+            </div>
+          )}
+        </div>
+      )}
 
-
-      {isLoading && (
+      {isLoading && !data && (
         <div className="text-sm text-muted-foreground">Loading bed board…</div>
       )}
-      {error && (
+      {error && !data && (
         <div className="text-sm text-destructive" role="alert">
-          Failed to load bed board: {error instanceof Error ? error.message : "unknown"}
+          Failed to load bed board:{" "}
+          {error instanceof Error ? error.message : "unknown"}
         </div>
       )}
 
+      {lastOk && (
+        <div className="space-y-6">
+          <section>
+            <h2 className="text-sm font-semibold text-muted-foreground mb-2">
+              {lastOk.unit}
+            </h2>
+            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3">
+              {lastOk.bed_board.map((slot) => (
+                <BedCard
+                  key={slot.bed}
+                  slot={slot}
+                  onOccupiedClick={setSelected}
+                />
+              ))}
+              {lastOk.bed_board.length === 0 && (
+                <div className="col-span-full text-sm text-muted-foreground">
+                  No beds in the partner roster.
+                </div>
+              )}
+            </div>
+          </section>
 
-      {!isLoading && !error && (
-        <div className="grid lg:grid-cols-[1fr_320px] gap-6">
-          <BedGrid
-            beds={beds}
-            occupancies={occupancies}
-            onEmptyClick={setAdmitBed}
-            onOccupiedClick={setEditOcc}
-          />
-          <div className="space-y-4">
-            <NurseCapacityPanel
-              occupancies={occupancies}
-              focusShift={
-                search.focus_shift ??
-                (search.focus_level || search.focus_invalid ? currentShiftFromClock() : undefined)
-              }
-              focusLevel={
-                search.focus_level ??
-                (search.focus_shift || search.focus_invalid ? 3 : undefined)
-              }
-            />
-            <OutliersPanel
-              outliers={outliers}
-              saving={saving}
-              onCreate={(v) => wrap(() => doCreateOutlier({ data: v }), "Outlier added")}
-              onEnd={(id) => wrap(() => doEndOutlier({ data: { id } }), "Outlier ended")}
-            />
-            <TransfersPanel
-              transfers={transfers}
-              authors={transferAuthors}
-              liveOccupancyIds={liveOccupancyIds}
-              saving={saving}
-              onCreate={(v) => wrap(() => doCreateTransfer({ data: v }), "Transfer created")}
-              onAdvance={(id, next) =>
-                wrap(() => doUpdateTransfer({ data: { id, status: next } }), "Transfer updated")
-              }
-              onCancel={(id) => wrap(() => doCancelTransfer({ data: { id } }), "Transfer cancelled")}
-            />
-          </div>
+          {lastOk.unassigned.length > 0 && (
+            <section>
+              <h2 className="text-sm font-semibold text-muted-foreground mb-2 flex items-center gap-1">
+                <AlertTriangle className="w-3.5 h-3.5" aria-hidden="true" />
+                Unassigned patients ({lastOk.unassigned.length})
+              </h2>
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                {lastOk.unassigned.map((occ) => (
+                  <Card
+                    key={occ.id}
+                    className="p-3 hover:bg-accent/40 cursor-pointer transition"
+                    onClick={() => setSelected(occ)}
+                    role="button"
+                    tabIndex={0}
+                    aria-label={`Unassigned — ${occ.full_name ?? "patient"}`}
+                    onKeyDown={(e) =>
+                      (e.key === "Enter" || e.key === " ") && setSelected(occ)
+                    }
+                  >
+                    <div className="flex items-center gap-1.5 text-sm font-medium">
+                      <UserRound className="w-4 h-4" aria-hidden="true" />
+                      {occ.full_name ?? "—"}
+                    </div>
+                    <div className="text-xs text-muted-foreground truncate mt-1">
+                      {occ.hospital_number ?? "—"}
+                      {occ.bed ? ` · Bed ${occ.bed}` : ""}
+                    </div>
+                  </Card>
+                ))}
+              </div>
+            </section>
+          )}
+
+          <section
+            className="rounded-md border bg-muted/20 px-3 py-2 text-xs text-muted-foreground"
+            aria-label="Bed board provenance"
+          >
+            <div className="flex items-start gap-2">
+              <Activity
+                className="w-3.5 h-3.5 mt-0.5 shrink-0"
+                aria-hidden="true"
+              />
+              <div>
+                Occupancy, acuity, outliers and transfers are managed in{" "}
+                <span className="font-medium">ICU Handover Hub</span>. This
+                board mirrors its live snapshot every 20 seconds. Clinical
+                acuity flags (level, ventilation, isolation, etc.), outliers
+                and out-transfers will appear here once the partner exposes
+                them over the bridge.
+              </div>
+            </div>
+          </section>
         </div>
       )}
 
-      <AdmitDialog
-        open={!!admitBed}
-        bed={admitBed}
-        saving={saving}
-        initial={admitPrefill}
-        sourceLabel={admitPrefill ? search.source_label ?? "referral" : undefined}
-        onOpenChange={(v) => !v && setAdmitBed(null)}
-        onSubmit={(value) => {
-          if (!admitBed) return;
-          const payload = {
-            bed_id: admitBed.id,
-            admitted_at: value.admitted_at,
-            hospital_number: value.hospital_number,
-            patient_initials: value.patient_initials,
-            admitting_consultant: value.admitting_consultant,
-            level: value.level,
-            wardable: value.wardable,
-            ventilated: value.ventilated,
-            nippv_cpap: value.nippv_cpap,
-            hfno: value.hfno,
-            vasopressors: value.vasopressors,
-            renal_replacement: value.renal_replacement,
-            tracheostomy: value.tracheostomy,
-            isolation: value.isolation,
-            isolation_reason: value.isolation_reason,
-            requires_side_room: value.requires_side_room,
-            predicted_discharge_at: toIsoOrNull(value.predicted_discharge_at),
-            predicted_step_down: value.predicted_step_down,
-            notes: value.notes,
-            source_referral_id: search.source_referral_id ?? null,
-            source_postop_booking_id: search.source_postop_booking_id ?? null,
-          };
-          wrap(() => doAdmit({ data: payload }), "Admitted").then(() => {
-            setAdmitBed(null);
-            if (admitPrefill) clearAdmitSource();
-          });
-        }}
-      />
-
-
-      <EditOccupancyDialog
-        open={!!editOcc}
-        occupancy={editOcc}
-        bedCode={editBedCode}
-        saving={saving}
-        onOpenChange={(v) => !v && setEditOcc(null)}
-        onSave={(v: OccupancyFormValue) => {
-          if (!editOcc) return;
-          wrap(
-            () =>
-              doUpdate({
-                data: {
-                  id: editOcc.id,
-                  hospital_number: v.hospital_number,
-                  patient_initials: v.patient_initials,
-                  admitting_consultant: v.admitting_consultant,
-                  level: v.level,
-                  wardable: v.wardable,
-                  ventilated: v.ventilated,
-                  nippv_cpap: v.nippv_cpap,
-                  hfno: v.hfno,
-                  vasopressors: v.vasopressors,
-                  renal_replacement: v.renal_replacement,
-                  tracheostomy: v.tracheostomy,
-                  isolation: v.isolation,
-                  isolation_reason: v.isolation_reason,
-                  requires_side_room: v.requires_side_room,
-                  predicted_discharge_at: toIsoOrNull(v.predicted_discharge_at),
-                  predicted_step_down: v.predicted_step_down,
-                  notes: v.notes,
-                },
-              }),
-            "Occupancy updated",
-          ).then(() => setEditOcc(null));
-        }}
-        onDischarge={() => {
-          if (!editOcc) return;
-          wrap(() => doDischarge({ data: { id: editOcc.id } }), "Patient discharged").then(() =>
-            setEditOcc(null),
-          );
-        }}
-        onMove={() => {
-          setMoveOcc(editOcc);
-          setEditOcc(null);
-        }}
-      />
-
-      <MoveDialog
-        open={!!moveOcc}
-        beds={beds}
-        currentBedId={moveOcc?.bed_id ?? ""}
-        liveBedIds={liveBedIds}
-        saving={saving}
-        onOpenChange={(v) => !v && setMoveOcc(null)}
-        onConfirm={(new_bed_id) => {
-          if (!moveOcc) return;
-          wrap(() => doMove({ data: { id: moveOcc.id, new_bed_id } }), "Patient moved").then(
-            () => setMoveOcc(null),
-          );
-        }}
-      />
+      <Dialog open={!!selected} onOpenChange={(v) => !v && setSelected(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>{selected?.full_name ?? "Patient"}</DialogTitle>
+            <DialogDescription>
+              Read-only view — edit in ICU Handover Hub.
+            </DialogDescription>
+          </DialogHeader>
+          {selected && (
+            <dl className="grid grid-cols-3 gap-x-3 gap-y-2 text-sm">
+              <dt className="text-muted-foreground">Hospital #</dt>
+              <dd className="col-span-2 font-mono">
+                {selected.hospital_number ?? "—"}
+              </dd>
+              <dt className="text-muted-foreground">Age</dt>
+              <dd className="col-span-2">
+                {selected.age != null ? `${selected.age}` : "—"}
+              </dd>
+              <dt className="text-muted-foreground">Bed</dt>
+              <dd className="col-span-2">{selected.bed ?? "—"}</dd>
+              <dt className="text-muted-foreground">Status</dt>
+              <dd className="col-span-2">{selected.status ?? "—"}</dd>
+              <dt className="text-muted-foreground">Admitted</dt>
+              <dd className="col-span-2">
+                {selected.admission_date
+                  ? new Date(selected.admission_date).toLocaleString()
+                  : "—"}
+                {(() => {
+                  const d = dayOfStay(selected.admission_date);
+                  return d != null ? ` · Day ${d}` : "";
+                })()}
+              </dd>
+              <dt className="text-muted-foreground">TEP</dt>
+              <dd className="col-span-2">
+                {selected.tep_in_place ? "In place" : "Not recorded"}
+              </dd>
+              <dt className="text-muted-foreground">DNACPR</dt>
+              <dd className="col-span-2">
+                {selected.dnacpr_decision ?? "—"}
+              </dd>
+              <dt className="text-muted-foreground">Tasks</dt>
+              <dd className="col-span-2 whitespace-pre-wrap">
+                {selected.outstanding_tasks ?? "—"}
+              </dd>
+              <dt className="text-muted-foreground">Updated</dt>
+              <dd className="col-span-2">
+                {formatUpdated(selected.updated_at)}
+              </dd>
+            </dl>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
-
-// Silence unused-import warnings for Transfer type in this file.
-export type _T = Transfer;
