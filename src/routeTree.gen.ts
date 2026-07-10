@@ -39,6 +39,7 @@ import { Route as AuthenticatedInboxIdRouteImport } from './routes/_authenticate
 import { Route as AuthenticatedBoardWardRoundRouteImport } from './routes/_authenticated/board.ward-round'
 import { Route as ApiPublicBridgeVerifySignatureRouteImport } from './routes/api/public/bridge/verify-signature'
 import { Route as ApiPublicBridgeSyncRouteImport } from './routes/api/public/bridge/sync'
+import { Route as ApiPublicBridgeRetryFailedRouteImport } from './routes/api/public/bridge/retry-failed'
 import { Route as ApiPublicBridgeReferralsRouteImport } from './routes/api/public/bridge/referrals'
 import { Route as ApiPublicBridgePatientsRouteImport } from './routes/api/public/bridge/patients'
 import { Route as ApiPublicBridgeNotificationsRouteImport } from './routes/api/public/bridge/notifications'
@@ -214,6 +215,12 @@ const ApiPublicBridgeSyncRoute = ApiPublicBridgeSyncRouteImport.update({
   path: '/api/public/bridge/sync',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiPublicBridgeRetryFailedRoute =
+  ApiPublicBridgeRetryFailedRouteImport.update({
+    id: '/api/public/bridge/retry-failed',
+    path: '/api/public/bridge/retry-failed',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 const ApiPublicBridgeReferralsRoute =
   ApiPublicBridgeReferralsRouteImport.update({
     id: '/api/public/bridge/referrals',
@@ -323,6 +330,7 @@ export interface FileRoutesByFullPath {
   '/api/public/bridge/notifications': typeof ApiPublicBridgeNotificationsRoute
   '/api/public/bridge/patients': typeof ApiPublicBridgePatientsRoute
   '/api/public/bridge/referrals': typeof ApiPublicBridgeReferralsRoute
+  '/api/public/bridge/retry-failed': typeof ApiPublicBridgeRetryFailedRoute
   '/api/public/bridge/sync': typeof ApiPublicBridgeSyncRoute
   '/api/public/bridge/verify-signature': typeof ApiPublicBridgeVerifySignatureRoute
 }
@@ -366,6 +374,7 @@ export interface FileRoutesByTo {
   '/api/public/bridge/notifications': typeof ApiPublicBridgeNotificationsRoute
   '/api/public/bridge/patients': typeof ApiPublicBridgePatientsRoute
   '/api/public/bridge/referrals': typeof ApiPublicBridgeReferralsRoute
+  '/api/public/bridge/retry-failed': typeof ApiPublicBridgeRetryFailedRoute
   '/api/public/bridge/sync': typeof ApiPublicBridgeSyncRoute
   '/api/public/bridge/verify-signature': typeof ApiPublicBridgeVerifySignatureRoute
 }
@@ -411,6 +420,7 @@ export interface FileRoutesById {
   '/api/public/bridge/notifications': typeof ApiPublicBridgeNotificationsRoute
   '/api/public/bridge/patients': typeof ApiPublicBridgePatientsRoute
   '/api/public/bridge/referrals': typeof ApiPublicBridgeReferralsRoute
+  '/api/public/bridge/retry-failed': typeof ApiPublicBridgeRetryFailedRoute
   '/api/public/bridge/sync': typeof ApiPublicBridgeSyncRoute
   '/api/public/bridge/verify-signature': typeof ApiPublicBridgeVerifySignatureRoute
 }
@@ -456,6 +466,7 @@ export interface FileRouteTypes {
     | '/api/public/bridge/notifications'
     | '/api/public/bridge/patients'
     | '/api/public/bridge/referrals'
+    | '/api/public/bridge/retry-failed'
     | '/api/public/bridge/sync'
     | '/api/public/bridge/verify-signature'
   fileRoutesByTo: FileRoutesByTo
@@ -499,6 +510,7 @@ export interface FileRouteTypes {
     | '/api/public/bridge/notifications'
     | '/api/public/bridge/patients'
     | '/api/public/bridge/referrals'
+    | '/api/public/bridge/retry-failed'
     | '/api/public/bridge/sync'
     | '/api/public/bridge/verify-signature'
   id:
@@ -543,6 +555,7 @@ export interface FileRouteTypes {
     | '/api/public/bridge/notifications'
     | '/api/public/bridge/patients'
     | '/api/public/bridge/referrals'
+    | '/api/public/bridge/retry-failed'
     | '/api/public/bridge/sync'
     | '/api/public/bridge/verify-signature'
   fileRoutesById: FileRoutesById
@@ -566,6 +579,7 @@ export interface RootRouteChildren {
   ApiPublicBridgeNotificationsRoute: typeof ApiPublicBridgeNotificationsRoute
   ApiPublicBridgePatientsRoute: typeof ApiPublicBridgePatientsRoute
   ApiPublicBridgeReferralsRoute: typeof ApiPublicBridgeReferralsRoute
+  ApiPublicBridgeRetryFailedRoute: typeof ApiPublicBridgeRetryFailedRoute
   ApiPublicBridgeSyncRoute: typeof ApiPublicBridgeSyncRoute
   ApiPublicBridgeVerifySignatureRoute: typeof ApiPublicBridgeVerifySignatureRoute
 }
@@ -782,6 +796,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiPublicBridgeSyncRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/public/bridge/retry-failed': {
+      id: '/api/public/bridge/retry-failed'
+      path: '/api/public/bridge/retry-failed'
+      fullPath: '/api/public/bridge/retry-failed'
+      preLoaderRoute: typeof ApiPublicBridgeRetryFailedRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/public/bridge/referrals': {
       id: '/api/public/bridge/referrals'
       path: '/api/public/bridge/referrals'
@@ -963,6 +984,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiPublicBridgeNotificationsRoute: ApiPublicBridgeNotificationsRoute,
   ApiPublicBridgePatientsRoute: ApiPublicBridgePatientsRoute,
   ApiPublicBridgeReferralsRoute: ApiPublicBridgeReferralsRoute,
+  ApiPublicBridgeRetryFailedRoute: ApiPublicBridgeRetryFailedRoute,
   ApiPublicBridgeSyncRoute: ApiPublicBridgeSyncRoute,
   ApiPublicBridgeVerifySignatureRoute: ApiPublicBridgeVerifySignatureRoute,
 }
