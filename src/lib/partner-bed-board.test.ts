@@ -17,7 +17,7 @@ function occupant(over: Partial<PartnerOccupant> = {}): PartnerOccupant {
     bed: "1",
     admission_date: "2026-07-05T08:00:00Z",
     tep_in_place: true,
-    dnacpr_decision: "For CPR",
+    dnacpr_decision: false,
     outstanding_tasks: "CT abdo",
     updated_at: "2026-07-10T08:59:00Z",
     ...over,
