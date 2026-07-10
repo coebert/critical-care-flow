@@ -141,11 +141,30 @@ export const getBedBoard = createServerFn({ method: "GET" })
     if (occRes.error) throw safeError("beds", occRes.error, "Could not load occupancies");
     if (outRes.error) throw safeError("beds", outRes.error, "Could not load outliers");
     if (xferRes.error) throw safeError("beds", xferRes.error, "Could not load transfers");
+
+    const transfers = xferRes.data ?? [];
+    const authorIds = Array.from(
+      new Set(
+        transfers.flatMap((t) => [t.created_by, t.updated_by]).filter((v): v is string => !!v),
+      ),
+    );
+    let authors: Record<string, { full_name: string | null; job_title: string | null }> = {};
+    if (authorIds.length) {
+      const { data: profs } = await context.supabase
+        .from("profiles")
+        .select("id, full_name, job_title")
+        .in("id", authorIds);
+      authors = Object.fromEntries(
+        (profs ?? []).map((p) => [p.id, { full_name: p.full_name, job_title: p.job_title }]),
+      );
+    }
+
     return {
       beds: bedsRes.data ?? [],
       occupancies: occRes.data ?? [],
       outliers: outRes.data ?? [],
-      transfers: xferRes.data ?? [],
+      transfers,
+      transferAuthors: authors,
     };
   });
 
