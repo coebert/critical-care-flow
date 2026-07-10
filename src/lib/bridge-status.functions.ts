@@ -56,11 +56,12 @@ export const getBridgeStatus = createServerFn({ method: "GET" })
     const perResource = await Promise.all(
       RESOURCES.map(async ({ key, table }) => {
         const state = stateByResource.get(key);
+        const admin = supabaseAdmin as any;
         const [{ count }, latest] = await Promise.all([
-          supabaseAdmin
+          admin
             .from(table)
             .select("id", { count: "exact", head: true }),
-          supabaseAdmin
+          admin
             .from(table)
             .select("updated_at")
             .order("updated_at", { ascending: false })
