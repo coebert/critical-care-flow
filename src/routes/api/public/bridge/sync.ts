@@ -489,62 +489,8 @@ export const Route = createFileRoute("/api/public/bridge/sync")({
       OPTIONS: async () => preflight(),
 
       // Cron trigger. Also accepts GET for manual introspection.
-      GET: async ({ request }) => runSync(request),
-      POST: async ({ request }) => runSync(request),
+      GET: async ({ request }) => runBridgeSync(request, { source: "sync" }),
+      POST: async ({ request }) => runBridgeSync(request, { source: "sync" }),
     },
   },
 });
-
-async function runSync(request: Request) {
-  // Guard: caller must present the project's publishable/anon key
-  // (or the service role key) via `apikey` header. This is the
-  // canonical pattern for pg_cron -> /api/public/* invocations.
-  const apiKey = request.headers.get("apikey") ?? "";
-  const allowed = [
-    process.env.SUPABASE_PUBLISHABLE_KEY,
-    process.env.SUPABASE_SERVICE_ROLE_KEY,
-  ].filter(Boolean) as string[];
-  if (!allowed.includes(apiKey)) {
-    return jsonResponse({ error: "unauthorized" }, { status: 401 });
-  }
-
-  const partner = process.env.PARTNER_BRIDGE_URL;
-  if (!partner) {
-    return jsonResponse(
-      { error: "PARTNER_BRIDGE_URL_not_configured" },
-      { status: 500 },
-    );
-  }
-
-  try {
-    getBridgeSecrets();
-  } catch (err) {
-    return jsonResponse(
-      { error: (err as Error).message },
-      { status: 500 },
-    );
-  }
-
-  const { supabaseAdmin } = await import(
-    "@/integrations/supabase/client.server"
-  );
-
-  const results: Awaited<ReturnType<typeof syncResource>>[] = [];
-  for (const r of RESOURCES) {
-    // Sequential; per-resource failure is captured and does not abort others.
-    // eslint-disable-next-line no-await-in-loop
-    const summary = await syncResource(supabaseAdmin, partner, r);
-    results.push(summary);
-  }
-
-  const hadError = results.some((r) => r.error);
-  return jsonResponse(
-    {
-      ok: !hadError,
-      partner,
-      ran_at: new Date().toISOString(),
-      results,
-    },
-    { status: hadError ? 207 : 200 },
-  );
-}
