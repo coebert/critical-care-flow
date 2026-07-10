@@ -71,18 +71,14 @@ function BridgeStatusPage() {
   const mutation = useMutation({
     mutationFn: () => runNow(),
     onSuccess: (res) => {
-      toast.success(
-        title: `Sync ${res.status < 300 ? "completed" : "finished with errors"}`,
-        description: `HTTP ${res.status}`,
-      });
+      const ok = res.status < 300;
+      const message = `Sync ${ok ? "completed" : "finished with errors"} (HTTP ${res.status})`;
+      if (ok) toast.success(message);
+      else toast.warning(message);
       query.refetch();
     },
     onError: (err: unknown) => {
-      toast.success(
-        title: "Sync failed",
-        description: (err as Error).message,
-        variant: "destructive",
-      });
+      toast.error("Sync failed", { description: (err as Error).message });
     },
   });
 
