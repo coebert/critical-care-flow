@@ -23,6 +23,7 @@ import { BedGrid } from "@/components/bed-board/bed-grid";
 import { AdmitDialog, EditOccupancyDialog, MoveDialog, type OccupancyFormValue } from "@/components/bed-board/dialogs";
 import { OutliersPanel, TransfersPanel } from "@/components/bed-board/side-panels";
 import { NurseCapacityPanel } from "@/components/bed-board/nurse-capacity-panel";
+import { RealtimeHealthBadge } from "@/components/bed-board/realtime-health-badge";
 
 type Bed = Database["public"]["Tables"]["beds"]["Row"];
 type Occ = Database["public"]["Tables"]["bed_occupancies"]["Row"];
@@ -237,6 +238,7 @@ function BedBoardPage() {
           <p className="text-sm text-muted-foreground">Live occupancy, outliers and transfers.</p>
         </div>
         <div className="flex items-center gap-2 text-sm">
+          <RealtimeHealthBadge />
           <Link to="/board" className="rounded-md border px-3 py-1.5 hover:bg-accent">TV / whiteboard mode</Link>
           <Link to="/board/ward-round" className="rounded-md border px-3 py-1.5 hover:bg-accent">Ward round list</Link>
         </div>
