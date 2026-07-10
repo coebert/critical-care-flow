@@ -142,6 +142,24 @@ function BridgeStatusPage() {
     },
   });
 
+  const bedsMutation = useMutation({
+    mutationFn: () => runBedsOnly(),
+    onSuccess: (res) => {
+      const ok = res.status < 300;
+      const message = `Beds sync ${ok ? "completed" : "finished with errors"} (HTTP ${res.status})`;
+      if (ok) toast.success(message);
+      else toast.warning(message);
+      query.refetch();
+      attemptsQuery.refetch();
+      verifyQuery.refetch();
+    },
+    onError: (err: unknown) => {
+      toast.error("Beds sync failed", {
+        description: (err as Error).message,
+      });
+    },
+  });
+
   const probeMutation = useMutation({
     mutationFn: () => sendProbe(),
     onSuccess: (res) => {
