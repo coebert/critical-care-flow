@@ -138,6 +138,37 @@ export const runBridgeSyncNow = createServerFn({ method: "POST" })
     return { status: res.status, body };
   });
 
+/**
+ * Runs the sync worker restricted to the bed-related tables only:
+ * beds, bed_occupancies, bed_outliers, bed_transfers_out. Useful when
+ * the bed board is lagging but the partner is otherwise healthy — avoids
+ * re-syncing patients/investigations/microbiology/referrals.
+ */
+export const runBridgeSyncBedsOnly = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ context }) => {
+    await assertAdmin(context);
+
+    // Call runBridgeSync in-process with a synthetic Request carrying the
+    // anon key so the shared apikey guard passes.
+    const apikey = process.env.SUPABASE_PUBLISHABLE_KEY ?? "";
+    const req = new Request("http://internal/bridge/sync", {
+      method: "POST",
+      headers: { "content-type": "application/json", apikey },
+      body: "{}",
+    });
+    const { runBridgeSync } = await import(
+      "@/routes/api/public/bridge/sync"
+    );
+    const res = await runBridgeSync(req, {
+      bedsOnly: true,
+      source: "manual",
+    });
+    const body = await res.json().catch(() => ({}));
+    return { status: res.status, body };
+  });
+
+
 export type BridgeProbeResult = {
   resource: string;
   status: number;
