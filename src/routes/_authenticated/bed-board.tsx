@@ -391,18 +391,10 @@ function BedBoardPage() {
             .filter((o): o is PartnerOccupant => o !== null),
           ...lastOk.unassigned,
         ];
-        const counts: Record<AcuityLevel, number> = { 0: 0, 1: 0, 2: 0, 3: 0 };
-        let scored = 0;
-        let sum = 0;
-        for (const o of allOccupants) {
-          const l = acuityMap.get(o.id);
-          if (l == null) continue;
-          counts[l] += 1;
-          scored += 1;
-          sum += l;
-        }
-        const unscored = allOccupants.length - scored;
-        const mean = scored > 0 ? sum / scored : 0;
+        const { counts, unscored, mean } = computeUnitAcuity(
+          allOccupants.map((o) => o.id),
+          acuityMap,
+        );
         return (
           <>
             <div
