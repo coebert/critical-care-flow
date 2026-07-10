@@ -531,7 +531,7 @@ function ReferralDetail() {
 
         <MessageLog referralId={id} />
 
-        <ReferralAuditTrail referralId={id} />
+        {isAdmin && <ReferralAuditTrail referralId={id} />}
 
         {canDelete && (
           <div className="flex justify-end pt-2">
