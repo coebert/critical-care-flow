@@ -129,6 +129,13 @@ function BedBoardPage() {
     queryKey: QK,
     queryFn: () => fetchBoard(),
     staleTime: 5_000,
+    // Safety net: ICU Handover data arrives via the pull-based bridge sync
+    // (pg_cron ~every 2 min), so Realtime on beds/bed_occupancies only fires
+    // once the sync worker has written. Poll and refetch on focus so the
+    // board catches up even if a Realtime event is missed.
+    refetchInterval: 20_000,
+    refetchIntervalInBackground: false,
+    refetchOnWindowFocus: true,
   });
 
 
