@@ -37,6 +37,7 @@ import { Route as AuthenticatedPostopBookingsAnalyticsRouteImport } from './rout
 import { Route as AuthenticatedInboxIdRouteImport } from './routes/_authenticated/inbox.$id'
 import { Route as AuthenticatedBoardWardRoundRouteImport } from './routes/_authenticated/board.ward-round'
 import { Route as ApiPublicBridgeVerifySignatureRouteImport } from './routes/api/public/bridge/verify-signature'
+import { Route as ApiPublicBridgeSyncRouteImport } from './routes/api/public/bridge/sync'
 import { Route as ApiPublicBridgeReferralsRouteImport } from './routes/api/public/bridge/referrals'
 import { Route as ApiPublicBridgePatientsRouteImport } from './routes/api/public/bridge/patients'
 import { Route as ApiPublicBridgeNotificationsRouteImport } from './routes/api/public/bridge/notifications'
@@ -197,6 +198,11 @@ const ApiPublicBridgeVerifySignatureRoute =
     path: '/api/public/bridge/verify-signature',
     getParentRoute: () => rootRouteImport,
   } as any)
+const ApiPublicBridgeSyncRoute = ApiPublicBridgeSyncRouteImport.update({
+  id: '/api/public/bridge/sync',
+  path: '/api/public/bridge/sync',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiPublicBridgeReferralsRoute =
   ApiPublicBridgeReferralsRouteImport.update({
     id: '/api/public/bridge/referrals',
@@ -278,6 +284,7 @@ export interface FileRoutesByFullPath {
   '/api/public/bridge/notifications': typeof ApiPublicBridgeNotificationsRoute
   '/api/public/bridge/patients': typeof ApiPublicBridgePatientsRoute
   '/api/public/bridge/referrals': typeof ApiPublicBridgeReferralsRoute
+  '/api/public/bridge/sync': typeof ApiPublicBridgeSyncRoute
   '/api/public/bridge/verify-signature': typeof ApiPublicBridgeVerifySignatureRoute
 }
 export interface FileRoutesByTo {
@@ -315,6 +322,7 @@ export interface FileRoutesByTo {
   '/api/public/bridge/notifications': typeof ApiPublicBridgeNotificationsRoute
   '/api/public/bridge/patients': typeof ApiPublicBridgePatientsRoute
   '/api/public/bridge/referrals': typeof ApiPublicBridgeReferralsRoute
+  '/api/public/bridge/sync': typeof ApiPublicBridgeSyncRoute
   '/api/public/bridge/verify-signature': typeof ApiPublicBridgeVerifySignatureRoute
 }
 export interface FileRoutesById {
@@ -354,6 +362,7 @@ export interface FileRoutesById {
   '/api/public/bridge/notifications': typeof ApiPublicBridgeNotificationsRoute
   '/api/public/bridge/patients': typeof ApiPublicBridgePatientsRoute
   '/api/public/bridge/referrals': typeof ApiPublicBridgeReferralsRoute
+  '/api/public/bridge/sync': typeof ApiPublicBridgeSyncRoute
   '/api/public/bridge/verify-signature': typeof ApiPublicBridgeVerifySignatureRoute
 }
 export interface FileRouteTypes {
@@ -393,6 +402,7 @@ export interface FileRouteTypes {
     | '/api/public/bridge/notifications'
     | '/api/public/bridge/patients'
     | '/api/public/bridge/referrals'
+    | '/api/public/bridge/sync'
     | '/api/public/bridge/verify-signature'
   fileRoutesByTo: FileRoutesByTo
   to:
@@ -430,6 +440,7 @@ export interface FileRouteTypes {
     | '/api/public/bridge/notifications'
     | '/api/public/bridge/patients'
     | '/api/public/bridge/referrals'
+    | '/api/public/bridge/sync'
     | '/api/public/bridge/verify-signature'
   id:
     | '__root__'
@@ -468,6 +479,7 @@ export interface FileRouteTypes {
     | '/api/public/bridge/notifications'
     | '/api/public/bridge/patients'
     | '/api/public/bridge/referrals'
+    | '/api/public/bridge/sync'
     | '/api/public/bridge/verify-signature'
   fileRoutesById: FileRoutesById
 }
@@ -486,6 +498,7 @@ export interface RootRouteChildren {
   ApiPublicBridgeNotificationsRoute: typeof ApiPublicBridgeNotificationsRoute
   ApiPublicBridgePatientsRoute: typeof ApiPublicBridgePatientsRoute
   ApiPublicBridgeReferralsRoute: typeof ApiPublicBridgeReferralsRoute
+  ApiPublicBridgeSyncRoute: typeof ApiPublicBridgeSyncRoute
   ApiPublicBridgeVerifySignatureRoute: typeof ApiPublicBridgeVerifySignatureRoute
 }
 
@@ -687,6 +700,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiPublicBridgeVerifySignatureRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/public/bridge/sync': {
+      id: '/api/public/bridge/sync'
+      path: '/api/public/bridge/sync'
+      fullPath: '/api/public/bridge/sync'
+      preLoaderRoute: typeof ApiPublicBridgeSyncRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/public/bridge/referrals': {
       id: '/api/public/bridge/referrals'
       path: '/api/public/bridge/referrals'
@@ -834,8 +854,19 @@ const rootRouteChildren: RootRouteChildren = {
   ApiPublicBridgeNotificationsRoute: ApiPublicBridgeNotificationsRoute,
   ApiPublicBridgePatientsRoute: ApiPublicBridgePatientsRoute,
   ApiPublicBridgeReferralsRoute: ApiPublicBridgeReferralsRoute,
+  ApiPublicBridgeSyncRoute: ApiPublicBridgeSyncRoute,
   ApiPublicBridgeVerifySignatureRoute: ApiPublicBridgeVerifySignatureRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
+
+import type { getRouter } from './router.tsx'
+import type { startInstance } from './start.ts'
+declare module '@tanstack/react-start' {
+  interface Register {
+    ssr: true
+    router: Awaited<ReturnType<typeof getRouter>>
+    config: Awaited<ReturnType<typeof startInstance.getOptions>>
+  }
+}
