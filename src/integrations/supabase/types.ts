@@ -904,6 +904,27 @@ export type Database = {
         }
         Relationships: []
       }
+      patient_acuity_overrides: {
+        Row: {
+          level: number
+          partner_patient_id: string
+          updated_at: string
+          updated_by: string | null
+        }
+        Insert: {
+          level: number
+          partner_patient_id: string
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Update: {
+          level?: number
+          partner_patient_id?: string
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Relationships: []
+      }
       patients: {
         Row: {
           admission_date: string | null
