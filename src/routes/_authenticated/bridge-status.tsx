@@ -306,6 +306,15 @@ function BridgeStatusPage() {
             </Table>
           </Card>
 
+          <BedBoardVerificationPanel
+            rows={verifyQuery.data?.rows ?? []}
+            ranAt={verifyQuery.data?.ran_at ?? null}
+            loading={verifyQuery.isLoading}
+            error={verifyQuery.error as Error | null}
+            onRefresh={() => verifyQuery.refetch()}
+            refreshing={verifyQuery.isFetching}
+          />
+
           <AttemptsPanel
             attempts={attemptsQuery.data ?? []}
             loading={attemptsQuery.isLoading}
