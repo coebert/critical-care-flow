@@ -396,6 +396,42 @@ export type Database = {
         }
         Relationships: []
       }
+      bridge_sync_attempts: {
+        Row: {
+          attempted_at: string
+          duration_ms: number | null
+          error: string | null
+          id: number
+          ok: boolean
+          pulled: number
+          pushed: number
+          resource: string
+          source: string
+        }
+        Insert: {
+          attempted_at?: string
+          duration_ms?: number | null
+          error?: string | null
+          id?: number
+          ok: boolean
+          pulled?: number
+          pushed?: number
+          resource: string
+          source: string
+        }
+        Update: {
+          attempted_at?: string
+          duration_ms?: number | null
+          error?: string | null
+          id?: number
+          ok?: boolean
+          pulled?: number
+          pushed?: number
+          resource?: string
+          source?: string
+        }
+        Relationships: []
+      }
       bridge_sync_state: {
         Row: {
           last_error: string | null
