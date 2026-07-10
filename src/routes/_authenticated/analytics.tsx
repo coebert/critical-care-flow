@@ -54,13 +54,15 @@ export const Route = createFileRoute("/_authenticated/analytics")({
 function AnalyticsPage() {
   const search = Route.useSearch();
   const navigate = Route.useNavigate();
-  const tab: "referrals" | "postop" | "nurse-capacity" | "capacity-alerts" =
+  const tab: "referrals" | "postop" | "nurse-capacity" | "capacity-alerts" | "acuity" =
     search.view === "postop"
       ? "postop"
       : search.view === "nurse-capacity"
       ? "nurse-capacity"
       : search.view === "capacity-alerts"
       ? "capacity-alerts"
+      : search.view === "acuity"
+      ? "acuity"
       : "referrals";
 
   return (
@@ -76,7 +78,7 @@ function AnalyticsPage() {
               view:
                 v === "referrals"
                   ? undefined
-                  : (v as "postop" | "nurse-capacity" | "capacity-alerts"),
+                  : (v as "postop" | "nurse-capacity" | "capacity-alerts" | "acuity"),
             },
             replace: true,
           })
@@ -87,6 +89,7 @@ function AnalyticsPage() {
           <TabsTrigger value="postop">Post-op bookings</TabsTrigger>
           <TabsTrigger value="nurse-capacity">Nurse capacity</TabsTrigger>
           <TabsTrigger value="capacity-alerts">Capacity alerts</TabsTrigger>
+          <TabsTrigger value="acuity">Acuity</TabsTrigger>
         </TabsList>
         <TabsContent value="referrals">
           <ReferralsAnalyticsPanel />
@@ -99,6 +102,9 @@ function AnalyticsPage() {
         </TabsContent>
         <TabsContent value="capacity-alerts">
           <CapacityAlertHistoryPanel />
+        </TabsContent>
+        <TabsContent value="acuity">
+          <AcuityAnalyticsPanel />
         </TabsContent>
       </Tabs>
     </div>
