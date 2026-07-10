@@ -396,6 +396,104 @@ export type Database = {
         }
         Relationships: []
       }
+      bridge_reconcile_job_items: {
+        Row: {
+          error: string | null
+          finished_at: string | null
+          id: string
+          job_id: string
+          locked_since: string | null
+          pulled: number
+          pulled_ids: Json
+          pushed: number
+          pushed_ids: Json
+          resource: string
+          skipped: number
+          started_at: string | null
+          status: Database["public"]["Enums"]["bridge_reconcile_item_status"]
+          updated_at: string
+        }
+        Insert: {
+          error?: string | null
+          finished_at?: string | null
+          id?: string
+          job_id: string
+          locked_since?: string | null
+          pulled?: number
+          pulled_ids?: Json
+          pushed?: number
+          pushed_ids?: Json
+          resource: string
+          skipped?: number
+          started_at?: string | null
+          status?: Database["public"]["Enums"]["bridge_reconcile_item_status"]
+          updated_at?: string
+        }
+        Update: {
+          error?: string | null
+          finished_at?: string | null
+          id?: string
+          job_id?: string
+          locked_since?: string | null
+          pulled?: number
+          pulled_ids?: Json
+          pushed?: number
+          pushed_ids?: Json
+          resource?: string
+          skipped?: number
+          started_at?: string | null
+          status?: Database["public"]["Enums"]["bridge_reconcile_item_status"]
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "bridge_reconcile_job_items_job_id_fkey"
+            columns: ["job_id"]
+            isOneToOne: false
+            referencedRelation: "bridge_reconcile_jobs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      bridge_reconcile_jobs: {
+        Row: {
+          created_at: string
+          dry_run: boolean
+          error: string | null
+          finished_at: string | null
+          from_ts: string
+          id: string
+          requested_by: string | null
+          started_at: string | null
+          status: Database["public"]["Enums"]["bridge_reconcile_job_status"]
+          to_ts: string
+        }
+        Insert: {
+          created_at?: string
+          dry_run?: boolean
+          error?: string | null
+          finished_at?: string | null
+          from_ts: string
+          id?: string
+          requested_by?: string | null
+          started_at?: string | null
+          status?: Database["public"]["Enums"]["bridge_reconcile_job_status"]
+          to_ts: string
+        }
+        Update: {
+          created_at?: string
+          dry_run?: boolean
+          error?: string | null
+          finished_at?: string | null
+          from_ts?: string
+          id?: string
+          requested_by?: string | null
+          started_at?: string | null
+          status?: Database["public"]["Enums"]["bridge_reconcile_job_status"]
+          to_ts?: string
+        }
+        Relationships: []
+      }
       bridge_reconcile_locks: {
         Row: {
           from_ts: string
@@ -1703,6 +1801,19 @@ export type Database = {
         | "cancelled"
       bed_transport_mode: "land_ambulance" | "air" | "self" | "other"
       bed_unit: "icu" | "hdu"
+      bridge_reconcile_item_status:
+        | "pending"
+        | "running"
+        | "complete"
+        | "error"
+        | "locked"
+        | "skipped"
+      bridge_reconcile_job_status:
+        | "queued"
+        | "running"
+        | "complete"
+        | "failed"
+        | "cancelled"
       ceiling_of_care:
         | "full_escalation"
         | "no_cpr"
@@ -1902,6 +2013,21 @@ export const Constants = {
       ],
       bed_transport_mode: ["land_ambulance", "air", "self", "other"],
       bed_unit: ["icu", "hdu"],
+      bridge_reconcile_item_status: [
+        "pending",
+        "running",
+        "complete",
+        "error",
+        "locked",
+        "skipped",
+      ],
+      bridge_reconcile_job_status: [
+        "queued",
+        "running",
+        "complete",
+        "failed",
+        "cancelled",
+      ],
       ceiling_of_care: [
         "full_escalation",
         "no_cpr",

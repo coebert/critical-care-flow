@@ -1,80 +1,66 @@
-# HMAC bridge with ICU Compass — full parity build
+# Background bed reconciliation with realtime progress
 
-## Scope
-Build both sides of the signed bridge on this app: inbound receiver + outbound sync client, using the exact scheme the ICU Compass agent published (HMAC-SHA256 over `${ts}.${actor}.${rawBody}`, headers `x-timestamp` / `x-actor` / `x-signature`, 300s skew, actor RBAC = admin|clinician, shared secret `HANDOVER_API_SECRET` with `_PREVIOUS` rotation support).
+Current reconcile runs inline in the admin's request — for a wide window it blocks the UI and can hit the Worker request timeout. This moves the work to a queued job that a cron/hook-triggered worker processes, and streams per-table progress to the panel via Realtime.
 
-## Secrets
-- Generate `HANDOVER_API_SECRET` here (64 chars). Deliver the value to you once so you can paste the identical value into ICU Compass.
-- Add `PARTNER_BRIDGE_URL` = `https://icu-compass-care.lovable.app/api/public/bridge` (settable via secure form; defaults handled if unset).
-- Optional `HANDOVER_API_SECRET_PREVIOUS` supported at verify time for zero-downtime rotation.
+## What you'll see change
 
-## Shared library
-`src/lib/bridge-hmac.server.ts` — pure sign/verify helpers, timing-safe compare, timestamp skew check, actor JSON parse, dual-secret verify. Unit tests in `src/lib/bridge-hmac.test.ts`.
+- Reconcile panel no longer waits for the whole run. Clicking "Run reconcile" (or "Dry-run") enqueues a job and immediately shows a live progress card with:
+  - Overall job status (queued → running → complete / failed / cancelled)
+  - Per-table row (status, pulled / pushed / skipped counts updating live, error, "locked" if the window is held)
+  - Cancel button (queued or running)
+- Last 5 jobs history table under the panel.
+- Large windows behave the same as small — nothing to hang the page.
 
-## Inbound endpoints — `src/routes/api/public/bridge/*`
-Each route: OPTIONS (CORS 204), GET + POST as listed. All handlers verify signature first, then check actor role, then dispatch. Errors return JSON `{error}` with CORS headers.
+## New database objects
 
-| Path | GET | POST |
-|---|---|---|
-| `/health` | liveness + secret-configured flag | — |
-| `/verify-signature` | self-test (signs a canned body with server secret and returns proof) | verifies caller's signature against submitted body, returns `{valid:true}` |
-| `/patients` | list (filter `?status=`) | upsert by `id`; optimistic concurrency via `expected_updated_at` → 409 with current row |
-| `/investigations` | list (filter `?patient_id=`) | upsert |
-| `/microbiology` | list | upsert |
-| `/referrals` | list | upsert |
-| `/notifications` | list (own actor) | insert |
-| `/audit` | list (paged, admin actor only) | — |
+- Enum `bridge_reconcile_job_status`: `queued | running | complete | failed | cancelled`
+- Enum `bridge_reconcile_item_status`: `pending | running | complete | error | locked | skipped`
+- Table `bridge_reconcile_jobs`: window, dry_run flag, status, requested_by, timestamps, error
+- Table `bridge_reconcile_job_items`: per-resource row (job_id, resource, status, pulled, pushed, skipped, pulled_ids/pushed_ids jsonb, error, locked_since, started/finished_at, updated_at) — unique (job_id, resource)
+- Both tables: `GRANT SELECT` to authenticated + admin-only RLS SELECT, `GRANT ALL` to service_role, added to `supabase_realtime` publication with `REPLICA IDENTITY FULL` so UPDATEs stream.
+- `AFTER INSERT` trigger on `bridge_reconcile_jobs` posts to the worker hook via `net.http_post` so a fresh job starts within a second (no need to wait for cron).
 
-DB writes use `supabaseAdmin` (loaded inside handler) since the bridge caller is a machine principal, not an auth.uid; every write records to `audit_log` with `user_id = actor.id` when the actor id resolves to a real user, otherwise null + `diff.actor` preserved.
+## New worker route
 
-## Schema additions
-Two tables this project doesn't have yet:
-- `public.microbiology` (id, patient_id fk, organism, sample_type, sensitivities jsonb, sampled_at, reported_at, notes, created_by, created_at, updated_at) + RLS + GRANTs.
-- `public.bridge_sync_state` (resource text PK, last_pulled_at timestamptz, last_pushed_at timestamptz, last_error text, last_error_at timestamptz) — cursor for the sync worker.
+`src/routes/api/public/hooks/bridge-reconcile-worker.ts` (POST, `apikey` header verified against `SUPABASE_PUBLISHABLE_KEY`):
 
-Patients table already has 31 columns; the receiver maps the documented payload shape onto existing columns and rejects unknown fields.
+1. Recover stale runs: any job in `running` with `started_at` older than 10 min → set back to `queued`.
+2. Claim one job with `UPDATE ... WHERE status='queued' ORDER BY created_at LIMIT 1 RETURNING *` — atomic pick.
+3. For each item (pending, alphabetical FK-safe order):
+   - Re-check job status; bail if `cancelled`.
+   - Mark item `running`, stamp `started_at`.
+   - Reuse existing `bridge_reconcile_locks` acquire/release (skipped for dry-run).
+   - Run pull+upsert / push (or ID-only for dry-run) using the shared `sync.pullResource` / `sync.pushOne` helpers, updating `pulled`/`pushed`/`skipped` and `updated_at` on the item after every partner call (Realtime pushes each update to the UI).
+   - On finish: item `complete` / `error` / `locked`; audit log written for real runs.
+4. Job `complete` (or `failed` if unhandled error) with `finished_at`. Also fires audit inserts as today.
 
-## Outbound sync — `src/routes/api/public/bridge/sync.ts`
-Cron-triggered POST. For each resource:
-1. Read `bridge_sync_state.last_pulled_at`.
-2. GET `${PARTNER_BRIDGE_URL}/<resource>?since=<iso>` with signed headers (actor = system admin principal).
-3. Upsert incoming rows via the same code path as the inbound handler (so validation is identical).
-4. Read rows updated locally since `last_pushed_at`, POST them to the partner in batches.
-5. Update `bridge_sync_state`; on partial failure record `last_error` but continue other resources.
+## New server functions
 
-pg_cron job runs every 2 minutes calling `/api/public/bridge/sync` with `apikey` header (per project convention).
+- `enqueueBedReconciliation({ from, to, dryRun })` — admin only. Validates window (same rules as current, 30-day cap). Inserts job + one item per bed resource (`pending`). Returns `{ jobId }`. Trigger kicks the worker.
+- `cancelBedReconciliationJob({ jobId })` — admin only. Updates job to `cancelled` if still `queued`/`running`; the worker checks between items.
+- `listBedReconciliationJobs({ limit = 5 })` — admin only, returns recent jobs + aggregated item counts.
+- `getBedReconciliationJob({ jobId })` — admin only, returns job + items (initial paint before Realtime kicks in).
 
-## Files created
-```
-src/lib/bridge-hmac.server.ts
-src/lib/bridge-hmac.test.ts
-src/lib/bridge-actor.ts                  # actor validation + role check
-src/lib/bridge-cors.ts
-src/lib/bridge-repo.server.ts            # per-resource read/upsert helpers, shared by receiver + sync
-src/routes/api/public/bridge/health.ts
-src/routes/api/public/bridge/verify-signature.ts
-src/routes/api/public/bridge/patients.ts
-src/routes/api/public/bridge/investigations.ts
-src/routes/api/public/bridge/microbiology.ts
-src/routes/api/public/bridge/referrals.ts
-src/routes/api/public/bridge/notifications.ts
-src/routes/api/public/bridge/audit.ts
-src/routes/api/public/bridge/sync.ts
-supabase/migrations/<ts>_bridge_tables.sql
-```
+The old synchronous `runBedReconciliation` is retired.
 
-## Verification
-1. `curl` `/bridge/health` — 200.
-2. `curl -XPOST /bridge/verify-signature` with a locally-signed body — 200 `{valid:true}`.
-3. `curl -XPOST /bridge/patients` upsert — new row appears in `patients`; second call with stale `expected_updated_at` → 409.
-4. Manual `/bridge/sync` invocation logs pull/push counts; `bridge_sync_state` rows populated.
-5. After you paste the same secret into ICU Compass, hit their `/verify-signature` from this app's sync worker — round-trip proven.
+## pg_cron
 
-## Phased delivery
-Because this is large, I will land it in this order and stop for you to confirm after each phase:
-1. **Phase 1** — secret + shared HMAC library + `/health` + `/verify-signature` + migration for `microbiology` and `bridge_sync_state`. This is enough for the two agents to prove signing works.
-2. **Phase 2** — `/patients` + `/investigations` + `/microbiology` receivers.
-3. **Phase 3** — `/referrals` + `/notifications` + `/audit` receivers.
-4. **Phase 4** — outbound sync worker + pg_cron schedule.
+Every minute the worker hook is polled as a backstop (in case the trigger's `net.http_post` fails or a job was requeued by the stale-run recovery). `apikey` header uses the anon key per the stack convention.
 
-Confirm and I'll execute Phase 1.
+## UI changes (`bridge-status.tsx` — `ReconcilePanel`)
+
+- Buttons call `enqueueBedReconciliation` and immediately switch to "Active job" view.
+- `useQuery` seeds job + items; `supabase.channel(...)` subscribes to `postgres_changes` on both tables filtered by `job_id`, invalidating/patching local state on every event; teardown on unmount.
+- Progress table shows per-resource counts live, with a small spinner on `running`, "Locked" badge if held, error text, and completion timestamp.
+- "Cancel" wires to `cancelBedReconciliationJob`. Panel refreshes verification/status/audit-log siblings via `onDone` when job reaches a terminal state.
+- Job history section below shows last 5 runs (window, dry-run flag, totals, duration, status).
+
+## Files touched
+
+- New migration
+- `src/routes/api/public/hooks/bridge-reconcile-worker.ts` (new)
+- `src/lib/bridge-status.functions.ts` (server fns replaced/added)
+- `src/routes/_authenticated/bridge-status.tsx` (ReconcilePanel rewrite, add history)
+- `src/routeTree.gen.ts` (auto)
+- `src/integrations/supabase/types.ts` (auto-regenerated by migration)
+- `supabase--insert` for the pg_cron backstop schedule

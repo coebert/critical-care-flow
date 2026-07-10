@@ -37,6 +37,7 @@ import { Route as AuthenticatedPostopBookingsCancellationsRouteImport } from './
 import { Route as AuthenticatedPostopBookingsAnalyticsRouteImport } from './routes/_authenticated/postop-bookings.analytics'
 import { Route as AuthenticatedInboxIdRouteImport } from './routes/_authenticated/inbox.$id'
 import { Route as AuthenticatedBoardWardRoundRouteImport } from './routes/_authenticated/board.ward-round'
+import { Route as ApiPublicHooksBridgeReconcileWorkerRouteImport } from './routes/api/public/hooks/bridge-reconcile-worker'
 import { Route as ApiPublicBridgeVerifySignatureRouteImport } from './routes/api/public/bridge/verify-signature'
 import { Route as ApiPublicBridgeSyncRouteImport } from './routes/api/public/bridge/sync'
 import { Route as ApiPublicBridgeRetryFailedRouteImport } from './routes/api/public/bridge/retry-failed'
@@ -204,6 +205,12 @@ const AuthenticatedBoardWardRoundRoute =
     path: '/ward-round',
     getParentRoute: () => AuthenticatedBoardRoute,
   } as any)
+const ApiPublicHooksBridgeReconcileWorkerRoute =
+  ApiPublicHooksBridgeReconcileWorkerRouteImport.update({
+    id: '/api/public/hooks/bridge-reconcile-worker',
+    path: '/api/public/hooks/bridge-reconcile-worker',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 const ApiPublicBridgeVerifySignatureRoute =
   ApiPublicBridgeVerifySignatureRouteImport.update({
     id: '/api/public/bridge/verify-signature',
@@ -333,6 +340,7 @@ export interface FileRoutesByFullPath {
   '/api/public/bridge/retry-failed': typeof ApiPublicBridgeRetryFailedRoute
   '/api/public/bridge/sync': typeof ApiPublicBridgeSyncRoute
   '/api/public/bridge/verify-signature': typeof ApiPublicBridgeVerifySignatureRoute
+  '/api/public/hooks/bridge-reconcile-worker': typeof ApiPublicHooksBridgeReconcileWorkerRoute
 }
 export interface FileRoutesByTo {
   '/auth': typeof AuthRoute
@@ -377,6 +385,7 @@ export interface FileRoutesByTo {
   '/api/public/bridge/retry-failed': typeof ApiPublicBridgeRetryFailedRoute
   '/api/public/bridge/sync': typeof ApiPublicBridgeSyncRoute
   '/api/public/bridge/verify-signature': typeof ApiPublicBridgeVerifySignatureRoute
+  '/api/public/hooks/bridge-reconcile-worker': typeof ApiPublicHooksBridgeReconcileWorkerRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -423,6 +432,7 @@ export interface FileRoutesById {
   '/api/public/bridge/retry-failed': typeof ApiPublicBridgeRetryFailedRoute
   '/api/public/bridge/sync': typeof ApiPublicBridgeSyncRoute
   '/api/public/bridge/verify-signature': typeof ApiPublicBridgeVerifySignatureRoute
+  '/api/public/hooks/bridge-reconcile-worker': typeof ApiPublicHooksBridgeReconcileWorkerRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -469,6 +479,7 @@ export interface FileRouteTypes {
     | '/api/public/bridge/retry-failed'
     | '/api/public/bridge/sync'
     | '/api/public/bridge/verify-signature'
+    | '/api/public/hooks/bridge-reconcile-worker'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/auth'
@@ -513,6 +524,7 @@ export interface FileRouteTypes {
     | '/api/public/bridge/retry-failed'
     | '/api/public/bridge/sync'
     | '/api/public/bridge/verify-signature'
+    | '/api/public/hooks/bridge-reconcile-worker'
   id:
     | '__root__'
     | '/_authenticated'
@@ -558,6 +570,7 @@ export interface FileRouteTypes {
     | '/api/public/bridge/retry-failed'
     | '/api/public/bridge/sync'
     | '/api/public/bridge/verify-signature'
+    | '/api/public/hooks/bridge-reconcile-worker'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -582,6 +595,7 @@ export interface RootRouteChildren {
   ApiPublicBridgeRetryFailedRoute: typeof ApiPublicBridgeRetryFailedRoute
   ApiPublicBridgeSyncRoute: typeof ApiPublicBridgeSyncRoute
   ApiPublicBridgeVerifySignatureRoute: typeof ApiPublicBridgeVerifySignatureRoute
+  ApiPublicHooksBridgeReconcileWorkerRoute: typeof ApiPublicHooksBridgeReconcileWorkerRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -781,6 +795,13 @@ declare module '@tanstack/react-router' {
       fullPath: '/board/ward-round'
       preLoaderRoute: typeof AuthenticatedBoardWardRoundRouteImport
       parentRoute: typeof AuthenticatedBoardRoute
+    }
+    '/api/public/hooks/bridge-reconcile-worker': {
+      id: '/api/public/hooks/bridge-reconcile-worker'
+      path: '/api/public/hooks/bridge-reconcile-worker'
+      fullPath: '/api/public/hooks/bridge-reconcile-worker'
+      preLoaderRoute: typeof ApiPublicHooksBridgeReconcileWorkerRouteImport
+      parentRoute: typeof rootRouteImport
     }
     '/api/public/bridge/verify-signature': {
       id: '/api/public/bridge/verify-signature'
@@ -987,6 +1008,8 @@ const rootRouteChildren: RootRouteChildren = {
   ApiPublicBridgeRetryFailedRoute: ApiPublicBridgeRetryFailedRoute,
   ApiPublicBridgeSyncRoute: ApiPublicBridgeSyncRoute,
   ApiPublicBridgeVerifySignatureRoute: ApiPublicBridgeVerifySignatureRoute,
+  ApiPublicHooksBridgeReconcileWorkerRoute:
+    ApiPublicHooksBridgeReconcileWorkerRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
