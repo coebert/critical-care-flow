@@ -296,6 +296,7 @@ async function syncResource(
   admin: any,
   base: string,
   resource: (typeof RESOURCES)[number],
+  source: "sync" | "retry" | "manual",
 ): Promise<{
   resource: ResourceKey;
   pulled: number;
@@ -305,6 +306,7 @@ async function syncResource(
   error?: string;
 }> {
   const runStartedAt = new Date().toISOString();
+  const startedMs = Date.now();
   const { data: state } = await admin
     .from("bridge_sync_state")
     .select("*")
@@ -374,6 +376,18 @@ async function syncResource(
     { onConflict: "resource" },
   );
 
+  // Record this attempt in the audit log for admin visibility.
+  // Fire-and-forget: audit failures must not break the sync itself.
+  await admin.from("bridge_sync_attempts").insert({
+    source,
+    resource: resource.key,
+    ok: !error,
+    pulled,
+    pushed,
+    duration_ms: Date.now() - startedMs,
+    error: error ?? null,
+  }).then(() => {}, () => {});
+
   return {
     resource: resource.key,
     pulled,
@@ -382,6 +396,91 @@ async function syncResource(
     last_pushed_at: newestPushed,
     error,
   };
+}
+
+// Exported so the retry-failed route (and admin manual runs) can reuse
+// the same auth + sync pipeline without duplicating it.
+export async function runBridgeSync(
+  request: Request,
+  opts: { failedOnly?: boolean; source?: "sync" | "retry" | "manual" } = {},
+): Promise<Response> {
+  const source = opts.source ?? "sync";
+  const failedOnly = Boolean(opts.failedOnly);
+
+  const apiKey = request.headers.get("apikey") ?? "";
+  const allowed = [
+    process.env.SUPABASE_PUBLISHABLE_KEY,
+    process.env.SUPABASE_SERVICE_ROLE_KEY,
+  ].filter(Boolean) as string[];
+  if (!allowed.includes(apiKey)) {
+    return jsonResponse({ error: "unauthorized" }, { status: 401 });
+  }
+
+  const partner = process.env.PARTNER_BRIDGE_URL;
+  if (!partner) {
+    return jsonResponse(
+      { error: "PARTNER_BRIDGE_URL_not_configured" },
+      { status: 500 },
+    );
+  }
+
+  try {
+    getBridgeSecrets();
+  } catch (err) {
+    return jsonResponse(
+      { error: (err as Error).message },
+      { status: 500 },
+    );
+  }
+
+  const { supabaseAdmin } = await import(
+    "@/integrations/supabase/client.server"
+  );
+
+  // Determine which resources to run. Retry mode skips resources that are
+  // currently healthy so we don't hammer the partner needlessly.
+  let toRun = RESOURCES;
+  if (failedOnly) {
+    const { data: state } = await supabaseAdmin
+      .from("bridge_sync_state")
+      .select("resource,last_error");
+    const failedKeys = new Set(
+      (state ?? [])
+        .filter((r: any) => r.last_error != null)
+        .map((r: any) => r.resource as string),
+    );
+    toRun = RESOURCES.filter((r) => failedKeys.has(r.key));
+    if (toRun.length === 0) {
+      return jsonResponse({
+        ok: true,
+        skipped: true,
+        reason: "no_failed_resources",
+        partner,
+        ran_at: new Date().toISOString(),
+        results: [],
+      });
+    }
+  }
+
+  const results: Awaited<ReturnType<typeof syncResource>>[] = [];
+  for (const r of toRun) {
+    // Sequential; per-resource failure is captured and does not abort others.
+    // eslint-disable-next-line no-await-in-loop
+    const summary = await syncResource(supabaseAdmin, partner, r, source);
+    results.push(summary);
+  }
+
+  const hadError = results.some((r) => r.error);
+  return jsonResponse(
+    {
+      ok: !hadError,
+      partner,
+      source,
+      ran_at: new Date().toISOString(),
+      results,
+    },
+    { status: hadError ? 207 : 200 },
+  );
 }
 
 export const Route = createFileRoute("/api/public/bridge/sync")({
