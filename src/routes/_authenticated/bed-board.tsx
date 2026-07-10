@@ -176,11 +176,13 @@ function BedCard({
         {occ.age != null ? ` · ${occ.age}y` : ""}
         {day != null ? ` · Day ${day}` : ""}
       </div>
-      {occ.dnacpr_decision && (
+      {occ.dnacpr_decision === true && (
         <div className="mt-1 text-[11px] text-amber-700 dark:text-amber-400 truncate">
-          DNACPR: {occ.dnacpr_decision}
+          DNACPR in place
+          {occ.dnacpr_details ? ` — ${occ.dnacpr_details}` : ""}
         </div>
       )}
+
     </Card>
   );
 }
