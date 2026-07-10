@@ -125,14 +125,18 @@ const STATUS_LABEL: Record<Transfer["status"], string> = {
   cancelled: "Cancelled",
 };
 
+type AuthorInfo = { full_name: string | null; job_title: string | null };
+
 export function TransfersPanel({
   transfers,
+  authors = {},
   onCreate,
   onAdvance,
   onCancel,
   saving,
 }: {
   transfers: Transfer[];
+  authors?: Record<string, AuthorInfo>;
   onCreate: (v: {
     destination_hospital: string;
     kind: "repat" | "tertiary" | "other";
@@ -157,6 +161,12 @@ export function TransfersPanel({
     if (s === "in_transit") return "completed";
     return null;
   };
+  const authorLabel = (id: string | null): string => {
+    if (!id) return "system";
+    const a = authors[id];
+    if (!a) return "unknown";
+    return a.full_name?.trim() || "unknown";
+  };
   return (
     <Card className="p-4">
       <div className="flex items-center justify-between mb-3">
@@ -174,6 +184,12 @@ export function TransfersPanel({
       <ul className="space-y-2">
         {transfers.map((t) => {
           const next = nextStatus(t.status);
+          const createdBy = authorLabel(t.created_by);
+          const updatedBy = authorLabel(t.updated_by);
+          const createdAgo = formatDistanceToNowStrict(new Date(t.created_at), { addSuffix: true });
+          const updatedAgo = formatDistanceToNowStrict(new Date(t.updated_at), { addSuffix: true });
+          const wasEdited =
+            t.updated_at !== t.created_at || (t.updated_by && t.updated_by !== t.created_by);
           return (
             <li key={t.id} className="border rounded p-2 text-sm">
               <div className="flex items-start justify-between gap-2">
@@ -184,6 +200,15 @@ export function TransfersPanel({
                   </div>
                 </div>
                 <Badge variant="outline" className="text-[10px]">{STATUS_LABEL[t.status]}</Badge>
+              </div>
+              <div
+                className="mt-1.5 text-[11px] text-muted-foreground leading-snug"
+                title={`Created ${new Date(t.created_at).toLocaleString()}${wasEdited ? ` · Updated ${new Date(t.updated_at).toLocaleString()}` : ""}`}
+              >
+                <div>Created by {createdBy} · {createdAgo}</div>
+                {wasEdited && (
+                  <div>Updated by {updatedBy} · {updatedAgo}</div>
+                )}
               </div>
               <div className="flex gap-2 mt-2">
                 {next && (

@@ -156,6 +156,7 @@ function BedBoardPage() {
   const occupancies = data?.occupancies ?? [];
   const outliers = data?.outliers ?? [];
   const transfers = data?.transfers ?? [];
+  const transferAuthors = data?.transferAuthors ?? {};
 
   const snapshot = useMemo(
     () =>
@@ -349,6 +350,7 @@ function BedBoardPage() {
             />
             <TransfersPanel
               transfers={transfers}
+              authors={transferAuthors}
               saving={saving}
               onCreate={(v) => wrap(() => doCreateTransfer({ data: v }), "Transfer created")}
               onAdvance={(id, next) =>
