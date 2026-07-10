@@ -188,7 +188,7 @@ const PUSH_ALLOW: Record<ResourceKey, readonly string[]> = {
   ],
 };
 
-const RESOURCES: {
+export const RESOURCES: {
   key: ResourceKey;
   table: string;
   conflict: string;
@@ -213,7 +213,18 @@ const RESOURCES: {
   { key: "bed_transfers_out", table: "bed_transfers_out", conflict: "id", select: "*" },
 ];
 
-function toPortable(
+export type BridgeResource = (typeof RESOURCES)[number];
+
+export const BED_RESOURCE_KEYS: ReadonlyArray<ResourceKey> = [
+  "beds",
+  "bed_occupancies",
+  "bed_outliers",
+  "bed_transfers_out",
+];
+
+export type { ResourceKey };
+
+export function toPortable(
   key: ResourceKey,
   row: Record<string, unknown>,
 ): Record<string, unknown> {
@@ -233,7 +244,7 @@ const SYSTEM_ACTOR = JSON.stringify({
 });
 const PUSH_BATCH = 50;
 
-function signedHeaders(rawBody: string) {
+export function signedHeaders(rawBody: string) {
   const secrets = getBridgeSecrets();
   const timestamp = String(Math.floor(Date.now() / 1000));
   const signature = signWith(secrets.current, {
@@ -249,7 +260,7 @@ function signedHeaders(rawBody: string) {
   };
 }
 
-async function pullResource(
+export async function pullResource(
   base: string,
   key: ResourceKey,
   since: string | null,
@@ -270,7 +281,7 @@ async function pullResource(
   return body.records ?? [];
 }
 
-async function pushOne(
+export async function pushOne(
   base: string,
   key: ResourceKey,
   record: Record<string, unknown>,

@@ -22,11 +22,15 @@ import {
   sendBridgeTestPayload,
   getBridgeSyncAttempts,
   getBedBoardVerification,
+  runBedReconciliation,
   type BridgeResourceStatus,
   type BridgeProbeResult,
   type BridgeSyncAttempt,
   type BedBoardVerificationRow,
+  type BedReconcileResourceResult,
 } from "@/lib/bridge-status.functions";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
 import { useState } from "react";
 
@@ -314,6 +318,17 @@ function BridgeStatusPage() {
             onRefresh={() => verifyQuery.refetch()}
             refreshing={verifyQuery.isFetching}
           />
+
+          <ReconcilePanel
+            stale={(verifyQuery.data?.rows ?? []).some((r) => r.stale)}
+            onDone={() => {
+              verifyQuery.refetch();
+              query.refetch();
+              attemptsQuery.refetch();
+            }}
+          />
+
+
 
           <AttemptsPanel
             attempts={attemptsQuery.data ?? []}
@@ -678,6 +693,199 @@ function BedBoardVerificationPanel({
           )}
         </>
       )}
+    </Card>
+  );
+}
+
+function toLocalInputValue(d: Date): string {
+  // <input type="datetime-local"> expects "YYYY-MM-DDTHH:mm" in local time.
+  const pad = (n: number) => String(n).padStart(2, "0");
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(
+    d.getHours(),
+  )}:${pad(d.getMinutes())}`;
+}
+
+function ReconcilePanel({
+  stale,
+  onDone,
+}: {
+  stale: boolean;
+  onDone: () => void;
+}) {
+  const reconcileFn = useServerFn(runBedReconciliation);
+  const now = new Date();
+  const defaultFrom = new Date(now.getTime() - 24 * 60 * 60 * 1000);
+  const [from, setFrom] = useState(toLocalInputValue(defaultFrom));
+  const [to, setTo] = useState(toLocalInputValue(now));
+  const [lastResults, setLastResults] = useState<
+    BedReconcileResourceResult[] | null
+  >(null);
+
+  const mutation = useMutation({
+    mutationFn: (input: { from: string; to: string }) =>
+      reconcileFn({ data: input }),
+    onSuccess: (res) => {
+      setLastResults(res.results);
+      const pulled = res.results.reduce((n, r) => n + r.pulled, 0);
+      const pushed = res.results.reduce((n, r) => n + r.pushed, 0);
+      const errors = res.results.filter((r) => r.error).length;
+      const msg = `Reconciled ${pulled} pulled / ${pushed} pushed across ${res.results.length} bed tables`;
+      if (errors === 0) toast.success(msg);
+      else toast.warning(`${msg} (${errors} with errors)`);
+      onDone();
+    },
+    onError: (err: unknown) => {
+      toast.error("Reconciliation failed", {
+        description: (err as Error).message,
+      });
+    },
+  });
+
+  const runWindow = (hours: number) => {
+    const end = new Date();
+    const start = new Date(end.getTime() - hours * 60 * 60 * 1000);
+    setFrom(toLocalInputValue(start));
+    setTo(toLocalInputValue(end));
+    mutation.mutate({
+      from: start.toISOString(),
+      to: end.toISOString(),
+    });
+  };
+
+  const runCustom = () => {
+    // Convert the datetime-local strings (in the admin's local zone) into
+    // ISO UTC so the server-side range matches how updated_at is stored.
+    const startISO = new Date(from).toISOString();
+    const endISO = new Date(to).toISOString();
+    mutation.mutate({ from: startISO, to: endISO });
+  };
+
+  return (
+    <Card className="p-0 overflow-hidden">
+      <div className="px-4 py-3 border-b flex items-center justify-between gap-2 flex-wrap">
+        <div>
+          <div className="text-sm font-medium flex items-center gap-2">
+            Reconcile / backfill bed rows
+            {stale && (
+              <Badge variant="destructive" className="text-[10px]">
+                Board stale
+              </Badge>
+            )}
+          </div>
+          <p className="text-xs text-muted-foreground">
+            Re-pulls partner rows and re-pushes local bed rows updated inside
+            the chosen window. Sync cursors are left untouched.
+          </p>
+        </div>
+      </div>
+
+      <div className="p-4 space-y-4">
+        <div className="flex flex-wrap gap-2">
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={() => runWindow(1)}
+            disabled={mutation.isPending}
+          >
+            Last 1h
+          </Button>
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={() => runWindow(24)}
+            disabled={mutation.isPending}
+          >
+            Last 24h
+          </Button>
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={() => runWindow(24 * 7)}
+            disabled={mutation.isPending}
+          >
+            Last 7d
+          </Button>
+        </div>
+
+        <div className="grid gap-3 sm:grid-cols-[1fr_1fr_auto] items-end">
+          <div className="space-y-1">
+            <Label htmlFor="reconcile-from" className="text-xs">
+              From
+            </Label>
+            <Input
+              id="reconcile-from"
+              type="datetime-local"
+              value={from}
+              onChange={(e) => setFrom(e.target.value)}
+            />
+          </div>
+          <div className="space-y-1">
+            <Label htmlFor="reconcile-to" className="text-xs">
+              To
+            </Label>
+            <Input
+              id="reconcile-to"
+              type="datetime-local"
+              value={to}
+              onChange={(e) => setTo(e.target.value)}
+            />
+          </div>
+          <Button
+            size="sm"
+            onClick={runCustom}
+            disabled={mutation.isPending || !from || !to}
+          >
+            {mutation.isPending ? "Reconciling…" : "Run reconcile"}
+          </Button>
+        </div>
+
+        {lastResults && (
+          <div className="border-t pt-3">
+            <div className="text-xs font-medium uppercase tracking-wide text-muted-foreground mb-2">
+              Last reconciliation
+            </div>
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Table</TableHead>
+                  <TableHead className="text-right">Pulled</TableHead>
+                  <TableHead className="text-right">Pushed</TableHead>
+                  <TableHead className="text-right">Skipped</TableHead>
+                  <TableHead>Result</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {lastResults.map((r) => (
+                  <TableRow key={r.resource}>
+                    <TableCell className="font-medium">{r.resource}</TableCell>
+                    <TableCell className="text-right tabular-nums">
+                      {r.pulled}
+                    </TableCell>
+                    <TableCell className="text-right tabular-nums">
+                      {r.pushed}
+                    </TableCell>
+                    <TableCell className="text-right tabular-nums text-muted-foreground">
+                      {r.skipped}
+                    </TableCell>
+                    <TableCell>
+                      {r.error ? (
+                        <span
+                          className="text-xs text-destructive truncate block max-w-[32ch]"
+                          title={r.error}
+                        >
+                          {r.error}
+                        </span>
+                      ) : (
+                        <Badge variant="secondary">OK</Badge>
+                      )}
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </div>
+        )}
+      </div>
     </Card>
   );
 }
