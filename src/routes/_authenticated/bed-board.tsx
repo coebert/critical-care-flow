@@ -53,6 +53,8 @@ const QK = ["partner-bed-board"] as const;
 const AQK = ["patient-acuity"] as const;
 
 import { LEVEL_TONE, LEVEL_LABEL, computeUnitAcuity } from "@/lib/acuity";
+import { NurseCapacityPanel } from "@/components/bed-board/nurse-capacity-panel";
+import type { Occupancy } from "@/lib/bed-capacity";
 
 export const Route = createFileRoute("/_authenticated/bed-board")({
   head: () => ({
@@ -463,6 +465,17 @@ function BedBoardPage() {
                 </div>
               )}
             </div>
+            <NurseCapacityPanel
+              occupancies={allOccupants.map<Occupancy>((o) => ({
+                id: o.id,
+                bed_id: o.bed ?? o.id,
+                discharged_at: null,
+                predicted_discharge_at: null,
+                level: acuityMap.get(o.id) ?? 1,
+              }))}
+              focusShift={search.focus_shift}
+              focusLevel={search.focus_level}
+            />
           </>
         );
       })()}
