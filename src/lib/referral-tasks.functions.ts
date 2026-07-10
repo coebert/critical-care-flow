@@ -139,6 +139,12 @@ export const updateTask = createServerFn({ method: "POST" })
       patch.completed_by = null;
       patch.completed_at = null;
     }
+    // Snapshot the prior assignment so we only push when it actually changes.
+    const { data: prior } = await context.supabase
+      .from("referral_tasks")
+      .select("assigned_role")
+      .eq("id", data.id)
+      .maybeSingle();
     const { data: row, error } = await context.supabase
       .from("referral_tasks")
       .update(patch)
@@ -146,6 +152,21 @@ export const updateTask = createServerFn({ method: "POST" })
       .select("*")
       .single();
     if (error) throw safeError("tasks", error, "Could not update task");
+    const roleChanged =
+      data.patch.assigned_role !== undefined &&
+      (prior?.assigned_role ?? null) !== (row.assigned_role ?? null);
+    if (
+      roleChanged &&
+      (row.assigned_role === "admin" || row.assigned_role === "clinician")
+    ) {
+      await fanOutTaskAssignment({
+        actorId: context.userId,
+        referralId: row.referral_id,
+        taskTitle: row.title,
+        assignedRole: row.assigned_role,
+        action: "reassigned",
+      });
+    }
     return row;
   });
 
