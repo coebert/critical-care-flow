@@ -270,7 +270,7 @@ export async function pullResource(
   return body.records ?? [];
 }
 
-async function pushOne(
+export async function pushOne(
   base: string,
   key: ResourceKey,
   record: Record<string, unknown>,
