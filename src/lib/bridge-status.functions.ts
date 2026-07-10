@@ -475,6 +475,8 @@ export type BedReconcileResourceResult = {
   pushed: number;
   skipped: number;
   error: string | null;
+  pulled_ids?: string[];
+  pushed_ids?: string[];
 };
 
 export type BedReconcileResult = {
@@ -482,8 +484,10 @@ export type BedReconcileResult = {
   ran_at: string;
   from: string;
   to: string;
+  dry_run: boolean;
   results: BedReconcileResourceResult[];
 };
+
 
 /**
  * Reconciliation/backfill for bed-related tables in a chosen time window.
