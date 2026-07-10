@@ -156,6 +156,7 @@ function BedBoardPage() {
   const occupancies = data?.occupancies ?? [];
   const outliers = data?.outliers ?? [];
   const transfers = data?.transfers ?? [];
+  const transferAuthors = data?.transferAuthors ?? {};
 
   const snapshot = useMemo(
     () =>
