@@ -938,7 +938,17 @@ function ReconcilePanel({
                       {r.skipped}
                     </TableCell>
                     <TableCell className="align-top">
-                      {r.error ? (
+                      {r.locked ? (
+                        <div className="flex flex-col gap-1">
+                          <Badge variant="outline" className="w-fit">
+                            Locked
+                          </Badge>
+                          <span className="text-[11px] text-muted-foreground">
+                            Held since{" "}
+                            {r.locked_since ? relative(r.locked_since) : "—"}
+                          </span>
+                        </div>
+                      ) : r.error ? (
                         <span
                           className="text-xs text-destructive truncate block max-w-[32ch]"
                           title={r.error}
@@ -948,6 +958,7 @@ function ReconcilePanel({
                       ) : (
                         <Badge variant="secondary">OK</Badge>
                       )}
+
                       {lastWasDryRun &&
                         ((r.pulled_ids?.length ?? 0) > 0 ||
                           (r.pushed_ids?.length ?? 0) > 0) && (
