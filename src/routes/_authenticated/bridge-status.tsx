@@ -512,3 +512,172 @@ function AttemptsPanel({
     </Card>
   );
 }
+
+function BedBoardVerificationPanel({
+  rows,
+  ranAt,
+  loading,
+  error,
+  onRefresh,
+  refreshing,
+}: {
+  rows: BedBoardVerificationRow[];
+  ranAt: string | null;
+  loading: boolean;
+  error: Error | null;
+  onRefresh: () => void;
+  refreshing: boolean;
+}) {
+  const staleCount = rows.filter((r) => r.stale).length;
+  return (
+    <Card className="p-0 overflow-hidden">
+      <div className="px-4 py-3 border-b flex items-center justify-between gap-2 flex-wrap">
+        <div>
+          <div className="text-sm font-medium">Bed board verification</div>
+          <p className="text-xs text-muted-foreground">
+            Cross-checks each synced bed table against what the bed board query
+            returns. Flags lag and missing/extra records.
+          </p>
+        </div>
+        <div className="flex items-center gap-2">
+          {rows.length > 0 &&
+            (staleCount === 0 ? (
+              <Badge variant="secondary">All in sync</Badge>
+            ) : (
+              <Badge variant="destructive">
+                {staleCount} stale
+              </Badge>
+            ))}
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={onRefresh}
+            disabled={refreshing}
+          >
+            <RefreshCcw
+              className={`h-4 w-4 mr-1 ${refreshing ? "animate-spin" : ""}`}
+            />
+            Recheck
+          </Button>
+        </div>
+      </div>
+      {error ? (
+        <div className="p-4 text-sm text-destructive flex items-center gap-2">
+          <AlertCircle className="h-4 w-4" />
+          {error.message}
+        </div>
+      ) : loading ? (
+        <div className="p-4 text-sm text-muted-foreground">
+          Running verification…
+        </div>
+      ) : rows.length === 0 ? (
+        <div className="p-4 text-sm text-muted-foreground">
+          No verification data yet.
+        </div>
+      ) : (
+        <>
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Table</TableHead>
+                <TableHead className="text-right">Synced</TableHead>
+                <TableHead className="text-right">On board</TableHead>
+                <TableHead className="text-right">Δ</TableHead>
+                <TableHead>Latest synced row</TableHead>
+                <TableHead>Last pulled</TableHead>
+                <TableHead className="text-right">Lag</TableHead>
+                <TableHead>Status</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {rows.map((r) => {
+                const delta = r.synced_rows - r.board_rows;
+                return (
+                  <TableRow key={r.table}>
+                    <TableCell className="font-medium">{r.table}</TableCell>
+                    <TableCell className="text-right tabular-nums">
+                      {r.synced_rows.toLocaleString()}
+                    </TableCell>
+                    <TableCell className="text-right tabular-nums">
+                      {r.board_rows.toLocaleString()}
+                    </TableCell>
+                    <TableCell
+                      className={`text-right tabular-nums ${delta !== 0 ? "text-amber-600 font-medium" : "text-muted-foreground"}`}
+                    >
+                      {delta > 0 ? `+${delta}` : delta}
+                    </TableCell>
+                    <TableCell>
+                      <div>{fmt(r.latest_synced_at)}</div>
+                      <div className="text-xs text-muted-foreground">
+                        {relative(r.latest_synced_at)}
+                      </div>
+                    </TableCell>
+                    <TableCell>
+                      <div>{fmt(r.last_pulled_at)}</div>
+                      <div className="text-xs text-muted-foreground">
+                        {relative(r.last_pulled_at)}
+                      </div>
+                    </TableCell>
+                    <TableCell className="text-right tabular-nums">
+                      {r.lag_seconds == null
+                        ? "—"
+                        : r.lag_seconds < 60
+                          ? `${r.lag_seconds}s`
+                          : `${Math.round(r.lag_seconds / 60)}m`}
+                    </TableCell>
+                    <TableCell>
+                      {r.stale ? (
+                        <Badge variant="destructive">Stale</Badge>
+                      ) : (
+                        <Badge variant="secondary">OK</Badge>
+                      )}
+                    </TableCell>
+                  </TableRow>
+                );
+              })}
+            </TableBody>
+          </Table>
+          {rows.some(
+            (r) => r.missing_from_board.length || r.extra_on_board.length,
+          ) && (
+            <div className="border-t p-4 space-y-3 bg-muted/30">
+              <div className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                Record discrepancies
+              </div>
+              {rows.map((r) =>
+                r.missing_from_board.length || r.extra_on_board.length ? (
+                  <div key={r.table} className="text-xs space-y-1">
+                    <div className="font-medium">{r.table}</div>
+                    {r.missing_from_board.length > 0 && (
+                      <div className="text-amber-700">
+                        Missing from board ({r.missing_from_board.length}
+                        {r.missing_from_board.length >= 10 ? "+" : ""}):{" "}
+                        <code className="text-[11px] break-all">
+                          {r.missing_from_board.join(", ")}
+                        </code>
+                      </div>
+                    )}
+                    {r.extra_on_board.length > 0 && (
+                      <div className="text-amber-700">
+                        Extra on board ({r.extra_on_board.length}
+                        {r.extra_on_board.length >= 10 ? "+" : ""}):{" "}
+                        <code className="text-[11px] break-all">
+                          {r.extra_on_board.join(", ")}
+                        </code>
+                      </div>
+                    )}
+                  </div>
+                ) : null,
+              )}
+            </div>
+          )}
+          {ranAt && (
+            <div className="border-t px-4 py-2 text-xs text-muted-foreground">
+              Verified {relative(ranAt)}.
+            </div>
+          )}
+        </>
+      )}
+    </Card>
+  );
+}
