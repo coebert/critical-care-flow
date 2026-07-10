@@ -251,15 +251,22 @@ async function processJob(admin: any, job: any) {
           }
         }
       } catch (err) {
-        if (err instanceof sync.PartnerEndpointMissingError) {
+        const e = err as { name?: string; message?: string };
+        // Name-based check: works even when the class identity differs across
+        // dynamic vs static import chunks in the built worker bundle.
+        if (
+          e?.name === "PartnerEndpointMissingError" ||
+          err instanceof sync.PartnerEndpointMissingError
+        ) {
           // Partner app doesn't expose this bridge endpoint — treat as a
           // clean skip so the job doesn't fail on the whole window.
           skipped += 1;
           error = null;
         } else {
-          error = (err as Error).message;
+          error = e?.message ?? String(err);
         }
       }
+
 
 
     }
