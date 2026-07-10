@@ -10,7 +10,7 @@ self.addEventListener("activate", (event) => {
 });
 
 self.addEventListener("push", (event) => {
-  let payload = { title: "SDH Critical Care", body: "New activity", url: "/" };
+  let payload = { title: "Radnor Critical Care", body: "New activity", url: "/" };
   try {
     if (event.data) {
       const data = event.data.json();
