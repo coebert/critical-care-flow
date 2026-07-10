@@ -160,11 +160,7 @@ export const sendBridgeTestPayload = createServerFn({ method: "POST" })
       partner: string;
       results: BridgeProbeResult[];
     }> => {
-      const { data: isAdmin } = await context.supabase.rpc("has_role", {
-        _user_id: context.userId,
-        _role: "admin",
-      });
-      if (!isAdmin) throw new Error("admin_required");
+      await assertAdmin(context);
 
       const partner = process.env.PARTNER_BRIDGE_URL;
       if (!partner) throw new Error("PARTNER_BRIDGE_URL not configured");
