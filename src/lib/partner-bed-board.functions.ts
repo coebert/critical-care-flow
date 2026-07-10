@@ -146,32 +146,46 @@ export const getPartnerBedBoard = createServerFn({ method: "GET" })
         return { ok: false, error: lastError, fetched_at: fetchedAt };
       }
 
-      const p = payload as Partial<PartnerBedBoardOk> | null;
-      if (!p || !Array.isArray(p.bed_board)) {
-        return {
-          ok: false,
-          error: "partner payload missing bed_board array",
-          fetched_at: fetchedAt,
-        };
-      }
-
-      return {
-        ok: true,
-        unit: typeof p.unit === "string" ? p.unit : "Radnor Critical Care Unit",
-        side_rooms: Array.isArray(p.side_rooms) ? p.side_rooms : [],
-        bed_board: p.bed_board as PartnerBedSlot[],
-        unassigned: Array.isArray(p.unassigned) ? (p.unassigned as PartnerOccupant[]) : [],
-        stats: p.stats ?? {
-          total_beds: p.bed_board.length,
-          occupied: p.bed_board.filter((b) => b.occupied).length,
-          available:
-            p.bed_board.length - p.bed_board.filter((b) => b.occupied).length,
-          unassigned: 0,
-        },
-        fetched_at: fetchedAt,
-      };
+      return mapPartnerPayload(payload, fetchedAt);
     }
 
     return { ok: false, error: lastError, fetched_at: fetchedAt };
   });
+
+/**
+ * Pure mapper for the partner `/bridge/beds` composite payload → our
+ * PartnerBedBoardResult. Exported for unit tests; the server fn above calls it
+ * with the raw JSON body after a successful fetch.
+ */
+export function mapPartnerPayload(
+  payload: unknown,
+  fetchedAt: string,
+): PartnerBedBoardResult {
+  const p = payload as Partial<PartnerBedBoardOk> | null;
+  if (!p || !Array.isArray(p.bed_board)) {
+    return {
+      ok: false,
+      error: "partner payload missing bed_board array",
+      fetched_at: fetchedAt,
+    };
+  }
+  const bedBoard = p.bed_board as PartnerBedSlot[];
+  return {
+    ok: true,
+    unit: typeof p.unit === "string" ? p.unit : "Radnor Critical Care Unit",
+    side_rooms: Array.isArray(p.side_rooms) ? p.side_rooms : [],
+    bed_board: bedBoard,
+    unassigned: Array.isArray(p.unassigned)
+      ? (p.unassigned as PartnerOccupant[])
+      : [],
+    stats: p.stats ?? {
+      total_beds: bedBoard.length,
+      occupied: bedBoard.filter((b) => b.occupied).length,
+      available: bedBoard.length - bedBoard.filter((b) => b.occupied).length,
+      unassigned: 0,
+    },
+    fetched_at: fetchedAt,
+  };
+}
+
 
