@@ -242,3 +242,35 @@ export const sendBridgeTestPayload = createServerFn({ method: "POST" })
     },
   );
 
+export type BridgeSyncAttempt = {
+  id: number;
+  attempted_at: string;
+  source: "sync" | "retry" | "manual";
+  resource: string;
+  ok: boolean;
+  pulled: number;
+  pushed: number;
+  duration_ms: number | null;
+  error: string | null;
+};
+
+/**
+ * Returns the most recent bridge sync attempts (admin-only).
+ * Backs the audit log panel on the bridge status page.
+ */
+export const getBridgeSyncAttempts = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ context }): Promise<BridgeSyncAttempt[]> => {
+    await assertAdmin(context);
+    const { supabaseAdmin } = await import(
+      "@/integrations/supabase/client.server"
+    );
+    const { data, error } = await (supabaseAdmin as any)
+      .from("bridge_sync_attempts")
+      .select("id, attempted_at, source, resource, ok, pulled, pushed, duration_ms, error")
+      .order("attempted_at", { ascending: false })
+      .limit(100);
+    if (error) throw new Error(error.message);
+    return (data ?? []) as BridgeSyncAttempt[];
+  });
+
