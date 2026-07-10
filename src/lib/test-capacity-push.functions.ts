@@ -149,7 +149,7 @@ export const sendTestCapacityPush = createServerFn({ method: "POST" })
         auth: s.auth,
       })),
       {
-        title: `Critical Care — ${shiftLabel} capacity (test)`,
+        title: `Radnor Critical Care — ${shiftLabel} capacity (test)`,
         body,
         url: deepLinkUrl,
         tag: `capacity-test-${userId}-${shift}-${focusLevel}`,
