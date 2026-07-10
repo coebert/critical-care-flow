@@ -319,6 +319,17 @@ function BridgeStatusPage() {
             refreshing={verifyQuery.isFetching}
           />
 
+          <ReconcilePanel
+            stale={(verifyQuery.data?.rows ?? []).some((r) => r.stale)}
+            onDone={() => {
+              verifyQuery.refetch();
+              query.refetch();
+              attemptsQuery.refetch();
+            }}
+          />
+
+
+
           <AttemptsPanel
             attempts={attemptsQuery.data ?? []}
             loading={attemptsQuery.isLoading}
