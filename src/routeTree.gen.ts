@@ -45,6 +45,10 @@ import { Route as ApiPublicBridgeNotificationsRouteImport } from './routes/api/p
 import { Route as ApiPublicBridgeMicrobiologyRouteImport } from './routes/api/public/bridge/microbiology'
 import { Route as ApiPublicBridgeInvestigationsRouteImport } from './routes/api/public/bridge/investigations'
 import { Route as ApiPublicBridgeHealthRouteImport } from './routes/api/public/bridge/health'
+import { Route as ApiPublicBridgeBedsRouteImport } from './routes/api/public/bridge/beds'
+import { Route as ApiPublicBridgeBed_transfers_outRouteImport } from './routes/api/public/bridge/bed_transfers_out'
+import { Route as ApiPublicBridgeBed_outliersRouteImport } from './routes/api/public/bridge/bed_outliers'
+import { Route as ApiPublicBridgeBed_occupanciesRouteImport } from './routes/api/public/bridge/bed_occupancies'
 import { Route as ApiPublicBridgeAuditRouteImport } from './routes/api/public/bridge/audit'
 import { Route as AuthenticatedPostopBookingsIdEditRouteImport } from './routes/_authenticated/postop-bookings.$id.edit'
 
@@ -244,6 +248,29 @@ const ApiPublicBridgeHealthRoute = ApiPublicBridgeHealthRouteImport.update({
   path: '/api/public/bridge/health',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiPublicBridgeBedsRoute = ApiPublicBridgeBedsRouteImport.update({
+  id: '/api/public/bridge/beds',
+  path: '/api/public/bridge/beds',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiPublicBridgeBed_transfers_outRoute =
+  ApiPublicBridgeBed_transfers_outRouteImport.update({
+    id: '/api/public/bridge/bed_transfers_out',
+    path: '/api/public/bridge/bed_transfers_out',
+    getParentRoute: () => rootRouteImport,
+  } as any)
+const ApiPublicBridgeBed_outliersRoute =
+  ApiPublicBridgeBed_outliersRouteImport.update({
+    id: '/api/public/bridge/bed_outliers',
+    path: '/api/public/bridge/bed_outliers',
+    getParentRoute: () => rootRouteImport,
+  } as any)
+const ApiPublicBridgeBed_occupanciesRoute =
+  ApiPublicBridgeBed_occupanciesRouteImport.update({
+    id: '/api/public/bridge/bed_occupancies',
+    path: '/api/public/bridge/bed_occupancies',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 const ApiPublicBridgeAuditRoute = ApiPublicBridgeAuditRouteImport.update({
   id: '/api/public/bridge/audit',
   path: '/api/public/bridge/audit',
@@ -286,6 +313,10 @@ export interface FileRoutesByFullPath {
   '/postop-bookings/': typeof AuthenticatedPostopBookingsIndexRoute
   '/postop-bookings/$id/edit': typeof AuthenticatedPostopBookingsIdEditRoute
   '/api/public/bridge/audit': typeof ApiPublicBridgeAuditRoute
+  '/api/public/bridge/bed_occupancies': typeof ApiPublicBridgeBed_occupanciesRoute
+  '/api/public/bridge/bed_outliers': typeof ApiPublicBridgeBed_outliersRoute
+  '/api/public/bridge/bed_transfers_out': typeof ApiPublicBridgeBed_transfers_outRoute
+  '/api/public/bridge/beds': typeof ApiPublicBridgeBedsRoute
   '/api/public/bridge/health': typeof ApiPublicBridgeHealthRoute
   '/api/public/bridge/investigations': typeof ApiPublicBridgeInvestigationsRoute
   '/api/public/bridge/microbiology': typeof ApiPublicBridgeMicrobiologyRoute
@@ -325,6 +356,10 @@ export interface FileRoutesByTo {
   '/postop-bookings': typeof AuthenticatedPostopBookingsIndexRoute
   '/postop-bookings/$id/edit': typeof AuthenticatedPostopBookingsIdEditRoute
   '/api/public/bridge/audit': typeof ApiPublicBridgeAuditRoute
+  '/api/public/bridge/bed_occupancies': typeof ApiPublicBridgeBed_occupanciesRoute
+  '/api/public/bridge/bed_outliers': typeof ApiPublicBridgeBed_outliersRoute
+  '/api/public/bridge/bed_transfers_out': typeof ApiPublicBridgeBed_transfers_outRoute
+  '/api/public/bridge/beds': typeof ApiPublicBridgeBedsRoute
   '/api/public/bridge/health': typeof ApiPublicBridgeHealthRoute
   '/api/public/bridge/investigations': typeof ApiPublicBridgeInvestigationsRoute
   '/api/public/bridge/microbiology': typeof ApiPublicBridgeMicrobiologyRoute
@@ -366,6 +401,10 @@ export interface FileRoutesById {
   '/_authenticated/postop-bookings/': typeof AuthenticatedPostopBookingsIndexRoute
   '/_authenticated/postop-bookings/$id/edit': typeof AuthenticatedPostopBookingsIdEditRoute
   '/api/public/bridge/audit': typeof ApiPublicBridgeAuditRoute
+  '/api/public/bridge/bed_occupancies': typeof ApiPublicBridgeBed_occupanciesRoute
+  '/api/public/bridge/bed_outliers': typeof ApiPublicBridgeBed_outliersRoute
+  '/api/public/bridge/bed_transfers_out': typeof ApiPublicBridgeBed_transfers_outRoute
+  '/api/public/bridge/beds': typeof ApiPublicBridgeBedsRoute
   '/api/public/bridge/health': typeof ApiPublicBridgeHealthRoute
   '/api/public/bridge/investigations': typeof ApiPublicBridgeInvestigationsRoute
   '/api/public/bridge/microbiology': typeof ApiPublicBridgeMicrobiologyRoute
@@ -407,6 +446,10 @@ export interface FileRouteTypes {
     | '/postop-bookings/'
     | '/postop-bookings/$id/edit'
     | '/api/public/bridge/audit'
+    | '/api/public/bridge/bed_occupancies'
+    | '/api/public/bridge/bed_outliers'
+    | '/api/public/bridge/bed_transfers_out'
+    | '/api/public/bridge/beds'
     | '/api/public/bridge/health'
     | '/api/public/bridge/investigations'
     | '/api/public/bridge/microbiology'
@@ -446,6 +489,10 @@ export interface FileRouteTypes {
     | '/postop-bookings'
     | '/postop-bookings/$id/edit'
     | '/api/public/bridge/audit'
+    | '/api/public/bridge/bed_occupancies'
+    | '/api/public/bridge/bed_outliers'
+    | '/api/public/bridge/bed_transfers_out'
+    | '/api/public/bridge/beds'
     | '/api/public/bridge/health'
     | '/api/public/bridge/investigations'
     | '/api/public/bridge/microbiology'
@@ -486,6 +533,10 @@ export interface FileRouteTypes {
     | '/_authenticated/postop-bookings/'
     | '/_authenticated/postop-bookings/$id/edit'
     | '/api/public/bridge/audit'
+    | '/api/public/bridge/bed_occupancies'
+    | '/api/public/bridge/bed_outliers'
+    | '/api/public/bridge/bed_transfers_out'
+    | '/api/public/bridge/beds'
     | '/api/public/bridge/health'
     | '/api/public/bridge/investigations'
     | '/api/public/bridge/microbiology'
@@ -505,6 +556,10 @@ export interface RootRouteChildren {
   SecurityRoute: typeof SecurityRoute
   SetupRoute: typeof SetupRoute
   ApiPublicBridgeAuditRoute: typeof ApiPublicBridgeAuditRoute
+  ApiPublicBridgeBed_occupanciesRoute: typeof ApiPublicBridgeBed_occupanciesRoute
+  ApiPublicBridgeBed_outliersRoute: typeof ApiPublicBridgeBed_outliersRoute
+  ApiPublicBridgeBed_transfers_outRoute: typeof ApiPublicBridgeBed_transfers_outRoute
+  ApiPublicBridgeBedsRoute: typeof ApiPublicBridgeBedsRoute
   ApiPublicBridgeHealthRoute: typeof ApiPublicBridgeHealthRoute
   ApiPublicBridgeInvestigationsRoute: typeof ApiPublicBridgeInvestigationsRoute
   ApiPublicBridgeMicrobiologyRoute: typeof ApiPublicBridgeMicrobiologyRoute
@@ -769,6 +824,34 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiPublicBridgeHealthRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/public/bridge/beds': {
+      id: '/api/public/bridge/beds'
+      path: '/api/public/bridge/beds'
+      fullPath: '/api/public/bridge/beds'
+      preLoaderRoute: typeof ApiPublicBridgeBedsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/public/bridge/bed_transfers_out': {
+      id: '/api/public/bridge/bed_transfers_out'
+      path: '/api/public/bridge/bed_transfers_out'
+      fullPath: '/api/public/bridge/bed_transfers_out'
+      preLoaderRoute: typeof ApiPublicBridgeBed_transfers_outRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/public/bridge/bed_outliers': {
+      id: '/api/public/bridge/bed_outliers'
+      path: '/api/public/bridge/bed_outliers'
+      fullPath: '/api/public/bridge/bed_outliers'
+      preLoaderRoute: typeof ApiPublicBridgeBed_outliersRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/public/bridge/bed_occupancies': {
+      id: '/api/public/bridge/bed_occupancies'
+      path: '/api/public/bridge/bed_occupancies'
+      fullPath: '/api/public/bridge/bed_occupancies'
+      preLoaderRoute: typeof ApiPublicBridgeBed_occupanciesRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/public/bridge/audit': {
       id: '/api/public/bridge/audit'
       path: '/api/public/bridge/audit'
@@ -870,6 +953,10 @@ const rootRouteChildren: RootRouteChildren = {
   SecurityRoute: SecurityRoute,
   SetupRoute: SetupRoute,
   ApiPublicBridgeAuditRoute: ApiPublicBridgeAuditRoute,
+  ApiPublicBridgeBed_occupanciesRoute: ApiPublicBridgeBed_occupanciesRoute,
+  ApiPublicBridgeBed_outliersRoute: ApiPublicBridgeBed_outliersRoute,
+  ApiPublicBridgeBed_transfers_outRoute: ApiPublicBridgeBed_transfers_outRoute,
+  ApiPublicBridgeBedsRoute: ApiPublicBridgeBedsRoute,
   ApiPublicBridgeHealthRoute: ApiPublicBridgeHealthRoute,
   ApiPublicBridgeInvestigationsRoute: ApiPublicBridgeInvestigationsRoute,
   ApiPublicBridgeMicrobiologyRoute: ApiPublicBridgeMicrobiologyRoute,

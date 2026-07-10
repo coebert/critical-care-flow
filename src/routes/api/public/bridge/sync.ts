@@ -19,7 +19,11 @@ type ResourceKey =
   | "patients"
   | "investigations"
   | "microbiology"
-  | "referrals";
+  | "referrals"
+  | "beds"
+  | "bed_occupancies"
+  | "bed_outliers"
+  | "bed_transfers_out";
 
 // Portable column allowlists per resource. Sync pushes ONLY these keys to the
 // partner so that partner-side validators (which reject unknown fields such
@@ -108,6 +112,79 @@ const PUSH_ALLOW: Record<ResourceKey, readonly string[]> = {
     "needs_ward_review",
     "ward_review_timeframe",
     "for_ongoing_ccot_review",
+  ],
+  beds: [
+    "id",
+    "code",
+    "unit",
+    "is_side_room",
+    "notes",
+    "active",
+    "sort_order",
+  ],
+  bed_occupancies: [
+    "id",
+    "bed_id",
+    "hospital_number",
+    "patient_initials",
+    "admitting_consultant",
+    "admitted_at",
+    "discharged_at",
+    "level",
+    "ventilated",
+    "nippv_cpap",
+    "hfno",
+    "vasopressors",
+    "renal_replacement",
+    "tracheostomy",
+    "isolation",
+    "isolation_reason",
+    "requires_side_room",
+    "predicted_discharge_at",
+    "predicted_step_down",
+    "actual_step_down",
+    "notes",
+    "source_referral_id",
+    "source_postop_booking_id",
+    "patient_id",
+    "wardable",
+  ],
+  bed_outliers: [
+    "id",
+    "hospital_number",
+    "patient_initials",
+    "ward",
+    "admitting_consultant",
+    "started_at",
+    "ended_at",
+    "level",
+    "ventilated",
+    "nippv_cpap",
+    "hfno",
+    "vasopressors",
+    "renal_replacement",
+    "reason",
+    "notes",
+    "deleted_at",
+  ],
+  bed_transfers_out: [
+    "id",
+    "occupancy_id",
+    "kind",
+    "destination_hospital",
+    "destination_specialty",
+    "reason",
+    "transport_mode",
+    "status",
+    "requested_at",
+    "accepted_at",
+    "eta_at",
+    "departed_at",
+    "completed_at",
+    "cancelled_at",
+    "cancel_reason",
+    "notes",
+    "deleted_at",
   ],
 };
 
