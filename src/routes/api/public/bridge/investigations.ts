@@ -106,7 +106,7 @@ export const Route = createFileRoute("/api/public/bridge/investigations")({
 
         const { data, error } = await supabaseAdmin
           .from("investigations")
-          .upsert(record, { onConflict: "id" })
+          .upsert(record as any, { onConflict: "id" })
           .select("*")
           .single();
         if (error) {
@@ -121,7 +121,7 @@ export const Route = createFileRoute("/api/public/bridge/investigations")({
           diff: {
             source: "handover_bridge",
             actor: verified.actor,
-            record,
+            record: record as any,
           },
         });
 

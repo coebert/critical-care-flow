@@ -61,7 +61,7 @@ export const Route = createFileRoute("/api/public/bridge/patients")({
           .select("*")
           .order("updated_at", { ascending: true })
           .limit(limit);
-        if (status) q = q.eq("status", status);
+        if (status) q = q.eq("status", status as any);
         if (since) q = q.gt("updated_at", since);
 
         const { data, error } = await q;
@@ -133,7 +133,7 @@ export const Route = createFileRoute("/api/public/bridge/patients")({
 
         const { data, error } = await supabaseAdmin
           .from("patients")
-          .upsert(record, { onConflict: "id" })
+          .upsert(record as any, { onConflict: "id" })
           .select("*")
           .single();
         if (error) {
@@ -148,7 +148,7 @@ export const Route = createFileRoute("/api/public/bridge/patients")({
           diff: {
             source: "handover_bridge",
             actor: verified.actor,
-            record,
+            record: record as any,
           },
         });
 

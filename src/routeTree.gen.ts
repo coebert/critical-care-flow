@@ -37,6 +37,9 @@ import { Route as AuthenticatedPostopBookingsAnalyticsRouteImport } from './rout
 import { Route as AuthenticatedInboxIdRouteImport } from './routes/_authenticated/inbox.$id'
 import { Route as AuthenticatedBoardWardRoundRouteImport } from './routes/_authenticated/board.ward-round'
 import { Route as ApiPublicBridgeVerifySignatureRouteImport } from './routes/api/public/bridge/verify-signature'
+import { Route as ApiPublicBridgePatientsRouteImport } from './routes/api/public/bridge/patients'
+import { Route as ApiPublicBridgeMicrobiologyRouteImport } from './routes/api/public/bridge/microbiology'
+import { Route as ApiPublicBridgeInvestigationsRouteImport } from './routes/api/public/bridge/investigations'
 import { Route as ApiPublicBridgeHealthRouteImport } from './routes/api/public/bridge/health'
 import { Route as AuthenticatedPostopBookingsIdEditRouteImport } from './routes/_authenticated/postop-bookings.$id.edit'
 
@@ -191,6 +194,23 @@ const ApiPublicBridgeVerifySignatureRoute =
     path: '/api/public/bridge/verify-signature',
     getParentRoute: () => rootRouteImport,
   } as any)
+const ApiPublicBridgePatientsRoute = ApiPublicBridgePatientsRouteImport.update({
+  id: '/api/public/bridge/patients',
+  path: '/api/public/bridge/patients',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiPublicBridgeMicrobiologyRoute =
+  ApiPublicBridgeMicrobiologyRouteImport.update({
+    id: '/api/public/bridge/microbiology',
+    path: '/api/public/bridge/microbiology',
+    getParentRoute: () => rootRouteImport,
+  } as any)
+const ApiPublicBridgeInvestigationsRoute =
+  ApiPublicBridgeInvestigationsRouteImport.update({
+    id: '/api/public/bridge/investigations',
+    path: '/api/public/bridge/investigations',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 const ApiPublicBridgeHealthRoute = ApiPublicBridgeHealthRouteImport.update({
   id: '/api/public/bridge/health',
   path: '/api/public/bridge/health',
@@ -232,6 +252,9 @@ export interface FileRoutesByFullPath {
   '/postop-bookings/': typeof AuthenticatedPostopBookingsIndexRoute
   '/postop-bookings/$id/edit': typeof AuthenticatedPostopBookingsIdEditRoute
   '/api/public/bridge/health': typeof ApiPublicBridgeHealthRoute
+  '/api/public/bridge/investigations': typeof ApiPublicBridgeInvestigationsRoute
+  '/api/public/bridge/microbiology': typeof ApiPublicBridgeMicrobiologyRoute
+  '/api/public/bridge/patients': typeof ApiPublicBridgePatientsRoute
   '/api/public/bridge/verify-signature': typeof ApiPublicBridgeVerifySignatureRoute
 }
 export interface FileRoutesByTo {
@@ -263,6 +286,9 @@ export interface FileRoutesByTo {
   '/postop-bookings': typeof AuthenticatedPostopBookingsIndexRoute
   '/postop-bookings/$id/edit': typeof AuthenticatedPostopBookingsIdEditRoute
   '/api/public/bridge/health': typeof ApiPublicBridgeHealthRoute
+  '/api/public/bridge/investigations': typeof ApiPublicBridgeInvestigationsRoute
+  '/api/public/bridge/microbiology': typeof ApiPublicBridgeMicrobiologyRoute
+  '/api/public/bridge/patients': typeof ApiPublicBridgePatientsRoute
   '/api/public/bridge/verify-signature': typeof ApiPublicBridgeVerifySignatureRoute
 }
 export interface FileRoutesById {
@@ -296,6 +322,9 @@ export interface FileRoutesById {
   '/_authenticated/postop-bookings/': typeof AuthenticatedPostopBookingsIndexRoute
   '/_authenticated/postop-bookings/$id/edit': typeof AuthenticatedPostopBookingsIdEditRoute
   '/api/public/bridge/health': typeof ApiPublicBridgeHealthRoute
+  '/api/public/bridge/investigations': typeof ApiPublicBridgeInvestigationsRoute
+  '/api/public/bridge/microbiology': typeof ApiPublicBridgeMicrobiologyRoute
+  '/api/public/bridge/patients': typeof ApiPublicBridgePatientsRoute
   '/api/public/bridge/verify-signature': typeof ApiPublicBridgeVerifySignatureRoute
 }
 export interface FileRouteTypes {
@@ -329,6 +358,9 @@ export interface FileRouteTypes {
     | '/postop-bookings/'
     | '/postop-bookings/$id/edit'
     | '/api/public/bridge/health'
+    | '/api/public/bridge/investigations'
+    | '/api/public/bridge/microbiology'
+    | '/api/public/bridge/patients'
     | '/api/public/bridge/verify-signature'
   fileRoutesByTo: FileRoutesByTo
   to:
@@ -360,6 +392,9 @@ export interface FileRouteTypes {
     | '/postop-bookings'
     | '/postop-bookings/$id/edit'
     | '/api/public/bridge/health'
+    | '/api/public/bridge/investigations'
+    | '/api/public/bridge/microbiology'
+    | '/api/public/bridge/patients'
     | '/api/public/bridge/verify-signature'
   id:
     | '__root__'
@@ -392,6 +427,9 @@ export interface FileRouteTypes {
     | '/_authenticated/postop-bookings/'
     | '/_authenticated/postop-bookings/$id/edit'
     | '/api/public/bridge/health'
+    | '/api/public/bridge/investigations'
+    | '/api/public/bridge/microbiology'
+    | '/api/public/bridge/patients'
     | '/api/public/bridge/verify-signature'
   fileRoutesById: FileRoutesById
 }
@@ -404,6 +442,9 @@ export interface RootRouteChildren {
   SecurityRoute: typeof SecurityRoute
   SetupRoute: typeof SetupRoute
   ApiPublicBridgeHealthRoute: typeof ApiPublicBridgeHealthRoute
+  ApiPublicBridgeInvestigationsRoute: typeof ApiPublicBridgeInvestigationsRoute
+  ApiPublicBridgeMicrobiologyRoute: typeof ApiPublicBridgeMicrobiologyRoute
+  ApiPublicBridgePatientsRoute: typeof ApiPublicBridgePatientsRoute
   ApiPublicBridgeVerifySignatureRoute: typeof ApiPublicBridgeVerifySignatureRoute
 }
 
@@ -605,6 +646,27 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiPublicBridgeVerifySignatureRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/public/bridge/patients': {
+      id: '/api/public/bridge/patients'
+      path: '/api/public/bridge/patients'
+      fullPath: '/api/public/bridge/patients'
+      preLoaderRoute: typeof ApiPublicBridgePatientsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/public/bridge/microbiology': {
+      id: '/api/public/bridge/microbiology'
+      path: '/api/public/bridge/microbiology'
+      fullPath: '/api/public/bridge/microbiology'
+      preLoaderRoute: typeof ApiPublicBridgeMicrobiologyRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/public/bridge/investigations': {
+      id: '/api/public/bridge/investigations'
+      path: '/api/public/bridge/investigations'
+      fullPath: '/api/public/bridge/investigations'
+      preLoaderRoute: typeof ApiPublicBridgeInvestigationsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/public/bridge/health': {
       id: '/api/public/bridge/health'
       path: '/api/public/bridge/health'
@@ -704,18 +766,11 @@ const rootRouteChildren: RootRouteChildren = {
   SecurityRoute: SecurityRoute,
   SetupRoute: SetupRoute,
   ApiPublicBridgeHealthRoute: ApiPublicBridgeHealthRoute,
+  ApiPublicBridgeInvestigationsRoute: ApiPublicBridgeInvestigationsRoute,
+  ApiPublicBridgeMicrobiologyRoute: ApiPublicBridgeMicrobiologyRoute,
+  ApiPublicBridgePatientsRoute: ApiPublicBridgePatientsRoute,
   ApiPublicBridgeVerifySignatureRoute: ApiPublicBridgeVerifySignatureRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
-
-import type { getRouter } from './router.tsx'
-import type { startInstance } from './start.ts'
-declare module '@tanstack/react-start' {
-  interface Register {
-    ssr: true
-    router: Awaited<ReturnType<typeof getRouter>>
-    config: Awaited<ReturnType<typeof startInstance.getOptions>>
-  }
-}
