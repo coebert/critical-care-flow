@@ -12,7 +12,18 @@ import { Card } from "@/components/ui/card";
 import { toast } from "sonner";
 import { Toaster } from "@/components/ui/sonner";
 
-// Public server fn — only works if no users exist yet. After that, it refuses.
+// Timing-safe string compare (avoid direct === for secret comparison).
+function safeEqualStr(a: string, b: string): boolean {
+  if (a.length !== b.length) return false;
+  let diff = 0;
+  for (let i = 0; i < a.length; i++) diff |= a.charCodeAt(i) ^ b.charCodeAt(i);
+  return diff === 0;
+}
+
+// Public server fn — refuses unless (a) no users exist AND (b) a valid
+// out-of-band SETUP_SECRET is provided. Without the secret set on the
+// server, /setup is disabled entirely, preventing a takeover race by
+// anyone who reaches the URL before the legitimate operator.
 const bootstrapFirstAdmin = createServerFn({ method: "POST" })
   .inputValidator((d: unknown) =>
     z
@@ -20,16 +31,25 @@ const bootstrapFirstAdmin = createServerFn({ method: "POST" })
         email: z.string().email().max(255),
         password: z.string().min(8).max(128),
         full_name: z.string().trim().min(1).max(120),
+        setup_secret: z.string().min(1).max(256),
       })
       .parse(d),
   )
   .handler(async ({ data }) => {
+    const expected = process.env.SETUP_SECRET;
+    if (!expected || expected.length < 16) {
+      throw new Error("Setup is disabled. Contact your administrator.");
+    }
+    if (!safeEqualStr(data.setup_secret, expected)) {
+      throw new Error("Invalid setup secret.");
+    }
+
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const { data: users, error: listErr } = await supabaseAdmin.auth.admin.listUsers({ perPage: 1 });
     if (listErr) throw safeError("setup.listUsers", listErr, "Setup check failed.");
     if (users.users.length > 0) throw new Error("Setup already complete. Sign in instead.");
 
-    const { data: created, error } = await supabaseAdmin.auth.admin.createUser({
+    const { error } = await supabaseAdmin.auth.admin.createUser({
       email: data.email,
       password: data.password,
       email_confirm: true,
@@ -40,11 +60,14 @@ const bootstrapFirstAdmin = createServerFn({ method: "POST" })
     return { ok: true };
   });
 
-const hasAnyUser = createServerFn({ method: "GET" }).handler(async () => {
+// Reports whether setup is currently possible. Does NOT reveal the secret;
+// only whether (a) it is configured and (b) no users exist yet.
+const setupAvailability = createServerFn({ method: "GET" }).handler(async () => {
+  const secretConfigured = !!(process.env.SETUP_SECRET && process.env.SETUP_SECRET.length >= 16);
   const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
   const { data, error } = await supabaseAdmin.auth.admin.listUsers({ perPage: 1 });
   if (error) throw safeError("setup.hasAnyUser", error, "Setup check failed.");
-  return { hasUsers: data.users.length > 0 };
+  return { hasUsers: data.users.length > 0, secretConfigured };
 });
 
 export const Route = createFileRoute("/setup")({
@@ -56,15 +79,17 @@ export const Route = createFileRoute("/setup")({
 function SetupPage() {
   const navigate = useNavigate();
   const bootstrap = useServerFn(bootstrapFirstAdmin);
-  const check = useServerFn(hasAnyUser);
+  const check = useServerFn(setupAvailability);
   const [checking, setChecking] = useState(true);
   const [available, setAvailable] = useState(false);
-  const [f, setF] = useState({ email: "", password: "", full_name: "" });
+  const [secretConfigured, setSecretConfigured] = useState(false);
+  const [f, setF] = useState({ email: "", password: "", full_name: "", setup_secret: "" });
   const [busy, setBusy] = useState(false);
 
   useEffect(() => {
     check({}).then((r: any) => {
-      setAvailable(!r.hasUsers);
+      setAvailable(!r.hasUsers && r.secretConfigured);
+      setSecretConfigured(!!r.secretConfigured);
       setChecking(false);
     });
   }, [check]);
@@ -92,8 +117,14 @@ function SetupPage() {
     return (
       <div className="min-h-dvh flex items-center justify-center p-4">
         <Card className="p-6 max-w-md">
-          <h1 className="font-semibold mb-2">Setup already complete</h1>
-          <p className="text-sm text-muted-foreground mb-4">An administrator already exists for this system.</p>
+          <h1 className="font-semibold mb-2">
+            {secretConfigured ? "Setup already complete" : "Setup is disabled"}
+          </h1>
+          <p className="text-sm text-muted-foreground mb-4">
+            {secretConfigured
+              ? "An administrator already exists for this system."
+              : "First-admin setup is not currently enabled on this deployment. Contact your administrator."}
+          </p>
           <Button onClick={() => navigate({ to: "/auth" })} className="w-full">Go to sign in</Button>
         </Card>
       </div>
@@ -105,9 +136,10 @@ function SetupPage() {
       <Card className="w-full max-w-md p-8">
         <h1 className="text-lg font-semibold mb-1">Create the first admin</h1>
         <p className="text-sm text-muted-foreground mb-6">
-          This page only works once — it sets up the initial administrator for the system. After this, accounts must be created from the Admin page.
+          This page only works once — it sets up the initial administrator for the system. You must supply the one-time setup secret provided out-of-band.
         </p>
         <form onSubmit={submit} className="space-y-4">
+          <div className="space-y-1.5"><Label>Setup secret</Label><Input type="password" required value={f.setup_secret} onChange={(e) => setF({ ...f, setup_secret: e.target.value })} /></div>
           <div className="space-y-1.5"><Label>Full name</Label><Input required value={f.full_name} onChange={(e) => setF({ ...f, full_name: e.target.value })} /></div>
           <div className="space-y-1.5"><Label>Email</Label><Input type="email" required value={f.email} onChange={(e) => setF({ ...f, email: e.target.value })} /></div>
           <div className="space-y-1.5"><Label>Password (min 8 chars)</Label><Input type="password" required minLength={8} value={f.password} onChange={(e) => setF({ ...f, password: e.target.value })} /></div>
