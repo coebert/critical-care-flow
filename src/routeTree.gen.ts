@@ -37,10 +37,13 @@ import { Route as AuthenticatedPostopBookingsAnalyticsRouteImport } from './rout
 import { Route as AuthenticatedInboxIdRouteImport } from './routes/_authenticated/inbox.$id'
 import { Route as AuthenticatedBoardWardRoundRouteImport } from './routes/_authenticated/board.ward-round'
 import { Route as ApiPublicBridgeVerifySignatureRouteImport } from './routes/api/public/bridge/verify-signature'
+import { Route as ApiPublicBridgeReferralsRouteImport } from './routes/api/public/bridge/referrals'
 import { Route as ApiPublicBridgePatientsRouteImport } from './routes/api/public/bridge/patients'
+import { Route as ApiPublicBridgeNotificationsRouteImport } from './routes/api/public/bridge/notifications'
 import { Route as ApiPublicBridgeMicrobiologyRouteImport } from './routes/api/public/bridge/microbiology'
 import { Route as ApiPublicBridgeInvestigationsRouteImport } from './routes/api/public/bridge/investigations'
 import { Route as ApiPublicBridgeHealthRouteImport } from './routes/api/public/bridge/health'
+import { Route as ApiPublicBridgeAuditRouteImport } from './routes/api/public/bridge/audit'
 import { Route as AuthenticatedPostopBookingsIdEditRouteImport } from './routes/_authenticated/postop-bookings.$id.edit'
 
 const SetupRoute = SetupRouteImport.update({
@@ -194,11 +197,23 @@ const ApiPublicBridgeVerifySignatureRoute =
     path: '/api/public/bridge/verify-signature',
     getParentRoute: () => rootRouteImport,
   } as any)
+const ApiPublicBridgeReferralsRoute =
+  ApiPublicBridgeReferralsRouteImport.update({
+    id: '/api/public/bridge/referrals',
+    path: '/api/public/bridge/referrals',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 const ApiPublicBridgePatientsRoute = ApiPublicBridgePatientsRouteImport.update({
   id: '/api/public/bridge/patients',
   path: '/api/public/bridge/patients',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiPublicBridgeNotificationsRoute =
+  ApiPublicBridgeNotificationsRouteImport.update({
+    id: '/api/public/bridge/notifications',
+    path: '/api/public/bridge/notifications',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 const ApiPublicBridgeMicrobiologyRoute =
   ApiPublicBridgeMicrobiologyRouteImport.update({
     id: '/api/public/bridge/microbiology',
@@ -214,6 +229,11 @@ const ApiPublicBridgeInvestigationsRoute =
 const ApiPublicBridgeHealthRoute = ApiPublicBridgeHealthRouteImport.update({
   id: '/api/public/bridge/health',
   path: '/api/public/bridge/health',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiPublicBridgeAuditRoute = ApiPublicBridgeAuditRouteImport.update({
+  id: '/api/public/bridge/audit',
+  path: '/api/public/bridge/audit',
   getParentRoute: () => rootRouteImport,
 } as any)
 const AuthenticatedPostopBookingsIdEditRoute =
@@ -251,10 +271,13 @@ export interface FileRoutesByFullPath {
   '/referrals/new': typeof AuthenticatedReferralsNewRoute
   '/postop-bookings/': typeof AuthenticatedPostopBookingsIndexRoute
   '/postop-bookings/$id/edit': typeof AuthenticatedPostopBookingsIdEditRoute
+  '/api/public/bridge/audit': typeof ApiPublicBridgeAuditRoute
   '/api/public/bridge/health': typeof ApiPublicBridgeHealthRoute
   '/api/public/bridge/investigations': typeof ApiPublicBridgeInvestigationsRoute
   '/api/public/bridge/microbiology': typeof ApiPublicBridgeMicrobiologyRoute
+  '/api/public/bridge/notifications': typeof ApiPublicBridgeNotificationsRoute
   '/api/public/bridge/patients': typeof ApiPublicBridgePatientsRoute
+  '/api/public/bridge/referrals': typeof ApiPublicBridgeReferralsRoute
   '/api/public/bridge/verify-signature': typeof ApiPublicBridgeVerifySignatureRoute
 }
 export interface FileRoutesByTo {
@@ -285,10 +308,13 @@ export interface FileRoutesByTo {
   '/referrals/new': typeof AuthenticatedReferralsNewRoute
   '/postop-bookings': typeof AuthenticatedPostopBookingsIndexRoute
   '/postop-bookings/$id/edit': typeof AuthenticatedPostopBookingsIdEditRoute
+  '/api/public/bridge/audit': typeof ApiPublicBridgeAuditRoute
   '/api/public/bridge/health': typeof ApiPublicBridgeHealthRoute
   '/api/public/bridge/investigations': typeof ApiPublicBridgeInvestigationsRoute
   '/api/public/bridge/microbiology': typeof ApiPublicBridgeMicrobiologyRoute
+  '/api/public/bridge/notifications': typeof ApiPublicBridgeNotificationsRoute
   '/api/public/bridge/patients': typeof ApiPublicBridgePatientsRoute
+  '/api/public/bridge/referrals': typeof ApiPublicBridgeReferralsRoute
   '/api/public/bridge/verify-signature': typeof ApiPublicBridgeVerifySignatureRoute
 }
 export interface FileRoutesById {
@@ -321,10 +347,13 @@ export interface FileRoutesById {
   '/_authenticated/referrals/new': typeof AuthenticatedReferralsNewRoute
   '/_authenticated/postop-bookings/': typeof AuthenticatedPostopBookingsIndexRoute
   '/_authenticated/postop-bookings/$id/edit': typeof AuthenticatedPostopBookingsIdEditRoute
+  '/api/public/bridge/audit': typeof ApiPublicBridgeAuditRoute
   '/api/public/bridge/health': typeof ApiPublicBridgeHealthRoute
   '/api/public/bridge/investigations': typeof ApiPublicBridgeInvestigationsRoute
   '/api/public/bridge/microbiology': typeof ApiPublicBridgeMicrobiologyRoute
+  '/api/public/bridge/notifications': typeof ApiPublicBridgeNotificationsRoute
   '/api/public/bridge/patients': typeof ApiPublicBridgePatientsRoute
+  '/api/public/bridge/referrals': typeof ApiPublicBridgeReferralsRoute
   '/api/public/bridge/verify-signature': typeof ApiPublicBridgeVerifySignatureRoute
 }
 export interface FileRouteTypes {
@@ -357,10 +386,13 @@ export interface FileRouteTypes {
     | '/referrals/new'
     | '/postop-bookings/'
     | '/postop-bookings/$id/edit'
+    | '/api/public/bridge/audit'
     | '/api/public/bridge/health'
     | '/api/public/bridge/investigations'
     | '/api/public/bridge/microbiology'
+    | '/api/public/bridge/notifications'
     | '/api/public/bridge/patients'
+    | '/api/public/bridge/referrals'
     | '/api/public/bridge/verify-signature'
   fileRoutesByTo: FileRoutesByTo
   to:
@@ -391,10 +423,13 @@ export interface FileRouteTypes {
     | '/referrals/new'
     | '/postop-bookings'
     | '/postop-bookings/$id/edit'
+    | '/api/public/bridge/audit'
     | '/api/public/bridge/health'
     | '/api/public/bridge/investigations'
     | '/api/public/bridge/microbiology'
+    | '/api/public/bridge/notifications'
     | '/api/public/bridge/patients'
+    | '/api/public/bridge/referrals'
     | '/api/public/bridge/verify-signature'
   id:
     | '__root__'
@@ -426,10 +461,13 @@ export interface FileRouteTypes {
     | '/_authenticated/referrals/new'
     | '/_authenticated/postop-bookings/'
     | '/_authenticated/postop-bookings/$id/edit'
+    | '/api/public/bridge/audit'
     | '/api/public/bridge/health'
     | '/api/public/bridge/investigations'
     | '/api/public/bridge/microbiology'
+    | '/api/public/bridge/notifications'
     | '/api/public/bridge/patients'
+    | '/api/public/bridge/referrals'
     | '/api/public/bridge/verify-signature'
   fileRoutesById: FileRoutesById
 }
@@ -441,10 +479,13 @@ export interface RootRouteChildren {
   ResetPasswordRoute: typeof ResetPasswordRoute
   SecurityRoute: typeof SecurityRoute
   SetupRoute: typeof SetupRoute
+  ApiPublicBridgeAuditRoute: typeof ApiPublicBridgeAuditRoute
   ApiPublicBridgeHealthRoute: typeof ApiPublicBridgeHealthRoute
   ApiPublicBridgeInvestigationsRoute: typeof ApiPublicBridgeInvestigationsRoute
   ApiPublicBridgeMicrobiologyRoute: typeof ApiPublicBridgeMicrobiologyRoute
+  ApiPublicBridgeNotificationsRoute: typeof ApiPublicBridgeNotificationsRoute
   ApiPublicBridgePatientsRoute: typeof ApiPublicBridgePatientsRoute
+  ApiPublicBridgeReferralsRoute: typeof ApiPublicBridgeReferralsRoute
   ApiPublicBridgeVerifySignatureRoute: typeof ApiPublicBridgeVerifySignatureRoute
 }
 
@@ -646,11 +687,25 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiPublicBridgeVerifySignatureRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/public/bridge/referrals': {
+      id: '/api/public/bridge/referrals'
+      path: '/api/public/bridge/referrals'
+      fullPath: '/api/public/bridge/referrals'
+      preLoaderRoute: typeof ApiPublicBridgeReferralsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/public/bridge/patients': {
       id: '/api/public/bridge/patients'
       path: '/api/public/bridge/patients'
       fullPath: '/api/public/bridge/patients'
       preLoaderRoute: typeof ApiPublicBridgePatientsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/public/bridge/notifications': {
+      id: '/api/public/bridge/notifications'
+      path: '/api/public/bridge/notifications'
+      fullPath: '/api/public/bridge/notifications'
+      preLoaderRoute: typeof ApiPublicBridgeNotificationsRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/api/public/bridge/microbiology': {
@@ -672,6 +727,13 @@ declare module '@tanstack/react-router' {
       path: '/api/public/bridge/health'
       fullPath: '/api/public/bridge/health'
       preLoaderRoute: typeof ApiPublicBridgeHealthRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/public/bridge/audit': {
+      id: '/api/public/bridge/audit'
+      path: '/api/public/bridge/audit'
+      fullPath: '/api/public/bridge/audit'
+      preLoaderRoute: typeof ApiPublicBridgeAuditRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/_authenticated/postop-bookings/$id/edit': {
@@ -765,22 +827,15 @@ const rootRouteChildren: RootRouteChildren = {
   ResetPasswordRoute: ResetPasswordRoute,
   SecurityRoute: SecurityRoute,
   SetupRoute: SetupRoute,
+  ApiPublicBridgeAuditRoute: ApiPublicBridgeAuditRoute,
   ApiPublicBridgeHealthRoute: ApiPublicBridgeHealthRoute,
   ApiPublicBridgeInvestigationsRoute: ApiPublicBridgeInvestigationsRoute,
   ApiPublicBridgeMicrobiologyRoute: ApiPublicBridgeMicrobiologyRoute,
+  ApiPublicBridgeNotificationsRoute: ApiPublicBridgeNotificationsRoute,
   ApiPublicBridgePatientsRoute: ApiPublicBridgePatientsRoute,
+  ApiPublicBridgeReferralsRoute: ApiPublicBridgeReferralsRoute,
   ApiPublicBridgeVerifySignatureRoute: ApiPublicBridgeVerifySignatureRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
-
-import type { getRouter } from './router.tsx'
-import type { startInstance } from './start.ts'
-declare module '@tanstack/react-start' {
-  interface Register {
-    ssr: true
-    router: Awaited<ReturnType<typeof getRouter>>
-    config: Awaited<ReturnType<typeof startInstance.getOptions>>
-  }
-}
