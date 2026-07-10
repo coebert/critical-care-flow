@@ -130,6 +130,7 @@ type AuthorInfo = { full_name: string | null; job_title: string | null };
 export function TransfersPanel({
   transfers,
   authors = {},
+  liveOccupancyIds,
   onCreate,
   onAdvance,
   onCancel,
@@ -137,6 +138,7 @@ export function TransfersPanel({
 }: {
   transfers: Transfer[];
   authors?: Record<string, AuthorInfo>;
+  liveOccupancyIds?: Set<string>;
   onCreate: (v: {
     destination_hospital: string;
     kind: "repat" | "tertiary" | "other";
@@ -149,6 +151,7 @@ export function TransfersPanel({
   saving?: boolean;
 }) {
   const [open, setOpen] = useState(false);
+  const [expandedGroups, setExpandedGroups] = useState<Record<string, boolean>>({});
   const [dest, setDest] = useState("");
   const [kind, setKind] = useState<"repat" | "tertiary" | "other">("repat");
   const [spec, setSpec] = useState("");
@@ -167,22 +170,53 @@ export function TransfersPanel({
     if (!a) return "unknown";
     return a.full_name?.trim() || "unknown";
   };
+
+  // Group transfers so duplicates/overlaps (same occupancy, or same
+  // destination+kind when no occupancy is linked) collapse to a single card
+  // showing the latest state, with earlier rows kept accessible as
+  // "superseded" so a user can cancel them.
+  const groups = (() => {
+    const map = new Map<string, Transfer[]>();
+    for (const t of transfers) {
+      const key = t.occupancy_id
+        ? `occ:${t.occupancy_id}`
+        : `dest:${t.destination_hospital.trim().toLowerCase()}|${t.kind}`;
+      const arr = map.get(key) ?? [];
+      arr.push(t);
+      map.set(key, arr);
+    }
+    return Array.from(map.entries()).map(([key, arr]) => {
+      const sorted = [...arr].sort(
+        (a, b) => new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime(),
+      );
+      return { key, primary: sorted[0], superseded: sorted.slice(1) };
+    });
+  })();
+
+  const totalOpen = transfers.length;
+  const supersededTotal = groups.reduce((n, g) => n + g.superseded.length, 0);
+
   return (
     <Card className="p-4">
       <div className="flex items-center justify-between mb-3">
         <h3 className="font-semibold text-sm flex items-center gap-2">
           <ArrowRightLeft className="w-4 h-4" aria-hidden="true" />
-          Transfers out ({transfers.length})
+          Transfers out ({totalOpen})
+          {supersededTotal > 0 && (
+            <Badge variant="secondary" className="text-[10px] font-normal">
+              {supersededTotal} duplicate{supersededTotal === 1 ? "" : "s"}
+            </Badge>
+          )}
         </h3>
         <Button size="sm" variant="outline" onClick={() => setOpen(true)}>
           <Plus className="w-3.5 h-3.5 mr-1" />Add
         </Button>
       </div>
-      {transfers.length === 0 && (
+      {groups.length === 0 && (
         <p className="text-xs text-muted-foreground">No open transfers.</p>
       )}
       <ul className="space-y-2">
-        {transfers.map((t) => {
+        {groups.map(({ key, primary: t, superseded }) => {
           const next = nextStatus(t.status);
           const createdBy = authorLabel(t.created_by);
           const updatedBy = authorLabel(t.updated_by);
@@ -190,8 +224,11 @@ export function TransfersPanel({
           const updatedAgo = formatDistanceToNowStrict(new Date(t.updated_at), { addSuffix: true });
           const wasEdited =
             t.updated_at !== t.created_at || (t.updated_by && t.updated_by !== t.created_by);
+          const staleOccupancy =
+            !!t.occupancy_id && liveOccupancyIds !== undefined && !liveOccupancyIds.has(t.occupancy_id);
+          const isExpanded = !!expandedGroups[key];
           return (
-            <li key={t.id} className="border rounded p-2 text-sm">
+            <li key={key} className="border rounded p-2 text-sm">
               <div className="flex items-start justify-between gap-2">
                 <div className="min-w-0">
                   <div className="font-medium truncate">{t.destination_hospital}</div>
@@ -199,7 +236,12 @@ export function TransfersPanel({
                     {t.kind} · {t.destination_specialty ?? "—"}
                   </div>
                 </div>
-                <Badge variant="outline" className="text-[10px]">{STATUS_LABEL[t.status]}</Badge>
+                <div className="flex flex-col items-end gap-1 shrink-0">
+                  <Badge variant="outline" className="text-[10px]">{STATUS_LABEL[t.status]}</Badge>
+                  {staleOccupancy && (
+                    <Badge variant="destructive" className="text-[10px]">Patient no longer admitted</Badge>
+                  )}
+                </div>
               </div>
               <div
                 className="mt-1.5 text-[11px] text-muted-foreground leading-snug"
@@ -210,8 +252,8 @@ export function TransfersPanel({
                   <div>Updated by {updatedBy} · {updatedAgo}</div>
                 )}
               </div>
-              <div className="flex gap-2 mt-2">
-                {next && (
+              <div className="flex gap-2 mt-2 flex-wrap">
+                {next && !staleOccupancy && (
                   <Button size="sm" variant="outline" disabled={saving} onClick={() => onAdvance(t.id, next)}>
                     → {STATUS_LABEL[next]}
                   </Button>
@@ -219,7 +261,47 @@ export function TransfersPanel({
                 <Button size="sm" variant="ghost" disabled={saving} onClick={() => onCancel(t.id)}>
                   Cancel
                 </Button>
+                {superseded.length > 0 && (
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    onClick={() =>
+                      setExpandedGroups((s) => ({ ...s, [key]: !s[key] }))
+                    }
+                  >
+                    {isExpanded ? "Hide" : "Show"} {superseded.length} earlier
+                  </Button>
+                )}
               </div>
+              {superseded.length > 0 && isExpanded && (
+                <ul className="mt-2 space-y-1.5 border-t pt-2">
+                  {superseded.map((s) => (
+                    <li
+                      key={s.id}
+                      className="flex items-start justify-between gap-2 text-xs text-muted-foreground"
+                    >
+                      <div className="min-w-0">
+                        <div className="truncate">
+                          <Badge variant="outline" className="text-[10px] mr-1.5">
+                            {STATUS_LABEL[s.status]}
+                          </Badge>
+                          Superseded · created by {authorLabel(s.created_by)} ·{" "}
+                          {formatDistanceToNowStrict(new Date(s.created_at), { addSuffix: true })}
+                        </div>
+                      </div>
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        className="h-6 px-2 text-[11px]"
+                        disabled={saving}
+                        onClick={() => onCancel(s.id)}
+                      >
+                        Cancel
+                      </Button>
+                    </li>
+                  ))}
+                </ul>
+              )}
             </li>
           );
         })}
