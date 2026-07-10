@@ -21,9 +21,11 @@ import {
   runBridgeSyncNow,
   sendBridgeTestPayload,
   getBridgeSyncAttempts,
+  getBedBoardVerification,
   type BridgeResourceStatus,
   type BridgeProbeResult,
   type BridgeSyncAttempt,
+  type BedBoardVerificationRow,
 } from "@/lib/bridge-status.functions";
 import { toast } from "sonner";
 import { useState } from "react";
