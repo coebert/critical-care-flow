@@ -469,48 +469,72 @@ export const getBedBoardVerification = createServerFn({ method: "GET" })
   });
 
 
-export type BedReconcileResourceResult = {
+// ============================================================================
+// Bed reconciliation — background job queue
+// ============================================================================
+
+export type BedReconcileItemStatus =
+  | "pending"
+  | "running"
+  | "complete"
+  | "error"
+  | "locked"
+  | "skipped";
+
+export type BedReconcileJobStatus =
+  | "queued"
+  | "running"
+  | "complete"
+  | "failed"
+  | "cancelled";
+
+export type BedReconcileJob = {
+  id: string;
+  from_ts: string;
+  to_ts: string;
+  dry_run: boolean;
+  status: BedReconcileJobStatus;
+  requested_by: string | null;
+  error: string | null;
+  created_at: string;
+  started_at: string | null;
+  finished_at: string | null;
+};
+
+export type BedReconcileJobItem = {
+  id: string;
+  job_id: string;
   resource: string;
+  status: BedReconcileItemStatus;
   pulled: number;
   pushed: number;
   skipped: number;
+  pulled_ids: string[];
+  pushed_ids: string[];
   error: string | null;
-  locked?: boolean;
-  locked_since?: string | null;
-  pulled_ids?: string[];
-  pushed_ids?: string[];
+  locked_since: string | null;
+  started_at: string | null;
+  finished_at: string | null;
+  updated_at: string;
 };
 
-export type BedReconcileResult = {
-  ok: boolean;
-  ran_at: string;
-  from: string;
-  to: string;
-  dry_run: boolean;
-  any_locked: boolean;
-  results: BedReconcileResourceResult[];
+export type BedReconcileJobDetail = {
+  job: BedReconcileJob;
+  items: BedReconcileJobItem[];
 };
 
-// A reconcile is considered abandoned after this long and can be taken over
-// (server crash, function timeout, etc.). Keep aligned with the Worker
-// invocation cap so a legitimately still-running run isn't stolen.
-const RECONCILE_LOCK_STALE_MS = 10 * 60 * 1000;
+export type BedReconcileJobSummary = BedReconcileJob & {
+  totals: { pulled: number; pushed: number; skipped: number; errored: number };
+};
 
+const BED_RESOURCE_ORDER = [
+  "beds",
+  "bed_occupancies",
+  "bed_outliers",
+  "bed_transfers_out",
+] as const;
 
-
-/**
- * Reconciliation/backfill for bed-related tables in a chosen time window.
- *
- * For each bed resource we:
- *   - Pull partner rows updated since `from` (partner's cursor param).
- *   - Re-push every local row with updated_at in [from, to], bypassing the
- *     regular push cursor so already-synced rows are resent to the partner.
- *
- * Cursors in bridge_sync_state are intentionally NOT touched — reconcile is
- * a safety-net run for when the board looks stale; the scheduled sync
- * continues from its own cursor as normal on the next tick.
- */
-export const runBedReconciliation = createServerFn({ method: "POST" })
+export const enqueueBedReconciliation = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((d: unknown) => {
     const v = (d ?? {}) as { from?: unknown; to?: unknown; dryRun?: unknown };
@@ -525,7 +549,6 @@ export const runBedReconciliation = createServerFn({ method: "POST" })
       throw new Error("'from' must be earlier than 'to'");
     }
     const spanMs = toDate.getTime() - fromDate.getTime();
-    // Guardrail: cap window at 30 days to prevent runaway re-pushes.
     if (spanMs > 30 * 24 * 60 * 60 * 1000) {
       throw new Error("Reconciliation window cannot exceed 30 days");
     }
@@ -535,193 +558,163 @@ export const runBedReconciliation = createServerFn({ method: "POST" })
       dryRun: v.dryRun === true,
     };
   })
-  .handler(async ({ data, context }): Promise<BedReconcileResult> => {
+  .handler(async ({ data, context }): Promise<{ jobId: string }> => {
     await assertAdmin(context);
-
-    const partner = process.env.PARTNER_BRIDGE_URL;
-    if (!partner) throw new Error("PARTNER_BRIDGE_URL not configured");
-
     const { supabaseAdmin } = await import(
       "@/integrations/supabase/client.server"
     );
     const admin = supabaseAdmin as any;
 
-    // Reuse the exact push/pull/HMAC helpers from the scheduled sync so the
-    // partner sees identical signed payloads.
-    const sync = await import("@/routes/api/public/bridge/sync");
-    const bedResources = sync.RESOURCES.filter((r) =>
-      sync.BED_RESOURCE_KEYS.includes(r.key),
-    );
+    const { data: job, error: jobErr } = await admin
+      .from("bridge_reconcile_jobs")
+      .insert({
+        from_ts: data.from,
+        to_ts: data.to,
+        dry_run: data.dryRun,
+        requested_by: context.userId,
+      })
+      .select("id")
+      .single();
+    if (jobErr) throw new Error(`enqueue job: ${jobErr.message}`);
 
-    const ID_SAMPLE_CAP = 50;
-    const results: BedReconcileResourceResult[] = [];
-    for (const resource of bedResources) {
-      const startedMs = Date.now();
-      let pulled = 0;
-      let pushed = 0;
-      let skipped = 0;
-      let error: string | null = null;
-      let locked = false;
-      let lockedSince: string | null = null;
-      let lockId: string | null = null;
-      const pulledIds: string[] = [];
-      const pushedIds: string[] = [];
-
-      // Lock acquisition (skipped for dry-runs — no writes, no concurrency
-      // hazard). Uses the UNIQUE (resource, from_ts, to_ts) constraint to
-      // serialize backfills for the exact same window & resource.
-      if (!data.dryRun) {
-        const staleCutoff = new Date(
-          Date.now() - RECONCILE_LOCK_STALE_MS,
-        ).toISOString();
-        // Sweep any abandoned lock for this exact key before trying to insert.
-        await admin
-          .from("bridge_reconcile_locks")
-          .delete()
-          .eq("resource", resource.key)
-          .eq("from_ts", data.from)
-          .eq("to_ts", data.to)
-          .lt("locked_at", staleCutoff);
-
-        const { data: inserted, error: lockErr } = await admin
-          .from("bridge_reconcile_locks")
-          .insert({
-            resource: resource.key,
-            from_ts: data.from,
-            to_ts: data.to,
-            locked_by: context.userId,
-          })
-          .select("id, locked_at")
-          .maybeSingle();
-
-        if (lockErr) {
-          // 23505 = unique_violation → another reconcile holds this window.
-          if ((lockErr as any).code === "23505") {
-            const { data: holder } = await admin
-              .from("bridge_reconcile_locks")
-              .select("locked_at")
-              .eq("resource", resource.key)
-              .eq("from_ts", data.from)
-              .eq("to_ts", data.to)
-              .maybeSingle();
-            locked = true;
-            lockedSince = (holder as any)?.locked_at ?? null;
-            error = "Another reconcile is already running for this window";
-          } else {
-            error = `lock acquire: ${lockErr.message}`;
-          }
-        } else {
-          lockId = (inserted as any)?.id ?? null;
-        }
-      }
-
-      if (!locked && !error) {
-        try {
-          // PULL — partner API only supports a `since` cursor, so we pass
-          // `from` and post-filter to the window client-side.
-          const incoming = await sync.pullResource(
-            partner,
-            resource.key,
-            data.from,
-          );
-          const inWindow = incoming.filter((r) => {
-            const u = (r as any).updated_at as string | undefined;
-            return !u || (u >= data.from && u <= data.to);
-          });
-          for (const r of inWindow) {
-            const id = (r as any).id;
-            if (id != null) pulledIds.push(String(id));
-          }
-          if (inWindow.length > 0 && !data.dryRun) {
-            const { error: upErr } = await admin
-              .from(resource.table)
-              .upsert(inWindow as any, { onConflict: resource.conflict });
-            if (upErr) throw new Error(`local upsert: ${upErr.message}`);
-          }
-          pulled = inWindow.length;
-          skipped = incoming.length - inWindow.length;
-
-          // PUSH — every local row updated inside the window, ignoring
-          // last_pushed_at so previously-synced rows are resent.
-          const { data: batch, error: readErr } = await admin
-            .from(resource.table)
-            .select(resource.select)
-            .gte("updated_at", data.from)
-            .lte("updated_at", data.to)
-            .order("updated_at", { ascending: true })
-            .limit(2000);
-          if (readErr) throw new Error(`local read: ${readErr.message}`);
-          for (const row of (batch ?? []) as Record<string, unknown>[]) {
-            const id = (row as any).id;
-            if (id != null) pushedIds.push(String(id));
-            if (!data.dryRun) {
-              await sync.pushOne(
-                partner,
-                resource.key,
-                sync.toPortable(resource.key, row),
-              );
-            }
-            pushed += 1;
-          }
-        } catch (err) {
-          error = (err as Error).message;
-        }
-      }
-
-      // Always release the lock we acquired, even if the work failed.
-      if (lockId) {
-        await admin
-          .from("bridge_reconcile_locks")
-          .delete()
-          .eq("id", lockId)
-          .then(
-            () => {},
-            () => {},
-          );
-      }
-
-      // Audit real attempts (not dry-runs, not lock-skipped runs — nothing
-      // was actually pulled or pushed when locked).
-      if (!data.dryRun && !locked) {
-        await admin
-          .from("bridge_sync_attempts")
-          .insert({
-            source: "manual",
-            resource: resource.key,
-            ok: !error,
-            pulled,
-            pushed,
-            duration_ms: Date.now() - startedMs,
-            error: error ?? `reconcile ${data.from} → ${data.to}`,
-          })
-          .then(
-            () => {},
-            () => {},
-          );
-      }
-
-      results.push({
-        resource: resource.key,
-        pulled,
-        pushed,
-        skipped,
-        error,
-        locked,
-        locked_since: lockedSince,
-        pulled_ids: pulledIds.slice(0, ID_SAMPLE_CAP),
-        pushed_ids: pushedIds.slice(0, ID_SAMPLE_CAP),
-      });
+    const itemRows = BED_RESOURCE_ORDER.map((resource) => ({
+      job_id: job.id,
+      resource,
+    }));
+    const { error: itemsErr } = await admin
+      .from("bridge_reconcile_job_items")
+      .insert(itemRows);
+    if (itemsErr) {
+      // Roll back the job so the queue doesn't hold an unrunnable stub.
+      await admin.from("bridge_reconcile_jobs").delete().eq("id", job.id);
+      throw new Error(`enqueue items: ${itemsErr.message}`);
     }
 
-    return {
-      ok: results.every((r) => !r.error),
-      ran_at: new Date().toISOString(),
-      from: data.from,
-      to: data.to,
-      dry_run: data.dryRun,
-      any_locked: results.some((r) => r.locked),
-      results,
-    };
+    return { jobId: job.id as string };
   });
+
+export const cancelBedReconciliationJob = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d: unknown) => {
+    const v = (d ?? {}) as { jobId?: unknown };
+    if (typeof v.jobId !== "string" || v.jobId.length === 0) {
+      throw new Error("jobId required");
+    }
+    return { jobId: v.jobId };
+  })
+  .handler(async ({ data, context }): Promise<{ cancelled: boolean }> => {
+    await assertAdmin(context);
+    const { supabaseAdmin } = await import(
+      "@/integrations/supabase/client.server"
+    );
+    const admin = supabaseAdmin as any;
+
+    const { data: updated, error } = await admin
+      .from("bridge_reconcile_jobs")
+      .update({ status: "cancelled", finished_at: new Date().toISOString() })
+      .eq("id", data.jobId)
+      .in("status", ["queued", "running"])
+      .select("id")
+      .maybeSingle();
+    if (error) throw new Error(error.message);
+    return { cancelled: !!updated };
+  });
+
+export const getBedReconciliationJob = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d: unknown) => {
+    const v = (d ?? {}) as { jobId?: unknown };
+    if (typeof v.jobId !== "string" || v.jobId.length === 0) {
+      throw new Error("jobId required");
+    }
+    return { jobId: v.jobId };
+  })
+  .handler(
+    async ({ data, context }): Promise<BedReconcileJobDetail | null> => {
+      await assertAdmin(context);
+      const { supabaseAdmin } = await import(
+        "@/integrations/supabase/client.server"
+      );
+      const admin = supabaseAdmin as any;
+
+      const { data: job } = await admin
+        .from("bridge_reconcile_jobs")
+        .select("*")
+        .eq("id", data.jobId)
+        .maybeSingle();
+      if (!job) return null;
+
+      const { data: items } = await admin
+        .from("bridge_reconcile_job_items")
+        .select("*")
+        .eq("job_id", data.jobId)
+        .order("resource", { ascending: true });
+
+      return {
+        job: job as BedReconcileJob,
+        items: (items ?? []) as BedReconcileJobItem[],
+      };
+    },
+  );
+
+export const listBedReconciliationJobs = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d: unknown) => {
+    const v = (d ?? {}) as { limit?: unknown };
+    const limit =
+      typeof v.limit === "number" && v.limit > 0 && v.limit <= 50
+        ? Math.floor(v.limit)
+        : 5;
+    return { limit };
+  })
+  .handler(
+    async ({ data, context }): Promise<BedReconcileJobSummary[]> => {
+      await assertAdmin(context);
+      const { supabaseAdmin } = await import(
+        "@/integrations/supabase/client.server"
+      );
+      const admin = supabaseAdmin as any;
+
+      const { data: jobs } = await admin
+        .from("bridge_reconcile_jobs")
+        .select("*")
+        .order("created_at", { ascending: false })
+        .limit(data.limit);
+
+      if (!jobs || jobs.length === 0) return [];
+
+      const ids = jobs.map((j: any) => j.id);
+      const { data: items } = await admin
+        .from("bridge_reconcile_job_items")
+        .select("job_id,pulled,pushed,skipped,status")
+        .in("job_id", ids);
+
+      const totalsByJob = new Map<
+        string,
+        { pulled: number; pushed: number; skipped: number; errored: number }
+      >();
+      for (const it of (items ?? []) as any[]) {
+        const t =
+          totalsByJob.get(it.job_id) ??
+          { pulled: 0, pushed: 0, skipped: 0, errored: 0 };
+        t.pulled += it.pulled ?? 0;
+        t.pushed += it.pushed ?? 0;
+        t.skipped += it.skipped ?? 0;
+        if (it.status === "error") t.errored += 1;
+        totalsByJob.set(it.job_id, t);
+      }
+
+      return (jobs as any[]).map((j) => ({
+        ...(j as BedReconcileJob),
+        totals: totalsByJob.get(j.id) ?? {
+          pulled: 0,
+          pushed: 0,
+          skipped: 0,
+          errored: 0,
+        },
+      }));
+    },
+  );
+
 
 
