@@ -583,73 +583,15 @@ function BedBoardPage() {
         </div>
       )}
 
-      <Dialog open={!!selected} onOpenChange={(v) => !v && setSelected(null)}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>{selected?.full_name ?? "Patient"}</DialogTitle>
-            <DialogDescription>
-              Read-only view — edit in ICU Handover Hub.
-            </DialogDescription>
-          </DialogHeader>
-          {selected && (
-            <dl className="grid grid-cols-3 gap-x-3 gap-y-2 text-sm">
-              <dt className="text-muted-foreground">Hospital #</dt>
-              <dd className="col-span-2 font-mono">
-                {selected.hospital_number ?? "—"}
-              </dd>
-              <dt className="text-muted-foreground">Age</dt>
-              <dd className="col-span-2">
-                {selected.age != null ? `${selected.age}` : "—"}
-              </dd>
-              <dt className="text-muted-foreground">Bed</dt>
-              <dd className="col-span-2">{selected.bed ?? "—"}</dd>
-              {selected.status != null && (
-                <>
-                  <dt className="text-muted-foreground">Status</dt>
-                  <dd className="col-span-2">{selected.status}</dd>
-                </>
-              )}
-              <dt className="text-muted-foreground">Admitted</dt>
-              <dd className="col-span-2">
-                {selected.admission_date
-                  ? new Date(selected.admission_date).toLocaleString()
-                  : "—"}
-                {(() => {
-                  const d = dayOfStay(selected.admission_date);
-                  return d != null ? ` · Day ${d}` : "";
-                })()}
-              </dd>
-              {selected.tep_in_place != null && (
-                <>
-                  <dt className="text-muted-foreground">TEP</dt>
-                  <dd className="col-span-2">
-                    {selected.tep_in_place ? "In place" : "Not recorded"}
-                  </dd>
-                </>
-              )}
-              {selected.dnacpr_decision != null && (
-                <>
-                  <dt className="text-muted-foreground">DNACPR</dt>
-                  <dd className="col-span-2">{selected.dnacpr_decision}</dd>
-                </>
-              )}
-              {selected.outstanding_tasks != null && (
-                <>
-                  <dt className="text-muted-foreground">Tasks</dt>
-                  <dd className="col-span-2 whitespace-pre-wrap">
-                    {selected.outstanding_tasks}
-                  </dd>
-                </>
-              )}
+      <EditOccupantDialog
+        occupant={selected}
+        onClose={() => setSelected(null)}
+        onSaved={(updated) => {
+          setSelected(updated);
+          refetch();
+        }}
+      />
 
-              <dt className="text-muted-foreground">Updated</dt>
-              <dd className="col-span-2">
-                {formatUpdated(selected.updated_at)}
-              </dd>
-            </dl>
-          )}
-        </DialogContent>
-      </Dialog>
     </div>
   );
 }
