@@ -281,6 +281,7 @@ function BedsColumn({ data, now, p }: { data: BedBoardData | undefined; now: num
                           {occ.renal_replacement && <Flag p={p} tone="blue">R</Flag>}
                           {occ.tracheostomy && <Flag p={p}>T</Flag>}
                           {occ.isolation && occ.isolation !== "none" && <Flag p={p} tone="red">ISO</Flag>}
+                          {(occ as { wardable?: boolean }).wardable && <Flag p={p}>WARDABLE</Flag>}
                         </div>
                         {occ.predicted_discharge_at && (
                           <div className="mt-1 text-[10px] text-emerald-600 dark:text-emerald-300/80">

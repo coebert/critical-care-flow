@@ -18,9 +18,17 @@ type Bed = Database["public"]["Tables"]["beds"]["Row"];
 type Occ = Database["public"]["Tables"]["bed_occupancies"]["Row"];
 
 const LEVEL_TONE: Record<number, string> = {
+  0: "bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border-emerald-500/30",
   1: "bg-sky-500/10 text-sky-700 dark:text-sky-400 border-sky-500/30",
   2: "bg-amber-500/10 text-amber-700 dark:text-amber-400 border-amber-500/30",
   3: "bg-rose-500/10 text-rose-700 dark:text-rose-400 border-rose-500/30",
+};
+
+const LEVEL_LABEL: Record<number, string> = {
+  0: "Level 0 — ward-level care",
+  1: "Level 1 — at risk of deterioration",
+  2: "Level 2 — HDU care",
+  3: "Level 3 — ICU care",
 };
 
 const ISOLATION_LABEL: Record<string, string> = {
@@ -108,7 +116,12 @@ export function BedCard({
           <BedIcon className="w-4 h-4" aria-hidden="true" />
           {bed.code}
         </div>
-        <Badge variant="outline" className={`text-[10px] ${LEVEL_TONE[occupancy.level] ?? ""}`}>
+        <Badge
+          variant="outline"
+          className={`text-[10px] ${LEVEL_TONE[occupancy.level] ?? ""}`}
+          title={LEVEL_LABEL[occupancy.level] ?? `Level ${occupancy.level}`}
+          aria-label={LEVEL_LABEL[occupancy.level] ?? `Level ${occupancy.level}`}
+        >
           L{occupancy.level}
         </Badge>
       </div>
@@ -123,6 +136,15 @@ export function BedCard({
       </div>
       <OrganSupportIcons o={occupancy} />
       <div className="mt-2 flex flex-wrap gap-1 items-center">
+        {(occupancy as { wardable?: boolean }).wardable && (
+          <Badge
+            variant="outline"
+            className="text-[10px] gap-1 bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border-emerald-500/30"
+            title="Wardable — ready for a ward bed"
+          >
+            Wardable
+          </Badge>
+        )}
         {occupancy.isolation !== "none" && (
           <Badge variant="outline" className="text-[10px] gap-1">
             <ShieldAlert className="w-3 h-3" aria-hidden="true" />
