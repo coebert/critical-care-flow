@@ -129,8 +129,8 @@ describe("bootstrapFirstAdmin dynamic-import path — no RLS/permission-impacted
       from,
       auth: {
         admin: {
-          listUsers: vi.fn(async () => ({ data: { users: [] }, error: null })),
-          createUser: vi.fn(async () => ({ data: {}, error: null })),
+          listUsers: vi.fn(async (_opts?: unknown) => ({ data: { users: [] }, error: null })),
+          createUser: vi.fn(async (_opts?: unknown) => ({ data: {}, error: null })),
         },
       },
     };
