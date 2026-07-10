@@ -126,9 +126,11 @@ function dayOfStay(iso: string | null | undefined): number | null {
 
 function BedCard({
   slot,
+  level,
   onOccupiedClick,
 }: {
   slot: PartnerBedSlot;
+  level: AcuityLevel | undefined;
   onOccupiedClick: (o: PartnerOccupant) => void;
 }) {
   const occ = slot.occupant;
