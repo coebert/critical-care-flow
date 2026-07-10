@@ -89,7 +89,8 @@ const RESOURCES: {
 
 const SYSTEM_ACTOR = JSON.stringify({
   id: "critical-care-connect-sync",
-  role: "system",
+  email: "sync@critical-care-connect.local",
+  role: "admin",
 });
 const PUSH_BATCH = 50;
 
