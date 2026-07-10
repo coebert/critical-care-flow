@@ -170,6 +170,7 @@ function BedBoardPage() {
   );
 
   const liveBedIds = useMemo(() => new Set(occupancies.map((o) => o.bed_id)), [occupancies]);
+  const liveOccupancyIds = useMemo(() => new Set(occupancies.map((o) => o.id)), [occupancies]);
 
   // Dialog state
   const [admitBed, setAdmitBed] = useState<Bed | null>(null);
