@@ -195,7 +195,29 @@ function StatBlock({
   );
 }
 
+function EmptyStateCard({
+  title,
+  body,
+  tone = "muted",
+}: {
+  title: string;
+  body: string;
+  tone?: "muted" | "ok";
+}) {
+  const cls =
+    tone === "ok"
+      ? "border-emerald-500/30 bg-emerald-500/5 text-emerald-800 dark:text-emerald-300"
+      : "border-dashed bg-muted/20 text-muted-foreground";
+  return (
+    <Card className={`p-3 text-sm ${cls}`}>
+      <div className="font-medium">{title}</div>
+      <div className="text-xs mt-1 opacity-90">{body}</div>
+    </Card>
+  );
+}
+
 function BedBoardPage() {
+
   const search = Route.useSearch();
   const navigate = Route.useNavigate();
   const fetchBoard = useServerFn(getPartnerBedBoard);
