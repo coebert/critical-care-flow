@@ -172,7 +172,7 @@ export function NoteItem({
 
 
       <div className="mt-1 flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-        <NoteHistoryButton noteId={note.id} />
+        {canViewAudit && <NoteHistoryButton noteId={note.id} />}
         {canEdit && !editing && (
           <>
             <Button size="sm" variant="ghost" className="h-7 px-2 text-xs" onClick={beginEdit} disabled={busy}>

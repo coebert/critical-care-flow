@@ -60,6 +60,7 @@ export function NoteboardList({
             directory={directory}
             currentUserId={currentUserId}
             canEdit={canEdit}
+            canViewAudit={isAdmin}
             onSave={(body, recipients) => onSave(n, body, recipients)}
             onDelete={() => onDelete(n)}
           />
