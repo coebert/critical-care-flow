@@ -23,17 +23,26 @@ import {
   sendBridgeTestPayload,
   getBridgeSyncAttempts,
   getBedBoardVerification,
-  runBedReconciliation,
+  enqueueBedReconciliation,
+  cancelBedReconciliationJob,
+  getBedReconciliationJob,
+  listBedReconciliationJobs,
   type BridgeResourceStatus,
   type BridgeProbeResult,
   type BridgeSyncAttempt,
   type BedBoardVerificationRow,
-  type BedReconcileResourceResult,
+  type BedReconcileJob,
+  type BedReconcileJobItem,
+  type BedReconcileJobDetail,
+  type BedReconcileJobSummary,
 } from "@/lib/bridge-status.functions";
+import { supabase } from "@/integrations/supabase/client";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Progress } from "@/components/ui/progress";
 import { toast } from "sonner";
 import { useState } from "react";
+
 
 
 export const Route = createFileRoute("/_authenticated/bridge-status")({
