@@ -1,31 +1,48 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useServerFn } from "@tanstack/react-start";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   Activity,
   AlertTriangle,
   Bed as BedIcon,
+  Loader2,
   RefreshCcw,
   ShieldCheck,
   UserRound,
 } from "lucide-react";
 import { formatDistanceToNowStrict } from "date-fns";
+import { toast } from "sonner";
 import {
   getPartnerBedBoard,
+  updatePartnerPatient,
   type PartnerBedSlot,
   type PartnerOccupant,
+  type UpdatePartnerPatientInput,
 } from "@/lib/partner-bed-board.functions";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
+import { Switch } from "@/components/ui/switch";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import {
   Dialog,
   DialogContent,
   DialogDescription,
+  DialogFooter,
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+
 
 const QK = ["partner-bed-board"] as const;
 
@@ -159,11 +176,13 @@ function BedCard({
         {occ.age != null ? ` · ${occ.age}y` : ""}
         {day != null ? ` · Day ${day}` : ""}
       </div>
-      {occ.dnacpr_decision && (
+      {occ.dnacpr_decision === true && (
         <div className="mt-1 text-[11px] text-amber-700 dark:text-amber-400 truncate">
-          DNACPR: {occ.dnacpr_decision}
+          DNACPR in place
+          {occ.dnacpr_details ? ` — ${occ.dnacpr_details}` : ""}
         </div>
       )}
+
     </Card>
   );
 }
@@ -564,73 +583,323 @@ function BedBoardPage() {
         </div>
       )}
 
-      <Dialog open={!!selected} onOpenChange={(v) => !v && setSelected(null)}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>{selected?.full_name ?? "Patient"}</DialogTitle>
-            <DialogDescription>
-              Read-only view — edit in ICU Handover Hub.
-            </DialogDescription>
-          </DialogHeader>
-          {selected && (
-            <dl className="grid grid-cols-3 gap-x-3 gap-y-2 text-sm">
-              <dt className="text-muted-foreground">Hospital #</dt>
-              <dd className="col-span-2 font-mono">
-                {selected.hospital_number ?? "—"}
-              </dd>
-              <dt className="text-muted-foreground">Age</dt>
-              <dd className="col-span-2">
-                {selected.age != null ? `${selected.age}` : "—"}
-              </dd>
-              <dt className="text-muted-foreground">Bed</dt>
-              <dd className="col-span-2">{selected.bed ?? "—"}</dd>
-              {selected.status != null && (
-                <>
-                  <dt className="text-muted-foreground">Status</dt>
-                  <dd className="col-span-2">{selected.status}</dd>
-                </>
-              )}
-              <dt className="text-muted-foreground">Admitted</dt>
-              <dd className="col-span-2">
-                {selected.admission_date
-                  ? new Date(selected.admission_date).toLocaleString()
-                  : "—"}
-                {(() => {
-                  const d = dayOfStay(selected.admission_date);
-                  return d != null ? ` · Day ${d}` : "";
-                })()}
-              </dd>
-              {selected.tep_in_place != null && (
-                <>
-                  <dt className="text-muted-foreground">TEP</dt>
-                  <dd className="col-span-2">
-                    {selected.tep_in_place ? "In place" : "Not recorded"}
-                  </dd>
-                </>
-              )}
-              {selected.dnacpr_decision != null && (
-                <>
-                  <dt className="text-muted-foreground">DNACPR</dt>
-                  <dd className="col-span-2">{selected.dnacpr_decision}</dd>
-                </>
-              )}
-              {selected.outstanding_tasks != null && (
-                <>
-                  <dt className="text-muted-foreground">Tasks</dt>
-                  <dd className="col-span-2 whitespace-pre-wrap">
-                    {selected.outstanding_tasks}
-                  </dd>
-                </>
-              )}
+      <EditOccupantDialog
+        occupant={selected}
+        onClose={() => setSelected(null)}
+        onSaved={(updated) => {
+          setSelected(updated);
+          refetch();
+        }}
+      />
 
-              <dt className="text-muted-foreground">Updated</dt>
-              <dd className="col-span-2">
-                {formatUpdated(selected.updated_at)}
-              </dd>
-            </dl>
-          )}
-        </DialogContent>
-      </Dialog>
     </div>
   );
 }
+
+type EditForm = {
+  full_name: string;
+  hospital_number: string;
+  age: string;
+  bed: string;
+  status: "referred" | "admitted" | "discharged" | "died";
+  tep_in_place: boolean;
+  tep_details: string;
+  dnacpr_decision: boolean;
+  dnacpr_details: string;
+  outstanding_tasks: string;
+};
+
+function occupantToForm(o: PartnerOccupant): EditForm {
+  const s = (o.status ?? "admitted") as EditForm["status"];
+  return {
+    full_name: o.full_name ?? "",
+    hospital_number: o.hospital_number ?? "",
+    age: o.age != null ? String(o.age) : "",
+    bed: o.bed ?? "",
+    status: ["referred", "admitted", "discharged", "died"].includes(s) ? s : "admitted",
+    tep_in_place: o.tep_in_place === true,
+    tep_details: o.tep_details ?? "",
+    dnacpr_decision: o.dnacpr_decision === true,
+    dnacpr_details: o.dnacpr_details ?? "",
+    outstanding_tasks: o.outstanding_tasks ?? "",
+  };
+}
+
+function buildDiff(
+  initial: EditForm,
+  current: EditForm,
+  id: string,
+  expected_updated_at: string | null,
+): UpdatePartnerPatientInput {
+  const out: UpdatePartnerPatientInput = { id, expected_updated_at };
+  const strKeys = [
+    "full_name",
+    "hospital_number",
+    "bed",
+    "tep_details",
+    "dnacpr_details",
+    "outstanding_tasks",
+  ] as const;
+  for (const k of strKeys) {
+    if (initial[k] !== current[k]) {
+      // Empty string → null (partner coerces anyway, be explicit).
+      (out as Record<string, unknown>)[k] = current[k] === "" ? null : current[k];
+    }
+  }
+  if (initial.age !== current.age) {
+    out.age = current.age === "" ? null : Number(current.age);
+  }
+  if (initial.status !== current.status) out.status = current.status;
+  if (initial.tep_in_place !== current.tep_in_place) out.tep_in_place = current.tep_in_place;
+  if (initial.dnacpr_decision !== current.dnacpr_decision) {
+    out.dnacpr_decision = current.dnacpr_decision;
+  }
+  return out;
+}
+
+function EditOccupantDialog({
+  occupant,
+  onClose,
+  onSaved,
+}: {
+  occupant: PartnerOccupant | null;
+  onClose: () => void;
+  onSaved: (updated: PartnerOccupant) => void;
+}) {
+  const save = useServerFn(updatePartnerPatient);
+  const initial = useMemo(
+    () => (occupant ? occupantToForm(occupant) : null),
+    [occupant],
+  );
+  const [form, setForm] = useState<EditForm | null>(initial);
+  const [conflict, setConflict] = useState<{
+    current: PartnerOccupant;
+    your_expected_updated_at: string | null;
+  } | null>(null);
+
+  // Reset form whenever the selected occupant changes (open/close/switch).
+  useEffect(() => {
+    setForm(initial);
+    setConflict(null);
+  }, [initial]);
+
+  const mutation = useMutation({
+    mutationFn: (input: UpdatePartnerPatientInput) => save({ data: input }),
+    onSuccess: (result) => {
+      if (result.ok) {
+        toast.success("Patient updated in ICU Handover Hub");
+        onSaved(result.patient);
+        return;
+      }
+      if (result.status === 409 && result.conflict) {
+        setConflict(result.conflict);
+        toast.warning("Someone else updated this patient — review and re-apply");
+        return;
+      }
+      toast.error(result.error || "Update failed");
+    },
+    onError: (err) => {
+      toast.error(err instanceof Error ? err.message : "Update failed");
+    },
+  });
+
+  const canSubmit =
+    !!occupant && !!form && !!initial && JSON.stringify(form) !== JSON.stringify(initial);
+
+  return (
+    <Dialog open={!!occupant} onOpenChange={(v) => !v && onClose()}>
+      <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
+        <DialogHeader>
+          <DialogTitle>Edit patient</DialogTitle>
+          <DialogDescription>
+            Changes write back to ICU Handover Hub over the signed bridge.
+          </DialogDescription>
+        </DialogHeader>
+
+        {conflict && (
+          <div
+            className="rounded-md border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-sm"
+            role="alert"
+          >
+            <div className="font-medium flex items-center gap-1.5">
+              <AlertTriangle className="w-4 h-4" aria-hidden="true" />
+              This patient was updated by someone else
+            </div>
+            <div className="text-xs mt-1 text-muted-foreground">
+              Their latest values are loaded below. Re-apply your changes on top
+              and save again.
+            </div>
+            <div className="mt-2 flex gap-2">
+              <Button
+                type="button"
+                size="sm"
+                variant="secondary"
+                onClick={() => {
+                  const fresh = occupantToForm(conflict.current);
+                  setForm(fresh);
+                  setConflict(null);
+                }}
+              >
+                Load latest
+              </Button>
+            </div>
+          </div>
+        )}
+
+        {occupant && form && (
+          <form
+            className="grid grid-cols-2 gap-3"
+            onSubmit={(e) => {
+              e.preventDefault();
+              if (!initial) return;
+              const diff = buildDiff(
+                initial,
+                form,
+                occupant.id,
+                occupant.updated_at,
+              );
+              mutation.mutate(diff);
+            }}
+          >
+            <div className="col-span-2">
+              <Label htmlFor="full_name">Full name</Label>
+              <Input
+                id="full_name"
+                value={form.full_name}
+                onChange={(e) => setForm({ ...form, full_name: e.target.value })}
+                required
+              />
+            </div>
+            <div>
+              <Label htmlFor="hospital_number">Hospital #</Label>
+              <Input
+                id="hospital_number"
+                value={form.hospital_number}
+                onChange={(e) =>
+                  setForm({ ...form, hospital_number: e.target.value })
+                }
+              />
+            </div>
+            <div>
+              <Label htmlFor="age">Age</Label>
+              <Input
+                id="age"
+                type="number"
+                min={0}
+                max={130}
+                value={form.age}
+                onChange={(e) => setForm({ ...form, age: e.target.value })}
+              />
+            </div>
+            <div>
+              <Label htmlFor="bed">Bed</Label>
+              <Input
+                id="bed"
+                value={form.bed}
+                onChange={(e) => setForm({ ...form, bed: e.target.value })}
+                placeholder="e.g. 4 or SR1"
+              />
+            </div>
+            <div>
+              <Label htmlFor="status">Status</Label>
+              <Select
+                value={form.status}
+                onValueChange={(v) =>
+                  setForm({ ...form, status: v as EditForm["status"] })
+                }
+              >
+                <SelectTrigger id="status">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="referred">Referred</SelectItem>
+                  <SelectItem value="admitted">Admitted</SelectItem>
+                  <SelectItem value="discharged">Discharged</SelectItem>
+                  <SelectItem value="died">Died</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="col-span-2 flex items-center justify-between border rounded-md px-3 py-2">
+              <Label htmlFor="tep_in_place" className="flex-1">
+                TEP in place
+              </Label>
+              <Switch
+                id="tep_in_place"
+                checked={form.tep_in_place}
+                onCheckedChange={(v) => setForm({ ...form, tep_in_place: v })}
+              />
+            </div>
+            {form.tep_in_place && (
+              <div className="col-span-2">
+                <Label htmlFor="tep_details">TEP details</Label>
+                <Textarea
+                  id="tep_details"
+                  rows={2}
+                  value={form.tep_details}
+                  onChange={(e) =>
+                    setForm({ ...form, tep_details: e.target.value })
+                  }
+                />
+              </div>
+            )}
+
+            <div className="col-span-2 flex items-center justify-between border rounded-md px-3 py-2">
+              <Label htmlFor="dnacpr" className="flex-1">
+                DNACPR decision
+              </Label>
+              <Switch
+                id="dnacpr"
+                checked={form.dnacpr_decision}
+                onCheckedChange={(v) =>
+                  setForm({ ...form, dnacpr_decision: v })
+                }
+              />
+            </div>
+            {form.dnacpr_decision && (
+              <div className="col-span-2">
+                <Label htmlFor="dnacpr_details">DNACPR details</Label>
+                <Textarea
+                  id="dnacpr_details"
+                  rows={2}
+                  value={form.dnacpr_details}
+                  onChange={(e) =>
+                    setForm({ ...form, dnacpr_details: e.target.value })
+                  }
+                />
+              </div>
+            )}
+
+            <div className="col-span-2">
+              <Label htmlFor="tasks">Outstanding tasks</Label>
+              <Textarea
+                id="tasks"
+                rows={3}
+                value={form.outstanding_tasks}
+                onChange={(e) =>
+                  setForm({ ...form, outstanding_tasks: e.target.value })
+                }
+              />
+            </div>
+
+            <DialogFooter className="col-span-2 mt-2">
+              <div className="text-xs text-muted-foreground mr-auto self-center">
+                Last updated {formatUpdated(occupant.updated_at)}
+              </div>
+              <Button type="button" variant="ghost" onClick={onClose}>
+                Cancel
+              </Button>
+              <Button type="submit" disabled={!canSubmit || mutation.isPending}>
+                {mutation.isPending && (
+                  <Loader2 className="w-4 h-4 mr-1 animate-spin" aria-hidden="true" />
+                )}
+                Save changes
+              </Button>
+            </DialogFooter>
+          </form>
+        )}
+      </DialogContent>
+    </Dialog>
+  );
+}
+
