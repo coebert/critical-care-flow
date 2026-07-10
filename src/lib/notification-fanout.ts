@@ -25,7 +25,7 @@ export interface PushSubRow {
   auth: string;
 }
 
-export type NotificationKind = "new" | "updated" | "status" | "note";
+export type NotificationKind = "new" | "updated" | "status" | "note" | "task";
 
 export interface NotificationRow {
   user_id: string;

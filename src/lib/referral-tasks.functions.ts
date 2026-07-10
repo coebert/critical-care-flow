@@ -3,6 +3,56 @@ import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { safeError } from "./safe-error";
 
+// Fan out a push + in-app notification to every at-work user with the
+// given role when a task is created or reassigned. Kept local to this
+// module so we can scope the eligible-role query to just the assignee
+// role instead of the broad "admin + clinician" default.
+async function fanOutTaskAssignment(args: {
+  actorId: string;
+  referralId: string;
+  taskTitle: string;
+  assignedRole: "admin" | "clinician";
+  action: "created" | "reassigned";
+}) {
+  try {
+    const [
+      { fanOutNotifications: runFanOut },
+      { buildNotificationFanoutDeps },
+      { supabaseAdmin },
+    ] = await Promise.all([
+      import("./notification-fanout"),
+      import("./notification-fanout-deps.server"),
+      import("@/integrations/supabase/client.server"),
+    ]);
+    const baseDeps = buildNotificationFanoutDeps(supabaseAdmin);
+    const deps = {
+      ...baseDeps,
+      // Narrow the recipient pool to holders of the assigned role only.
+      fetchEligibleRoles: async (actorId: string) => {
+        const { data } = await supabaseAdmin
+          .from("user_roles")
+          .select("user_id, role")
+          .eq("role", args.assignedRole)
+          .neq("user_id", actorId);
+        return (data ?? []) as { user_id: string; role: string }[];
+      },
+    };
+    const roleLabel = args.assignedRole === "admin" ? "admins" : "clinicians";
+    const verb = args.action === "created" ? "assigned" : "reassigned";
+    await runFanOut(deps, {
+      actorId: args.actorId,
+      referralId: args.referralId,
+      kind: "task",
+      message: `Task ${verb} to ${roleLabel}: ${args.taskTitle}`,
+      title: "Referral task",
+      url: `/referrals/${args.referralId}`,
+    });
+  } catch (err) {
+    // Push is best-effort — never fail the task write because of it.
+    console.error("[referral-tasks] fanOutTaskAssignment failed", err);
+  }
+}
+
 const roleEnum = z.enum(["admin", "clinician"]);
 const statusEnum = z.enum(["open", "done", "cancelled"]);
 
@@ -57,6 +107,15 @@ export const createTask = createServerFn({ method: "POST" })
       .select("*")
       .single();
     if (error) throw safeError("tasks", error, "Could not create task");
+    if (row.assigned_role === "admin" || row.assigned_role === "clinician") {
+      await fanOutTaskAssignment({
+        actorId: context.userId,
+        referralId: row.referral_id,
+        taskTitle: row.title,
+        assignedRole: row.assigned_role,
+        action: "created",
+      });
+    }
     return row;
   });
 
@@ -80,6 +139,12 @@ export const updateTask = createServerFn({ method: "POST" })
       patch.completed_by = null;
       patch.completed_at = null;
     }
+    // Snapshot the prior assignment so we only push when it actually changes.
+    const { data: prior } = await context.supabase
+      .from("referral_tasks")
+      .select("assigned_role")
+      .eq("id", data.id)
+      .maybeSingle();
     const { data: row, error } = await context.supabase
       .from("referral_tasks")
       .update(patch)
@@ -87,6 +152,21 @@ export const updateTask = createServerFn({ method: "POST" })
       .select("*")
       .single();
     if (error) throw safeError("tasks", error, "Could not update task");
+    const roleChanged =
+      data.patch.assigned_role !== undefined &&
+      (prior?.assigned_role ?? null) !== (row.assigned_role ?? null);
+    if (
+      roleChanged &&
+      (row.assigned_role === "admin" || row.assigned_role === "clinician")
+    ) {
+      await fanOutTaskAssignment({
+        actorId: context.userId,
+        referralId: row.referral_id,
+        taskTitle: row.title,
+        assignedRole: row.assigned_role,
+        action: "reassigned",
+      });
+    }
     return row;
   });
 
