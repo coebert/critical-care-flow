@@ -238,6 +238,7 @@ function BedBoardPage() {
           <p className="text-sm text-muted-foreground">Live occupancy, outliers and transfers.</p>
         </div>
         <div className="flex items-center gap-2 text-sm">
+          <RealtimeHealthBadge />
           <Link to="/board" className="rounded-md border px-3 py-1.5 hover:bg-accent">TV / whiteboard mode</Link>
           <Link to="/board/ward-round" className="rounded-md border px-3 py-1.5 hover:bg-accent">Ward round list</Link>
         </div>
