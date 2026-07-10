@@ -155,10 +155,14 @@ function BoardPage() {
   });
 
   useEffect(() => {
+    const refreshBeds = () => { bedBoard.refetch(); capacity.refetch(); };
     const ch = supabase
       .channel("board-refresh")
       .on("postgres_changes", { event: "*", schema: "public", table: "referrals" }, () => referrals.refetch())
-      .on("postgres_changes", { event: "*", schema: "public", table: "bed_occupancies" }, () => { bedBoard.refetch(); capacity.refetch(); })
+      .on("postgres_changes", { event: "*", schema: "public", table: "bed_occupancies" }, refreshBeds)
+      .on("postgres_changes", { event: "*", schema: "public", table: "beds" }, refreshBeds)
+      .on("postgres_changes", { event: "*", schema: "public", table: "bed_outliers" }, refreshBeds)
+      .on("postgres_changes", { event: "*", schema: "public", table: "bed_transfers_out" }, refreshBeds)
       .subscribe();
     return () => { supabase.removeChannel(ch); };
   }, [bedBoard, capacity, referrals]);

@@ -28,14 +28,13 @@ export function MiniCapacityLink() {
   });
 
   useEffect(() => {
+    const invalidate = () => qc.invalidateQueries({ queryKey: QK });
     const ch = supabase
       .channel("bed-capacity-mini")
-      .on("postgres_changes", { event: "*", schema: "public", table: "bed_occupancies" }, () =>
-        qc.invalidateQueries({ queryKey: QK }),
-      )
-      .on("postgres_changes", { event: "*", schema: "public", table: "beds" }, () =>
-        qc.invalidateQueries({ queryKey: QK }),
-      )
+      .on("postgres_changes", { event: "*", schema: "public", table: "bed_occupancies" }, invalidate)
+      .on("postgres_changes", { event: "*", schema: "public", table: "beds" }, invalidate)
+      .on("postgres_changes", { event: "*", schema: "public", table: "bed_outliers" }, invalidate)
+      .on("postgres_changes", { event: "*", schema: "public", table: "bed_transfers_out" }, invalidate)
       .subscribe();
     return () => {
       supabase.removeChannel(ch);
