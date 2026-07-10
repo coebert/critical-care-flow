@@ -20,8 +20,10 @@ import {
   getBridgeStatus,
   runBridgeSyncNow,
   sendBridgeTestPayload,
+  getBridgeSyncAttempts,
   type BridgeResourceStatus,
   type BridgeProbeResult,
+  type BridgeSyncAttempt,
 } from "@/lib/bridge-status.functions";
 import { toast } from "sonner";
 import { useState } from "react";
@@ -91,6 +93,7 @@ function BridgeStatusPage() {
   const getStatus = useServerFn(getBridgeStatus);
   const runNow = useServerFn(runBridgeSyncNow);
   const sendProbe = useServerFn(sendBridgeTestPayload);
+  const getAttempts = useServerFn(getBridgeSyncAttempts);
 
   const [probeResults, setProbeResults] = useState<BridgeProbeResult[] | null>(
     null,
@@ -99,6 +102,12 @@ function BridgeStatusPage() {
   const query = useQuery({
     queryKey: ["bridge-status"],
     queryFn: () => getStatus(),
+    refetchInterval: 15_000,
+  });
+
+  const attemptsQuery = useQuery({
+    queryKey: ["bridge-sync-attempts"],
+    queryFn: () => getAttempts(),
     refetchInterval: 15_000,
   });
 
