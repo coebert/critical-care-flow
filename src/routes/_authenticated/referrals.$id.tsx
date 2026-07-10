@@ -305,7 +305,18 @@ function ReferralDetail() {
         </Button>
       </div>
 
+      {isViewer && (
+        <Alert className="mb-4">
+          <AlertCircle className="h-4 w-4" aria-hidden="true" />
+          <AlertTitle>Read-only viewer</AlertTitle>
+          <AlertDescription>
+            You can view this referral and its notes, but editing, deleting, and
+            posting notes are disabled for your role.
+          </AlertDescription>
+        </Alert>
+      )}
       <div className="space-y-4">
+        <fieldset disabled={isViewer} className="space-y-4 min-w-0 p-0 m-0 border-0 disabled:opacity-90">
         <Card className="p-5 space-y-4">
           <h2 className="font-semibold">Details</h2>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
