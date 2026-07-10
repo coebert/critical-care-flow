@@ -255,11 +255,12 @@ async function processJob(admin: any, job: any) {
           // Partner app doesn't expose this bridge endpoint — treat as a
           // clean skip so the job doesn't fail on the whole window.
           skipped += 1;
-          error = undefined;
+          error = null;
         } else {
           error = (err as Error).message;
         }
       }
+
 
     }
 
