@@ -88,67 +88,90 @@ export const getPartnerBedBoard = createServerFn({ method: "GET" })
       .digest("hex");
 
     const url = `${base.replace(/\/$/, "")}/beds`;
-    let res: Response;
-    try {
-      res = await fetch(url, {
-        method: "GET",
-        headers: {
-          "x-timestamp": timestamp,
-          "x-actor": actor,
-          "x-signature": signature,
-          "cache-control": "no-store",
+
+    // Retry transient failures (network errors, 5xx, 408, 429, invalid JSON)
+    // with exponential backoff + full jitter. Non-transient failures (4xx
+    // other than 408/429, missing bed_board shape) return immediately.
+    const MAX_ATTEMPTS = 3;
+    const BASE_DELAY_MS = 250;
+    const MAX_DELAY_MS = 2_000;
+    const isTransientStatus = (s: number) =>
+      s === 408 || s === 429 || (s >= 500 && s < 600);
+    const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+
+    let lastError = "unknown partner error";
+    for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
+      let res: Response;
+      try {
+        res = await fetch(url, {
+          method: "GET",
+          headers: {
+            "x-timestamp": timestamp,
+            "x-actor": actor,
+            "x-signature": signature,
+            "cache-control": "no-store",
+          },
+        });
+      } catch (err) {
+        lastError = `partner unreachable: ${(err as Error).message}`;
+        if (attempt < MAX_ATTEMPTS) {
+          const cap = Math.min(BASE_DELAY_MS * 2 ** (attempt - 1), MAX_DELAY_MS);
+          await sleep(Math.floor(Math.random() * cap));
+          continue;
+        }
+        return { ok: false, error: lastError, fetched_at: fetchedAt };
+      }
+
+      if (!res.ok) {
+        const body = await res.text().catch(() => "");
+        lastError = `partner responded ${res.status}: ${body.slice(0, 200) || res.statusText}`;
+        if (isTransientStatus(res.status) && attempt < MAX_ATTEMPTS) {
+          const cap = Math.min(BASE_DELAY_MS * 2 ** (attempt - 1), MAX_DELAY_MS);
+          await sleep(Math.floor(Math.random() * cap));
+          continue;
+        }
+        return { ok: false, error: lastError, fetched_at: fetchedAt };
+      }
+
+      let payload: unknown;
+      try {
+        payload = await res.json();
+      } catch (err) {
+        lastError = `partner returned invalid JSON: ${(err as Error).message}`;
+        if (attempt < MAX_ATTEMPTS) {
+          const cap = Math.min(BASE_DELAY_MS * 2 ** (attempt - 1), MAX_DELAY_MS);
+          await sleep(Math.floor(Math.random() * cap));
+          continue;
+        }
+        return { ok: false, error: lastError, fetched_at: fetchedAt };
+      }
+
+      const p = payload as Partial<PartnerBedBoardOk> | null;
+      if (!p || !Array.isArray(p.bed_board)) {
+        return {
+          ok: false,
+          error: "partner payload missing bed_board array",
+          fetched_at: fetchedAt,
+        };
+      }
+
+      return {
+        ok: true,
+        unit: typeof p.unit === "string" ? p.unit : "Radnor Critical Care Unit",
+        side_rooms: Array.isArray(p.side_rooms) ? p.side_rooms : [],
+        bed_board: p.bed_board as PartnerBedSlot[],
+        unassigned: Array.isArray(p.unassigned) ? (p.unassigned as PartnerOccupant[]) : [],
+        stats: p.stats ?? {
+          total_beds: p.bed_board.length,
+          occupied: p.bed_board.filter((b) => b.occupied).length,
+          available:
+            p.bed_board.length - p.bed_board.filter((b) => b.occupied).length,
+          unassigned: 0,
         },
-      });
-    } catch (err) {
-      return {
-        ok: false,
-        error: `partner unreachable: ${(err as Error).message}`,
         fetched_at: fetchedAt,
       };
     }
 
-    if (!res.ok) {
-      const body = await res.text().catch(() => "");
-      return {
-        ok: false,
-        error: `partner responded ${res.status}: ${body.slice(0, 200) || res.statusText}`,
-        fetched_at: fetchedAt,
-      };
-    }
-
-    let payload: unknown;
-    try {
-      payload = await res.json();
-    } catch (err) {
-      return {
-        ok: false,
-        error: `partner returned invalid JSON: ${(err as Error).message}`,
-        fetched_at: fetchedAt,
-      };
-    }
-
-    const p = payload as Partial<PartnerBedBoardOk> | null;
-    if (!p || !Array.isArray(p.bed_board)) {
-      return {
-        ok: false,
-        error: "partner payload missing bed_board array",
-        fetched_at: fetchedAt,
-      };
-    }
-
-    return {
-      ok: true,
-      unit: typeof p.unit === "string" ? p.unit : "Radnor Critical Care Unit",
-      side_rooms: Array.isArray(p.side_rooms) ? p.side_rooms : [],
-      bed_board: p.bed_board as PartnerBedSlot[],
-      unassigned: Array.isArray(p.unassigned) ? (p.unassigned as PartnerOccupant[]) : [],
-      stats: p.stats ?? {
-        total_beds: p.bed_board.length,
-        occupied: p.bed_board.filter((b) => b.occupied).length,
-        available:
-          p.bed_board.length - p.bed_board.filter((b) => b.occupied).length,
-        unassigned: 0,
-      },
-      fetched_at: fetchedAt,
-    };
+    return { ok: false, error: lastError, fetched_at: fetchedAt };
   });
+
