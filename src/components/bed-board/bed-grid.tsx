@@ -116,7 +116,12 @@ export function BedCard({
           <BedIcon className="w-4 h-4" aria-hidden="true" />
           {bed.code}
         </div>
-        <Badge variant="outline" className={`text-[10px] ${LEVEL_TONE[occupancy.level] ?? ""}`}>
+        <Badge
+          variant="outline"
+          className={`text-[10px] ${LEVEL_TONE[occupancy.level] ?? ""}`}
+          title={LEVEL_LABEL[occupancy.level] ?? `Level ${occupancy.level}`}
+          aria-label={LEVEL_LABEL[occupancy.level] ?? `Level ${occupancy.level}`}
+        >
           L{occupancy.level}
         </Badge>
       </div>
