@@ -77,9 +77,28 @@ test.describe("bed board acuity", () => {
       name: new RegExp(`^Bed ${bedCode} — `),
     });
 
-    // Baseline: read the strip BEFORE we touch anything. All later
-    // assertions compare against this snapshot so the test does not care
-    // whether the unit already has other scored patients.
+    // Ensure the patient starts unscored so the baseline snapshot below
+    // does not already include their level — otherwise "baseline+1" on
+    // the first iteration would be off by however they were previously
+    // scored.
+    await cardSel.click();
+    const prep = page.getByRole("dialog", { name: /edit patient/i });
+    await expect(prep).toBeVisible();
+    const prepClear = prep.getByRole("button", { name: /^Clear$/ });
+    if (await prepClear.isVisible().catch(() => false)) {
+      await prepClear.click();
+      for (const l of [0, 1, 2, 3] as const) {
+        await expect(cardSel.getByLabel(LEVEL_LABEL[l])).toHaveCount(0, {
+          timeout: 10_000,
+        });
+      }
+    }
+    await page.keyboard.press("Escape");
+    await expect(prep).toBeHidden({ timeout: 5_000 });
+
+    // Baseline: read the strip with the target patient unscored. All
+    // later assertions compare against this snapshot so the test does
+    // not care whether the unit already has other scored patients.
     const baseline = await readStrip(page);
 
     for (const level of [0, 1, 2, 3] as const) {
