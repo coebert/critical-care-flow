@@ -475,6 +475,8 @@ export type BedReconcileResourceResult = {
   pushed: number;
   skipped: number;
   error: string | null;
+  pulled_ids?: string[];
+  pushed_ids?: string[];
 };
 
 export type BedReconcileResult = {
@@ -482,8 +484,10 @@ export type BedReconcileResult = {
   ran_at: string;
   from: string;
   to: string;
+  dry_run: boolean;
   results: BedReconcileResourceResult[];
 };
+
 
 /**
  * Reconciliation/backfill for bed-related tables in a chosen time window.
@@ -500,7 +504,7 @@ export type BedReconcileResult = {
 export const runBedReconciliation = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((d: unknown) => {
-    const v = (d ?? {}) as { from?: unknown; to?: unknown };
+    const v = (d ?? {}) as { from?: unknown; to?: unknown; dryRun?: unknown };
     const fromStr = typeof v.from === "string" ? v.from : "";
     const toStr = typeof v.to === "string" ? v.to : "";
     const fromDate = new Date(fromStr);
@@ -516,7 +520,11 @@ export const runBedReconciliation = createServerFn({ method: "POST" })
     if (spanMs > 30 * 24 * 60 * 60 * 1000) {
       throw new Error("Reconciliation window cannot exceed 30 days");
     }
-    return { from: fromDate.toISOString(), to: toDate.toISOString() };
+    return {
+      from: fromDate.toISOString(),
+      to: toDate.toISOString(),
+      dryRun: v.dryRun === true,
+    };
   })
   .handler(async ({ data, context }): Promise<BedReconcileResult> => {
     await assertAdmin(context);
@@ -536,6 +544,7 @@ export const runBedReconciliation = createServerFn({ method: "POST" })
       sync.BED_RESOURCE_KEYS.includes(r.key),
     );
 
+    const ID_SAMPLE_CAP = 50;
     const results: BedReconcileResourceResult[] = [];
     for (const resource of bedResources) {
       const startedMs = Date.now();
@@ -543,6 +552,8 @@ export const runBedReconciliation = createServerFn({ method: "POST" })
       let pushed = 0;
       let skipped = 0;
       let error: string | null = null;
+      const pulledIds: string[] = [];
+      const pushedIds: string[] = [];
 
       try {
         // PULL — partner API only supports a `since` cursor, so we pass
@@ -556,13 +567,17 @@ export const runBedReconciliation = createServerFn({ method: "POST" })
           const u = (r as any).updated_at as string | undefined;
           return !u || (u >= data.from && u <= data.to);
         });
-        if (inWindow.length > 0) {
+        for (const r of inWindow) {
+          const id = (r as any).id;
+          if (id != null) pulledIds.push(String(id));
+        }
+        if (inWindow.length > 0 && !data.dryRun) {
           const { error: upErr } = await admin
             .from(resource.table)
             .upsert(inWindow as any, { onConflict: resource.conflict });
           if (upErr) throw new Error(`local upsert: ${upErr.message}`);
-          pulled = inWindow.length;
         }
+        pulled = inWindow.length;
         skipped = incoming.length - inWindow.length;
 
         // PUSH — every local row updated inside the window, ignoring
@@ -576,34 +591,41 @@ export const runBedReconciliation = createServerFn({ method: "POST" })
           .limit(2000);
         if (readErr) throw new Error(`local read: ${readErr.message}`);
         for (const row of (batch ?? []) as Record<string, unknown>[]) {
-          await sync.pushOne(
-            partner,
-            resource.key,
-            sync.toPortable(resource.key, row),
-          );
+          const id = (row as any).id;
+          if (id != null) pushedIds.push(String(id));
+          if (!data.dryRun) {
+            await sync.pushOne(
+              partner,
+              resource.key,
+              sync.toPortable(resource.key, row),
+            );
+          }
           pushed += 1;
         }
       } catch (err) {
         error = (err as Error).message;
       }
 
-      // Audit every attempt so admins can see reconciliation runs alongside
-      // scheduled syncs and auto-retries.
-      await admin
-        .from("bridge_sync_attempts")
-        .insert({
-          source: "manual",
-          resource: resource.key,
-          ok: !error,
-          pulled,
-          pushed,
-          duration_ms: Date.now() - startedMs,
-          error: error ?? `reconcile ${data.from} → ${data.to}`,
-        })
-        .then(
-          () => {},
-          () => {},
-        );
+      // Audit every real attempt so admins can see reconciliation runs
+      // alongside scheduled syncs and auto-retries. Dry-runs are preview-only
+      // and intentionally do not touch the audit log.
+      if (!data.dryRun) {
+        await admin
+          .from("bridge_sync_attempts")
+          .insert({
+            source: "manual",
+            resource: resource.key,
+            ok: !error,
+            pulled,
+            pushed,
+            duration_ms: Date.now() - startedMs,
+            error: error ?? `reconcile ${data.from} → ${data.to}`,
+          })
+          .then(
+            () => {},
+            () => {},
+          );
+      }
 
       results.push({
         resource: resource.key,
@@ -611,6 +633,8 @@ export const runBedReconciliation = createServerFn({ method: "POST" })
         pushed,
         skipped,
         error,
+        pulled_ids: pulledIds.slice(0, ID_SAMPLE_CAP),
+        pushed_ids: pushedIds.slice(0, ID_SAMPLE_CAP),
       });
     }
 
@@ -619,6 +643,8 @@ export const runBedReconciliation = createServerFn({ method: "POST" })
       ran_at: new Date().toISOString(),
       from: data.from,
       to: data.to,
+      dry_run: data.dryRun,
       results,
     };
   });
+

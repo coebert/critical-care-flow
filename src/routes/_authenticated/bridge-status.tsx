@@ -749,19 +749,23 @@ function ReconcilePanel({
   const [lastResults, setLastResults] = useState<
     BedReconcileResourceResult[] | null
   >(null);
+  const [lastWasDryRun, setLastWasDryRun] = useState(false);
 
   const mutation = useMutation({
-    mutationFn: (input: { from: string; to: string }) =>
+    mutationFn: (input: { from: string; to: string; dryRun: boolean }) =>
       reconcileFn({ data: input }),
     onSuccess: (res) => {
       setLastResults(res.results);
+      setLastWasDryRun(res.dry_run);
       const pulled = res.results.reduce((n, r) => n + r.pulled, 0);
       const pushed = res.results.reduce((n, r) => n + r.pushed, 0);
       const errors = res.results.filter((r) => r.error).length;
-      const msg = `Reconciled ${pulled} pulled / ${pushed} pushed across ${res.results.length} bed tables`;
+      const prefix = res.dry_run ? "Dry-run: would" : "Reconciled";
+      const msg = `${prefix} ${pulled} pulled / ${pushed} pushed across ${res.results.length} bed tables`;
       if (errors === 0) toast.success(msg);
       else toast.warning(`${msg} (${errors} with errors)`);
-      onDone();
+      // Dry-runs don't change anything, so no need to refresh sibling panels.
+      if (!res.dry_run) onDone();
     },
     onError: (err: unknown) => {
       toast.error("Reconciliation failed", {
@@ -770,7 +774,7 @@ function ReconcilePanel({
     },
   });
 
-  const runWindow = (hours: number) => {
+  const runWindow = (hours: number, dryRun: boolean) => {
     const end = new Date();
     const start = new Date(end.getTime() - hours * 60 * 60 * 1000);
     setFrom(toLocalInputValue(start));
@@ -778,15 +782,16 @@ function ReconcilePanel({
     mutation.mutate({
       from: start.toISOString(),
       to: end.toISOString(),
+      dryRun,
     });
   };
 
-  const runCustom = () => {
+  const runCustom = (dryRun: boolean) => {
     // Convert the datetime-local strings (in the admin's local zone) into
     // ISO UTC so the server-side range matches how updated_at is stored.
     const startISO = new Date(from).toISOString();
     const endISO = new Date(to).toISOString();
-    mutation.mutate({ from: startISO, to: endISO });
+    mutation.mutate({ from: startISO, to: endISO, dryRun });
   };
 
   return (
@@ -803,7 +808,8 @@ function ReconcilePanel({
           </div>
           <p className="text-xs text-muted-foreground">
             Re-pulls partner rows and re-pushes local bed rows updated inside
-            the chosen window. Sync cursors are left untouched.
+            the chosen window. Use Dry-run to preview counts and offending IDs
+            without writing anything. Sync cursors are left untouched.
           </p>
         </div>
       </div>
@@ -813,30 +819,30 @@ function ReconcilePanel({
           <Button
             size="sm"
             variant="outline"
-            onClick={() => runWindow(1)}
+            onClick={() => runWindow(1, true)}
             disabled={mutation.isPending}
           >
-            Last 1h
+            Dry-run 1h
           </Button>
           <Button
             size="sm"
             variant="outline"
-            onClick={() => runWindow(24)}
+            onClick={() => runWindow(24, true)}
             disabled={mutation.isPending}
           >
-            Last 24h
+            Dry-run 24h
           </Button>
           <Button
             size="sm"
             variant="outline"
-            onClick={() => runWindow(24 * 7)}
+            onClick={() => runWindow(24 * 7, true)}
             disabled={mutation.isPending}
           >
-            Last 7d
+            Dry-run 7d
           </Button>
         </div>
 
-        <div className="grid gap-3 sm:grid-cols-[1fr_1fr_auto] items-end">
+        <div className="grid gap-3 sm:grid-cols-[1fr_1fr_auto_auto] items-end">
           <div className="space-y-1">
             <Label htmlFor="reconcile-from" className="text-xs">
               From
@@ -861,24 +867,43 @@ function ReconcilePanel({
           </div>
           <Button
             size="sm"
-            onClick={runCustom}
+            variant="outline"
+            onClick={() => runCustom(true)}
             disabled={mutation.isPending || !from || !to}
           >
-            {mutation.isPending ? "Reconciling…" : "Run reconcile"}
+            {mutation.isPending && lastWasDryRun ? "Previewing…" : "Dry-run"}
+          </Button>
+          <Button
+            size="sm"
+            onClick={() => runCustom(false)}
+            disabled={mutation.isPending || !from || !to}
+          >
+            {mutation.isPending && !lastWasDryRun
+              ? "Reconciling…"
+              : "Run reconcile"}
           </Button>
         </div>
 
         {lastResults && (
           <div className="border-t pt-3">
-            <div className="text-xs font-medium uppercase tracking-wide text-muted-foreground mb-2">
-              Last reconciliation
+            <div className="text-xs font-medium uppercase tracking-wide text-muted-foreground mb-2 flex items-center gap-2">
+              {lastWasDryRun ? "Dry-run preview" : "Last reconciliation"}
+              {lastWasDryRun && (
+                <Badge variant="outline" className="text-[10px]">
+                  no writes
+                </Badge>
+              )}
             </div>
             <Table>
               <TableHeader>
                 <TableRow>
                   <TableHead>Table</TableHead>
-                  <TableHead className="text-right">Pulled</TableHead>
-                  <TableHead className="text-right">Pushed</TableHead>
+                  <TableHead className="text-right">
+                    {lastWasDryRun ? "Would pull" : "Pulled"}
+                  </TableHead>
+                  <TableHead className="text-right">
+                    {lastWasDryRun ? "Would push" : "Pushed"}
+                  </TableHead>
                   <TableHead className="text-right">Skipped</TableHead>
                   <TableHead>Result</TableHead>
                 </TableRow>
@@ -886,17 +911,19 @@ function ReconcilePanel({
               <TableBody>
                 {lastResults.map((r) => (
                   <TableRow key={r.resource}>
-                    <TableCell className="font-medium">{r.resource}</TableCell>
-                    <TableCell className="text-right tabular-nums">
+                    <TableCell className="font-medium align-top">
+                      {r.resource}
+                    </TableCell>
+                    <TableCell className="text-right tabular-nums align-top">
                       {r.pulled}
                     </TableCell>
-                    <TableCell className="text-right tabular-nums">
+                    <TableCell className="text-right tabular-nums align-top">
                       {r.pushed}
                     </TableCell>
-                    <TableCell className="text-right tabular-nums text-muted-foreground">
+                    <TableCell className="text-right tabular-nums text-muted-foreground align-top">
                       {r.skipped}
                     </TableCell>
-                    <TableCell>
+                    <TableCell className="align-top">
                       {r.error ? (
                         <span
                           className="text-xs text-destructive truncate block max-w-[32ch]"
@@ -907,6 +934,36 @@ function ReconcilePanel({
                       ) : (
                         <Badge variant="secondary">OK</Badge>
                       )}
+                      {lastWasDryRun &&
+                        ((r.pulled_ids?.length ?? 0) > 0 ||
+                          (r.pushed_ids?.length ?? 0) > 0) && (
+                          <div className="mt-2 space-y-1 text-[11px] text-muted-foreground">
+                            {r.pulled_ids && r.pulled_ids.length > 0 && (
+                              <div>
+                                <span className="font-medium">Pull IDs</span>{" "}
+                                <span className="font-mono break-all">
+                                  {r.pulled_ids.join(", ")}
+                                  {r.pulled < (r.pulled_ids?.length ?? 0)
+                                    ? ""
+                                    : r.pulled > r.pulled_ids.length
+                                      ? ` … +${r.pulled - r.pulled_ids.length}`
+                                      : ""}
+                                </span>
+                              </div>
+                            )}
+                            {r.pushed_ids && r.pushed_ids.length > 0 && (
+                              <div>
+                                <span className="font-medium">Push IDs</span>{" "}
+                                <span className="font-mono break-all">
+                                  {r.pushed_ids.join(", ")}
+                                  {r.pushed > r.pushed_ids.length
+                                    ? ` … +${r.pushed - r.pushed_ids.length}`
+                                    : ""}
+                                </span>
+                              </div>
+                            )}
+                          </div>
+                        )}
                     </TableCell>
                   </TableRow>
                 ))}
@@ -918,3 +975,4 @@ function ReconcilePanel({
     </Card>
   );
 }
+
