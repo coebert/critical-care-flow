@@ -396,43 +396,96 @@ function BedBoardPage() {
       )}
 
 
-      {lastOk && (
-        <div
-          className="flex flex-wrap items-center gap-2 mb-4"
-          role="status"
-          aria-label="Unit capacity"
-        >
-          <StatBlock label={lastOk.unit} value={lastOk.stats.total_beds} tone="muted" />
-          <StatBlock
-            label="Occupied"
-            value={lastOk.stats.occupied}
-            tone={
-              lastOk.stats.available === 0
-                ? "bad"
-                : lastOk.stats.available <= 1
-                  ? "warn"
-                  : "ok"
-            }
-          />
-          <StatBlock
-            label="Free"
-            value={lastOk.stats.available}
-            tone={
-              lastOk.stats.available === 0
-                ? "bad"
-                : lastOk.stats.available <= 1
-                  ? "warn"
-                  : "ok"
-            }
-          />
-          {lastOk.stats.unassigned > 0 && (
-            <Badge variant="outline" className="gap-1">
-              <AlertTriangle className="w-3.5 h-3.5" aria-hidden="true" />
-              {lastOk.stats.unassigned} unassigned
-            </Badge>
-          )}
-        </div>
-      )}
+      {lastOk && (() => {
+        const allOccupants = [
+          ...lastOk.bed_board
+            .map((b) => b.occupant)
+            .filter((o): o is PartnerOccupant => o !== null),
+          ...lastOk.unassigned,
+        ];
+        const counts: Record<AcuityLevel, number> = { 0: 0, 1: 0, 2: 0, 3: 0 };
+        let scored = 0;
+        let sum = 0;
+        for (const o of allOccupants) {
+          const l = acuityMap.get(o.id);
+          if (l == null) continue;
+          counts[l] += 1;
+          scored += 1;
+          sum += l;
+        }
+        const unscored = allOccupants.length - scored;
+        const mean = scored > 0 ? sum / scored : 0;
+        return (
+          <>
+            <div
+              className="flex flex-wrap items-center gap-2 mb-3"
+              role="status"
+              aria-label="Unit capacity"
+            >
+              <StatBlock label={lastOk.unit} value={lastOk.stats.total_beds} tone="muted" />
+              <StatBlock
+                label="Occupied"
+                value={lastOk.stats.occupied}
+                tone={
+                  lastOk.stats.available === 0
+                    ? "bad"
+                    : lastOk.stats.available <= 1
+                      ? "warn"
+                      : "ok"
+                }
+              />
+              <StatBlock
+                label="Free"
+                value={lastOk.stats.available}
+                tone={
+                  lastOk.stats.available === 0
+                    ? "bad"
+                    : lastOk.stats.available <= 1
+                      ? "warn"
+                      : "ok"
+                }
+              />
+              {lastOk.stats.unassigned > 0 && (
+                <Badge variant="outline" className="gap-1">
+                  <AlertTriangle className="w-3.5 h-3.5" aria-hidden="true" />
+                  {lastOk.stats.unassigned} unassigned
+                </Badge>
+              )}
+            </div>
+            <div
+              className="flex flex-wrap items-center gap-2 mb-4"
+              role="status"
+              aria-label="Unit acuity"
+            >
+              <div className="text-xs uppercase tracking-wide text-muted-foreground mr-1">
+                Acuity
+              </div>
+              {([0, 1, 2, 3] as const).map((l) => (
+                <div
+                  key={l}
+                  className={`flex items-center gap-1.5 rounded-md border px-2.5 py-1 text-sm ${LEVEL_TONE[l]}`}
+                  title={LEVEL_LABEL[l]}
+                >
+                  <span className="font-semibold">L{l}</span>
+                  <span className="tabular-nums">{counts[l]}</span>
+                </div>
+              ))}
+              <div
+                className="flex items-center gap-1.5 rounded-md border px-2.5 py-1 text-sm bg-muted text-muted-foreground"
+                title="Mean level across scored patients"
+              >
+                <span className="font-semibold">Mean</span>
+                <span className="tabular-nums">{mean.toFixed(2)}</span>
+              </div>
+              {unscored > 0 && (
+                <div className="text-xs text-muted-foreground">
+                  {unscored} patient{unscored === 1 ? "" : "s"} not yet scored
+                </div>
+              )}
+            </div>
+          </>
+        );
+      })()}
 
       {partnerError && (
         <div
