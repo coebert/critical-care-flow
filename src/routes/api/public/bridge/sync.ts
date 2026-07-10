@@ -21,71 +21,127 @@ type ResourceKey =
   | "microbiology"
   | "referrals";
 
+// Portable column allowlists per resource. Sync pushes ONLY these keys to the
+// partner so that partner-side validators (which reject unknown fields such
+// as `created_by`, `updated_by`, `_enc` blobs, or internal audit metadata)
+// accept the payload. Local upserts on pull still use the full row.
+const PUSH_ALLOW: Record<ResourceKey, readonly string[]> = {
+  patients: [
+    "id",
+    "full_name",
+    "hospital_number",
+    "nhs_number",
+    "dob",
+    "location_type",
+    "ward",
+    "bed",
+    "status",
+    "admission_date",
+    "discharge_date",
+    "discharge_destination",
+    "date_of_death",
+    "past_medical_history",
+    "current_admission",
+    "current_management",
+    "outstanding_tasks",
+    "tep_in_place",
+    "tep_details",
+    "dnacpr_decision",
+    "dnacpr_details",
+    "dnacpr_date",
+    "nok_name",
+    "nok_relationship",
+    "nok_contact",
+    "nok_last_updated",
+    "nok_last_updated_by",
+  ],
+  investigations: [
+    "id",
+    "patient_id",
+    "category",
+    "findings",
+    "result_at",
+  ],
+  microbiology: [
+    "id",
+    "patient_id",
+    "organism",
+    "sample_type",
+    "sensitivities",
+    "sampled_at",
+    "reported_at",
+    "notes",
+  ],
+  referrals: [
+    "id",
+    "age",
+    "sex",
+    "current_ward",
+    "current_bed",
+    "dnacpr_respect",
+    "referring_specialty",
+    "referral_received_at",
+    "first_seen_at",
+    "decision_at",
+    "arrived_on_unit_at",
+    "status",
+    "decline_reason",
+    "admission_urgency",
+    "consultant_to_consultant_only",
+    "accepting_consultant",
+    "discussed_with_consultant",
+    "is_test",
+    "news2_score",
+    "news2_recorded_at",
+    "ceiling_of_care",
+    "reason_category",
+    "frailty_score",
+    "anticipated_interventions",
+    "infection_status",
+    "infection_organism",
+    "weight_kg",
+    "allergies",
+    "resus_status",
+    "previous_referral_id",
+    "outcome",
+    "outcome_recorded_at",
+    "needs_ward_review",
+    "ward_review_timeframe",
+    "for_ongoing_ccot_review",
+  ],
+};
+
 const RESOURCES: {
   key: ResourceKey;
   table: string;
   conflict: string;
   select: string;
-  pushMap?: (row: Record<string, unknown>) => Record<string, unknown>;
 }[] = [
   { key: "patients", table: "patients", conflict: "id", select: "*" },
+  { key: "investigations", table: "investigations", conflict: "id", select: "*" },
+  { key: "microbiology", table: "microbiology", conflict: "id", select: "*" },
   {
-    key: "investigations",
-    table: "investigations",
-    conflict: "id",
-    select: "*",
-  },
-  {
-    key: "microbiology",
-    table: "microbiology",
-    conflict: "id",
-    select: "*",
-  },
-  {
-    // Encrypted columns cannot cross the bridge — only ship the safe subset.
+    // Encrypted columns cannot cross the bridge — read the safe subset plus
+    // updated_at (needed for cursor bookkeeping; stripped before push).
     key: "referrals",
     table: "referrals",
     conflict: "id",
-    select: [
-      "id",
-      "age",
-      "sex",
-      "current_ward",
-      "current_bed",
-      "dnacpr_respect",
-      "referring_specialty",
-      "referral_received_at",
-      "first_seen_at",
-      "decision_at",
-      "arrived_on_unit_at",
-      "status",
-      "decline_reason",
-      "admission_urgency",
-      "consultant_to_consultant_only",
-      "accepting_consultant",
-      "discussed_with_consultant",
-      "is_test",
-      "news2_score",
-      "news2_recorded_at",
-      "ceiling_of_care",
-      "reason_category",
-      "frailty_score",
-      "anticipated_interventions",
-      "infection_status",
-      "infection_organism",
-      "weight_kg",
-      "allergies",
-      "resus_status",
-      "previous_referral_id",
-      "outcome",
-      "outcome_recorded_at",
-      "needs_ward_review",
-      "ward_review_timeframe",
-      "for_ongoing_ccot_review",
-      "updated_at",
-    ].join(","),
+    select: [...PUSH_ALLOW.referrals, "updated_at"].join(","),
   },
 ];
+
+function toPortable(
+  key: ResourceKey,
+  row: Record<string, unknown>,
+): Record<string, unknown> {
+  const allow = PUSH_ALLOW[key];
+  const out: Record<string, unknown> = {};
+  for (const k of allow) {
+    if (k in row) out[k] = (row as any)[k];
+  }
+  return out;
+}
+
 
 const SYSTEM_ACTOR = JSON.stringify({
   id: "critical-care-connect-sync",
@@ -208,7 +264,7 @@ async function syncResource(
       if (readErr) throw new Error(`local read ${resource.key}: ${readErr.message}`);
       if (!batch || batch.length === 0) break;
       for (const row of batch as Record<string, unknown>[]) {
-        await pushOne(base, resource.key, row);
+        await pushOne(base, resource.key, toPortable(resource.key, row));
         pushed += 1;
         const u = (row as any).updated_at as string | undefined;
         if (u && (!pushCursor || u > pushCursor)) pushCursor = u;

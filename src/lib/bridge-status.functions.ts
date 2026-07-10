@@ -81,23 +81,23 @@ export const getBridgeStatus = createServerFn({ method: "GET" })
       }),
     );
 
-    // Is the pg_cron job scheduled and active?
+    // Is the pg_cron job scheduled and active? cron.job is not reachable
+    // over PostgREST, so use a SECURITY DEFINER RPC that returns the row.
     let cronActive = false;
     let cronSchedule: string | null = null;
     try {
-      const { data: cronRows } = await (supabaseAdmin as any)
-        .schema("cron")
-        .from("job")
-        .select("jobname, schedule, active")
-        .eq("jobname", "bridge-sync-every-2-min")
-        .maybeSingle();
-      if (cronRows) {
-        cronActive = Boolean(cronRows.active);
-        cronSchedule = cronRows.schedule ?? null;
+      const { data: cronRows } = await (supabaseAdmin as any).rpc(
+        "get_bridge_cron_state",
+      );
+      const row = Array.isArray(cronRows) ? cronRows[0] : cronRows;
+      if (row) {
+        cronActive = Boolean(row.active);
+        cronSchedule = row.schedule ?? null;
       }
     } catch {
-      // cron schema not readable via PostgREST in every environment; ignore.
+      // If the RPC is missing in an older environment, leave defaults.
     }
+
 
     return {
       ok: perResource.every((r) => !r.last_error),

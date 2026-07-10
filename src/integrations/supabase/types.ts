@@ -1593,6 +1593,14 @@ export type Database = {
         Args: { _attempt_id: number; _success: boolean }
         Returns: undefined
       }
+      get_bridge_cron_state: {
+        Args: never
+        Returns: {
+          active: boolean
+          jobname: string
+          schedule: string
+        }[]
+      }
       has_clinical_access: { Args: { _user_id: string }; Returns: boolean }
       has_role: {
         Args: {
