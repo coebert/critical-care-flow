@@ -29,25 +29,62 @@ const bootstrapFirstAdmin = createServerFn({ method: "POST" })
       .parse(d),
   )
   .handler(async ({ data }) => {
-    // Runs BEFORE any dynamic import of supabaseAdmin — a rejection here
-    // guarantees no DB or auth writes occur.
-    assertSetupSecret(data.setup_secret, process.env.SETUP_SECRET);
-
+    // Throttle FIRST — 5 failures / 15 min under a fixed sentinel key so
+    // rotating the submitted email/secret cannot bypass the counter. Uses
+    // the existing begin_auth_attempt / finalize_auth_attempt RPCs.
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-    const { data: users, error: listErr } = await supabaseAdmin.auth.admin.listUsers({ perPage: 1 });
-    if (listErr) throw safeError("setup.listUsers", listErr, "Setup check failed.");
-    if (users.users.length > 0) throw new Error("Setup already complete. Sign in instead.");
+    const THROTTLE_KEY = "setup-bootstrap";
+    const { data: begin, error: beginErr } = await supabaseAdmin.rpc(
+      "begin_auth_attempt",
+      { _email: THROTTLE_KEY, _attempt_type: "setup" },
+    );
+    if (beginErr) throw safeError("setup.throttle.begin", beginErr, "Setup temporarily unavailable.");
+    const beginJson = (begin ?? {}) as {
+      locked?: boolean;
+      attempt_id?: number | null;
+      retry_after_seconds?: number;
+    };
+    if (beginJson.locked) {
+      const mins = Math.max(1, Math.ceil((beginJson.retry_after_seconds ?? 900) / 60));
+      throw new Error(
+        `Too many setup attempts. Try again in about ${mins} minute${mins === 1 ? "" : "s"}.`,
+      );
+    }
+    const attemptId = beginJson.attempt_id ?? null;
 
-    const { error } = await supabaseAdmin.auth.admin.createUser({
-      email: data.email,
-      password: data.password,
-      email_confirm: true,
-      user_metadata: { full_name: data.full_name },
-    });
-    if (error) throw safeError("setup.createAdmin", error, "Failed to create admin account.");
-    // Trigger already creates 'admin' for the first user
-    return { ok: true };
+    // Wrap the real work: any thrown error must first record a failure
+    // against the throttle counter so a wrong secret costs an attempt.
+    try {
+      assertSetupSecret(data.setup_secret, process.env.SETUP_SECRET);
+
+      const { data: users, error: listErr } = await supabaseAdmin.auth.admin.listUsers({ perPage: 1 });
+      if (listErr) throw safeError("setup.listUsers", listErr, "Setup check failed.");
+      if (users.users.length > 0) throw new Error("Setup already complete. Sign in instead.");
+
+      const { error } = await supabaseAdmin.auth.admin.createUser({
+        email: data.email,
+        password: data.password,
+        email_confirm: true,
+        user_metadata: { full_name: data.full_name },
+      });
+      if (error) throw safeError("setup.createAdmin", error, "Failed to create admin account.");
+
+      // Success — clear pending failures for this key.
+      await supabaseAdmin.rpc("finalize_auth_attempt", {
+        _attempt_id: attemptId,
+        _success: true,
+      });
+      // Trigger already creates 'admin' for the first user
+      return { ok: true };
+    } catch (err) {
+      // Leave the reserved failure row in place so the counter increments.
+      await supabaseAdmin
+        .rpc("finalize_auth_attempt", { _attempt_id: attemptId, _success: false })
+        .then(() => undefined, () => undefined);
+      throw err;
+    }
   });
+
 
 // Reports whether setup is currently possible. Does NOT reveal the secret;
 // only whether (a) it is configured and (b) no users exist yet.
