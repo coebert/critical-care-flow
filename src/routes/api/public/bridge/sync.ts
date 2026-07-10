@@ -188,7 +188,7 @@ const PUSH_ALLOW: Record<ResourceKey, readonly string[]> = {
   ],
 };
 
-const RESOURCES: {
+export const RESOURCES: {
   key: ResourceKey;
   table: string;
   conflict: string;
@@ -212,6 +212,17 @@ const RESOURCES: {
   { key: "bed_outliers", table: "bed_outliers", conflict: "id", select: "*" },
   { key: "bed_transfers_out", table: "bed_transfers_out", conflict: "id", select: "*" },
 ];
+
+export type BridgeResource = (typeof RESOURCES)[number];
+
+export const BED_RESOURCE_KEYS: ReadonlyArray<ResourceKey> = [
+  "beds",
+  "bed_occupancies",
+  "bed_outliers",
+  "bed_transfers_out",
+];
+
+export type { ResourceKey };
 
 export function toPortable(
   key: ResourceKey,
