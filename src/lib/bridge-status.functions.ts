@@ -141,3 +141,108 @@ export const runBridgeSyncNow = createServerFn({ method: "POST" })
     const body = await res.json().catch(() => ({}));
     return { status: res.status, body };
   });
+
+export type BridgeProbeResult = {
+  resource: string;
+  status: number;
+  ok: boolean;
+  message: string;
+};
+
+/**
+ * Probes each partner resource endpoint with an intentionally empty record.
+ * A well-behaved partner responds with a 400 validation error, proving:
+ *   - the endpoint is reachable
+ *   - our HMAC signature is accepted (not 401)
+ *   - the partner's payload validator is running
+ * No rows are created because the empty payload fails validation.
+ */
+export const sendBridgeTestPayload = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .handler(
+    async ({
+      context,
+    }): Promise<{
+      ok: boolean;
+      ran_at: string;
+      partner: string;
+      results: BridgeProbeResult[];
+    }> => {
+      const { data: isAdmin } = await context.supabase.rpc("has_role", {
+        _user_id: context.userId,
+        _role: "admin",
+      });
+      if (!isAdmin) throw new Error("admin_required");
+
+      const partner = process.env.PARTNER_BRIDGE_URL;
+      if (!partner) throw new Error("PARTNER_BRIDGE_URL not configured");
+
+      const { getBridgeSecrets, signWith } = await import(
+        "@/lib/bridge-hmac.server"
+      );
+      const secrets = getBridgeSecrets();
+      const actor = JSON.stringify({
+        id: "critical-care-connect-probe",
+        email: "probe@critical-care-connect.local",
+        role: "admin",
+      });
+
+      const probes: BridgeProbeResult[] = [];
+      const rawBody = JSON.stringify({ record: {}, __probe: true });
+      const base = partner.replace(/\/$/, "");
+
+      for (const key of [
+        "patients",
+        "investigations",
+        "microbiology",
+        "referrals",
+      ]) {
+        const timestamp = String(Math.floor(Date.now() / 1000));
+        const signature = signWith(secrets.current, {
+          timestamp,
+          actor,
+          rawBody,
+        });
+        try {
+          const res = await fetch(`${base}/${key}`, {
+            method: "POST",
+            headers: {
+              "content-type": "application/json",
+              "x-timestamp": timestamp,
+              "x-actor": actor,
+              "x-signature": signature,
+            },
+            body: rawBody,
+          });
+          const text = (await res.text()).slice(0, 200);
+          // 400 (validation error) proves the contract is intact without
+          // creating a row. 401/403 mean signature/actor rejected.
+          // 200/201 would be unexpected: partner accepted an empty record.
+          const contractOk = res.status === 400;
+          probes.push({
+            resource: key,
+            status: res.status,
+            ok: contractOk,
+            message: contractOk
+              ? `Validator rejected empty payload as expected (${text || "no body"})`
+              : text || `HTTP ${res.status}`,
+          });
+        } catch (err) {
+          probes.push({
+            resource: key,
+            status: 0,
+            ok: false,
+            message: (err as Error).message,
+          });
+        }
+      }
+
+      return {
+        ok: probes.every((p) => p.ok),
+        ran_at: new Date().toISOString(),
+        partner,
+        results: probes,
+      };
+    },
+  );
+
