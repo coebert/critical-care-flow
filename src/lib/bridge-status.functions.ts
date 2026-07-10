@@ -1,5 +1,6 @@
 import { createServerFn } from "@tanstack/react-start";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
+import { assertAdmin } from "@/lib/auth-guards";
 
 export type BridgeResourceStatus = {
   resource: string;
@@ -32,14 +33,9 @@ const RESOURCES: { key: string; table: string }[] = [
 export const getBridgeStatus = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
   .handler(async ({ context }): Promise<BridgeStatusSummary> => {
-    // Admin-only. Non-admins get an explicit error the route surfaces.
-    const { data: isAdmin } = await context.supabase.rpc("has_role", {
-      _user_id: context.userId,
-      _role: "admin",
-    });
-    if (!isAdmin) {
-      throw new Error("admin_required");
-    }
+    // Server-side admin gate: blocks non-admins even if the route is hit
+    // directly, and the RPC/URL is invoked by anyone with a valid session.
+    await assertAdmin(context);
 
     const { supabaseAdmin } = await import(
       "@/integrations/supabase/client.server"
@@ -113,11 +109,7 @@ export const getBridgeStatus = createServerFn({ method: "GET" })
 export const runBridgeSyncNow = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .handler(async ({ context }) => {
-    const { data: isAdmin } = await context.supabase.rpc("has_role", {
-      _user_id: context.userId,
-      _role: "admin",
-    });
-    if (!isAdmin) throw new Error("admin_required");
+    await assertAdmin(context);
 
     const url = `${process.env.SUPABASE_URL?.replace(
       /\.supabase\.co$/,
@@ -168,11 +160,7 @@ export const sendBridgeTestPayload = createServerFn({ method: "POST" })
       partner: string;
       results: BridgeProbeResult[];
     }> => {
-      const { data: isAdmin } = await context.supabase.rpc("has_role", {
-        _user_id: context.userId,
-        _role: "admin",
-      });
-      if (!isAdmin) throw new Error("admin_required");
+      await assertAdmin(context);
 
       const partner = process.env.PARTNER_BRIDGE_URL;
       if (!partner) throw new Error("PARTNER_BRIDGE_URL not configured");
