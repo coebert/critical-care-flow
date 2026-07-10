@@ -12,7 +12,7 @@ import { ReferralRouteError } from "@/components/referral-route-error";
 import { Noteboard, referralNotesQueryOptions } from "@/components/noteboard";
 import { TaskList } from "@/components/referrals/task-list";
 import { MessageLog } from "@/components/referrals/message-log";
-import { useAuth, useRole } from "@/hooks/use-auth";
+import { useAuth, useIsViewer, useRole } from "@/hooks/use-auth";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -86,6 +86,7 @@ function ReferralDetail() {
   const fetchDetail = useServerFn(getReferralDetail);
   const { user } = useAuth();
   const { hasRole: isAdmin } = useRole("admin");
+  const { isViewer } = useIsViewer();
   const [deleting, setDeleting] = useState(false);
   const [expandCmd, setExpandCmd] = useState<ExpandCommand>(null);
   const { specialties, wards, consultants } = useReferralOptions();
@@ -136,7 +137,7 @@ function ReferralDetail() {
 
   if (!ref) return <div className="p-6 text-muted-foreground">Loading…</div>;
 
-  const canDelete = !!user && (user.id === ref.created_by || isAdmin);
+  const canDelete = !isViewer && !!user && (user.id === ref.created_by || isAdmin);
 
   const set = (k: keyof Referral, v: any) => setRef({ ...ref, [k]: v });
 
@@ -304,7 +305,18 @@ function ReferralDetail() {
         </Button>
       </div>
 
+      {isViewer && (
+        <Alert className="mb-4">
+          <AlertCircle className="h-4 w-4" aria-hidden="true" />
+          <AlertTitle>Read-only viewer</AlertTitle>
+          <AlertDescription>
+            You can view this referral and its notes, but editing, deleting, and
+            posting notes are disabled for your role.
+          </AlertDescription>
+        </Alert>
+      )}
       <div className="space-y-4">
+        <fieldset disabled={isViewer} className="space-y-4 min-w-0 p-0 m-0 border-0 disabled:opacity-90">
         <Card className="p-5 space-y-4">
           <h2 className="font-semibold">Details</h2>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -482,32 +494,35 @@ function ReferralDetail() {
           )}
         </Card>
 
-        <div className="flex flex-wrap gap-2 justify-end">
-          {(ref.status === "accepted" || ref.status === "admitted") && (
-            <Button
-              variant="outline"
-              onClick={() =>
-                navigate({
-                  to: "/bed-board",
-                  search: {
-                    source_referral_id: id,
-                    hospital_number: ref.hospital_number ?? undefined,
-                    patient_initials: undefined,
-                    admitting_consultant: ref.accepting_consultant ?? undefined,
-                    level: undefined,
-                    source_label: `referral ${ref.hospital_number ?? ""}`.trim(),
-                    source_postop_booking_id: undefined,
-                  },
-                })
-              }
-            >
-              Admit to bed…
+        {!isViewer && (
+          <div className="flex flex-wrap gap-2 justify-end">
+            {(ref.status === "accepted" || ref.status === "admitted") && (
+              <Button
+                variant="outline"
+                onClick={() =>
+                  navigate({
+                    to: "/bed-board",
+                    search: {
+                      source_referral_id: id,
+                      hospital_number: ref.hospital_number ?? undefined,
+                      patient_initials: undefined,
+                      admitting_consultant: ref.accepting_consultant ?? undefined,
+                      level: undefined,
+                      source_label: `referral ${ref.hospital_number ?? ""}`.trim(),
+                      source_postop_booking_id: undefined,
+                    },
+                  })
+                }
+              >
+                Admit to bed…
+              </Button>
+            )}
+            <Button onClick={save} disabled={saving || acceptingConsultantMissing || declineConsultantMissing}>
+              <Save className="w-4 h-4 mr-1" aria-hidden="true" />{saving ? "Saving…" : "Save changes"}
             </Button>
-          )}
-          <Button onClick={save} disabled={saving || acceptingConsultantMissing || declineConsultantMissing}>
-            <Save className="w-4 h-4 mr-1" aria-hidden="true" />{saving ? "Saving…" : "Save changes"}
-          </Button>
-        </div>
+          </div>
+        )}
+        </fieldset>
 
 
         <Noteboard referralId={id} />

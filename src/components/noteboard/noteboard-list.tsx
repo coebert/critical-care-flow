@@ -7,6 +7,8 @@ interface NoteboardListProps {
   directory: DirectoryEntry[];
   currentUserId: string | undefined;
   isAdmin: boolean;
+  /** Read-only viewer — never render edit/delete affordances on any note. */
+  isViewer?: boolean;
   totalNotes: number;
   onSave: (note: Note, body: string, recipients?: Set<string>) => Promise<void>;
   onDelete: (note: Note) => Promise<void>;
@@ -31,6 +33,7 @@ export function NoteboardList({
   directory,
   currentUserId,
   isAdmin,
+  isViewer = false,
   totalNotes,
   onSave,
   onDelete,
@@ -44,6 +47,7 @@ export function NoteboardList({
       )}
       {notes.map((n) => {
         const canEdit =
+          !isViewer &&
           !!currentUserId &&
           (currentUserId === n.author_id || isAdmin) &&
           !NON_EDITABLE_STATUSES.includes(n._e2eStatus);
