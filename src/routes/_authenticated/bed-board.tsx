@@ -759,14 +759,32 @@ function buildDiff(
 
 function EditOccupantDialog({
   occupant,
+  currentLevel,
   onClose,
   onSaved,
+  onAcuityChanged,
 }: {
   occupant: PartnerOccupant | null;
+  currentLevel: AcuityLevel | null;
   onClose: () => void;
   onSaved: (updated: PartnerOccupant) => void;
+  onAcuityChanged: () => void;
 }) {
   const save = useServerFn(updatePartnerPatient);
+  const saveAcuity = useServerFn(setPatientAcuity);
+  const acuityMutation = useMutation({
+    mutationFn: (level: AcuityLevel | null) =>
+      saveAcuity({ data: { partner_patient_id: occupant!.id, level } }),
+    onSuccess: (result) => {
+      if (result.ok) {
+        toast.success("Level of care updated");
+        onAcuityChanged();
+      } else {
+        toast.error(result.error || "Could not save level");
+      }
+    },
+    onError: (err) => toast.error(err instanceof Error ? err.message : "Could not save level"),
+  });
   const initial = useMemo(
     () => (occupant ? occupantToForm(occupant) : null),
     [occupant],
