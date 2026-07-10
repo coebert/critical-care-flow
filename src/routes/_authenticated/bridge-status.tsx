@@ -15,13 +15,17 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { AlertCircle, CheckCircle2, RefreshCcw } from "lucide-react";
+import { AlertCircle, CheckCircle2, RefreshCcw, Beaker } from "lucide-react";
 import {
   getBridgeStatus,
   runBridgeSyncNow,
+  sendBridgeTestPayload,
   type BridgeResourceStatus,
+  type BridgeProbeResult,
 } from "@/lib/bridge-status.functions";
 import { toast } from "sonner";
+import { useState } from "react";
+
 
 export const Route = createFileRoute("/_authenticated/bridge-status")({
   head: () => ({
@@ -86,6 +90,11 @@ function BridgeStatusPage() {
 
   const getStatus = useServerFn(getBridgeStatus);
   const runNow = useServerFn(runBridgeSyncNow);
+  const sendProbe = useServerFn(sendBridgeTestPayload);
+
+  const [probeResults, setProbeResults] = useState<BridgeProbeResult[] | null>(
+    null,
+  );
 
   const query = useQuery({
     queryKey: ["bridge-status"],
@@ -107,6 +116,23 @@ function BridgeStatusPage() {
     },
   });
 
+  const probeMutation = useMutation({
+    mutationFn: () => sendProbe(),
+    onSuccess: (res) => {
+      setProbeResults(res.results);
+      const passed = res.results.filter((r) => r.ok).length;
+      const total = res.results.length;
+      const message = `Contract probe: ${passed}/${total} endpoints healthy`;
+      if (res.ok) toast.success(message);
+      else toast.warning(message);
+    },
+    onError: (err: unknown) => {
+      toast.error("Test payload failed", {
+        description: (err as Error).message,
+      });
+    },
+  });
+
   const data = query.data;
 
   return (
@@ -118,7 +144,7 @@ function BridgeStatusPage() {
             ICU Handover Hub ⇄ Critical Care Connect. Auto-refreshes every 15s.
           </p>
         </div>
-        <div className="flex gap-2">
+        <div className="flex gap-2 flex-wrap">
           <Button
             variant="outline"
             size="sm"
@@ -131,6 +157,18 @@ function BridgeStatusPage() {
             Refresh
           </Button>
           <Button
+            variant="outline"
+            size="sm"
+            onClick={() => probeMutation.mutate()}
+            disabled={probeMutation.isPending}
+            title="Probes every partner endpoint with an intentionally empty record. Nothing is written."
+          >
+            <Beaker
+              className={`h-4 w-4 mr-1 ${probeMutation.isPending ? "animate-pulse" : ""}`}
+            />
+            {probeMutation.isPending ? "Probing…" : "Send test payload"}
+          </Button>
+          <Button
             size="sm"
             onClick={() => mutation.mutate()}
             disabled={mutation.isPending}
@@ -139,6 +177,56 @@ function BridgeStatusPage() {
           </Button>
         </div>
       </div>
+
+      {probeResults && (
+        <Card className="p-4 space-y-3">
+          <div className="flex items-center justify-between">
+            <div>
+              <div className="text-sm font-medium">Partner contract probe</div>
+              <p className="text-xs text-muted-foreground">
+                Empty payloads sent to each partner endpoint. A 400 response
+                means the contract is intact — no rows were created.
+              </p>
+            </div>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => setProbeResults(null)}
+            >
+              Dismiss
+            </Button>
+          </div>
+          <div className="grid gap-2 sm:grid-cols-2">
+            {probeResults.map((p) => (
+              <div
+                key={p.resource}
+                className="flex items-start gap-2 rounded-md border p-2"
+              >
+                {p.ok ? (
+                  <CheckCircle2 className="h-4 w-4 mt-0.5 text-emerald-600 shrink-0" />
+                ) : (
+                  <AlertCircle className="h-4 w-4 mt-0.5 text-amber-600 shrink-0" />
+                )}
+                <div className="min-w-0">
+                  <div className="flex items-center gap-2">
+                    <span className="font-medium text-sm">{p.resource}</span>
+                    <Badge variant={p.ok ? "secondary" : "destructive"}>
+                      HTTP {p.status || "—"}
+                    </Badge>
+                  </div>
+                  <div
+                    className="text-xs text-muted-foreground truncate"
+                    title={p.message}
+                  >
+                    {p.message}
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </Card>
+      )}
+
 
       {query.isError && (
         <Card className="p-4 border-destructive">
