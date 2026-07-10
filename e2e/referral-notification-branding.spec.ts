@@ -2,22 +2,18 @@ import { test, expect, chromium, type BrowserContext, type Page } from "@playwri
 
 /**
  * End-to-end check that referral notifications — both the push title and
- * the in-app toast/inbox row — are branded with "Radnor Critical Care".
+ * the in-app toast — are branded with "Radnor Critical Care".
  *
- * Web push cannot be observed headlessly, so we assert two proxies:
+ * Web push cannot be observed headlessly, so we assert the in-app toast
+ * as the primary proxy: with the reviewer parked on an authenticated
+ * page, the realtime INSERT on `notifications` fires a Sonner toast
+ * whose title is `Radnor Critical Care — <kind>`. That is the exact
+ * string a signed-in user sees when a referral arrives.
  *
- *   1. **In-app toast**: with the reviewer parked on any authenticated
- *      page, the realtime INSERT on `notifications` fires a Sonner toast
- *      whose title is `Radnor Critical Care — <kind>`. That is the exact
- *      string a signed-in user sees when a referral arrives.
- *   2. **Inbox row**: after the actor creates and updates the referral,
- *      the reviewer's `/notifications` page lists the corresponding rows
- *      and the "Radnor Critical Care" branding is visible on the page.
- *
- * The push title comes from the same fanout call — it is unit-covered in
- * `src/lib/notification-fanout.test.ts` and locked in by the default in
- * `notification-fanout.ts` (`args.title ?? "Radnor Critical Care"`), which
- * is imported and asserted by that unit test.
+ * The push title itself comes from the same fanout call and defaults to
+ * "Radnor Critical Care" in `src/lib/notification-fanout.ts`
+ * (`args.title ?? "Radnor Critical Care"`), covered by
+ * `src/lib/notification-fanout.test.ts`.
  *
  * Requires a second account in addition to E2E_EMAIL / E2E_PASSWORD:
  *   E2E_REVIEWER_EMAIL
@@ -29,7 +25,6 @@ import { test, expect, chromium, type BrowserContext, type Page } from "@playwri
 const REVIEWER_EMAIL = process.env.E2E_REVIEWER_EMAIL;
 const REVIEWER_PASSWORD = process.env.E2E_REVIEWER_PASSWORD;
 
-const BRAND = /Radnor Critical Care/;
 
 test.describe("Referral notification branding — Radnor Critical Care", () => {
   test.skip(
