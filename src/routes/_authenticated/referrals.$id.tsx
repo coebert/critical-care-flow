@@ -12,7 +12,7 @@ import { ReferralRouteError } from "@/components/referral-route-error";
 import { Noteboard, referralNotesQueryOptions } from "@/components/noteboard";
 import { TaskList } from "@/components/referrals/task-list";
 import { MessageLog } from "@/components/referrals/message-log";
-import { useAuth, useRole } from "@/hooks/use-auth";
+import { useAuth, useIsViewer, useRole } from "@/hooks/use-auth";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -86,6 +86,7 @@ function ReferralDetail() {
   const fetchDetail = useServerFn(getReferralDetail);
   const { user } = useAuth();
   const { hasRole: isAdmin } = useRole("admin");
+  const { isViewer } = useIsViewer();
   const [deleting, setDeleting] = useState(false);
   const [expandCmd, setExpandCmd] = useState<ExpandCommand>(null);
   const { specialties, wards, consultants } = useReferralOptions();
@@ -136,7 +137,7 @@ function ReferralDetail() {
 
   if (!ref) return <div className="p-6 text-muted-foreground">Loading…</div>;
 
-  const canDelete = !!user && (user.id === ref.created_by || isAdmin);
+  const canDelete = !isViewer && !!user && (user.id === ref.created_by || isAdmin);
 
   const set = (k: keyof Referral, v: any) => setRef({ ...ref, [k]: v });
 
