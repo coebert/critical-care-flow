@@ -21,7 +21,7 @@ export const sendTestPushNotification = createServerFn({ method: "POST" })
     const { goneEndpoints } = await sendPushToMany(
       subs.map((s) => ({ endpoint: s.endpoint, p256dh: s.p256dh, auth: s.auth })),
       {
-        title: "SDH Critical Care — Test",
+        title: "Radnor Critical Care — Test",
         body: "Push notifications are working. You'll receive alerts like this while on shift.",
         url: "/",
         tag: "test-push",

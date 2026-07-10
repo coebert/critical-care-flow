@@ -185,7 +185,7 @@ export async function fanOutNotifications(
     const safeSubs = subs.filter((s) => recipientSet.has(s.user_id));
     if (safeSubs.length) {
       const { goneEndpoints, results } = await deps.sendPush(safeSubs, {
-        title: args.title ?? "SDH Critical Care",
+        title: args.title ?? "Radnor Critical Care",
         body: args.message,
         url: args.url ?? `/referrals/${args.referralId}`,
         tag: `referral-${args.referralId}`,
