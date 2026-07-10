@@ -23,6 +23,7 @@ import { Route as AuthenticatedPermissionsRouteImport } from './routes/_authenti
 import { Route as AuthenticatedNotificationsAuditRouteImport } from './routes/_authenticated/notifications-audit'
 import { Route as AuthenticatedNotificationsRouteImport } from './routes/_authenticated/notifications'
 import { Route as AuthenticatedInboxRouteImport } from './routes/_authenticated/inbox'
+import { Route as AuthenticatedBridgeStatusRouteImport } from './routes/_authenticated/bridge-status'
 import { Route as AuthenticatedBoardRouteImport } from './routes/_authenticated/board'
 import { Route as AuthenticatedBedBoardRouteImport } from './routes/_authenticated/bed-board'
 import { Route as AuthenticatedAnalyticsRouteImport } from './routes/_authenticated/analytics'
@@ -119,6 +120,12 @@ const AuthenticatedInboxRoute = AuthenticatedInboxRouteImport.update({
   path: '/inbox',
   getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
+const AuthenticatedBridgeStatusRoute =
+  AuthenticatedBridgeStatusRouteImport.update({
+    id: '/bridge-status',
+    path: '/bridge-status',
+    getParentRoute: () => AuthenticatedRouteRoute,
+  } as any)
 const AuthenticatedBoardRoute = AuthenticatedBoardRouteImport.update({
   id: '/board',
   path: '/board',
@@ -261,6 +268,7 @@ export interface FileRoutesByFullPath {
   '/analytics': typeof AuthenticatedAnalyticsRoute
   '/bed-board': typeof AuthenticatedBedBoardRoute
   '/board': typeof AuthenticatedBoardRouteWithChildren
+  '/bridge-status': typeof AuthenticatedBridgeStatusRoute
   '/inbox': typeof AuthenticatedInboxRouteWithChildren
   '/notifications': typeof AuthenticatedNotificationsRoute
   '/notifications-audit': typeof AuthenticatedNotificationsAuditRoute
@@ -298,6 +306,7 @@ export interface FileRoutesByTo {
   '/analytics': typeof AuthenticatedAnalyticsRoute
   '/bed-board': typeof AuthenticatedBedBoardRoute
   '/board': typeof AuthenticatedBoardRouteWithChildren
+  '/bridge-status': typeof AuthenticatedBridgeStatusRoute
   '/inbox': typeof AuthenticatedInboxRouteWithChildren
   '/notifications': typeof AuthenticatedNotificationsRoute
   '/notifications-audit': typeof AuthenticatedNotificationsAuditRoute
@@ -338,6 +347,7 @@ export interface FileRoutesById {
   '/_authenticated/analytics': typeof AuthenticatedAnalyticsRoute
   '/_authenticated/bed-board': typeof AuthenticatedBedBoardRoute
   '/_authenticated/board': typeof AuthenticatedBoardRouteWithChildren
+  '/_authenticated/bridge-status': typeof AuthenticatedBridgeStatusRoute
   '/_authenticated/inbox': typeof AuthenticatedInboxRouteWithChildren
   '/_authenticated/notifications': typeof AuthenticatedNotificationsRoute
   '/_authenticated/notifications-audit': typeof AuthenticatedNotificationsAuditRoute
@@ -379,6 +389,7 @@ export interface FileRouteTypes {
     | '/analytics'
     | '/bed-board'
     | '/board'
+    | '/bridge-status'
     | '/inbox'
     | '/notifications'
     | '/notifications-audit'
@@ -416,6 +427,7 @@ export interface FileRouteTypes {
     | '/analytics'
     | '/bed-board'
     | '/board'
+    | '/bridge-status'
     | '/inbox'
     | '/notifications'
     | '/notifications-audit'
@@ -455,6 +467,7 @@ export interface FileRouteTypes {
     | '/_authenticated/analytics'
     | '/_authenticated/bed-board'
     | '/_authenticated/board'
+    | '/_authenticated/bridge-status'
     | '/_authenticated/inbox'
     | '/_authenticated/notifications'
     | '/_authenticated/notifications-audit'
@@ -600,6 +613,13 @@ declare module '@tanstack/react-router' {
       path: '/inbox'
       fullPath: '/inbox'
       preLoaderRoute: typeof AuthenticatedInboxRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/bridge-status': {
+      id: '/_authenticated/bridge-status'
+      path: '/bridge-status'
+      fullPath: '/bridge-status'
+      preLoaderRoute: typeof AuthenticatedBridgeStatusRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
     '/_authenticated/board': {
@@ -793,6 +813,7 @@ interface AuthenticatedRouteRouteChildren {
   AuthenticatedAnalyticsRoute: typeof AuthenticatedAnalyticsRoute
   AuthenticatedBedBoardRoute: typeof AuthenticatedBedBoardRoute
   AuthenticatedBoardRoute: typeof AuthenticatedBoardRouteWithChildren
+  AuthenticatedBridgeStatusRoute: typeof AuthenticatedBridgeStatusRoute
   AuthenticatedInboxRoute: typeof AuthenticatedInboxRouteWithChildren
   AuthenticatedNotificationsRoute: typeof AuthenticatedNotificationsRoute
   AuthenticatedNotificationsAuditRoute: typeof AuthenticatedNotificationsAuditRoute
@@ -815,6 +836,7 @@ const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedAnalyticsRoute: AuthenticatedAnalyticsRoute,
   AuthenticatedBedBoardRoute: AuthenticatedBedBoardRoute,
   AuthenticatedBoardRoute: AuthenticatedBoardRouteWithChildren,
+  AuthenticatedBridgeStatusRoute: AuthenticatedBridgeStatusRoute,
   AuthenticatedInboxRoute: AuthenticatedInboxRouteWithChildren,
   AuthenticatedNotificationsRoute: AuthenticatedNotificationsRoute,
   AuthenticatedNotificationsAuditRoute: AuthenticatedNotificationsAuditRoute,
