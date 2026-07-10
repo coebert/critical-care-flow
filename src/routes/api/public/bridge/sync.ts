@@ -205,6 +205,12 @@ const RESOURCES: {
     conflict: "id",
     select: [...PUSH_ALLOW.referrals, "updated_at"].join(","),
   },
+  // Bed board resources — must sync in FK-safe order:
+  // beds (parent) → bed_occupancies → bed_transfers_out (FK to occupancy).
+  { key: "beds", table: "beds", conflict: "id", select: "*" },
+  { key: "bed_occupancies", table: "bed_occupancies", conflict: "id", select: "*" },
+  { key: "bed_outliers", table: "bed_outliers", conflict: "id", select: "*" },
+  { key: "bed_transfers_out", table: "bed_transfers_out", conflict: "id", select: "*" },
 ];
 
 function toPortable(
