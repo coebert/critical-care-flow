@@ -117,13 +117,14 @@ function OccupancyForm({
           />
         </div>
         <div className="space-y-1">
-          <Label>Level</Label>
+          <Label>Level of care</Label>
           <Select
             value={String(value.level)}
-            onValueChange={(v) => onChange({ level: Number(v) as 1 | 2 | 3 })}
+            onValueChange={(v) => onChange({ level: Number(v) as 0 | 1 | 2 | 3 })}
           >
             <SelectTrigger><SelectValue /></SelectTrigger>
             <SelectContent>
+              <SelectItem value="0">Level 0 (ward-level)</SelectItem>
               <SelectItem value="1">Level 1</SelectItem>
               <SelectItem value="2">Level 2 (HDU)</SelectItem>
               <SelectItem value="3">Level 3 (ICU)</SelectItem>
@@ -131,6 +132,13 @@ function OccupancyForm({
           </Select>
         </div>
       </div>
+      <label className="flex items-center gap-2 text-sm cursor-pointer">
+        <Checkbox
+          checked={value.wardable}
+          onCheckedChange={(c) => onChange({ wardable: !!c })}
+        />
+        <span>Wardable — ready for a ward bed</span>
+      </label>
       <fieldset className="rounded-md border p-3">
         <legend className="text-xs font-medium px-1">Organ support</legend>
         <div className="grid grid-cols-2 gap-2 text-sm">
