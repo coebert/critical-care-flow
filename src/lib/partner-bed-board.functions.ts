@@ -22,7 +22,10 @@ export type PartnerOccupant = {
   bed: string | null;
   admission_date: string | null;
   tep_in_place: boolean | null;
-  dnacpr_decision: string | null;
+  dnacpr_decision: boolean | null;
+  dnacpr_details?: string | null;
+  tep_details?: string | null;
+
   outstanding_tasks: string | null;
   updated_at: string | null;
 };
