@@ -251,8 +251,17 @@ async function processJob(admin: any, job: any) {
           }
         }
       } catch (err) {
-        error = (err as Error).message;
+        if (err instanceof sync.PartnerEndpointMissingError) {
+          // Partner app doesn't expose this bridge endpoint — treat as a
+          // clean skip so the job doesn't fail on the whole window.
+          skipped += 1;
+          error = null;
+        } else {
+          error = (err as Error).message;
+        }
       }
+
+
     }
 
     if (lockId) {
