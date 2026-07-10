@@ -40,6 +40,36 @@ export const Route = createFileRoute("/_authenticated/bed-board")({
       },
     ],
   }),
+  // Preserved for backwards compatibility with callers that still deep-link
+  // referral/postop context or nurse-capacity alerts. This page no longer
+  // owns the admit flow (writes go through ICU Handover Hub), so we display
+  // a lightweight breadcrumb banner instead of a prefilled dialog.
+  validateSearch: (s: Record<string, unknown>) => {
+    const str = (v: unknown): string | undefined =>
+      typeof v === "string" && v.trim().length ? v.trim() : undefined;
+    const parseShift = (v: unknown): "day" | "night" | undefined => {
+      const t = str(v)?.toLowerCase();
+      return t === "day" || t === "night" ? t : undefined;
+    };
+    const parseLevel = (v: unknown): 1 | 2 | 3 | undefined => {
+      const t = str(v);
+      if (!t) return undefined;
+      const n = Number(t);
+      if (!Number.isFinite(n) || Math.trunc(n) !== n) return undefined;
+      return n === 1 || n === 2 || n === 3 ? (n as 1 | 2 | 3) : undefined;
+    };
+    return {
+      source_referral_id: str(s.source_referral_id),
+      source_postop_booking_id: str(s.source_postop_booking_id),
+      hospital_number: str(s.hospital_number),
+      patient_initials: str(s.patient_initials),
+      admitting_consultant: str(s.admitting_consultant),
+      level: parseLevel(s.level),
+      source_label: str(s.source_label),
+      focus_shift: parseShift(s.focus_shift),
+      focus_level: parseLevel(s.focus_level),
+    };
+  },
   component: BedBoardPage,
 });
 
