@@ -36,6 +36,8 @@ import { Route as AuthenticatedPostopBookingsCancellationsRouteImport } from './
 import { Route as AuthenticatedPostopBookingsAnalyticsRouteImport } from './routes/_authenticated/postop-bookings.analytics'
 import { Route as AuthenticatedInboxIdRouteImport } from './routes/_authenticated/inbox.$id'
 import { Route as AuthenticatedBoardWardRoundRouteImport } from './routes/_authenticated/board.ward-round'
+import { Route as ApiPublicBridgeVerifySignatureRouteImport } from './routes/api/public/bridge/verify-signature'
+import { Route as ApiPublicBridgeHealthRouteImport } from './routes/api/public/bridge/health'
 import { Route as AuthenticatedPostopBookingsIdEditRouteImport } from './routes/_authenticated/postop-bookings.$id.edit'
 
 const SetupRoute = SetupRouteImport.update({
@@ -183,6 +185,17 @@ const AuthenticatedBoardWardRoundRoute =
     path: '/ward-round',
     getParentRoute: () => AuthenticatedBoardRoute,
   } as any)
+const ApiPublicBridgeVerifySignatureRoute =
+  ApiPublicBridgeVerifySignatureRouteImport.update({
+    id: '/api/public/bridge/verify-signature',
+    path: '/api/public/bridge/verify-signature',
+    getParentRoute: () => rootRouteImport,
+  } as any)
+const ApiPublicBridgeHealthRoute = ApiPublicBridgeHealthRouteImport.update({
+  id: '/api/public/bridge/health',
+  path: '/api/public/bridge/health',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const AuthenticatedPostopBookingsIdEditRoute =
   AuthenticatedPostopBookingsIdEditRouteImport.update({
     id: '/postop-bookings/$id/edit',
@@ -218,6 +231,8 @@ export interface FileRoutesByFullPath {
   '/referrals/new': typeof AuthenticatedReferralsNewRoute
   '/postop-bookings/': typeof AuthenticatedPostopBookingsIndexRoute
   '/postop-bookings/$id/edit': typeof AuthenticatedPostopBookingsIdEditRoute
+  '/api/public/bridge/health': typeof ApiPublicBridgeHealthRoute
+  '/api/public/bridge/verify-signature': typeof ApiPublicBridgeVerifySignatureRoute
 }
 export interface FileRoutesByTo {
   '/auth': typeof AuthRoute
@@ -247,6 +262,8 @@ export interface FileRoutesByTo {
   '/referrals/new': typeof AuthenticatedReferralsNewRoute
   '/postop-bookings': typeof AuthenticatedPostopBookingsIndexRoute
   '/postop-bookings/$id/edit': typeof AuthenticatedPostopBookingsIdEditRoute
+  '/api/public/bridge/health': typeof ApiPublicBridgeHealthRoute
+  '/api/public/bridge/verify-signature': typeof ApiPublicBridgeVerifySignatureRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -278,6 +295,8 @@ export interface FileRoutesById {
   '/_authenticated/referrals/new': typeof AuthenticatedReferralsNewRoute
   '/_authenticated/postop-bookings/': typeof AuthenticatedPostopBookingsIndexRoute
   '/_authenticated/postop-bookings/$id/edit': typeof AuthenticatedPostopBookingsIdEditRoute
+  '/api/public/bridge/health': typeof ApiPublicBridgeHealthRoute
+  '/api/public/bridge/verify-signature': typeof ApiPublicBridgeVerifySignatureRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -309,6 +328,8 @@ export interface FileRouteTypes {
     | '/referrals/new'
     | '/postop-bookings/'
     | '/postop-bookings/$id/edit'
+    | '/api/public/bridge/health'
+    | '/api/public/bridge/verify-signature'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/auth'
@@ -338,6 +359,8 @@ export interface FileRouteTypes {
     | '/referrals/new'
     | '/postop-bookings'
     | '/postop-bookings/$id/edit'
+    | '/api/public/bridge/health'
+    | '/api/public/bridge/verify-signature'
   id:
     | '__root__'
     | '/_authenticated'
@@ -368,6 +391,8 @@ export interface FileRouteTypes {
     | '/_authenticated/referrals/new'
     | '/_authenticated/postop-bookings/'
     | '/_authenticated/postop-bookings/$id/edit'
+    | '/api/public/bridge/health'
+    | '/api/public/bridge/verify-signature'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -378,6 +403,8 @@ export interface RootRouteChildren {
   ResetPasswordRoute: typeof ResetPasswordRoute
   SecurityRoute: typeof SecurityRoute
   SetupRoute: typeof SetupRoute
+  ApiPublicBridgeHealthRoute: typeof ApiPublicBridgeHealthRoute
+  ApiPublicBridgeVerifySignatureRoute: typeof ApiPublicBridgeVerifySignatureRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -571,6 +598,20 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedBoardWardRoundRouteImport
       parentRoute: typeof AuthenticatedBoardRoute
     }
+    '/api/public/bridge/verify-signature': {
+      id: '/api/public/bridge/verify-signature'
+      path: '/api/public/bridge/verify-signature'
+      fullPath: '/api/public/bridge/verify-signature'
+      preLoaderRoute: typeof ApiPublicBridgeVerifySignatureRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/public/bridge/health': {
+      id: '/api/public/bridge/health'
+      path: '/api/public/bridge/health'
+      fullPath: '/api/public/bridge/health'
+      preLoaderRoute: typeof ApiPublicBridgeHealthRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/_authenticated/postop-bookings/$id/edit': {
       id: '/_authenticated/postop-bookings/$id/edit'
       path: '/postop-bookings/$id/edit'
@@ -662,7 +703,19 @@ const rootRouteChildren: RootRouteChildren = {
   ResetPasswordRoute: ResetPasswordRoute,
   SecurityRoute: SecurityRoute,
   SetupRoute: SetupRoute,
+  ApiPublicBridgeHealthRoute: ApiPublicBridgeHealthRoute,
+  ApiPublicBridgeVerifySignatureRoute: ApiPublicBridgeVerifySignatureRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
+
+import type { getRouter } from './router.tsx'
+import type { startInstance } from './start.ts'
+declare module '@tanstack/react-start' {
+  interface Register {
+    ssr: true
+    router: Awaited<ReturnType<typeof getRouter>>
+    config: Awaited<ReturnType<typeof startInstance.getOptions>>
+  }
+}
