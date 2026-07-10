@@ -561,64 +561,128 @@ export const runBedReconciliation = createServerFn({ method: "POST" })
       let pushed = 0;
       let skipped = 0;
       let error: string | null = null;
+      let locked = false;
+      let lockedSince: string | null = null;
+      let lockId: string | null = null;
       const pulledIds: string[] = [];
       const pushedIds: string[] = [];
 
-      try {
-        // PULL — partner API only supports a `since` cursor, so we pass
-        // `from` and post-filter to the window client-side.
-        const incoming = await sync.pullResource(
-          partner,
-          resource.key,
-          data.from,
-        );
-        const inWindow = incoming.filter((r) => {
-          const u = (r as any).updated_at as string | undefined;
-          return !u || (u >= data.from && u <= data.to);
-        });
-        for (const r of inWindow) {
-          const id = (r as any).id;
-          if (id != null) pulledIds.push(String(id));
-        }
-        if (inWindow.length > 0 && !data.dryRun) {
-          const { error: upErr } = await admin
-            .from(resource.table)
-            .upsert(inWindow as any, { onConflict: resource.conflict });
-          if (upErr) throw new Error(`local upsert: ${upErr.message}`);
-        }
-        pulled = inWindow.length;
-        skipped = incoming.length - inWindow.length;
+      // Lock acquisition (skipped for dry-runs — no writes, no concurrency
+      // hazard). Uses the UNIQUE (resource, from_ts, to_ts) constraint to
+      // serialize backfills for the exact same window & resource.
+      if (!data.dryRun) {
+        const staleCutoff = new Date(
+          Date.now() - RECONCILE_LOCK_STALE_MS,
+        ).toISOString();
+        // Sweep any abandoned lock for this exact key before trying to insert.
+        await admin
+          .from("bridge_reconcile_locks")
+          .delete()
+          .eq("resource", resource.key)
+          .eq("from_ts", data.from)
+          .eq("to_ts", data.to)
+          .lt("locked_at", staleCutoff);
 
-        // PUSH — every local row updated inside the window, ignoring
-        // last_pushed_at so previously-synced rows are resent.
-        const { data: batch, error: readErr } = await admin
-          .from(resource.table)
-          .select(resource.select)
-          .gte("updated_at", data.from)
-          .lte("updated_at", data.to)
-          .order("updated_at", { ascending: true })
-          .limit(2000);
-        if (readErr) throw new Error(`local read: ${readErr.message}`);
-        for (const row of (batch ?? []) as Record<string, unknown>[]) {
-          const id = (row as any).id;
-          if (id != null) pushedIds.push(String(id));
-          if (!data.dryRun) {
-            await sync.pushOne(
-              partner,
-              resource.key,
-              sync.toPortable(resource.key, row),
-            );
+        const { data: inserted, error: lockErr } = await admin
+          .from("bridge_reconcile_locks")
+          .insert({
+            resource: resource.key,
+            from_ts: data.from,
+            to_ts: data.to,
+            locked_by: context.userId,
+          })
+          .select("id, locked_at")
+          .maybeSingle();
+
+        if (lockErr) {
+          // 23505 = unique_violation → another reconcile holds this window.
+          if ((lockErr as any).code === "23505") {
+            const { data: holder } = await admin
+              .from("bridge_reconcile_locks")
+              .select("locked_at")
+              .eq("resource", resource.key)
+              .eq("from_ts", data.from)
+              .eq("to_ts", data.to)
+              .maybeSingle();
+            locked = true;
+            lockedSince = (holder as any)?.locked_at ?? null;
+            error = "Another reconcile is already running for this window";
+          } else {
+            error = `lock acquire: ${lockErr.message}`;
           }
-          pushed += 1;
+        } else {
+          lockId = (inserted as any)?.id ?? null;
         }
-      } catch (err) {
-        error = (err as Error).message;
       }
 
-      // Audit every real attempt so admins can see reconciliation runs
-      // alongside scheduled syncs and auto-retries. Dry-runs are preview-only
-      // and intentionally do not touch the audit log.
-      if (!data.dryRun) {
+      if (!locked && !error) {
+        try {
+          // PULL — partner API only supports a `since` cursor, so we pass
+          // `from` and post-filter to the window client-side.
+          const incoming = await sync.pullResource(
+            partner,
+            resource.key,
+            data.from,
+          );
+          const inWindow = incoming.filter((r) => {
+            const u = (r as any).updated_at as string | undefined;
+            return !u || (u >= data.from && u <= data.to);
+          });
+          for (const r of inWindow) {
+            const id = (r as any).id;
+            if (id != null) pulledIds.push(String(id));
+          }
+          if (inWindow.length > 0 && !data.dryRun) {
+            const { error: upErr } = await admin
+              .from(resource.table)
+              .upsert(inWindow as any, { onConflict: resource.conflict });
+            if (upErr) throw new Error(`local upsert: ${upErr.message}`);
+          }
+          pulled = inWindow.length;
+          skipped = incoming.length - inWindow.length;
+
+          // PUSH — every local row updated inside the window, ignoring
+          // last_pushed_at so previously-synced rows are resent.
+          const { data: batch, error: readErr } = await admin
+            .from(resource.table)
+            .select(resource.select)
+            .gte("updated_at", data.from)
+            .lte("updated_at", data.to)
+            .order("updated_at", { ascending: true })
+            .limit(2000);
+          if (readErr) throw new Error(`local read: ${readErr.message}`);
+          for (const row of (batch ?? []) as Record<string, unknown>[]) {
+            const id = (row as any).id;
+            if (id != null) pushedIds.push(String(id));
+            if (!data.dryRun) {
+              await sync.pushOne(
+                partner,
+                resource.key,
+                sync.toPortable(resource.key, row),
+              );
+            }
+            pushed += 1;
+          }
+        } catch (err) {
+          error = (err as Error).message;
+        }
+      }
+
+      // Always release the lock we acquired, even if the work failed.
+      if (lockId) {
+        await admin
+          .from("bridge_reconcile_locks")
+          .delete()
+          .eq("id", lockId)
+          .then(
+            () => {},
+            () => {},
+          );
+      }
+
+      // Audit real attempts (not dry-runs, not lock-skipped runs — nothing
+      // was actually pulled or pushed when locked).
+      if (!data.dryRun && !locked) {
         await admin
           .from("bridge_sync_attempts")
           .insert({
@@ -642,6 +706,8 @@ export const runBedReconciliation = createServerFn({ method: "POST" })
         pushed,
         skipped,
         error,
+        locked,
+        locked_since: lockedSince,
         pulled_ids: pulledIds.slice(0, ID_SAMPLE_CAP),
         pushed_ids: pushedIds.slice(0, ID_SAMPLE_CAP),
       });
@@ -653,7 +719,9 @@ export const runBedReconciliation = createServerFn({ method: "POST" })
       from: data.from,
       to: data.to,
       dry_run: data.dryRun,
+      any_locked: results.some((r) => r.locked),
       results,
     };
   });
+
 
