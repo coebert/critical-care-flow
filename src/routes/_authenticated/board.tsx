@@ -109,6 +109,20 @@ const PALETTES: Record<Theme, Palette> = {
   },
 };
 
+const LEVEL_PILL: Record<number, string> = {
+  0: "bg-emerald-500/40 text-emerald-50",
+  1: "bg-sky-500/40 text-sky-50",
+  2: "bg-amber-500/40 text-amber-50",
+  3: "bg-rose-500/40 text-rose-50",
+};
+
+const LEVEL_TITLE: Record<number, string> = {
+  0: "Level 0 — ward-level care",
+  1: "Level 1 — at risk of deterioration",
+  2: "Level 2 — HDU care",
+  3: "Level 3 — ICU care",
+};
+
 function useClock() {
   const [now, setNow] = useState(() => new Date());
   useEffect(() => {
