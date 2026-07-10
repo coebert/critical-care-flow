@@ -48,7 +48,11 @@ export function NotificationBell() {
           const n = payload.new as Notification;
           setItems((cur) => [n, ...cur].slice(0, 30));
 
-          const title =
+          // Brand every in-app alert with the unit name so a user glancing
+          // at a toast or a background OS notification always knows which
+          // service the alert is from. Matches the push-title branding in
+          // notification-fanout.ts and sw-push.js.
+          const kindLabel =
             n.kind === "new"
               ? "New referral"
               : n.kind === "status"
@@ -56,6 +60,7 @@ export function NotificationBell() {
               : n.kind === "note"
               ? "New referral note"
               : "Referral updated";
+          const title = `Radnor Critical Care — ${kindLabel}`;
 
           // In-app toast when the tab is visible; native browser notification
           // when it isn't (so users still get notified when app is backgrounded).
