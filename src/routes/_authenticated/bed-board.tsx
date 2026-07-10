@@ -52,19 +52,7 @@ import {
 const QK = ["partner-bed-board"] as const;
 const AQK = ["patient-acuity"] as const;
 
-const LEVEL_TONE: Record<AcuityLevel, string> = {
-  0: "bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border-emerald-500/30",
-  1: "bg-sky-500/10 text-sky-700 dark:text-sky-400 border-sky-500/30",
-  2: "bg-amber-500/10 text-amber-700 dark:text-amber-400 border-amber-500/30",
-  3: "bg-rose-500/10 text-rose-700 dark:text-rose-400 border-rose-500/30",
-};
-
-const LEVEL_LABEL: Record<AcuityLevel, string> = {
-  0: "Level 0 — ward-level care",
-  1: "Level 1 — at risk of deterioration",
-  2: "Level 2 — HDU care",
-  3: "Level 3 — ICU care",
-};
+import { LEVEL_TONE, LEVEL_LABEL, computeUnitAcuity } from "@/lib/acuity";
 
 export const Route = createFileRoute("/_authenticated/bed-board")({
   head: () => ({
@@ -403,18 +391,10 @@ function BedBoardPage() {
             .filter((o): o is PartnerOccupant => o !== null),
           ...lastOk.unassigned,
         ];
-        const counts: Record<AcuityLevel, number> = { 0: 0, 1: 0, 2: 0, 3: 0 };
-        let scored = 0;
-        let sum = 0;
-        for (const o of allOccupants) {
-          const l = acuityMap.get(o.id);
-          if (l == null) continue;
-          counts[l] += 1;
-          scored += 1;
-          sum += l;
-        }
-        const unscored = allOccupants.length - scored;
-        const mean = scored > 0 ? sum / scored : 0;
+        const { counts, unscored, mean } = computeUnitAcuity(
+          allOccupants.map((o) => o.id),
+          acuityMap,
+        );
         return (
           <>
             <div
