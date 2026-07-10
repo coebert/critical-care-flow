@@ -1,7 +1,8 @@
-import { createFileRoute, Link } from "@tanstack/react-router";
+import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
+import { useEffect } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
-import { AdminOnly } from "@/components/admin-only";
+import { useRole } from "@/hooks/use-auth";
 import { RouteErrorFallback } from "@/components/route-error-fallback";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -29,12 +30,36 @@ export const Route = createFileRoute("/_authenticated/bridge-status")({
   errorComponent: ({ error }) => (
     <RouteErrorFallback error={error} label="Bridge status" />
   ),
-  component: () => (
-    <AdminOnly>
-      <BridgeStatusPage />
-    </AdminOnly>
-  ),
+  component: BridgeStatusRoute,
 });
+
+function BridgeStatusRoute() {
+  const { hasRole, loading } = useRole("admin");
+  const navigate = useNavigate();
+
+  useEffect(() => {
+    if (!loading && !hasRole) {
+      toast.error("Admins only", {
+        description:
+          "The bridge sync status page is restricted to administrators.",
+      });
+      navigate({ to: "/", replace: true });
+    }
+  }, [loading, hasRole, navigate]);
+
+  if (loading || !hasRole) {
+    return (
+      <div className="max-w-5xl mx-auto p-6">
+        <Card className="p-6 text-sm text-muted-foreground">
+          {loading ? "Checking access…" : "Redirecting…"}
+        </Card>
+      </div>
+    );
+  }
+
+  return <BridgeStatusPage />;
+}
+
 
 function fmt(ts: string | null) {
   if (!ts) return "—";
