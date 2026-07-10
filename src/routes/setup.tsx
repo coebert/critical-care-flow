@@ -70,17 +70,21 @@ const bootstrapFirstAdmin = createServerFn({ method: "POST" })
       if (error) throw safeError("setup.createAdmin", error, "Failed to create admin account.");
 
       // Success — clear pending failures for this key.
-      await supabaseAdmin.rpc("finalize_auth_attempt", {
-        _attempt_id: attemptId,
-        _success: true,
-      });
+      if (attemptId !== null) {
+        await supabaseAdmin.rpc("finalize_auth_attempt", {
+          _attempt_id: attemptId,
+          _success: true,
+        });
+      }
       // Trigger already creates 'admin' for the first user
       return { ok: true };
     } catch (err) {
       // Leave the reserved failure row in place so the counter increments.
-      await supabaseAdmin
-        .rpc("finalize_auth_attempt", { _attempt_id: attemptId, _success: false })
-        .then(() => undefined, () => undefined);
+      if (attemptId !== null) {
+        await supabaseAdmin
+          .rpc("finalize_auth_attempt", { _attempt_id: attemptId, _success: false })
+          .then(() => undefined, () => undefined);
+      }
       throw err;
     }
   });
