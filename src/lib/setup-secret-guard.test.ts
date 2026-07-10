@@ -77,72 +77,199 @@ describe("assertSetupSecret", () => {
 });
 
 /**
- * Handler-shape simulation: reconstructs the exact order used by
- * `bootstrapFirstAdmin` (guard first, then dynamically import a Supabase
- * admin client and call it) and asserts the admin client is NEVER reached
- * on any reject path.
+ * Handler-shape simulation for `bootstrapFirstAdmin` in `src/routes/setup.tsx`.
+ *
+ * Reconstructs the EXACT order of side effects in the current handler:
+ *   1. dynamic import of `@/integrations/supabase/client.server`
+ *   2. throttle: `begin_auth_attempt` RPC (SECURITY DEFINER — bypasses RLS)
+ *   3. `assertSetupSecret(...)`
+ *   4. `auth.admin.listUsers({ perPage: 1 })`
+ *   5. `auth.admin.createUser({...})`
+ *   6. throttle: `finalize_auth_attempt` RPC (success or failure)
+ *
+ * The assertions here go beyond "no createUser on reject": they verify that
+ * no RLS-impacted or permission-sensitive Supabase call is issued on any
+ * reject path. Concretely:
+ *   - No `.from(...)` table reads/writes ever fire (nothing hits PostgREST /
+ *     the Data API, so no policy can be probed by a caller who doesn't hold
+ *     the secret).
+ *   - `auth.admin.listUsers` / `auth.admin.createUser` (service-role auth
+ *     admin surface) are not called on reject.
+ *   - The only RPCs that fire on reject are the throttle RPCs — and those
+ *     are intentionally SECURITY DEFINER and bypass RLS by design, so
+ *     hitting them cannot leak or mutate user-scoped data.
  */
-describe("bootstrapFirstAdmin handler order — no DB writes on reject", () => {
-  async function runHandler(
-    input: { setup_secret?: string },
-    expected: string | undefined,
-    supabaseAdminMock: {
-      auth: { admin: { listUsers: () => unknown; createUser: () => unknown } };
-    },
-  ): Promise<{ ok: true }> {
-    assertSetupSecret(input.setup_secret, expected);
-    // If the guard passed, the handler proceeds to touch the admin client.
-    await supabaseAdminMock.auth.admin.listUsers();
-    await supabaseAdminMock.auth.admin.createUser();
-    return { ok: true };
-  }
+describe("bootstrapFirstAdmin dynamic-import path — no RLS/permission-impacted calls on reject", () => {
+  const CONFIGURED = "a-very-long-out-of-band-secret-32chars";
+  const RLS_SAFE_RPCS = new Set(["begin_auth_attempt", "finalize_auth_attempt"]);
 
-  function makeAdminSpy() {
+  type Spy = ReturnType<typeof makeAdminSpy>;
+
+  function makeAdminSpy(
+    opts: { locked?: boolean; attemptId?: number | null } = {},
+  ) {
+    const attemptId = opts.attemptId ?? 42;
+    const rpc = vi.fn(async (name: string, _args: unknown) => {
+      if (name === "begin_auth_attempt") {
+        return opts.locked
+          ? { data: { locked: true, attempt_id: null, retry_after_seconds: 600 }, error: null }
+          : { data: { locked: false, attempt_id: attemptId, remaining_attempts: 4 }, error: null };
+      }
+      if (name === "finalize_auth_attempt") return { data: null, error: null };
+      return { data: null, error: null };
+    });
+    // `.from(...)` MUST never be called by the setup handler — assert-track it.
+    const from = vi.fn((_table: string) => {
+      throw new Error(
+        `bootstrapFirstAdmin unexpectedly issued a Data API call: .from(${_table})`,
+      );
+    });
     return {
+      rpc,
+      from,
       auth: {
         admin: {
-          listUsers: vi.fn(async () => ({ data: { users: [] }, error: null })),
-          createUser: vi.fn(async () => ({ data: {}, error: null })),
+          listUsers: vi.fn(async (_opts?: unknown) => ({ data: { users: [] }, error: null })),
+          createUser: vi.fn(async (_opts?: unknown) => ({ data: {}, error: null })),
         },
       },
     };
   }
 
-  const CONFIGURED = "a-very-long-out-of-band-secret-32chars";
+  // Faithful re-implementation of the handler body. Keep this in sync with
+  // `src/routes/setup.tsx` — the test's value depends on it matching.
+  async function runHandler(
+    input: {
+      setup_secret?: string;
+      email?: string;
+      password?: string;
+      full_name?: string;
+    },
+    expectedSecret: string | undefined,
+    admin: Spy,
+  ): Promise<{ ok: true }> {
+    const THROTTLE_KEY = "setup-bootstrap";
+    const { data: begin, error: beginErr } = await admin.rpc(
+      "begin_auth_attempt",
+      { _email: THROTTLE_KEY, _attempt_type: "setup" },
+    );
+    if (beginErr) throw new Error("throttle begin failed");
+    const beginJson = (begin ?? {}) as {
+      locked?: boolean;
+      attempt_id?: number | null;
+      retry_after_seconds?: number;
+    };
+    if (beginJson.locked) {
+      throw new Error("Too many setup attempts.");
+    }
+    const attemptId = beginJson.attempt_id ?? null;
 
-  it("does not call listUsers or createUser when SETUP_SECRET is unset", async () => {
+    try {
+      assertSetupSecret(input.setup_secret, expectedSecret);
+      await admin.auth.admin.listUsers({ perPage: 1 });
+      await admin.auth.admin.createUser({
+        email: input.email ?? "",
+        password: input.password ?? "",
+      });
+      if (attemptId !== null) {
+        await admin.rpc("finalize_auth_attempt", {
+          _attempt_id: attemptId,
+          _success: true,
+        });
+      }
+      return { ok: true };
+    } catch (err) {
+      if (attemptId !== null) {
+        await admin
+          .rpc("finalize_auth_attempt", { _attempt_id: attemptId, _success: false })
+          .then(
+            () => undefined,
+            () => undefined,
+          );
+      }
+      throw err;
+    }
+  }
+
+  function assertNoPermissionImpactedCalls(admin: Spy) {
+    // No Data API (`.from`) call — no table RLS policy is ever probed.
+    expect(admin.from).not.toHaveBeenCalled();
+    // No service-role auth admin surface reached.
+    expect(admin.auth.admin.listUsers).not.toHaveBeenCalled();
+    expect(admin.auth.admin.createUser).not.toHaveBeenCalled();
+    // Every RPC that DID fire must be one of the RLS-safe throttle RPCs.
+    for (const call of admin.rpc.mock.calls) {
+      const name = call[0] as string;
+      expect(
+        RLS_SAFE_RPCS.has(name),
+        `Unexpected RPC on reject path: ${name}`,
+      ).toBe(true);
+    }
+  }
+
+  it("SETUP_SECRET unset: only throttle RPCs run; no auth admin or Data API calls", async () => {
     const spy = makeAdminSpy();
     await expect(
       runHandler({ setup_secret: "anything" }, undefined, spy),
     ).rejects.toThrow(SETUP_DISABLED_MESSAGE);
-    expect(spy.auth.admin.listUsers).not.toHaveBeenCalled();
-    expect(spy.auth.admin.createUser).not.toHaveBeenCalled();
+    assertNoPermissionImpactedCalls(spy);
+    // Throttle recorded a failure for this reserved attempt.
+    expect(spy.rpc).toHaveBeenCalledWith("begin_auth_attempt", expect.anything());
+    expect(spy.rpc).toHaveBeenCalledWith("finalize_auth_attempt", {
+      _attempt_id: 42,
+      _success: false,
+    });
   });
 
-  it("does not call listUsers or createUser when the caller omits the secret", async () => {
+  it("caller omits setup_secret: only throttle RPCs run", async () => {
     const spy = makeAdminSpy();
     await expect(runHandler({}, CONFIGURED, spy)).rejects.toThrow(
       SETUP_INVALID_SECRET_MESSAGE,
     );
-    expect(spy.auth.admin.listUsers).not.toHaveBeenCalled();
-    expect(spy.auth.admin.createUser).not.toHaveBeenCalled();
+    assertNoPermissionImpactedCalls(spy);
+    expect(spy.rpc).toHaveBeenCalledWith("finalize_auth_attempt", {
+      _attempt_id: 42,
+      _success: false,
+    });
   });
 
-  it("does not call listUsers or createUser when the secret is wrong", async () => {
+  it("wrong setup_secret: only throttle RPCs run", async () => {
     const spy = makeAdminSpy();
     await expect(
       runHandler({ setup_secret: "totally-wrong" }, CONFIGURED, spy),
     ).rejects.toThrow(SETUP_INVALID_SECRET_MESSAGE);
-    expect(spy.auth.admin.listUsers).not.toHaveBeenCalled();
-    expect(spy.auth.admin.createUser).not.toHaveBeenCalled();
+    assertNoPermissionImpactedCalls(spy);
+    expect(spy.rpc).toHaveBeenCalledWith("finalize_auth_attempt", {
+      _attempt_id: 42,
+      _success: false,
+    });
   });
 
-  it("proceeds to the admin client only when the secret matches exactly", async () => {
+  it("throttle-locked: only begin_auth_attempt runs; no finalize, no auth admin, no Data API", async () => {
+    const spy = makeAdminSpy({ locked: true });
+    await expect(
+      runHandler({ setup_secret: CONFIGURED }, CONFIGURED, spy),
+    ).rejects.toThrow(/too many setup attempts/i);
+    assertNoPermissionImpactedCalls(spy);
+    // Under lock there is no attempt_id to finalize.
+    expect(spy.rpc).toHaveBeenCalledTimes(1);
+    expect(spy.rpc).toHaveBeenCalledWith("begin_auth_attempt", expect.anything());
+  });
+
+  it("correct secret: proceeds to auth admin and clears the throttle with success", async () => {
     const spy = makeAdminSpy();
     await expect(
       runHandler({ setup_secret: CONFIGURED }, CONFIGURED, spy),
     ).resolves.toEqual({ ok: true });
+    // No Data API call even on the happy path — the setup flow talks only
+    // to the auth admin surface plus the throttle RPCs.
+    expect(spy.from).not.toHaveBeenCalled();
     expect(spy.auth.admin.listUsers).toHaveBeenCalledTimes(1);
     expect(spy.auth.admin.createUser).toHaveBeenCalledTimes(1);
+    expect(spy.rpc).toHaveBeenCalledWith("finalize_auth_attempt", {
+      _attempt_id: 42,
+      _success: true,
+    });
   });
 });
+
