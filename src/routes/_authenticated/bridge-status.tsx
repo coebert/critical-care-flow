@@ -296,13 +296,19 @@ function BridgeStatusPage() {
             </Table>
           </Card>
 
+          <AttemptsPanel
+            attempts={attemptsQuery.data ?? []}
+            loading={attemptsQuery.isLoading}
+          />
+
           <div className="text-xs text-muted-foreground">
-            Last checked {fmt(data.ran_at)}.{" "}
+            Last checked {fmt(data.ran_at)}. Failed resources are automatically
+            retried every 5 minutes.{" "}
             <Link
               to="/notifications-audit"
               className="underline hover:text-foreground"
             >
-              View audit log →
+              View notifications audit log →
             </Link>
           </div>
         </>
