@@ -129,6 +129,7 @@ function BridgeStatusPage() {
       else toast.warning(message);
       query.refetch();
       attemptsQuery.refetch();
+      verifyQuery.refetch();
     },
     onError: (err: unknown) => {
       toast.error("Sync failed", { description: (err as Error).message });
