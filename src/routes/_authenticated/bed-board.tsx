@@ -350,6 +350,7 @@ function BedBoardPage() {
             />
             <TransfersPanel
               transfers={transfers}
+              authors={transferAuthors}
               saving={saving}
               onCreate={(v) => wrap(() => doCreateTransfer({ data: v }), "Transfer created")}
               onAdvance={(id, next) =>
