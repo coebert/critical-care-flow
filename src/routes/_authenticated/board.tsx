@@ -8,6 +8,7 @@ import type { Referral } from "@/lib/referrals-list-utils";
 import { formatElapsed } from "@/lib/referrals-list-utils";
 import { dayOfStay } from "@/lib/bed-capacity";
 import { X, Printer, Sun, Moon } from "lucide-react";
+import { WardableBadge } from "@/components/bed-board/wardable-badge";
 
 export const Route = createFileRoute("/_authenticated/board")({
   head: () => ({
