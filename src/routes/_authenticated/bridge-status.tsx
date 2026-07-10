@@ -20,7 +20,7 @@ import {
   runBridgeSyncNow,
   type BridgeResourceStatus,
 } from "@/lib/bridge-status.functions";
-import { useToast } from "@/hooks/use-toast";
+import { toast } from "sonner";
 
 export const Route = createFileRoute("/_authenticated/bridge-status")({
   head: () => ({
@@ -58,7 +58,7 @@ function relative(ts: string | null) {
 }
 
 function BridgeStatusPage() {
-  const { toast } = useToast();
+
   const getStatus = useServerFn(getBridgeStatus);
   const runNow = useServerFn(runBridgeSyncNow);
 
@@ -71,14 +71,14 @@ function BridgeStatusPage() {
   const mutation = useMutation({
     mutationFn: () => runNow(),
     onSuccess: (res) => {
-      toast({
+      toast.success(
         title: `Sync ${res.status < 300 ? "completed" : "finished with errors"}`,
         description: `HTTP ${res.status}`,
       });
       query.refetch();
     },
     onError: (err: unknown) => {
-      toast({
+      toast.success(
         title: "Sync failed",
         description: (err as Error).message,
         variant: "destructive",
