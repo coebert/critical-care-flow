@@ -272,6 +272,7 @@ function BedBoardPage() {
   const search = Route.useSearch();
   const navigate = Route.useNavigate();
   const fetchBoard = useServerFn(getPartnerBedBoard);
+  const fetchAcuity = useServerFn(getPatientAcuity);
   const qc = useQueryClient();
   const { data, isLoading, isFetching, error, refetch } = useQuery({
     queryKey: QK,
@@ -283,6 +284,17 @@ function BedBoardPage() {
     refetchIntervalInBackground: false,
     refetchOnWindowFocus: true,
   });
+  const { data: acuityRows, refetch: refetchAcuity } = useQuery({
+    queryKey: AQK,
+    queryFn: () => fetchAcuity(),
+    staleTime: 5_000,
+    refetchInterval: 30_000,
+  });
+  const acuityMap = useMemo(() => {
+    const m = new Map<string, AcuityLevel>();
+    for (const r of acuityRows ?? []) m.set(r.partner_patient_id, r.level as AcuityLevel);
+    return m;
+  }, [acuityRows]);
 
   const [selected, setSelected] = useState<PartnerOccupant | null>(null);
 
