@@ -170,3 +170,70 @@ export function useClinicalAccess() {
 
   return { hasAccess, loading };
 }
+
+/**
+ * Read-only viewer role — the user has a `viewer` row in `user_roles` but
+ * neither `admin` nor `clinician`. When true, the UI must hide/disable
+ * edit and delete affordances across the referral and note surfaces.
+ *
+ * Queries all of the user's roles as plain strings so the check is safe
+ * even if the `viewer` value hasn't been added to the `app_role` enum
+ * yet — in that case no rows match and the hook returns false.
+ */
+export function useIsViewer() {
+  const { user, loading: authLoading } = useAuth();
+  const [isViewer, setIsViewer] = useState(false);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    if (authLoading) {
+      setLoading(true);
+      return;
+    }
+    if (!user) {
+      setIsViewer(false);
+      setLoading(false);
+      return;
+    }
+
+    let cancelled = false;
+    const check = async () => {
+      const { data } = await supabase
+        .from("user_roles")
+        .select("role")
+        .eq("user_id", user.id);
+      if (cancelled) return;
+      const roles = (data ?? []).map((r: { role: string }) => String(r.role));
+      const hasEditor = roles.includes("admin") || roles.includes("clinician");
+      setIsViewer(roles.includes("viewer") && !hasEditor);
+      setLoading(false);
+    };
+
+    setLoading(true);
+    void check();
+
+    const channelKey = `user-roles-viewer-${user.id}-${Math.random().toString(36).slice(2, 10)}`;
+    const channel = supabase
+      .channel(channelKey)
+      .on(
+        "postgres_changes",
+        {
+          event: "*",
+          schema: "public",
+          table: "user_roles",
+          filter: `user_id=eq.${user.id}`,
+        },
+        () => {
+          void check();
+        },
+      )
+      .subscribe();
+
+    return () => {
+      cancelled = true;
+      void supabase.removeChannel(channel);
+    };
+  }, [user, authLoading]);
+
+  return { isViewer, loading };
+}
