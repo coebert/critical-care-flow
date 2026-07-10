@@ -20,6 +20,11 @@ import {
   type PartnerOccupant,
   type UpdatePartnerPatientInput,
 } from "@/lib/partner-bed-board.functions";
+import {
+  getPatientAcuity,
+  setPatientAcuity,
+  type AcuityLevel,
+} from "@/lib/patient-acuity.functions";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -45,6 +50,21 @@ import {
 
 
 const QK = ["partner-bed-board"] as const;
+const AQK = ["patient-acuity"] as const;
+
+const LEVEL_TONE: Record<AcuityLevel, string> = {
+  0: "bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border-emerald-500/30",
+  1: "bg-sky-500/10 text-sky-700 dark:text-sky-400 border-sky-500/30",
+  2: "bg-amber-500/10 text-amber-700 dark:text-amber-400 border-amber-500/30",
+  3: "bg-rose-500/10 text-rose-700 dark:text-rose-400 border-rose-500/30",
+};
+
+const LEVEL_LABEL: Record<AcuityLevel, string> = {
+  0: "Level 0 — ward-level care",
+  1: "Level 1 — at risk of deterioration",
+  2: "Level 2 — HDU care",
+  3: "Level 3 — ICU care",
+};
 
 export const Route = createFileRoute("/_authenticated/bed-board")({
   head: () => ({
@@ -106,9 +126,11 @@ function dayOfStay(iso: string | null | undefined): number | null {
 
 function BedCard({
   slot,
+  level,
   onOccupiedClick,
 }: {
   slot: PartnerBedSlot;
+  level: AcuityLevel | undefined;
   onOccupiedClick: (o: PartnerOccupant) => void;
 }) {
   const occ = slot.occupant;
@@ -151,6 +173,16 @@ function BedCard({
           {slot.bed}
         </div>
         <div className="flex items-center gap-1">
+          {level != null && (
+            <Badge
+              variant="outline"
+              className={`text-[10px] ${LEVEL_TONE[level]}`}
+              title={LEVEL_LABEL[level]}
+              aria-label={LEVEL_LABEL[level]}
+            >
+              L{level}
+            </Badge>
+          )}
           {slot.is_side_room && (
             <Badge variant="outline" className="text-[10px]">
               Side room
@@ -240,6 +272,7 @@ function BedBoardPage() {
   const search = Route.useSearch();
   const navigate = Route.useNavigate();
   const fetchBoard = useServerFn(getPartnerBedBoard);
+  const fetchAcuity = useServerFn(getPatientAcuity);
   const qc = useQueryClient();
   const { data, isLoading, isFetching, error, refetch } = useQuery({
     queryKey: QK,
@@ -251,6 +284,17 @@ function BedBoardPage() {
     refetchIntervalInBackground: false,
     refetchOnWindowFocus: true,
   });
+  const { data: acuityRows, refetch: refetchAcuity } = useQuery({
+    queryKey: AQK,
+    queryFn: () => fetchAcuity(),
+    staleTime: 5_000,
+    refetchInterval: 30_000,
+  });
+  const acuityMap = useMemo(() => {
+    const m = new Map<string, AcuityLevel>();
+    for (const r of acuityRows ?? []) m.set(r.partner_patient_id, r.level as AcuityLevel);
+    return m;
+  }, [acuityRows]);
 
   const [selected, setSelected] = useState<PartnerOccupant | null>(null);
 
@@ -352,43 +396,96 @@ function BedBoardPage() {
       )}
 
 
-      {lastOk && (
-        <div
-          className="flex flex-wrap items-center gap-2 mb-4"
-          role="status"
-          aria-label="Unit capacity"
-        >
-          <StatBlock label={lastOk.unit} value={lastOk.stats.total_beds} tone="muted" />
-          <StatBlock
-            label="Occupied"
-            value={lastOk.stats.occupied}
-            tone={
-              lastOk.stats.available === 0
-                ? "bad"
-                : lastOk.stats.available <= 1
-                  ? "warn"
-                  : "ok"
-            }
-          />
-          <StatBlock
-            label="Free"
-            value={lastOk.stats.available}
-            tone={
-              lastOk.stats.available === 0
-                ? "bad"
-                : lastOk.stats.available <= 1
-                  ? "warn"
-                  : "ok"
-            }
-          />
-          {lastOk.stats.unassigned > 0 && (
-            <Badge variant="outline" className="gap-1">
-              <AlertTriangle className="w-3.5 h-3.5" aria-hidden="true" />
-              {lastOk.stats.unassigned} unassigned
-            </Badge>
-          )}
-        </div>
-      )}
+      {lastOk && (() => {
+        const allOccupants = [
+          ...lastOk.bed_board
+            .map((b) => b.occupant)
+            .filter((o): o is PartnerOccupant => o !== null),
+          ...lastOk.unassigned,
+        ];
+        const counts: Record<AcuityLevel, number> = { 0: 0, 1: 0, 2: 0, 3: 0 };
+        let scored = 0;
+        let sum = 0;
+        for (const o of allOccupants) {
+          const l = acuityMap.get(o.id);
+          if (l == null) continue;
+          counts[l] += 1;
+          scored += 1;
+          sum += l;
+        }
+        const unscored = allOccupants.length - scored;
+        const mean = scored > 0 ? sum / scored : 0;
+        return (
+          <>
+            <div
+              className="flex flex-wrap items-center gap-2 mb-3"
+              role="status"
+              aria-label="Unit capacity"
+            >
+              <StatBlock label={lastOk.unit} value={lastOk.stats.total_beds} tone="muted" />
+              <StatBlock
+                label="Occupied"
+                value={lastOk.stats.occupied}
+                tone={
+                  lastOk.stats.available === 0
+                    ? "bad"
+                    : lastOk.stats.available <= 1
+                      ? "warn"
+                      : "ok"
+                }
+              />
+              <StatBlock
+                label="Free"
+                value={lastOk.stats.available}
+                tone={
+                  lastOk.stats.available === 0
+                    ? "bad"
+                    : lastOk.stats.available <= 1
+                      ? "warn"
+                      : "ok"
+                }
+              />
+              {lastOk.stats.unassigned > 0 && (
+                <Badge variant="outline" className="gap-1">
+                  <AlertTriangle className="w-3.5 h-3.5" aria-hidden="true" />
+                  {lastOk.stats.unassigned} unassigned
+                </Badge>
+              )}
+            </div>
+            <div
+              className="flex flex-wrap items-center gap-2 mb-4"
+              role="status"
+              aria-label="Unit acuity"
+            >
+              <div className="text-xs uppercase tracking-wide text-muted-foreground mr-1">
+                Acuity
+              </div>
+              {([0, 1, 2, 3] as const).map((l) => (
+                <div
+                  key={l}
+                  className={`flex items-center gap-1.5 rounded-md border px-2.5 py-1 text-sm ${LEVEL_TONE[l]}`}
+                  title={LEVEL_LABEL[l]}
+                >
+                  <span className="font-semibold">L{l}</span>
+                  <span className="tabular-nums">{counts[l]}</span>
+                </div>
+              ))}
+              <div
+                className="flex items-center gap-1.5 rounded-md border px-2.5 py-1 text-sm bg-muted text-muted-foreground"
+                title="Mean level across scored patients"
+              >
+                <span className="font-semibold">Mean</span>
+                <span className="tabular-nums">{mean.toFixed(2)}</span>
+              </div>
+              {unscored > 0 && (
+                <div className="text-xs text-muted-foreground">
+                  {unscored} patient{unscored === 1 ? "" : "s"} not yet scored
+                </div>
+              )}
+            </div>
+          </>
+        );
+      })()}
 
       {partnerError && (
         <div
@@ -430,6 +527,7 @@ function BedBoardPage() {
                 <BedCard
                   key={slot.bed}
                   slot={slot}
+                  level={slot.occupant ? acuityMap.get(slot.occupant.id) : undefined}
                   onOccupiedClick={setSelected}
                 />
               ))}
@@ -585,11 +683,13 @@ function BedBoardPage() {
 
       <EditOccupantDialog
         occupant={selected}
+        currentLevel={selected ? acuityMap.get(selected.id) ?? null : null}
         onClose={() => setSelected(null)}
         onSaved={(updated) => {
           setSelected(updated);
           refetch();
         }}
+        onAcuityChanged={() => refetchAcuity()}
       />
 
     </div>
@@ -659,14 +759,32 @@ function buildDiff(
 
 function EditOccupantDialog({
   occupant,
+  currentLevel,
   onClose,
   onSaved,
+  onAcuityChanged,
 }: {
   occupant: PartnerOccupant | null;
+  currentLevel: AcuityLevel | null;
   onClose: () => void;
   onSaved: (updated: PartnerOccupant) => void;
+  onAcuityChanged: () => void;
 }) {
   const save = useServerFn(updatePartnerPatient);
+  const saveAcuity = useServerFn(setPatientAcuity);
+  const acuityMutation = useMutation({
+    mutationFn: (level: AcuityLevel | null) =>
+      saveAcuity({ data: { partner_patient_id: occupant!.id, level } }),
+    onSuccess: (result) => {
+      if (result.ok) {
+        toast.success("Level of care updated");
+        onAcuityChanged();
+      } else {
+        toast.error(result.error || "Could not save level");
+      }
+    },
+    onError: (err) => toast.error(err instanceof Error ? err.message : "Could not save level"),
+  });
   const initial = useMemo(
     () => (occupant ? occupantToForm(occupant) : null),
     [occupant],
@@ -745,6 +863,50 @@ function EditOccupantDialog({
             </div>
           </div>
         )}
+
+        {occupant && (
+          <div className="rounded-md border px-3 py-2">
+            <div className="flex items-center justify-between gap-2 mb-2">
+              <Label className="text-sm">Level of care</Label>
+              {currentLevel != null && (
+                <button
+                  type="button"
+                  className="text-xs text-muted-foreground hover:text-foreground underline underline-offset-2 disabled:opacity-50"
+                  disabled={acuityMutation.isPending}
+                  onClick={() => acuityMutation.mutate(null)}
+                >
+                  Clear
+                </button>
+              )}
+            </div>
+            <div className="flex flex-wrap gap-1.5">
+              {([0, 1, 2, 3] as const).map((l) => {
+                const selected = currentLevel === l;
+                return (
+                  <button
+                    key={l}
+                    type="button"
+                    disabled={acuityMutation.isPending}
+                    onClick={() => acuityMutation.mutate(l)}
+                    className={`rounded-md border px-3 py-1.5 text-sm transition disabled:opacity-50 ${
+                      selected ? LEVEL_TONE[l] + " ring-2 ring-offset-1 ring-current" : "hover:bg-accent"
+                    }`}
+                    title={LEVEL_LABEL[l]}
+                    aria-pressed={selected}
+                    aria-label={LEVEL_LABEL[l]}
+                  >
+                    L{l}
+                  </button>
+                );
+              })}
+            </div>
+            <div className="text-[11px] text-muted-foreground mt-1.5">
+              Level of care is stored in this app and feeds unit acuity. Other
+              patient details write back to ICU Handover Hub.
+            </div>
+          </div>
+        )}
+
 
         {occupant && form && (
           <form
