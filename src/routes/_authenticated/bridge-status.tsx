@@ -93,9 +93,9 @@ function fmt(ts: string | null) {
   }
 }
 
-function relative(ts: string | null) {
+function relative(ts: string | null, nowMs: number = Date.now()) {
   if (!ts) return "never";
-  const diffMs = Date.now() - new Date(ts).getTime();
+  const diffMs = nowMs - new Date(ts).getTime();
   const sec = Math.max(1, Math.floor(diffMs / 1000));
   if (sec < 60) return `${sec}s ago`;
   const min = Math.floor(sec / 60);
@@ -103,6 +103,34 @@ function relative(ts: string | null) {
   const hr = Math.floor(min / 60);
   if (hr < 48) return `${hr}h ago`;
   return `${Math.floor(hr / 24)}d ago`;
+}
+
+function formatDuration(ms: number): string {
+  if (!Number.isFinite(ms) || ms < 0) return "—";
+  const s = Math.floor(ms / 1000);
+  if (s < 1) return "<1s";
+  if (s < 60) return `${s}s`;
+  const m = Math.floor(s / 60);
+  const rs = s % 60;
+  if (m < 60) return rs ? `${m}m ${rs}s` : `${m}m`;
+  const h = Math.floor(m / 60);
+  const rm = m % 60;
+  return rm ? `${h}h ${rm}m` : `${h}h`;
+}
+
+/**
+ * Ticks every second so relative timestamps and live durations refresh
+ * in the UI while a job is in-flight. Gated by `active` so we don't burn
+ * a timer on idle panels.
+ */
+function useNowTick(active: boolean, intervalMs = 1000): number {
+  const [now, setNow] = useState(() => Date.now());
+  useEffect(() => {
+    if (!active) return;
+    const id = setInterval(() => setNow(Date.now()), intervalMs);
+    return () => clearInterval(id);
+  }, [active, intervalMs]);
+  return now;
 }
 
 function BridgeStatusPage() {
