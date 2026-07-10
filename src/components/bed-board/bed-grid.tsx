@@ -174,34 +174,30 @@ export function BedGrid({
 }) {
   const liveByBed = new Map<string, Occ>();
   for (const o of occupancies) if (!o.discharged_at) liveByBed.set(o.bed_id, o);
-  const icu = beds.filter((b) => b.unit === "icu");
-  const hdu = beds.filter((b) => b.unit === "hdu");
+  const unitBeds = [...beds].sort((a, b) => a.sort_order - b.sort_order);
   return (
     <div className="space-y-6">
-      {[
-        { label: "ICU", list: icu },
-        { label: "HDU", list: hdu },
-      ].map(({ label, list }) => (
-        <section key={label}>
-          <h2 className="text-sm font-semibold text-muted-foreground mb-2">{label}</h2>
-          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3">
-            {list.map((b) => (
-              <BedCard
-                key={b.id}
-                bed={b}
-                occupancy={liveByBed.get(b.id)}
-                onEmptyClick={onEmptyClick}
-                onOccupiedClick={onOccupiedClick}
-              />
-            ))}
-            {list.length === 0 && (
-              <div className="col-span-full text-sm text-muted-foreground">
-                No {label} beds configured. Admins can add beds in the register.
-              </div>
-            )}
-          </div>
-        </section>
-      ))}
+      <section>
+        <h2 className="text-sm font-semibold text-muted-foreground mb-2">
+          Radnor Critical Care Unit
+        </h2>
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3">
+          {unitBeds.map((b) => (
+            <BedCard
+              key={b.id}
+              bed={b}
+              occupancy={liveByBed.get(b.id)}
+              onEmptyClick={onEmptyClick}
+              onOccupiedClick={onOccupiedClick}
+            />
+          ))}
+          {unitBeds.length === 0 && (
+            <div className="col-span-full text-sm text-muted-foreground">
+              No beds configured. Admins can add beds in the register.
+            </div>
+          )}
+        </div>
+      </section>
       <div className="text-xs text-muted-foreground">
         <Button variant="link" size="sm" className="h-auto p-0" asChild>
           <span />
