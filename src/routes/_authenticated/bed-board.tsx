@@ -20,6 +20,11 @@ import {
   type PartnerOccupant,
   type UpdatePartnerPatientInput,
 } from "@/lib/partner-bed-board.functions";
+import {
+  getPatientAcuity,
+  setPatientAcuity,
+  type AcuityLevel,
+} from "@/lib/patient-acuity.functions";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
