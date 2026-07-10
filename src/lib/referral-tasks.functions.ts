@@ -3,6 +3,56 @@ import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { safeError } from "./safe-error";
 
+// Fan out a push + in-app notification to every at-work user with the
+// given role when a task is created or reassigned. Kept local to this
+// module so we can scope the eligible-role query to just the assignee
+// role instead of the broad "admin + clinician" default.
+async function fanOutTaskAssignment(args: {
+  actorId: string;
+  referralId: string;
+  taskTitle: string;
+  assignedRole: "admin" | "clinician";
+  action: "created" | "reassigned";
+}) {
+  try {
+    const [
+      { fanOutNotifications: runFanOut },
+      { buildNotificationFanoutDeps },
+      { supabaseAdmin },
+    ] = await Promise.all([
+      import("./notification-fanout"),
+      import("./notification-fanout-deps.server"),
+      import("@/integrations/supabase/client.server"),
+    ]);
+    const baseDeps = buildNotificationFanoutDeps(supabaseAdmin);
+    const deps = {
+      ...baseDeps,
+      // Narrow the recipient pool to holders of the assigned role only.
+      fetchEligibleRoles: async (actorId: string) => {
+        const { data } = await supabaseAdmin
+          .from("user_roles")
+          .select("user_id, role")
+          .eq("role", args.assignedRole)
+          .neq("user_id", actorId);
+        return (data ?? []) as { user_id: string; role: string }[];
+      },
+    };
+    const roleLabel = args.assignedRole === "admin" ? "admins" : "clinicians";
+    const verb = args.action === "created" ? "assigned" : "reassigned";
+    await runFanOut(deps, {
+      actorId: args.actorId,
+      referralId: args.referralId,
+      kind: "task",
+      message: `Task ${verb} to ${roleLabel}: ${args.taskTitle}`,
+      title: "Referral task",
+      url: `/referrals/${args.referralId}`,
+    });
+  } catch (err) {
+    // Push is best-effort — never fail the task write because of it.
+    console.error("[referral-tasks] fanOutTaskAssignment failed", err);
+  }
+}
+
 const roleEnum = z.enum(["admin", "clinician"]);
 const statusEnum = z.enum(["open", "done", "cancelled"]);
 
