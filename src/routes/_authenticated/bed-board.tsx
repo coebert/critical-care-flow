@@ -173,6 +173,16 @@ function BedCard({
           {slot.bed}
         </div>
         <div className="flex items-center gap-1">
+          {level != null && (
+            <Badge
+              variant="outline"
+              className={`text-[10px] ${LEVEL_TONE[level]}`}
+              title={LEVEL_LABEL[level]}
+              aria-label={LEVEL_LABEL[level]}
+            >
+              L{level}
+            </Badge>
+          )}
           {slot.is_side_room && (
             <Badge variant="outline" className="text-[10px]">
               Side room
