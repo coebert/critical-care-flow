@@ -192,7 +192,6 @@ function BoardPage() {
           {cap && (
             <div className="flex items-center gap-4 text-lg">
               <CapCell label="ICU" a={cap.icu.occupied} b={cap.icu.total} p={p} />
-              <CapCell label="HDU" a={cap.hdu.occupied} b={cap.hdu.total} p={p} />
               <div className={p.muted}>
                 <span className={`${p.eyebrow} text-sm mr-1`}>Outliers</span>{cap.outliers_count}
               </div>
