@@ -260,6 +260,13 @@ export function signedHeaders(rawBody: string) {
   };
 }
 
+export class PartnerEndpointMissingError extends Error {
+  constructor(public readonly key: ResourceKey) {
+    super(`partner endpoint /${key} not implemented (404) — skipped`);
+    this.name = "PartnerEndpointMissingError";
+  }
+}
+
 export async function pullResource(
   base: string,
   key: ResourceKey,
@@ -272,6 +279,11 @@ export async function pullResource(
     method: "GET",
     headers: signedHeaders(""),
   });
+  if (res.status === 404) {
+    // Consume body to free the connection, then signal "not implemented".
+    await res.text().catch(() => "");
+    throw new PartnerEndpointMissingError(key);
+  }
   if (!res.ok) {
     throw new Error(
       `pull ${key} ${res.status}: ${(await res.text()).slice(0, 200)}`,
@@ -295,6 +307,10 @@ export async function pushOne(
     headers: signedHeaders(raw),
     body: raw,
   });
+  if (res.status === 404) {
+    await res.text().catch(() => "");
+    throw new PartnerEndpointMissingError(key);
+  }
   if (!res.ok && res.status !== 409) {
     // 409 = partner's row is newer — acceptable, next pull will reconcile.
     throw new Error(
@@ -302,6 +318,7 @@ export async function pushOne(
     );
   }
 }
+
 
 async function syncResource(
   admin: any,
@@ -373,8 +390,16 @@ async function syncResource(
       page += 1;
     }
   } catch (err) {
-    error = (err as Error).message;
+    if (err instanceof PartnerEndpointMissingError) {
+      // Partner app doesn't expose this bridge endpoint yet — skip cleanly
+      // instead of surfacing a red error. Cursors stay untouched so a future
+      // partner rollout will pick up from where we left off.
+      error = undefined;
+    } else {
+      error = (err as Error).message;
+    }
   }
+
 
   await admin.from("bridge_sync_state").upsert(
     {
