@@ -1,0 +1,142 @@
+import { createServerFn } from "@tanstack/react-start";
+import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
+
+export type BridgeResourceStatus = {
+  resource: string;
+  row_count: number;
+  last_pulled_at: string | null;
+  last_pushed_at: string | null;
+  last_error: string | null;
+  last_error_at: string | null;
+  latest_updated_at: string | null;
+};
+
+export type BridgeStatusSummary = {
+  ok: boolean;
+  ran_at: string;
+  partner_configured: boolean;
+  secret_configured: boolean;
+  cron_active: boolean;
+  cron_schedule: string | null;
+  resources: BridgeResourceStatus[];
+};
+
+const RESOURCES: { key: string; table: string }[] = [
+  { key: "patients", table: "patients" },
+  { key: "investigations", table: "investigations" },
+  { key: "microbiology", table: "microbiology" },
+  { key: "referrals", table: "referrals" },
+  { key: "notifications", table: "notifications" },
+];
+
+export const getBridgeStatus = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ context }): Promise<BridgeStatusSummary> => {
+    // Admin-only. Non-admins get an explicit error the route surfaces.
+    const { data: isAdmin } = await context.supabase.rpc("has_role", {
+      _user_id: context.userId,
+      _role: "admin",
+    });
+    if (!isAdmin) {
+      throw new Error("admin_required");
+    }
+
+    const { supabaseAdmin } = await import(
+      "@/integrations/supabase/client.server"
+    );
+
+    // Sync state for every resource (may be missing rows).
+    const { data: stateRows } = await supabaseAdmin
+      .from("bridge_sync_state")
+      .select("*");
+    const stateByResource = new Map<string, any>();
+    (stateRows ?? []).forEach((r: any) => stateByResource.set(r.resource, r));
+
+    // Per-resource row count + latest updated_at.
+    const perResource = await Promise.all(
+      RESOURCES.map(async ({ key, table }) => {
+        const state = stateByResource.get(key);
+        const [{ count }, latest] = await Promise.all([
+          supabaseAdmin
+            .from(table)
+            .select("id", { count: "exact", head: true }),
+          supabaseAdmin
+            .from(table)
+            .select("updated_at")
+            .order("updated_at", { ascending: false })
+            .limit(1)
+            .maybeSingle(),
+        ]);
+        return {
+          resource: key,
+          row_count: count ?? 0,
+          last_pulled_at: state?.last_pulled_at ?? null,
+          last_pushed_at: state?.last_pushed_at ?? null,
+          last_error: state?.last_error ?? null,
+          last_error_at: state?.last_error_at ?? null,
+          latest_updated_at:
+            (latest.data as any)?.updated_at ?? null,
+        } satisfies BridgeResourceStatus;
+      }),
+    );
+
+    // Is the pg_cron job scheduled and active?
+    let cronActive = false;
+    let cronSchedule: string | null = null;
+    try {
+      const { data: cronRows } = await (supabaseAdmin as any)
+        .schema("cron")
+        .from("job")
+        .select("jobname, schedule, active")
+        .eq("jobname", "bridge-sync-every-2-min")
+        .maybeSingle();
+      if (cronRows) {
+        cronActive = Boolean(cronRows.active);
+        cronSchedule = cronRows.schedule ?? null;
+      }
+    } catch {
+      // cron schema not readable via PostgREST in every environment; ignore.
+    }
+
+    return {
+      ok: perResource.every((r) => !r.last_error),
+      ran_at: new Date().toISOString(),
+      partner_configured: Boolean(process.env.PARTNER_BRIDGE_URL),
+      secret_configured: Boolean(process.env.HANDOVER_API_SECRET),
+      cron_active: cronActive,
+      cron_schedule: cronSchedule,
+      resources: perResource,
+    };
+  });
+
+export const runBridgeSyncNow = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ context }) => {
+    const { data: isAdmin } = await context.supabase.rpc("has_role", {
+      _user_id: context.userId,
+      _role: "admin",
+    });
+    if (!isAdmin) throw new Error("admin_required");
+
+    const url = `${process.env.SUPABASE_URL?.replace(
+      /\.supabase\.co$/,
+      "",
+    ) ? "" : ""}`;
+    // Same-origin invocation of the sync route. We rely on the platform
+    // URL provided by the request; fall back to the published URL.
+    const base =
+      process.env.PUBLIC_APP_URL ??
+      "https://critical-care-flow.lovable.app";
+    void url;
+    const apikey = process.env.SUPABASE_PUBLISHABLE_KEY ?? "";
+    const res = await fetch(`${base}/api/public/bridge/sync`, {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        apikey,
+      },
+      body: "{}",
+    });
+    const body = await res.json().catch(() => ({}));
+    return { status: res.status, body };
+  });
