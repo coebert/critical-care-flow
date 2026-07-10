@@ -85,6 +85,7 @@ export type Database = {
           level: number
           nippv_cpap: boolean
           notes: string | null
+          patient_id: string | null
           patient_initials: string | null
           predicted_discharge_at: string | null
           predicted_step_down:
@@ -116,6 +117,7 @@ export type Database = {
           level?: number
           nippv_cpap?: boolean
           notes?: string | null
+          patient_id?: string | null
           patient_initials?: string | null
           predicted_discharge_at?: string | null
           predicted_step_down?:
@@ -147,6 +149,7 @@ export type Database = {
           level?: number
           nippv_cpap?: boolean
           notes?: string | null
+          patient_id?: string | null
           patient_initials?: string | null
           predicted_discharge_at?: string | null
           predicted_step_down?:
@@ -168,6 +171,13 @@ export type Database = {
             columns: ["bed_id"]
             isOneToOne: false
             referencedRelation: "beds"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "bed_occupancies_patient_id_fkey"
+            columns: ["patient_id"]
+            isOneToOne: false
+            referencedRelation: "patients"
             referencedColumns: ["id"]
           },
           {
@@ -407,6 +417,47 @@ export type Database = {
         }
         Relationships: []
       }
+      investigations: {
+        Row: {
+          category: string
+          created_at: string
+          created_by: string | null
+          findings: string
+          id: string
+          patient_id: string
+          result_at: string
+          updated_at: string
+        }
+        Insert: {
+          category: string
+          created_at?: string
+          created_by?: string | null
+          findings: string
+          id?: string
+          patient_id: string
+          result_at?: string
+          updated_at?: string
+        }
+        Update: {
+          category?: string
+          created_at?: string
+          created_by?: string | null
+          findings?: string
+          id?: string
+          patient_id?: string
+          result_at?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "investigations_patient_id_fkey"
+            columns: ["patient_id"]
+            isOneToOne: false
+            referencedRelation: "patients"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       message_templates: {
         Row: {
           active: boolean
@@ -609,6 +660,108 @@ export type Database = {
           shift?: string
           shift_date?: string
           updated_at?: string
+        }
+        Relationships: []
+      }
+      patients: {
+        Row: {
+          admission_date: string | null
+          bed: string | null
+          created_at: string
+          created_by: string | null
+          current_admission: string | null
+          current_management: string | null
+          date_of_death: string | null
+          discharge_date: string | null
+          discharge_destination: string | null
+          dnacpr_date: string | null
+          dnacpr_decision: boolean
+          dnacpr_details: string | null
+          dob: string | null
+          full_name: string
+          hospital_number: string | null
+          id: string
+          location_type: Database["public"]["Enums"]["patient_location"]
+          nhs_number: string | null
+          nok_contact: string | null
+          nok_last_updated: string | null
+          nok_last_updated_by: string | null
+          nok_name: string | null
+          nok_relationship: string | null
+          outstanding_tasks: string | null
+          past_medical_history: string | null
+          status: Database["public"]["Enums"]["patient_status"]
+          tep_details: string | null
+          tep_in_place: boolean
+          updated_at: string
+          updated_by: string | null
+          ward: string | null
+        }
+        Insert: {
+          admission_date?: string | null
+          bed?: string | null
+          created_at?: string
+          created_by?: string | null
+          current_admission?: string | null
+          current_management?: string | null
+          date_of_death?: string | null
+          discharge_date?: string | null
+          discharge_destination?: string | null
+          dnacpr_date?: string | null
+          dnacpr_decision?: boolean
+          dnacpr_details?: string | null
+          dob?: string | null
+          full_name: string
+          hospital_number?: string | null
+          id?: string
+          location_type?: Database["public"]["Enums"]["patient_location"]
+          nhs_number?: string | null
+          nok_contact?: string | null
+          nok_last_updated?: string | null
+          nok_last_updated_by?: string | null
+          nok_name?: string | null
+          nok_relationship?: string | null
+          outstanding_tasks?: string | null
+          past_medical_history?: string | null
+          status?: Database["public"]["Enums"]["patient_status"]
+          tep_details?: string | null
+          tep_in_place?: boolean
+          updated_at?: string
+          updated_by?: string | null
+          ward?: string | null
+        }
+        Update: {
+          admission_date?: string | null
+          bed?: string | null
+          created_at?: string
+          created_by?: string | null
+          current_admission?: string | null
+          current_management?: string | null
+          date_of_death?: string | null
+          discharge_date?: string | null
+          discharge_destination?: string | null
+          dnacpr_date?: string | null
+          dnacpr_decision?: boolean
+          dnacpr_details?: string | null
+          dob?: string | null
+          full_name?: string
+          hospital_number?: string | null
+          id?: string
+          location_type?: Database["public"]["Enums"]["patient_location"]
+          nhs_number?: string | null
+          nok_contact?: string | null
+          nok_last_updated?: string | null
+          nok_last_updated_by?: string | null
+          nok_name?: string | null
+          nok_relationship?: string | null
+          outstanding_tasks?: string | null
+          past_medical_history?: string | null
+          status?: Database["public"]["Enums"]["patient_status"]
+          tep_details?: string | null
+          tep_in_place?: boolean
+          updated_at?: string
+          updated_by?: string | null
+          ward?: string | null
         }
         Relationships: []
       }
@@ -1406,7 +1559,9 @@ export type Database = {
         | "symptom_control"
         | "not_documented"
       infection_status: "none" | "suspected" | "confirmed" | "unknown"
+      patient_location: "icu" | "outlier"
       patient_sex: "male" | "female" | "other" | "unknown"
+      patient_status: "referred" | "admitted" | "discharged" | "died"
       postop_booking_status:
         | "requested"
         | "provisionally_confirmed"
@@ -1604,7 +1759,9 @@ export const Constants = {
         "not_documented",
       ],
       infection_status: ["none", "suspected", "confirmed", "unknown"],
+      patient_location: ["icu", "outlier"],
       patient_sex: ["male", "female", "other", "unknown"],
+      patient_status: ["referred", "admitted", "discharged", "died"],
       postop_booking_status: [
         "requested",
         "provisionally_confirmed",
