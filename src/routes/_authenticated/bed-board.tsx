@@ -195,7 +195,29 @@ function StatBlock({
   );
 }
 
+function EmptyStateCard({
+  title,
+  body,
+  tone = "muted",
+}: {
+  title: string;
+  body: string;
+  tone?: "muted" | "ok";
+}) {
+  const cls =
+    tone === "ok"
+      ? "border-emerald-500/30 bg-emerald-500/5 text-emerald-800 dark:text-emerald-300"
+      : "border-dashed bg-muted/20 text-muted-foreground";
+  return (
+    <Card className={`p-3 text-sm ${cls}`}>
+      <div className="font-medium">{title}</div>
+      <div className="text-xs mt-1 opacity-90">{body}</div>
+    </Card>
+  );
+}
+
 function BedBoardPage() {
+
   const search = Route.useSearch();
   const navigate = Route.useNavigate();
   const fetchBoard = useServerFn(getPartnerBedBoard);
@@ -433,25 +455,112 @@ function BedBoardPage() {
             </section>
           )}
 
-          <section
-            className="rounded-md border bg-muted/20 px-3 py-2 text-xs text-muted-foreground"
-            aria-label="Bed board provenance"
-          >
-            <div className="flex items-start gap-2">
-              <Activity
-                className="w-3.5 h-3.5 mt-0.5 shrink-0"
-                aria-hidden="true"
-              />
-              <div>
-                Occupancy, acuity, outliers and transfers are managed in{" "}
-                <span className="font-medium">ICU Handover Hub</span>. This
-                board mirrors its live snapshot every 20 seconds. Clinical
-                acuity flags (level, ventilation, isolation, etc.), outliers
-                and out-transfers will appear here once the partner exposes
-                them over the bridge.
-              </div>
-            </div>
-          </section>
+          {(() => {
+            // Detect what the partner payload actually carries so we can hide
+            // sections/rows that would otherwise show blank "—" everywhere.
+            // Outliers, transfers and clinical acuity are not part of the
+            // current /bridge/beds contract; treat any future dynamic keys
+            // as available if they appear as arrays / non-null values.
+            const raw = lastOk as unknown as Record<string, unknown>;
+            const outliersProvided = Array.isArray(raw.outliers);
+            const transfersProvided = Array.isArray(raw.transfers_out);
+            const allOccupants = [
+              ...lastOk.bed_board
+                .map((b) => b.occupant)
+                .filter((o): o is PartnerOccupant => o !== null),
+              ...lastOk.unassigned,
+            ];
+            const acuityProvided = allOccupants.some(
+              (o) => o.status != null && String(o.status).trim() !== "",
+            );
+            const outliers = outliersProvided
+              ? (raw.outliers as unknown[])
+              : [];
+            const transfers = transfersProvided
+              ? (raw.transfers_out as unknown[])
+              : [];
+
+            return (
+              <>
+                <section aria-labelledby="outliers-heading">
+                  <h2
+                    id="outliers-heading"
+                    className="text-sm font-semibold text-muted-foreground mb-2"
+                  >
+                    Outliers
+                  </h2>
+                  {!outliersProvided ? (
+                    <EmptyStateCard
+                      title="Outliers not available"
+                      body="The ICU Handover Hub bridge does not expose outliers yet. Manage outliers there — they will appear here once the partner exposes them."
+                    />
+                  ) : outliers.length === 0 ? (
+                    <EmptyStateCard
+                      title="No outliers"
+                      body="No patients are currently outlying from the unit."
+                      tone="ok"
+                    />
+                  ) : (
+                    <div className="text-sm text-muted-foreground">
+                      {outliers.length} outlier(s)
+                    </div>
+                  )}
+                </section>
+
+                <section aria-labelledby="transfers-heading">
+                  <h2
+                    id="transfers-heading"
+                    className="text-sm font-semibold text-muted-foreground mb-2"
+                  >
+                    Transfers out
+                  </h2>
+                  {!transfersProvided ? (
+                    <EmptyStateCard
+                      title="Transfers not available"
+                      body="The ICU Handover Hub bridge does not expose out-transfers yet. Manage transfers there — they will appear here once the partner exposes them."
+                    />
+                  ) : transfers.length === 0 ? (
+                    <EmptyStateCard
+                      title="No open transfers"
+                      body="No patients are currently awaiting transfer out."
+                      tone="ok"
+                    />
+                  ) : (
+                    <div className="text-sm text-muted-foreground">
+                      {transfers.length} transfer(s)
+                    </div>
+                  )}
+                </section>
+
+                <section
+                  className="rounded-md border bg-muted/20 px-3 py-2 text-xs text-muted-foreground"
+                  aria-label="Bed board provenance"
+                >
+                  <div className="flex items-start gap-2">
+                    <Activity
+                      className="w-3.5 h-3.5 mt-0.5 shrink-0"
+                      aria-hidden="true"
+                    />
+                    <div>
+                      Occupancy is mirrored from{" "}
+                      <span className="font-medium">ICU Handover Hub</span>{" "}
+                      every 20 seconds.
+                      {!acuityProvided && (
+                        <>
+                          {" "}
+                          Clinical acuity flags (level, ventilation,
+                          isolation, vasopressors) are not exposed by the
+                          bridge yet — they will appear once the partner adds
+                          them.
+                        </>
+                      )}
+                    </div>
+                  </div>
+                </section>
+              </>
+            );
+          })()}
+
         </div>
       )}
 
@@ -475,8 +584,12 @@ function BedBoardPage() {
               </dd>
               <dt className="text-muted-foreground">Bed</dt>
               <dd className="col-span-2">{selected.bed ?? "—"}</dd>
-              <dt className="text-muted-foreground">Status</dt>
-              <dd className="col-span-2">{selected.status ?? "—"}</dd>
+              {selected.status != null && (
+                <>
+                  <dt className="text-muted-foreground">Status</dt>
+                  <dd className="col-span-2">{selected.status}</dd>
+                </>
+              )}
               <dt className="text-muted-foreground">Admitted</dt>
               <dd className="col-span-2">
                 {selected.admission_date
@@ -487,18 +600,29 @@ function BedBoardPage() {
                   return d != null ? ` · Day ${d}` : "";
                 })()}
               </dd>
-              <dt className="text-muted-foreground">TEP</dt>
-              <dd className="col-span-2">
-                {selected.tep_in_place ? "In place" : "Not recorded"}
-              </dd>
-              <dt className="text-muted-foreground">DNACPR</dt>
-              <dd className="col-span-2">
-                {selected.dnacpr_decision ?? "—"}
-              </dd>
-              <dt className="text-muted-foreground">Tasks</dt>
-              <dd className="col-span-2 whitespace-pre-wrap">
-                {selected.outstanding_tasks ?? "—"}
-              </dd>
+              {selected.tep_in_place != null && (
+                <>
+                  <dt className="text-muted-foreground">TEP</dt>
+                  <dd className="col-span-2">
+                    {selected.tep_in_place ? "In place" : "Not recorded"}
+                  </dd>
+                </>
+              )}
+              {selected.dnacpr_decision != null && (
+                <>
+                  <dt className="text-muted-foreground">DNACPR</dt>
+                  <dd className="col-span-2">{selected.dnacpr_decision}</dd>
+                </>
+              )}
+              {selected.outstanding_tasks != null && (
+                <>
+                  <dt className="text-muted-foreground">Tasks</dt>
+                  <dd className="col-span-2 whitespace-pre-wrap">
+                    {selected.outstanding_tasks}
+                  </dd>
+                </>
+              )}
+
               <dt className="text-muted-foreground">Updated</dt>
               <dd className="col-span-2">
                 {formatUpdated(selected.updated_at)}
