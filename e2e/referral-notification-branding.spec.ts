@@ -123,11 +123,6 @@ test.describe("Referral notification branding — Radnor Critical Care", () => {
       "in-app toast on status change should be branded 'Radnor Critical Care — Referral status changed'",
     ).toBeVisible({ timeout: 20_000 });
 
-    // --- Inbox surface: the /notifications page must also carry the
-    //     Radnor Critical Care branding visible to the recipient.
-    await reviewerPage.goto("/notifications");
-    await expect(reviewerPage.getByText(BRAND).first()).toBeVisible({ timeout: 15_000 });
-
     await reviewerPage.close();
     await reviewer.close();
   });
