@@ -223,4 +223,57 @@ describe("bootstrapFirstAdmin — brute-force lockout", () => {
       runHandler({ setup_secret: "totally-wrong" }, CONFIGURED, admin),
     ).rejects.toThrow(/too many setup attempts/i);
   });
+
+  it("when locked: zero listUsers/createUser calls, only the lockout message returned", async () => {
+    const { admin } = makeThrottledAdmin();
+    // Prime the counter to the lockout threshold.
+    for (let i = 0; i < FAILURE_LIMIT; i++) {
+      await expect(
+        runHandler({ setup_secret: "totally-wrong" }, CONFIGURED, admin),
+      ).rejects.toThrow(SETUP_INVALID_SECRET_MESSAGE);
+    }
+    // Baseline: no DB user list/create calls happened even while filling the counter.
+    expect(admin.auth.admin.listUsers).toHaveBeenCalledTimes(0);
+    expect(admin.auth.admin.createUser).toHaveBeenCalledTimes(0);
+
+    // Now hammer the locked endpoint with a mix of wrong, correct, and
+    // omitted secrets. Every response must be the lockout message AND
+    // must not touch the auth-admin surface.
+    const inputs = [
+      { setup_secret: "totally-wrong" },
+      { setup_secret: CONFIGURED },
+      { setup_secret: "" },
+      {},
+      { setup_secret: "another-guess" },
+    ];
+    for (const input of inputs) {
+      let caught: unknown;
+      try {
+        await runHandler(input, CONFIGURED, admin);
+      } catch (e) {
+        caught = e;
+      }
+      expect(caught).toBeInstanceOf(Error);
+      const msg = (caught as Error).message;
+      // Exact shape from setup.tsx: "Too many setup attempts. Try again in about N minute(s)."
+      expect(msg).toMatch(
+        /^Too many setup attempts\. Try again in about \d+ minutes?\.$/,
+      );
+      // Message must NOT leak the invalid-secret / disabled reason.
+      expect(msg).not.toContain(SETUP_INVALID_SECRET_MESSAGE);
+      expect(msg.toLowerCase()).not.toContain("secret");
+    }
+
+    // Hard invariant: across the entire locked run, zero DB user list/create calls.
+    expect(admin.auth.admin.listUsers).toHaveBeenCalledTimes(0);
+    expect(admin.auth.admin.createUser).toHaveBeenCalledTimes(0);
+
+    // And no finalize either — locked path has no attempt_id to close.
+    const finalizes = admin.rpc.mock.calls.filter(
+      (c) => c[0] === "finalize_auth_attempt",
+    );
+    // Only the FAILURE_LIMIT priming failures produced a finalize; none from the locked calls.
+    expect(finalizes).toHaveLength(FAILURE_LIMIT);
+  });
 });
+
