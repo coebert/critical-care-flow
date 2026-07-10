@@ -254,16 +254,15 @@ function BedsColumn({ data, now, p }: { data: BedBoardData | undefined; now: num
   const { beds, occupancies } = data;
   const live = occupancies.filter((o) => !o.discharged_at);
   const byBed = new Map(live.map((o) => [o.bed_id, o]));
-  const groups: Array<{ label: string; unit: "icu" | "hdu" }> = [
-    { label: "ICU", unit: "icu" },
-    { label: "HDU", unit: "hdu" },
+  const groups: Array<{ label: string; filter: (b: (typeof beds)[number]) => boolean }> = [
+    { label: "Radnor Critical Care", filter: (b) => b.active },
   ];
   return (
     <div className="p-4 space-y-6">
-      {groups.map(({ label, unit }) => {
-        const unitBeds = beds.filter((b) => b.active && b.unit === unit);
+      {groups.map(({ label, filter }) => {
+        const unitBeds = beds.filter(filter).sort((a, b) => a.sort_order - b.sort_order);
         return (
-          <div key={unit}>
+          <div key={label}>
             <h2 className={`text-sm uppercase tracking-widest mb-2 ${p.eyebrow}`}>{label} · {unitBeds.length} beds</h2>
             <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-2">
               {unitBeds.map((b) => {
