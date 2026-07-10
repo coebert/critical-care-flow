@@ -23,7 +23,7 @@ import { deleteNote, updateNote } from "@/lib/referrals.functions";
 import { getMyPrivateKeyMaterial, getPublicKeyDirectory } from "@/lib/e2e-keys.functions";
 import { encryptNote as e2eEncryptNote } from "@/lib/e2e-crypto";
 import { useE2ESession } from "@/hooks/use-e2e-session";
-import { useAuth, useRole } from "@/hooks/use-auth";
+import { useAuth, useIsViewer, useRole } from "@/hooks/use-auth";
 import { useDecryptedNotes } from "@/hooks/use-decrypted-notes";
 import { useRecipientDirectory, type DirectoryEntry } from "@/hooks/use-recipient-directory";
 import { useRecipientCoverage } from "@/hooks/use-recipient-coverage";
@@ -57,6 +57,7 @@ interface NoteboardProps {
 export function Noteboard({ referralId: id }: NoteboardProps) {
   const { user } = useAuth();
   const { hasRole: isAdmin } = useRole("admin");
+  const { isViewer } = useIsViewer();
   const queryClient = useQueryClient();
 
   const updateNoteFn = useServerFn(updateNote);
@@ -304,29 +305,35 @@ export function Noteboard({ referralId: id }: NoteboardProps) {
           counts={filterCounts}
           onUnlockRequest={() => setUnlockOpen(true)}
         />
-        {e2e.isUnlocked && (
+        {!isViewer && e2e.isUnlocked && (
           <>
             <NoteMissingRecipientsAlert missingRecipients={coverage.missingRecipients} />
             <NotePartialCoverageAlert coverage={coverage} recipientsTouched={recipientsTouched} />
           </>
         )}
-        <NoteComposer
-          value={noteBody}
-          onValueChange={setNoteBody}
-          onSubmit={postNote}
-          posting={posting}
-          isUnlocked={e2e.isUnlocked}
-          eligibleRecipientCount={eligibleRecipientCount}
-          directory={directoryWithSelf}
-          selectedRecipients={selectedRecipients}
-          newlyEligibleIds={newlyEligibleIds}
-          currentUserId={user?.id}
-          onToggleRecipient={toggleRecipient}
-          onChangeRecipients={(next) => {
-            setRecipientsTouched(true);
-            setSelectedRecipients(next);
-          }}
-        />
+        {isViewer ? (
+          <p className="text-xs text-muted-foreground mb-4 italic">
+            Read-only viewer — you can read notes but cannot post, edit, or delete them.
+          </p>
+        ) : (
+          <NoteComposer
+            value={noteBody}
+            onValueChange={setNoteBody}
+            onSubmit={postNote}
+            posting={posting}
+            isUnlocked={e2e.isUnlocked}
+            eligibleRecipientCount={eligibleRecipientCount}
+            directory={directoryWithSelf}
+            selectedRecipients={selectedRecipients}
+            newlyEligibleIds={newlyEligibleIds}
+            currentUserId={user?.id}
+            onToggleRecipient={toggleRecipient}
+            onChangeRecipients={(next) => {
+              setRecipientsTouched(true);
+              setSelectedRecipients(next);
+            }}
+          />
+        )}
         <NoteboardList
           notes={filteredNotes}
           authors={authors}
