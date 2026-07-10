@@ -29,7 +29,7 @@ function UnitBlock({ label, counts }: { label: string; counts: CapacitySnapshot[
 export function CapacityStrip({ snapshot }: { snapshot: CapacitySnapshot }) {
   return (
     <div className="flex flex-wrap items-center gap-2 mb-4" role="status" aria-label="Unit capacity">
-      <UnitBlock label="Radnor CCU" counts={snapshot.icu} />
+      <UnitBlock label="Radnor Critical Care" counts={snapshot.icu} />
       {snapshot.hdu.total > 0 && <UnitBlock label="HDU" counts={snapshot.hdu} />}
       {snapshot.outliers_count > 0 && (
         <Badge variant="outline" className="gap-1">
