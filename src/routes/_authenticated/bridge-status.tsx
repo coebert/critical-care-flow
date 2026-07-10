@@ -213,6 +213,15 @@ function BridgeStatusPage() {
             {probeMutation.isPending ? "Probing…" : "Send test payload"}
           </Button>
           <Button
+            variant="secondary"
+            size="sm"
+            onClick={() => bedsMutation.mutate()}
+            disabled={bedsMutation.isPending}
+            title="Runs the sync worker restricted to beds, bed_occupancies, bed_outliers, and bed_transfers_out."
+          >
+            {bedsMutation.isPending ? "Syncing beds…" : "Sync beds only"}
+          </Button>
+          <Button
             size="sm"
             onClick={() => mutation.mutate()}
             disabled={mutation.isPending}
