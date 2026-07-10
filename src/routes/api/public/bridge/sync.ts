@@ -390,8 +390,16 @@ async function syncResource(
       page += 1;
     }
   } catch (err) {
-    error = (err as Error).message;
+    if (err instanceof PartnerEndpointMissingError) {
+      // Partner app doesn't expose this bridge endpoint yet — skip cleanly
+      // instead of surfacing a red error. Cursors stay untouched so a future
+      // partner rollout will pick up from where we left off.
+      error = undefined;
+    } else {
+      error = (err as Error).message;
+    }
   }
+
 
   await admin.from("bridge_sync_state").upsert(
     {
