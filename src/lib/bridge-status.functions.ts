@@ -274,3 +274,166 @@ export const getBridgeSyncAttempts = createServerFn({ method: "GET" })
     return (data ?? []) as BridgeSyncAttempt[];
   });
 
+export type BedBoardVerificationRow = {
+  table: string;
+  synced_rows: number;
+  board_rows: number;
+  missing_from_board: string[];
+  extra_on_board: string[];
+  latest_synced_at: string | null;
+  last_pulled_at: string | null;
+  lag_seconds: number | null;
+  stale: boolean;
+};
+
+export type BedBoardVerification = {
+  ran_at: string;
+  ok: boolean;
+  rows: BedBoardVerificationRow[];
+};
+
+// A resource is "stale" when the newest row we've received (or written locally)
+// is more than this many seconds ahead of the last successful pull. Two sync
+// cycles (2 min cron + slack) is a reasonable ceiling before we surface lag.
+const STALE_LAG_SECONDS = 300;
+
+/**
+ * Cross-checks the bed board query against the raw synced tables.
+ *
+ * For each bed-related table we:
+ *   1. Run the same "active" filter the bed board uses via the admin client
+ *      (source of truth: what has actually been synced into our DB).
+ *   2. Run getBedBoard as the calling admin (RLS applies) and diff the ID set.
+ *
+ * A mismatch means either RLS is hiding rows the board should see, or the
+ * board query is behind realtime. We also compute lag = latest row updated_at
+ * minus last_pulled_at so admins can tell when the bridge has fallen behind.
+ */
+export const getBedBoardVerification = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ context }): Promise<BedBoardVerification> => {
+    await assertAdmin(context);
+
+    const { supabaseAdmin } = await import(
+      "@/integrations/supabase/client.server"
+    );
+    const admin = supabaseAdmin as any;
+
+    // Same shape/filters as getBedBoard, but bypassing RLS so we see the true
+    // synced state of each table.
+    const [bedsRes, occRes, outRes, xferRes, stateRes, boardRes] =
+      await Promise.all([
+        admin
+          .from("beds")
+          .select("id, updated_at")
+          .eq("active", true),
+        admin
+          .from("bed_occupancies")
+          .select("id, updated_at")
+          .is("discharged_at", null),
+        admin
+          .from("bed_outliers")
+          .select("id, updated_at")
+          .is("deleted_at", null)
+          .is("ended_at", null),
+        admin
+          .from("bed_transfers_out")
+          .select("id, updated_at, status")
+          .is("deleted_at", null)
+          .not("status", "in", "(completed,cancelled)"),
+        admin
+          .from("bridge_sync_state")
+          .select("resource, last_pulled_at")
+          .in("resource", [
+            "beds",
+            "bed_occupancies",
+            "bed_outliers",
+            "bed_transfers_out",
+          ]),
+        // Import lazily to avoid a cycle with beds.functions.
+        (async () => {
+          const { getBedBoard } = await import("@/lib/beds.functions");
+          return getBedBoard();
+        })(),
+      ]);
+
+    const pulledByResource = new Map<string, string | null>();
+    (stateRes.data ?? []).forEach((r: any) =>
+      pulledByResource.set(r.resource, r.last_pulled_at ?? null),
+    );
+
+    type SyncedRow = { id: string; updated_at: string | null };
+    const buildRow = (
+      table: string,
+      synced: SyncedRow[],
+      boardIds: string[],
+    ): BedBoardVerificationRow => {
+      const syncedIds = new Set(synced.map((r) => r.id));
+      const boardIdSet = new Set(boardIds);
+      const missing_from_board = [...syncedIds].filter(
+        (id) => !boardIdSet.has(id),
+      );
+      const extra_on_board = boardIds.filter((id) => !syncedIds.has(id));
+      const latest = synced.reduce<string | null>((acc, r) => {
+        if (!r.updated_at) return acc;
+        return !acc || r.updated_at > acc ? r.updated_at : acc;
+      }, null);
+      const lastPulled = pulledByResource.get(table) ?? null;
+      const lag_seconds =
+        latest && lastPulled
+          ? Math.max(
+              0,
+              Math.round(
+                (new Date(latest).getTime() -
+                  new Date(lastPulled).getTime()) /
+                  1000,
+              ),
+            )
+          : null;
+      const stale =
+        missing_from_board.length > 0 ||
+        extra_on_board.length > 0 ||
+        (lag_seconds !== null && lag_seconds > STALE_LAG_SECONDS);
+      return {
+        table,
+        synced_rows: synced.length,
+        board_rows: boardIds.length,
+        missing_from_board: missing_from_board.slice(0, 10),
+        extra_on_board: extra_on_board.slice(0, 10),
+        latest_synced_at: latest,
+        last_pulled_at: lastPulled,
+        lag_seconds,
+        stale,
+      };
+    };
+
+    const board = boardRes as Awaited<
+      ReturnType<typeof import("@/lib/beds.functions").getBedBoard>
+    >;
+
+    const rows: BedBoardVerificationRow[] = [
+      buildRow("beds", (bedsRes.data ?? []) as SyncedRow[], board.beds.map((b) => b.id)),
+      buildRow(
+        "bed_occupancies",
+        (occRes.data ?? []) as SyncedRow[],
+        board.occupancies.map((o) => o.id),
+      ),
+      buildRow(
+        "bed_outliers",
+        (outRes.data ?? []) as SyncedRow[],
+        board.outliers.map((o) => o.id),
+      ),
+      buildRow(
+        "bed_transfers_out",
+        (xferRes.data ?? []) as SyncedRow[],
+        board.transfers.map((t) => t.id),
+      ),
+    ];
+
+    return {
+      ran_at: new Date().toISOString(),
+      ok: rows.every((r) => !r.stale),
+      rows,
+    };
+  });
+
