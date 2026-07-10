@@ -4,7 +4,7 @@ import { useShiftStatus } from "@/hooks/use-shift-status";
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useE2ESession, initKeyStatusCrossTabSync } from "@/hooks/use-e2e-session";
-import { Activity, BarChart3, ListChecks, Shield, LogOut, Plus, Menu, Bell, BellRing, Inbox, PanelLeftClose, PanelLeftOpen, CalendarClock, UserCircle, Bed as BedIcon } from "lucide-react";
+import { Activity, BarChart3, ListChecks, Shield, LogOut, Plus, Menu, Bell, BellRing, Inbox, PanelLeftClose, PanelLeftOpen, CalendarClock, UserCircle, Bed as BedIcon, RefreshCw } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useAuth, useRole, useClinicalAccess } from "@/hooks/use-auth";
 import { NotificationBell } from "@/components/notification-bell";
@@ -163,6 +163,7 @@ function AuthedShell() {
           <NavGroup label="Admin" collapsed={collapsed}>
             <NavItem to="/analytics" icon={<BarChart3 className="w-4 h-4" />} collapsed={collapsed} label="Analytics" />
             <NavItem to="/admin" icon={<Shield className="w-4 h-4" />} collapsed={collapsed} label="Admin" />
+            <NavItem to="/bridge-status" icon={<RefreshCw className="w-4 h-4" />} collapsed={collapsed} label="Bridge sync" />
             <NavItem to="/push-test" icon={<BellRing className="w-4 h-4" />} collapsed={collapsed} label="Push test" />
           </NavGroup>
         )}
@@ -303,6 +304,7 @@ function getPageTitle(pathname: string): string {
   if (pathname === "/profile") return "Profile";
   if (pathname === "/analytics") return "Analytics";
   if (pathname === "/admin") return "Admin";
+  if (pathname === "/bridge-status") return "Bridge sync";
   if (pathname === "/push-test") return "Push test";
   return "SDH Critical Care";
 }
