@@ -137,13 +137,7 @@ export function BedCard({
       <OrganSupportIcons o={occupancy} />
       <div className="mt-2 flex flex-wrap gap-1 items-center">
         {(occupancy as { wardable?: boolean }).wardable && (
-          <Badge
-            variant="outline"
-            className="text-[10px] gap-1 bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border-emerald-500/30"
-            title="Wardable — ready for a ward bed"
-          >
-            Wardable
-          </Badge>
+          <WardableBadge className="text-[10px]" />
         )}
         {occupancy.isolation !== "none" && (
           <Badge variant="outline" className="text-[10px] gap-1">
