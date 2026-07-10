@@ -196,6 +196,8 @@ function StatBlock({
 }
 
 function BedBoardPage() {
+  const search = Route.useSearch();
+  const navigate = Route.useNavigate();
   const fetchBoard = useServerFn(getPartnerBedBoard);
   const qc = useQueryClient();
   const { data, isLoading, isFetching, error, refetch } = useQuery({
@@ -210,6 +212,24 @@ function BedBoardPage() {
   });
 
   const [selected, setSelected] = useState<PartnerOccupant | null>(null);
+
+  const arrivedFromSource =
+    search.source_referral_id || search.source_postop_booking_id;
+  const clearSource = () =>
+    navigate({
+      search: {
+        source_referral_id: undefined,
+        source_postop_booking_id: undefined,
+        hospital_number: undefined,
+        patient_initials: undefined,
+        admitting_consultant: undefined,
+        level: undefined,
+        source_label: undefined,
+        focus_shift: search.focus_shift,
+        focus_level: search.focus_level,
+      },
+      replace: true,
+    });
 
   // If we get an ok:false response, surface it as an error banner but keep the
   // prior successful payload rendered so the board doesn't blank out on a
