@@ -292,7 +292,9 @@ async function processJob(admin: any, job: any) {
       ? "locked"
       : error
         ? "error"
-        : "complete";
+        : partnerMissing
+          ? "skipped"
+          : "complete";
     await admin
       .from("bridge_reconcile_job_items")
       .update({
@@ -302,12 +304,13 @@ async function processJob(admin: any, job: any) {
         skipped,
         pulled_ids: pulledIds.slice(0, ID_SAMPLE_CAP),
         pushed_ids: pushedIds.slice(0, ID_SAMPLE_CAP),
-        error,
+        error: error ?? partnerMissingNote,
         locked_since: lockedSince,
         finished_at: new Date().toISOString(),
         updated_at: new Date().toISOString(),
       })
       .eq("id", item.id);
+
 
     if (!job.dry_run && !locked) {
       await admin
