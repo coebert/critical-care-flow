@@ -163,6 +163,7 @@ function AuthedShell() {
           <NavGroup label="Admin" collapsed={collapsed}>
             <NavItem to="/analytics" icon={<BarChart3 className="w-4 h-4" />} collapsed={collapsed} label="Analytics" />
             <NavItem to="/admin" icon={<Shield className="w-4 h-4" />} collapsed={collapsed} label="Admin" />
+            <NavItem to="/bridge-status" icon={<RefreshCw className="w-4 h-4" />} collapsed={collapsed} label="Bridge sync" />
             <NavItem to="/push-test" icon={<BellRing className="w-4 h-4" />} collapsed={collapsed} label="Push test" />
           </NavGroup>
         )}
