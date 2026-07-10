@@ -46,6 +46,7 @@ export function NoteItem({
   directory,
   currentUserId,
   canEdit,
+  canViewAudit = false,
   onSave,
   onDelete,
 }: {
@@ -55,6 +56,8 @@ export function NoteItem({
   directory: Array<{ user_id: string; full_name: string; public_key: string | null }>;
   currentUserId?: string;
   canEdit: boolean;
+  /** Show the note-history/audit button. Admin-only surface. */
+  canViewAudit?: boolean;
   onSave: (body: string, recipients?: Set<string>) => Promise<void>;
   onDelete: () => Promise<void>;
 }) {
