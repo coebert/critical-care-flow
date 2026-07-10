@@ -19,6 +19,7 @@ import { AlertCircle, CheckCircle2, RefreshCcw, Beaker } from "lucide-react";
 import {
   getBridgeStatus,
   runBridgeSyncNow,
+  runBridgeSyncBedsOnly,
   sendBridgeTestPayload,
   getBridgeSyncAttempts,
   getBedBoardVerification,
@@ -98,6 +99,7 @@ function BridgeStatusPage() {
 
   const getStatus = useServerFn(getBridgeStatus);
   const runNow = useServerFn(runBridgeSyncNow);
+  const runBedsOnly = useServerFn(runBridgeSyncBedsOnly);
   const sendProbe = useServerFn(sendBridgeTestPayload);
   const getAttempts = useServerFn(getBridgeSyncAttempts);
   const getVerification = useServerFn(getBedBoardVerification);
@@ -137,6 +139,24 @@ function BridgeStatusPage() {
     },
     onError: (err: unknown) => {
       toast.error("Sync failed", { description: (err as Error).message });
+    },
+  });
+
+  const bedsMutation = useMutation({
+    mutationFn: () => runBedsOnly(),
+    onSuccess: (res) => {
+      const ok = res.status < 300;
+      const message = `Beds sync ${ok ? "completed" : "finished with errors"} (HTTP ${res.status})`;
+      if (ok) toast.success(message);
+      else toast.warning(message);
+      query.refetch();
+      attemptsQuery.refetch();
+      verifyQuery.refetch();
+    },
+    onError: (err: unknown) => {
+      toast.error("Beds sync failed", {
+        description: (err as Error).message,
+      });
     },
   });
 
@@ -191,6 +211,15 @@ function BridgeStatusPage() {
               className={`h-4 w-4 mr-1 ${probeMutation.isPending ? "animate-pulse" : ""}`}
             />
             {probeMutation.isPending ? "Probing…" : "Send test payload"}
+          </Button>
+          <Button
+            variant="secondary"
+            size="sm"
+            onClick={() => bedsMutation.mutate()}
+            disabled={bedsMutation.isPending}
+            title="Runs the sync worker restricted to beds, bed_occupancies, bed_outliers, and bed_transfers_out."
+          >
+            {bedsMutation.isPending ? "Syncing beds…" : "Sync beds only"}
           </Button>
           <Button
             size="sm"

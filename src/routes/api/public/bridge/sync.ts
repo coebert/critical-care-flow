@@ -413,10 +413,15 @@ async function syncResource(
 // the same auth + sync pipeline without duplicating it.
 export async function runBridgeSync(
   request: Request,
-  opts: { failedOnly?: boolean; source?: "sync" | "retry" | "manual" } = {},
+  opts: {
+    failedOnly?: boolean;
+    bedsOnly?: boolean;
+    source?: "sync" | "retry" | "manual";
+  } = {},
 ): Promise<Response> {
   const source = opts.source ?? "sync";
   const failedOnly = Boolean(opts.failedOnly);
+  const bedsOnly = Boolean(opts.bedsOnly);
 
   const apiKey = request.headers.get("apikey") ?? "";
   const allowed = [
@@ -449,8 +454,13 @@ export async function runBridgeSync(
   );
 
   // Determine which resources to run. Retry mode skips resources that are
-  // currently healthy so we don't hammer the partner needlessly.
+  // currently healthy so we don't hammer the partner needlessly. Beds mode
+  // restricts to bed-related tables (also FK-safe because RESOURCES is
+  // already declared in bed-safe order).
   let toRun = RESOURCES;
+  if (bedsOnly) {
+    toRun = RESOURCES.filter((r) => BED_RESOURCE_KEYS.includes(r.key));
+  }
   if (failedOnly) {
     const { data: state } = await supabaseAdmin
       .from("bridge_sync_state")
@@ -460,7 +470,7 @@ export async function runBridgeSync(
         .filter((r: any) => r.last_error != null)
         .map((r: any) => r.resource as string),
     );
-    toRun = RESOURCES.filter((r) => failedKeys.has(r.key));
+    toRun = toRun.filter((r) => failedKeys.has(r.key));
     if (toRun.length === 0) {
       return jsonResponse({
         ok: true,
