@@ -264,11 +264,14 @@ async function processJob(admin: any, job: any) {
           // Partner app doesn't expose this bridge endpoint — treat as a
           // clean skip so the job doesn't fail on the whole window.
           skipped += 1;
+          partnerMissing = true;
+          partnerMissingNote = e?.message ?? "Partner endpoint not implemented";
           error = null;
         } else {
           error = e?.message ?? String(err);
         }
       }
+
 
 
 
