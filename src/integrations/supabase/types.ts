@@ -396,6 +396,33 @@ export type Database = {
         }
         Relationships: []
       }
+      bridge_sync_state: {
+        Row: {
+          last_error: string | null
+          last_error_at: string | null
+          last_pulled_at: string | null
+          last_pushed_at: string | null
+          resource: string
+          updated_at: string
+        }
+        Insert: {
+          last_error?: string | null
+          last_error_at?: string | null
+          last_pulled_at?: string | null
+          last_pushed_at?: string | null
+          resource: string
+          updated_at?: string
+        }
+        Update: {
+          last_error?: string | null
+          last_error_at?: string | null
+          last_pulled_at?: string | null
+          last_pushed_at?: string | null
+          resource?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       icnarc_targets: {
         Row: {
           decision_to_arrival_target_min: number
@@ -493,6 +520,56 @@ export type Database = {
           updated_at?: string
         }
         Relationships: []
+      }
+      microbiology: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          id: string
+          notes: string | null
+          organism: string
+          patient_id: string
+          reported_at: string
+          sample_type: string | null
+          sampled_at: string | null
+          sensitivities: Json
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          notes?: string | null
+          organism: string
+          patient_id: string
+          reported_at?: string
+          sample_type?: string | null
+          sampled_at?: string | null
+          sensitivities?: Json
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          notes?: string | null
+          organism?: string
+          patient_id?: string
+          reported_at?: string
+          sample_type?: string | null
+          sampled_at?: string | null
+          sensitivities?: Json
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "microbiology_patient_id_fkey"
+            columns: ["patient_id"]
+            isOneToOne: false
+            referencedRelation: "patients"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       notification_deliveries: {
         Row: {
