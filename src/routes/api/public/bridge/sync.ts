@@ -264,7 +264,7 @@ async function syncResource(
       if (readErr) throw new Error(`local read ${resource.key}: ${readErr.message}`);
       if (!batch || batch.length === 0) break;
       for (const row of batch as Record<string, unknown>[]) {
-        await pushOne(base, resource.key, row);
+        await pushOne(base, resource.key, toPortable(resource.key, row));
         pushed += 1;
         const u = (row as any).updated_at as string | undefined;
         if (u && (!pushCursor || u > pushCursor)) pushCursor = u;
