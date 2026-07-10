@@ -128,6 +128,9 @@ async function processJob(admin: any, job: any) {
     let pushed = 0;
     let skipped = 0;
     let error: string | null = null;
+    let partnerMissing = false;
+    let partnerMissingNote: string | null = null;
+
     let locked = false;
     let lockedSince: string | null = null;
     let lockId: string | null = null;
@@ -251,15 +254,25 @@ async function processJob(admin: any, job: any) {
           }
         }
       } catch (err) {
-        if (err instanceof sync.PartnerEndpointMissingError) {
+        const e = err as { name?: string; message?: string };
+        // Name-based check: works even when the class identity differs across
+        // dynamic vs static import chunks in the built worker bundle.
+        if (
+          e?.name === "PartnerEndpointMissingError" ||
+          err instanceof sync.PartnerEndpointMissingError
+        ) {
           // Partner app doesn't expose this bridge endpoint — treat as a
           // clean skip so the job doesn't fail on the whole window.
           skipped += 1;
+          partnerMissing = true;
+          partnerMissingNote = e?.message ?? "Partner endpoint not implemented";
           error = null;
         } else {
-          error = (err as Error).message;
+          error = e?.message ?? String(err);
         }
       }
+
+
 
 
     }
@@ -279,7 +292,9 @@ async function processJob(admin: any, job: any) {
       ? "locked"
       : error
         ? "error"
-        : "complete";
+        : partnerMissing
+          ? "skipped"
+          : "complete";
     await admin
       .from("bridge_reconcile_job_items")
       .update({
@@ -289,12 +304,13 @@ async function processJob(admin: any, job: any) {
         skipped,
         pulled_ids: pulledIds.slice(0, ID_SAMPLE_CAP),
         pushed_ids: pushedIds.slice(0, ID_SAMPLE_CAP),
-        error,
+        error: error ?? partnerMissingNote,
         locked_since: lockedSince,
         finished_at: new Date().toISOString(),
         updated_at: new Date().toISOString(),
       })
       .eq("id", item.id);
+
 
     if (!job.dry_run && !locked) {
       await admin
