@@ -15,13 +15,17 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { AlertCircle, CheckCircle2, RefreshCcw } from "lucide-react";
+import { AlertCircle, CheckCircle2, RefreshCcw, Beaker } from "lucide-react";
 import {
   getBridgeStatus,
   runBridgeSyncNow,
+  sendBridgeTestPayload,
   type BridgeResourceStatus,
+  type BridgeProbeResult,
 } from "@/lib/bridge-status.functions";
 import { toast } from "sonner";
+import { useState } from "react";
+
 
 export const Route = createFileRoute("/_authenticated/bridge-status")({
   head: () => ({
