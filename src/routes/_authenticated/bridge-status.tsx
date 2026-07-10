@@ -907,7 +907,21 @@ function ReconcilePanel({
                   no writes
                 </Badge>
               )}
+              {lastResults.some((r) => r.locked) && (
+                <Badge variant="destructive" className="text-[10px]">
+                  {lastResults.filter((r) => r.locked).length} locked
+                </Badge>
+              )}
             </div>
+            {lastResults.some((r) => r.locked) && (
+              <div className="mb-3 rounded-md border border-destructive/40 bg-destructive/5 px-3 py-2 text-xs text-destructive">
+                Another reconciliation is already running for this window on
+                the locked table(s). Wait for it to finish, pick a different
+                window, or retry after ~10&nbsp;minutes if you believe the
+                previous run crashed.
+              </div>
+            )}
+
             <Table>
               <TableHeader>
                 <TableRow>
