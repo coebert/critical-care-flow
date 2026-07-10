@@ -96,6 +96,7 @@ function BridgeStatusPage() {
   const runNow = useServerFn(runBridgeSyncNow);
   const sendProbe = useServerFn(sendBridgeTestPayload);
   const getAttempts = useServerFn(getBridgeSyncAttempts);
+  const getVerification = useServerFn(getBedBoardVerification);
 
   const [probeResults, setProbeResults] = useState<BridgeProbeResult[] | null>(
     null,
@@ -110,6 +111,12 @@ function BridgeStatusPage() {
   const attemptsQuery = useQuery({
     queryKey: ["bridge-sync-attempts"],
     queryFn: () => getAttempts(),
+    refetchInterval: 15_000,
+  });
+
+  const verifyQuery = useQuery({
+    queryKey: ["bed-board-verification"],
+    queryFn: () => getVerification(),
     refetchInterval: 15_000,
   });
 
