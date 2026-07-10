@@ -5,14 +5,16 @@ import { PostopAnalyticsPanel } from "@/components/postop-analytics-panel";
 import { ReferralsAnalyticsPanel } from "@/components/analytics/referrals-panel";
 import { NurseCapacityAnalyticsPanel } from "@/components/analytics/nurse-capacity-panel";
 import { CapacityAlertHistoryPanel } from "@/components/analytics/capacity-alert-history-panel";
+import { AcuityAnalyticsPanel } from "@/components/analytics/acuity-panel";
 import { icnarcTargetsQueryOptions, initialAnalyticsRange } from "@/components/analytics/queries";
 import { getReferralsAnalytics, getPostopAnalytics } from "@/lib/analytics.functions";
 import { getNurseCapacityAnalytics } from "@/lib/nurse-staffing.functions";
+import { getAcuityAnalytics } from "@/lib/acuity-analytics.functions";
 import { AdminOnly } from "@/components/admin-only";
 import { RouteErrorFallback } from "@/components/route-error-fallback";
 
 const analyticsSearchSchema = z.object({
-  view: z.enum(["referrals", "postop", "nurse-capacity", "capacity-alerts"]).optional(),
+  view: z.enum(["referrals", "postop", "nurse-capacity", "capacity-alerts", "acuity"]).optional(),
 });
 
 export const Route = createFileRoute("/_authenticated/analytics")({
@@ -35,6 +37,10 @@ export const Route = createFileRoute("/_authenticated/analytics")({
       queryKey: ["analytics", "nurse-capacity", fromIso.slice(0, 10), toIso.slice(0, 10)],
       queryFn: () => getNurseCapacityAnalytics({ data: { from: fromIso.slice(0, 10), to: toIso.slice(0, 10) } }),
     });
+    void context.queryClient.prefetchQuery({
+      queryKey: ["analytics", "acuity", fromIso.slice(0, 10), toIso.slice(0, 10)],
+      queryFn: () => getAcuityAnalytics({ data: { from: fromIso.slice(0, 10), to: toIso.slice(0, 10) } }),
+    });
     void context.queryClient.prefetchQuery(icnarcTargetsQueryOptions);
   },
   errorComponent: ({ error }) => <RouteErrorFallback error={error} label="Analytics" />,
@@ -48,13 +54,15 @@ export const Route = createFileRoute("/_authenticated/analytics")({
 function AnalyticsPage() {
   const search = Route.useSearch();
   const navigate = Route.useNavigate();
-  const tab: "referrals" | "postop" | "nurse-capacity" | "capacity-alerts" =
+  const tab: "referrals" | "postop" | "nurse-capacity" | "capacity-alerts" | "acuity" =
     search.view === "postop"
       ? "postop"
       : search.view === "nurse-capacity"
       ? "nurse-capacity"
       : search.view === "capacity-alerts"
       ? "capacity-alerts"
+      : search.view === "acuity"
+      ? "acuity"
       : "referrals";
 
   return (
@@ -70,7 +78,7 @@ function AnalyticsPage() {
               view:
                 v === "referrals"
                   ? undefined
-                  : (v as "postop" | "nurse-capacity" | "capacity-alerts"),
+                  : (v as "postop" | "nurse-capacity" | "capacity-alerts" | "acuity"),
             },
             replace: true,
           })
@@ -81,6 +89,7 @@ function AnalyticsPage() {
           <TabsTrigger value="postop">Post-op bookings</TabsTrigger>
           <TabsTrigger value="nurse-capacity">Nurse capacity</TabsTrigger>
           <TabsTrigger value="capacity-alerts">Capacity alerts</TabsTrigger>
+          <TabsTrigger value="acuity">Acuity</TabsTrigger>
         </TabsList>
         <TabsContent value="referrals">
           <ReferralsAnalyticsPanel />
@@ -93,6 +102,9 @@ function AnalyticsPage() {
         </TabsContent>
         <TabsContent value="capacity-alerts">
           <CapacityAlertHistoryPanel />
+        </TabsContent>
+        <TabsContent value="acuity">
+          <AcuityAnalyticsPanel />
         </TabsContent>
       </Tabs>
     </div>

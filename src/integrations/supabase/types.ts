@@ -904,6 +904,33 @@ export type Database = {
         }
         Relationships: []
       }
+      patient_acuity_history: {
+        Row: {
+          id: string
+          level: number | null
+          partner_patient_id: string
+          recorded_at: string
+          recorded_by: string | null
+          source: string
+        }
+        Insert: {
+          id?: string
+          level?: number | null
+          partner_patient_id: string
+          recorded_at?: string
+          recorded_by?: string | null
+          source: string
+        }
+        Update: {
+          id?: string
+          level?: number | null
+          partner_patient_id?: string
+          recorded_at?: string
+          recorded_by?: string | null
+          source?: string
+        }
+        Relationships: []
+      }
       patient_acuity_overrides: {
         Row: {
           level: number
@@ -1792,6 +1819,7 @@ export type Database = {
         Returns: boolean
       }
       lookup_user_id_by_email: { Args: { _email: string }; Returns: string }
+      snapshot_patient_acuity: { Args: never; Returns: number }
     }
     Enums: {
       admission_urgency:
