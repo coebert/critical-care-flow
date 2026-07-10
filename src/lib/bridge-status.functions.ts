@@ -437,3 +437,157 @@ export const getBedBoardVerification = createServerFn({ method: "GET" })
     };
   });
 
+
+export type BedReconcileResourceResult = {
+  resource: string;
+  pulled: number;
+  pushed: number;
+  skipped: number;
+  error: string | null;
+};
+
+export type BedReconcileResult = {
+  ok: boolean;
+  ran_at: string;
+  from: string;
+  to: string;
+  results: BedReconcileResourceResult[];
+};
+
+/**
+ * Reconciliation/backfill for bed-related tables in a chosen time window.
+ *
+ * For each bed resource we:
+ *   - Pull partner rows updated since `from` (partner's cursor param).
+ *   - Re-push every local row with updated_at in [from, to], bypassing the
+ *     regular push cursor so already-synced rows are resent to the partner.
+ *
+ * Cursors in bridge_sync_state are intentionally NOT touched — reconcile is
+ * a safety-net run for when the board looks stale; the scheduled sync
+ * continues from its own cursor as normal on the next tick.
+ */
+export const runBedReconciliation = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d: unknown) => {
+    const v = (d ?? {}) as { from?: unknown; to?: unknown };
+    const fromStr = typeof v.from === "string" ? v.from : "";
+    const toStr = typeof v.to === "string" ? v.to : "";
+    const fromDate = new Date(fromStr);
+    const toDate = new Date(toStr);
+    if (!isFinite(fromDate.getTime()) || !isFinite(toDate.getTime())) {
+      throw new Error("Invalid from/to timestamps");
+    }
+    if (fromDate >= toDate) {
+      throw new Error("'from' must be earlier than 'to'");
+    }
+    const spanMs = toDate.getTime() - fromDate.getTime();
+    // Guardrail: cap window at 30 days to prevent runaway re-pushes.
+    if (spanMs > 30 * 24 * 60 * 60 * 1000) {
+      throw new Error("Reconciliation window cannot exceed 30 days");
+    }
+    return { from: fromDate.toISOString(), to: toDate.toISOString() };
+  })
+  .handler(async ({ data, context }): Promise<BedReconcileResult> => {
+    await assertAdmin(context);
+
+    const partner = process.env.PARTNER_BRIDGE_URL;
+    if (!partner) throw new Error("PARTNER_BRIDGE_URL not configured");
+
+    const { supabaseAdmin } = await import(
+      "@/integrations/supabase/client.server"
+    );
+    const admin = supabaseAdmin as any;
+
+    // Reuse the exact push/pull/HMAC helpers from the scheduled sync so the
+    // partner sees identical signed payloads.
+    const sync = await import("@/routes/api/public/bridge/sync");
+    const bedResources = sync.RESOURCES.filter((r) =>
+      sync.BED_RESOURCE_KEYS.includes(r.key),
+    );
+
+    const results: BedReconcileResourceResult[] = [];
+    for (const resource of bedResources) {
+      const startedMs = Date.now();
+      let pulled = 0;
+      let pushed = 0;
+      let skipped = 0;
+      let error: string | null = null;
+
+      try {
+        // PULL — partner API only supports a `since` cursor, so we pass
+        // `from` and post-filter to the window client-side.
+        const incoming = await sync.pullResource(
+          partner,
+          resource.key,
+          data.from,
+        );
+        const inWindow = incoming.filter((r) => {
+          const u = (r as any).updated_at as string | undefined;
+          return !u || (u >= data.from && u <= data.to);
+        });
+        if (inWindow.length > 0) {
+          const { error: upErr } = await admin
+            .from(resource.table)
+            .upsert(inWindow as any, { onConflict: resource.conflict });
+          if (upErr) throw new Error(`local upsert: ${upErr.message}`);
+          pulled = inWindow.length;
+        }
+        skipped = incoming.length - inWindow.length;
+
+        // PUSH — every local row updated inside the window, ignoring
+        // last_pushed_at so previously-synced rows are resent.
+        const { data: batch, error: readErr } = await admin
+          .from(resource.table)
+          .select(resource.select)
+          .gte("updated_at", data.from)
+          .lte("updated_at", data.to)
+          .order("updated_at", { ascending: true })
+          .limit(2000);
+        if (readErr) throw new Error(`local read: ${readErr.message}`);
+        for (const row of (batch ?? []) as Record<string, unknown>[]) {
+          await sync.pushOne(
+            partner,
+            resource.key,
+            sync.toPortable(resource.key, row),
+          );
+          pushed += 1;
+        }
+      } catch (err) {
+        error = (err as Error).message;
+      }
+
+      // Audit every attempt so admins can see reconciliation runs alongside
+      // scheduled syncs and auto-retries.
+      await admin
+        .from("bridge_sync_attempts")
+        .insert({
+          source: "manual",
+          resource: resource.key,
+          ok: !error,
+          pulled,
+          pushed,
+          duration_ms: Date.now() - startedMs,
+          error: error ?? `reconcile ${data.from} → ${data.to}`,
+        })
+        .then(
+          () => {},
+          () => {},
+        );
+
+      results.push({
+        resource: resource.key,
+        pulled,
+        pushed,
+        skipped,
+        error,
+      });
+    }
+
+    return {
+      ok: results.every((r) => !r.error),
+      ran_at: new Date().toISOString(),
+      from: data.from,
+      to: data.to,
+      results,
+    };
+  });
