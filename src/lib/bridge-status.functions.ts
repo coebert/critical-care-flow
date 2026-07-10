@@ -28,6 +28,10 @@ const RESOURCES: { key: string; table: string }[] = [
   { key: "microbiology", table: "microbiology" },
   { key: "referrals", table: "referrals" },
   { key: "notifications", table: "notifications" },
+  { key: "beds", table: "beds" },
+  { key: "bed_occupancies", table: "bed_occupancies" },
+  { key: "bed_outliers", table: "bed_outliers" },
+  { key: "bed_transfers_out", table: "bed_transfers_out" },
 ];
 
 export const getBridgeStatus = createServerFn({ method: "GET" })
@@ -184,6 +188,10 @@ export const sendBridgeTestPayload = createServerFn({ method: "POST" })
         "investigations",
         "microbiology",
         "referrals",
+        "beds",
+        "bed_occupancies",
+        "bed_outliers",
+        "bed_transfers_out",
       ]) {
         const timestamp = String(Math.floor(Date.now() / 1000));
         const signature = signWith(secrets.current, {
