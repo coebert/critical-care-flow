@@ -864,6 +864,50 @@ function EditOccupantDialog({
           </div>
         )}
 
+        {occupant && (
+          <div className="rounded-md border px-3 py-2">
+            <div className="flex items-center justify-between gap-2 mb-2">
+              <Label className="text-sm">Level of care</Label>
+              {currentLevel != null && (
+                <button
+                  type="button"
+                  className="text-xs text-muted-foreground hover:text-foreground underline underline-offset-2 disabled:opacity-50"
+                  disabled={acuityMutation.isPending}
+                  onClick={() => acuityMutation.mutate(null)}
+                >
+                  Clear
+                </button>
+              )}
+            </div>
+            <div className="flex flex-wrap gap-1.5">
+              {([0, 1, 2, 3] as const).map((l) => {
+                const selected = currentLevel === l;
+                return (
+                  <button
+                    key={l}
+                    type="button"
+                    disabled={acuityMutation.isPending}
+                    onClick={() => acuityMutation.mutate(l)}
+                    className={`rounded-md border px-3 py-1.5 text-sm transition disabled:opacity-50 ${
+                      selected ? LEVEL_TONE[l] + " ring-2 ring-offset-1 ring-current" : "hover:bg-accent"
+                    }`}
+                    title={LEVEL_LABEL[l]}
+                    aria-pressed={selected}
+                    aria-label={LEVEL_LABEL[l]}
+                  >
+                    L{l}
+                  </button>
+                );
+              })}
+            </div>
+            <div className="text-[11px] text-muted-foreground mt-1.5">
+              Level of care is stored in this app and feeds unit acuity. Other
+              patient details write back to ICU Handover Hub.
+            </div>
+          </div>
+        )}
+
+
         {occupant && form && (
           <form
             className="grid grid-cols-2 gap-3"
