@@ -743,6 +743,35 @@ function toLocalInputValue(d: Date): string {
   )}:${pad(d.getMinutes())}`;
 }
 
+const ITEM_STATUS_STYLES: Record<
+  BedReconcileJobItem["status"],
+  { label: string; variant: "default" | "secondary" | "outline" | "destructive" }
+> = {
+  pending: { label: "Pending", variant: "outline" },
+  running: { label: "Running", variant: "default" },
+  complete: { label: "Complete", variant: "secondary" },
+  error: { label: "Error", variant: "destructive" },
+  locked: { label: "Locked", variant: "destructive" },
+  skipped: { label: "Skipped", variant: "outline" },
+};
+
+const JOB_STATUS_STYLES: Record<
+  BedReconcileJob["status"],
+  { label: string; variant: "default" | "secondary" | "outline" | "destructive" }
+> = {
+  queued: { label: "Queued", variant: "outline" },
+  running: { label: "Running", variant: "default" },
+  complete: { label: "Complete", variant: "secondary" },
+  failed: { label: "Failed", variant: "destructive" },
+  cancelled: { label: "Cancelled", variant: "outline" },
+};
+
+function isTerminalJobStatus(status: BedReconcileJob["status"]): boolean {
+  return (
+    status === "complete" || status === "failed" || status === "cancelled"
+  );
+}
+
 function ReconcilePanel({
   stale,
   onDone,
@@ -750,50 +779,124 @@ function ReconcilePanel({
   stale: boolean;
   onDone: () => void;
 }) {
-  const reconcileFn = useServerFn(runBedReconciliation);
+  const enqueueFn = useServerFn(enqueueBedReconciliation);
+  const getJobFn = useServerFn(getBedReconciliationJob);
+  const listJobsFn = useServerFn(listBedReconciliationJobs);
+  const cancelFn = useServerFn(cancelBedReconciliationJob);
+
   const now = new Date();
   const defaultFrom = new Date(now.getTime() - 24 * 60 * 60 * 1000);
   const [from, setFrom] = useState(toLocalInputValue(defaultFrom));
   const [to, setTo] = useState(toLocalInputValue(now));
-  const [lastResults, setLastResults] = useState<
-    BedReconcileResourceResult[] | null
-  >(null);
-  const [lastWasDryRun, setLastWasDryRun] = useState(false);
+  const [activeJobId, setActiveJobId] = useState<string | null>(null);
+  const [pendingDryRun, setPendingDryRun] = useState(false);
 
-  const mutation = useMutation({
-    mutationFn: (input: { from: string; to: string; dryRun: boolean }) =>
-      reconcileFn({ data: input }),
-    onSuccess: (res) => {
-      setLastResults(res.results);
-      setLastWasDryRun(res.dry_run);
-      const pulled = res.results.reduce((n, r) => n + r.pulled, 0);
-      const pushed = res.results.reduce((n, r) => n + r.pushed, 0);
-      const errors = res.results.filter((r) => r.error && !r.locked).length;
-      const lockedCount = res.results.filter((r) => r.locked).length;
-      const prefix = res.dry_run ? "Dry-run: would" : "Reconciled";
-      const msg = `${prefix} ${pulled} pulled / ${pushed} pushed across ${res.results.length} bed tables`;
-      if (lockedCount === res.results.length) {
-        toast.warning("Reconcile already running", {
-          description:
-            "Another admin is backfilling this exact window. Try again once it completes.",
-        });
-      } else if (lockedCount > 0) {
-        toast.warning(
-          `${msg} — ${lockedCount} table(s) skipped (already running)`,
-        );
-      } else if (errors === 0) {
-        toast.success(msg);
-      } else {
-        toast.warning(`${msg} (${errors} with errors)`);
-      }
-      // Dry-runs don't change anything, so no need to refresh sibling panels.
-      if (!res.dry_run) onDone();
-    },
+  const jobDetailQuery = useQuery({
+    queryKey: ["bed-reconcile-job", activeJobId],
+    queryFn: () => getJobFn({ data: { jobId: activeJobId! } }),
+    enabled: !!activeJobId,
+  });
 
-    onError: (err: unknown) => {
+  const historyQuery = useQuery({
+    queryKey: ["bed-reconcile-jobs"],
+    queryFn: () => listJobsFn({ data: { limit: 5 } }),
+    refetchInterval: 15000,
+  });
+
+  // Realtime: patch the active job + its items as the worker updates them.
+  useEffect(() => {
+    if (!activeJobId) return;
+    const channel = supabase
+      .channel(`bridge-reconcile-${activeJobId}`)
+      .on(
+        "postgres_changes",
+        {
+          event: "*",
+          schema: "public",
+          table: "bridge_reconcile_jobs",
+          filter: `id=eq.${activeJobId}`,
+        },
+        () => {
+          jobDetailQuery.refetch();
+          historyQuery.refetch();
+        },
+      )
+      .on(
+        "postgres_changes",
+        {
+          event: "*",
+          schema: "public",
+          table: "bridge_reconcile_job_items",
+          filter: `job_id=eq.${activeJobId}`,
+        },
+        () => {
+          jobDetailQuery.refetch();
+        },
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeJobId]);
+
+  const detail = jobDetailQuery.data as BedReconcileJobDetail | null | undefined;
+  const jobStatus = detail?.job.status;
+  const terminal = jobStatus ? isTerminalJobStatus(jobStatus) : false;
+
+  // When the active job reaches a terminal state, refresh sibling panels once.
+  const [notifiedTerminalFor, setNotifiedTerminalFor] = useState<string | null>(
+    null,
+  );
+  useEffect(() => {
+    if (!detail || !terminal) return;
+    if (notifiedTerminalFor === detail.job.id) return;
+    setNotifiedTerminalFor(detail.job.id);
+    if (!detail.job.dry_run) onDone();
+    if (detail.job.status === "complete") {
+      toast.success(
+        detail.job.dry_run ? "Dry-run complete" : "Reconciliation complete",
+      );
+    } else if (detail.job.status === "failed") {
       toast.error("Reconciliation failed", {
+        description: detail.job.error ?? undefined,
+      });
+    } else if (detail.job.status === "cancelled") {
+      toast.warning("Reconciliation cancelled");
+    }
+  }, [detail, terminal, notifiedTerminalFor, onDone]);
+
+  const enqueueMutation = useMutation({
+    mutationFn: (input: { from: string; to: string; dryRun: boolean }) =>
+      enqueueFn({ data: input }),
+    onSuccess: (res: { jobId: string }, vars) => {
+      setPendingDryRun(vars.dryRun);
+      setNotifiedTerminalFor(null);
+      setActiveJobId(res.jobId);
+      historyQuery.refetch();
+      toast.info(
+        vars.dryRun ? "Dry-run queued" : "Reconciliation queued",
+        {
+          description:
+            "Progress will appear below as the worker picks up the job.",
+        },
+      );
+    },
+    onError: (err: unknown) => {
+      toast.error("Could not queue reconciliation", {
         description: (err as Error).message,
       });
+    },
+  });
+
+  const cancelMutation = useMutation({
+    mutationFn: () => cancelFn({ data: { jobId: activeJobId! } }),
+    onSuccess: (res: { cancelled: boolean }) => {
+      if (res.cancelled) toast.info("Cancellation requested");
+      else toast.warning("Job already finished");
+      jobDetailQuery.refetch();
+      historyQuery.refetch();
     },
   });
 
@@ -802,7 +905,7 @@ function ReconcilePanel({
     const start = new Date(end.getTime() - hours * 60 * 60 * 1000);
     setFrom(toLocalInputValue(start));
     setTo(toLocalInputValue(end));
-    mutation.mutate({
+    enqueueMutation.mutate({
       from: start.toISOString(),
       to: end.toISOString(),
       dryRun,
@@ -810,12 +913,18 @@ function ReconcilePanel({
   };
 
   const runCustom = (dryRun: boolean) => {
-    // Convert the datetime-local strings (in the admin's local zone) into
-    // ISO UTC so the server-side range matches how updated_at is stored.
     const startISO = new Date(from).toISOString();
     const endISO = new Date(to).toISOString();
-    mutation.mutate({ from: startISO, to: endISO, dryRun });
+    enqueueMutation.mutate({ from: startISO, to: endISO, dryRun });
   };
+
+  const totalItems = detail?.items.length ?? 0;
+  const doneItems =
+    detail?.items.filter((i) =>
+      ["complete", "error", "locked", "skipped"].includes(i.status),
+    ).length ?? 0;
+  const overallPercent =
+    totalItems > 0 ? Math.round((doneItems / totalItems) * 100) : 0;
 
   return (
     <Card className="p-0 overflow-hidden">
@@ -830,9 +939,9 @@ function ReconcilePanel({
             )}
           </div>
           <p className="text-xs text-muted-foreground">
-            Re-pulls partner rows and re-pushes local bed rows updated inside
-            the chosen window. Use Dry-run to preview counts and offending IDs
-            without writing anything. Sync cursors are left untouched.
+            Backfills run in the background. Progress streams in live per
+            table, so the UI stays responsive even for wide windows. Sync
+            cursors are left untouched.
           </p>
         </div>
       </div>
@@ -843,7 +952,7 @@ function ReconcilePanel({
             size="sm"
             variant="outline"
             onClick={() => runWindow(1, true)}
-            disabled={mutation.isPending}
+            disabled={enqueueMutation.isPending}
           >
             Dry-run 1h
           </Button>
@@ -851,7 +960,7 @@ function ReconcilePanel({
             size="sm"
             variant="outline"
             onClick={() => runWindow(24, true)}
-            disabled={mutation.isPending}
+            disabled={enqueueMutation.isPending}
           >
             Dry-run 24h
           </Button>
@@ -859,7 +968,7 @@ function ReconcilePanel({
             size="sm"
             variant="outline"
             onClick={() => runWindow(24 * 7, true)}
-            disabled={mutation.isPending}
+            disabled={enqueueMutation.isPending}
           >
             Dry-run 7d
           </Button>
@@ -892,135 +1001,264 @@ function ReconcilePanel({
             size="sm"
             variant="outline"
             onClick={() => runCustom(true)}
-            disabled={mutation.isPending || !from || !to}
+            disabled={enqueueMutation.isPending || !from || !to}
           >
-            {mutation.isPending && lastWasDryRun ? "Previewing…" : "Dry-run"}
+            {enqueueMutation.isPending && pendingDryRun
+              ? "Queueing…"
+              : "Dry-run"}
           </Button>
           <Button
             size="sm"
             onClick={() => runCustom(false)}
-            disabled={mutation.isPending || !from || !to}
+            disabled={enqueueMutation.isPending || !from || !to}
           >
-            {mutation.isPending && !lastWasDryRun
-              ? "Reconciling…"
+            {enqueueMutation.isPending && !pendingDryRun
+              ? "Queueing…"
               : "Run reconcile"}
           </Button>
         </div>
 
-        {lastResults && (
-          <div className="border-t pt-3">
-            <div className="text-xs font-medium uppercase tracking-wide text-muted-foreground mb-2 flex items-center gap-2">
-              {lastWasDryRun ? "Dry-run preview" : "Last reconciliation"}
-              {lastWasDryRun && (
-                <Badge variant="outline" className="text-[10px]">
-                  no writes
-                </Badge>
-              )}
-              {lastResults.some((r) => r.locked) && (
-                <Badge variant="destructive" className="text-[10px]">
-                  {lastResults.filter((r) => r.locked).length} locked
-                </Badge>
-              )}
-            </div>
-            {lastResults.some((r) => r.locked) && (
-              <div className="mb-3 rounded-md border border-destructive/40 bg-destructive/5 px-3 py-2 text-xs text-destructive">
-                Another reconciliation is already running for this window on
-                the locked table(s). Wait for it to finish, pick a different
-                window, or retry after ~10&nbsp;minutes if you believe the
-                previous run crashed.
-              </div>
-            )}
+        {detail && (
+          <ActiveJobCard
+            detail={detail}
+            overallPercent={overallPercent}
+            onCancel={() => cancelMutation.mutate()}
+            cancelling={cancelMutation.isPending}
+          />
+        )}
 
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Table</TableHead>
-                  <TableHead className="text-right">
-                    {lastWasDryRun ? "Would pull" : "Pulled"}
-                  </TableHead>
-                  <TableHead className="text-right">
-                    {lastWasDryRun ? "Would push" : "Pushed"}
-                  </TableHead>
-                  <TableHead className="text-right">Skipped</TableHead>
-                  <TableHead>Result</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {lastResults.map((r) => (
-                  <TableRow key={r.resource}>
-                    <TableCell className="font-medium align-top">
-                      {r.resource}
-                    </TableCell>
-                    <TableCell className="text-right tabular-nums align-top">
-                      {r.pulled}
-                    </TableCell>
-                    <TableCell className="text-right tabular-nums align-top">
-                      {r.pushed}
-                    </TableCell>
-                    <TableCell className="text-right tabular-nums text-muted-foreground align-top">
-                      {r.skipped}
-                    </TableCell>
-                    <TableCell className="align-top">
-                      {r.locked ? (
-                        <div className="flex flex-col gap-1">
-                          <Badge variant="outline" className="w-fit">
-                            Locked
-                          </Badge>
-                          <span className="text-[11px] text-muted-foreground">
-                            Held since{" "}
-                            {r.locked_since ? relative(r.locked_since) : "—"}
-                          </span>
-                        </div>
-                      ) : r.error ? (
-                        <span
-                          className="text-xs text-destructive truncate block max-w-[32ch]"
-                          title={r.error}
-                        >
-                          {r.error}
-                        </span>
-                      ) : (
-                        <Badge variant="secondary">OK</Badge>
-                      )}
-
-                      {lastWasDryRun &&
-                        ((r.pulled_ids?.length ?? 0) > 0 ||
-                          (r.pushed_ids?.length ?? 0) > 0) && (
-                          <div className="mt-2 space-y-1 text-[11px] text-muted-foreground">
-                            {r.pulled_ids && r.pulled_ids.length > 0 && (
-                              <div>
-                                <span className="font-medium">Pull IDs</span>{" "}
-                                <span className="font-mono break-all">
-                                  {r.pulled_ids.join(", ")}
-                                  {r.pulled < (r.pulled_ids?.length ?? 0)
-                                    ? ""
-                                    : r.pulled > r.pulled_ids.length
-                                      ? ` … +${r.pulled - r.pulled_ids.length}`
-                                      : ""}
-                                </span>
-                              </div>
-                            )}
-                            {r.pushed_ids && r.pushed_ids.length > 0 && (
-                              <div>
-                                <span className="font-medium">Push IDs</span>{" "}
-                                <span className="font-mono break-all">
-                                  {r.pushed_ids.join(", ")}
-                                  {r.pushed > r.pushed_ids.length
-                                    ? ` … +${r.pushed - r.pushed_ids.length}`
-                                    : ""}
-                                </span>
-                              </div>
-                            )}
-                          </div>
-                        )}
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </div>
+        {(historyQuery.data?.length ?? 0) > 0 && (
+          <JobHistoryTable
+            jobs={historyQuery.data ?? []}
+            activeJobId={activeJobId}
+            onSelect={(id) => {
+              setNotifiedTerminalFor(id); // don't retoast old jobs
+              setActiveJobId(id);
+            }}
+          />
         )}
       </div>
     </Card>
   );
 }
+
+function ActiveJobCard({
+  detail,
+  overallPercent,
+  onCancel,
+  cancelling,
+}: {
+  detail: BedReconcileJobDetail;
+  overallPercent: number;
+  onCancel: () => void;
+  cancelling: boolean;
+}) {
+  const { job, items } = detail;
+  const statusStyle = JOB_STATUS_STYLES[job.status];
+  const canCancel = job.status === "queued" || job.status === "running";
+
+  return (
+    <div className="border-t pt-3 space-y-3">
+      <div className="flex items-start justify-between gap-2 flex-wrap">
+        <div className="space-y-1">
+          <div className="text-xs font-medium uppercase tracking-wide text-muted-foreground flex items-center gap-2">
+            Active job
+            <Badge variant={statusStyle.variant} className="text-[10px]">
+              {statusStyle.label}
+            </Badge>
+            {job.dry_run && (
+              <Badge variant="outline" className="text-[10px]">
+                dry-run
+              </Badge>
+            )}
+          </div>
+          <div className="text-xs text-muted-foreground">
+            Window {fmt(job.from_ts)} → {fmt(job.to_ts)}
+            {job.started_at && ` · started ${relative(job.started_at)}`}
+            {job.finished_at && ` · finished ${relative(job.finished_at)}`}
+          </div>
+        </div>
+        {canCancel && (
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={onCancel}
+            disabled={cancelling}
+          >
+            {cancelling ? "Cancelling…" : "Cancel job"}
+          </Button>
+        )}
+      </div>
+
+      <div className="space-y-1">
+        <div className="flex justify-between text-[11px] text-muted-foreground">
+          <span>Overall progress</span>
+          <span>{overallPercent}%</span>
+        </div>
+        <Progress value={overallPercent} />
+      </div>
+
+      <Table>
+        <TableHeader>
+          <TableRow>
+            <TableHead>Table</TableHead>
+            <TableHead>Status</TableHead>
+            <TableHead className="text-right">
+              {job.dry_run ? "Would pull" : "Pulled"}
+            </TableHead>
+            <TableHead className="text-right">
+              {job.dry_run ? "Would push" : "Pushed"}
+            </TableHead>
+            <TableHead className="text-right">Skipped</TableHead>
+            <TableHead>Detail</TableHead>
+          </TableRow>
+        </TableHeader>
+        <TableBody>
+          {items.map((it) => {
+            const style = ITEM_STATUS_STYLES[it.status];
+            return (
+              <TableRow key={it.id}>
+                <TableCell className="font-medium align-top">
+                  {it.resource}
+                </TableCell>
+                <TableCell className="align-top">
+                  <div className="flex items-center gap-2">
+                    <Badge variant={style.variant} className="text-[10px]">
+                      {style.label}
+                    </Badge>
+                    {it.status === "running" && (
+                      <RefreshCcw className="w-3 h-3 animate-spin text-muted-foreground" />
+                    )}
+                  </div>
+                </TableCell>
+                <TableCell className="text-right tabular-nums align-top">
+                  {it.pulled}
+                </TableCell>
+                <TableCell className="text-right tabular-nums align-top">
+                  {it.pushed}
+                </TableCell>
+                <TableCell className="text-right tabular-nums text-muted-foreground align-top">
+                  {it.skipped}
+                </TableCell>
+                <TableCell className="align-top">
+                  {it.status === "locked" && (
+                    <span className="text-[11px] text-muted-foreground">
+                      Held since{" "}
+                      {it.locked_since ? relative(it.locked_since) : "—"}
+                    </span>
+                  )}
+                  {it.status === "error" && it.error && (
+                    <span
+                      className="text-xs text-destructive block max-w-[32ch] truncate"
+                      title={it.error}
+                    >
+                      {it.error}
+                    </span>
+                  )}
+                  {it.status === "complete" && it.finished_at && (
+                    <span className="text-[11px] text-muted-foreground">
+                      Done {relative(it.finished_at)}
+                    </span>
+                  )}
+                  {it.status === "running" && it.started_at && (
+                    <span className="text-[11px] text-muted-foreground">
+                      Since {relative(it.started_at)}
+                    </span>
+                  )}
+                </TableCell>
+              </TableRow>
+            );
+          })}
+        </TableBody>
+      </Table>
+
+      {job.error && (
+        <div className="rounded-md border border-destructive/40 bg-destructive/5 px-3 py-2 text-xs text-destructive">
+          {job.error}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function JobHistoryTable({
+  jobs,
+  activeJobId,
+  onSelect,
+}: {
+  jobs: BedReconcileJobSummary[];
+  activeJobId: string | null;
+  onSelect: (id: string) => void;
+}) {
+  return (
+    <div className="border-t pt-3">
+      <div className="text-xs font-medium uppercase tracking-wide text-muted-foreground mb-2">
+        Recent jobs
+      </div>
+      <Table>
+        <TableHeader>
+          <TableRow>
+            <TableHead>When</TableHead>
+            <TableHead>Window</TableHead>
+            <TableHead>Status</TableHead>
+            <TableHead className="text-right">Pulled</TableHead>
+            <TableHead className="text-right">Pushed</TableHead>
+            <TableHead />
+          </TableRow>
+        </TableHeader>
+        <TableBody>
+          {jobs.map((j) => {
+            const style = JOB_STATUS_STYLES[j.status];
+            const isActive = j.id === activeJobId;
+            return (
+              <TableRow key={j.id}>
+                <TableCell className="text-xs whitespace-nowrap">
+                  {relative(j.created_at)}
+                </TableCell>
+                <TableCell className="text-xs whitespace-nowrap">
+                  {fmt(j.from_ts)} → {fmt(j.to_ts)}
+                  {j.dry_run && (
+                    <Badge variant="outline" className="ml-2 text-[10px]">
+                      dry-run
+                    </Badge>
+                  )}
+                </TableCell>
+                <TableCell>
+                  <Badge variant={style.variant} className="text-[10px]">
+                    {style.label}
+                  </Badge>
+                  {j.totals.errored > 0 && (
+                    <Badge
+                      variant="destructive"
+                      className="ml-1 text-[10px]"
+                    >
+                      {j.totals.errored} err
+                    </Badge>
+                  )}
+                </TableCell>
+                <TableCell className="text-right tabular-nums text-xs">
+                  {j.totals.pulled}
+                </TableCell>
+                <TableCell className="text-right tabular-nums text-xs">
+                  {j.totals.pushed}
+                </TableCell>
+                <TableCell className="text-right">
+                  <Button
+                    size="sm"
+                    variant={isActive ? "secondary" : "ghost"}
+                    onClick={() => onSelect(j.id)}
+                    disabled={isActive}
+                  >
+                    {isActive ? "Viewing" : "View"}
+                  </Button>
+                </TableCell>
+              </TableRow>
+            );
+          })}
+        </TableBody>
+      </Table>
+    </div>
+  );
+}
+
 
