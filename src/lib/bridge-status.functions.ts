@@ -475,6 +475,8 @@ export type BedReconcileResourceResult = {
   pushed: number;
   skipped: number;
   error: string | null;
+  locked?: boolean;
+  locked_since?: string | null;
   pulled_ids?: string[];
   pushed_ids?: string[];
 };
@@ -485,8 +487,15 @@ export type BedReconcileResult = {
   from: string;
   to: string;
   dry_run: boolean;
+  any_locked: boolean;
   results: BedReconcileResourceResult[];
 };
+
+// A reconcile is considered abandoned after this long and can be taken over
+// (server crash, function timeout, etc.). Keep aligned with the Worker
+// invocation cap so a legitimately still-running run isn't stolen.
+const RECONCILE_LOCK_STALE_MS = 10 * 60 * 1000;
+
 
 
 /**
