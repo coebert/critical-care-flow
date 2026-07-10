@@ -99,6 +99,7 @@ function BridgeStatusPage() {
 
   const getStatus = useServerFn(getBridgeStatus);
   const runNow = useServerFn(runBridgeSyncNow);
+  const runBedsOnly = useServerFn(runBridgeSyncBedsOnly);
   const sendProbe = useServerFn(sendBridgeTestPayload);
   const getAttempts = useServerFn(getBridgeSyncAttempts);
   const getVerification = useServerFn(getBedBoardVerification);
