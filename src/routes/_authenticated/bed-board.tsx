@@ -474,6 +474,7 @@ function BedBoardPage() {
                 <BedCard
                   key={slot.bed}
                   slot={slot}
+                  level={slot.occupant ? acuityMap.get(slot.occupant.id) : undefined}
                   onOccupiedClick={setSelected}
                 />
               ))}
