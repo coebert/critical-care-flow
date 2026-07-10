@@ -128,6 +128,9 @@ async function processJob(admin: any, job: any) {
     let pushed = 0;
     let skipped = 0;
     let error: string | null = null;
+    let partnerMissing = false;
+    let partnerMissingNote: string | null = null;
+
     let locked = false;
     let lockedSince: string | null = null;
     let lockId: string | null = null;
