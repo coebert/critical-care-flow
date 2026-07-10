@@ -11,14 +11,7 @@ import { Label } from "@/components/ui/label";
 import { Card } from "@/components/ui/card";
 import { toast } from "sonner";
 import { Toaster } from "@/components/ui/sonner";
-
-// Timing-safe string compare (avoid direct === for secret comparison).
-function safeEqualStr(a: string, b: string): boolean {
-  if (a.length !== b.length) return false;
-  let diff = 0;
-  for (let i = 0; i < a.length; i++) diff |= a.charCodeAt(i) ^ b.charCodeAt(i);
-  return diff === 0;
-}
+import { assertSetupSecret } from "@/lib/setup-secret-guard";
 
 // Public server fn — refuses unless (a) no users exist AND (b) a valid
 // out-of-band SETUP_SECRET is provided. Without the secret set on the
@@ -36,13 +29,9 @@ const bootstrapFirstAdmin = createServerFn({ method: "POST" })
       .parse(d),
   )
   .handler(async ({ data }) => {
-    const expected = process.env.SETUP_SECRET;
-    if (!expected || expected.length < 16) {
-      throw new Error("Setup is disabled. Contact your administrator.");
-    }
-    if (!safeEqualStr(data.setup_secret, expected)) {
-      throw new Error("Invalid setup secret.");
-    }
+    // Runs BEFORE any dynamic import of supabaseAdmin — a rejection here
+    // guarantees no DB or auth writes occur.
+    assertSetupSecret(data.setup_secret, process.env.SETUP_SECRET);
 
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const { data: users, error: listErr } = await supabaseAdmin.auth.admin.listUsers({ perPage: 1 });
