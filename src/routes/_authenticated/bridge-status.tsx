@@ -42,6 +42,7 @@ import { Label } from "@/components/ui/label";
 import { Progress } from "@/components/ui/progress";
 import { toast } from "sonner";
 import { useState } from "react";
+import { tzTooltip } from "@/lib/format-timestamp";
 
 
 
@@ -92,9 +93,9 @@ function fmt(ts: string | null) {
   }
 }
 
-function relative(ts: string | null) {
+function relative(ts: string | null, nowMs: number = Date.now()) {
   if (!ts) return "never";
-  const diffMs = Date.now() - new Date(ts).getTime();
+  const diffMs = nowMs - new Date(ts).getTime();
   const sec = Math.max(1, Math.floor(diffMs / 1000));
   if (sec < 60) return `${sec}s ago`;
   const min = Math.floor(sec / 60);
@@ -102,6 +103,34 @@ function relative(ts: string | null) {
   const hr = Math.floor(min / 60);
   if (hr < 48) return `${hr}h ago`;
   return `${Math.floor(hr / 24)}d ago`;
+}
+
+function formatDuration(ms: number): string {
+  if (!Number.isFinite(ms) || ms < 0) return "—";
+  const s = Math.floor(ms / 1000);
+  if (s < 1) return "<1s";
+  if (s < 60) return `${s}s`;
+  const m = Math.floor(s / 60);
+  const rs = s % 60;
+  if (m < 60) return rs ? `${m}m ${rs}s` : `${m}m`;
+  const h = Math.floor(m / 60);
+  const rm = m % 60;
+  return rm ? `${h}h ${rm}m` : `${h}h`;
+}
+
+/**
+ * Ticks every second so relative timestamps and live durations refresh
+ * in the UI while a job is in-flight. Gated by `active` so we don't burn
+ * a timer on idle panels.
+ */
+function useNowTick(active: boolean, intervalMs = 1000): number {
+  const [now, setNow] = useState(() => Date.now());
+  useEffect(() => {
+    if (!active) return;
+    const id = setInterval(() => setNow(Date.now()), intervalMs);
+    return () => clearInterval(id);
+  }, [active, intervalMs]);
+  return now;
 }
 
 function BridgeStatusPage() {
@@ -1057,6 +1086,27 @@ function ActiveJobCard({
   const statusStyle = JOB_STATUS_STYLES[job.status];
   const canCancel = job.status === "queued" || job.status === "running";
 
+  // Live-tick every second while the job (or any item) is in flight, so
+  // "started 12s ago" and running durations advance without a refetch.
+  const anyRunning =
+    !isTerminalJobStatus(job.status) ||
+    items.some((i) => i.status === "running");
+  const nowMs = useNowTick(anyRunning);
+
+  // Job-level timeline points, in the order the worker moves through them.
+  const timeline: { label: string; ts: string | null }[] = [
+    { label: "Queued", ts: job.created_at },
+    { label: "Started", ts: job.started_at },
+    { label: "Finished", ts: job.finished_at },
+  ];
+
+  // Elapsed since job started (for the header duration chip).
+  const jobElapsed =
+    job.started_at != null
+      ? (job.finished_at ? new Date(job.finished_at).getTime() : nowMs) -
+        new Date(job.started_at).getTime()
+      : null;
+
   return (
     <div className="border-t pt-3 space-y-3">
       <div className="flex items-start justify-between gap-2 flex-wrap">
@@ -1071,11 +1121,14 @@ function ActiveJobCard({
                 dry-run
               </Badge>
             )}
+            {jobElapsed != null && (
+              <Badge variant="outline" className="text-[10px] tabular-nums">
+                {formatDuration(jobElapsed)}
+              </Badge>
+            )}
           </div>
           <div className="text-xs text-muted-foreground">
             Window {fmt(job.from_ts)} → {fmt(job.to_ts)}
-            {job.started_at && ` · started ${relative(job.started_at)}`}
-            {job.finished_at && ` · finished ${relative(job.finished_at)}`}
           </div>
         </div>
         {canCancel && (
@@ -1088,6 +1141,28 @@ function ActiveJobCard({
             {cancelling ? "Cancelling…" : "Cancel job"}
           </Button>
         )}
+      </div>
+
+      {/* Job timeline strip — makes the queued→running→finished transition
+          and its exact timestamps first-class visible. */}
+      <div className="flex flex-wrap gap-x-4 gap-y-1 text-[11px] text-muted-foreground">
+        {timeline.map((p) => (
+          <div key={p.label} className="flex items-center gap-1.5">
+            <span
+              className={`inline-block w-1.5 h-1.5 rounded-full ${
+                p.ts ? "bg-primary" : "bg-muted-foreground/30"
+              }`}
+            />
+            <span className="font-medium text-foreground/80">{p.label}</span>
+            {p.ts ? (
+              <span title={tzTooltip(p.ts)} className="tabular-nums">
+                {fmt(p.ts)} · {relative(p.ts, nowMs)}
+              </span>
+            ) : (
+              <span>—</span>
+            )}
+          </div>
+        ))}
       </div>
 
       <div className="space-y-1">
@@ -1110,12 +1185,26 @@ function ActiveJobCard({
               {job.dry_run ? "Would push" : "Pushed"}
             </TableHead>
             <TableHead className="text-right">Skipped</TableHead>
+            <TableHead>Started</TableHead>
+            <TableHead className="text-right">Duration</TableHead>
+            <TableHead>Last update</TableHead>
             <TableHead>Detail</TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>
           {items.map((it) => {
             const style = ITEM_STATUS_STYLES[it.status];
+            const startedMs = it.started_at
+              ? new Date(it.started_at).getTime()
+              : null;
+            const endedMs =
+              it.finished_at != null
+                ? new Date(it.finished_at).getTime()
+                : it.status === "running" && startedMs != null
+                  ? nowMs
+                  : null;
+            const duration =
+              startedMs != null && endedMs != null ? endedMs - startedMs : null;
             return (
               <TableRow key={it.id}>
                 <TableCell className="font-medium align-top">
@@ -1141,10 +1230,42 @@ function ActiveJobCard({
                   {it.skipped}
                 </TableCell>
                 <TableCell className="align-top">
+                  {it.started_at ? (
+                    <span
+                      className="text-[11px] text-muted-foreground tabular-nums"
+                      title={tzTooltip(it.started_at)}
+                    >
+                      {fmt(it.started_at)}
+                      <br />
+                      <span className="text-foreground/60">
+                        {relative(it.started_at, nowMs)}
+                      </span>
+                    </span>
+                  ) : (
+                    <span className="text-[11px] text-muted-foreground">—</span>
+                  )}
+                </TableCell>
+                <TableCell className="text-right tabular-nums align-top text-[11px]">
+                  {duration != null ? formatDuration(duration) : "—"}
+                </TableCell>
+                <TableCell className="align-top">
+                  <span
+                    className="text-[11px] text-muted-foreground tabular-nums"
+                    title={tzTooltip(it.updated_at)}
+                  >
+                    {relative(it.updated_at, nowMs)}
+                  </span>
+                </TableCell>
+                <TableCell className="align-top">
                   {it.status === "locked" && (
-                    <span className="text-[11px] text-muted-foreground">
+                    <span
+                      className="text-[11px] text-muted-foreground"
+                      title={
+                        it.locked_since ? tzTooltip(it.locked_since) : undefined
+                      }
+                    >
                       Held since{" "}
-                      {it.locked_since ? relative(it.locked_since) : "—"}
+                      {it.locked_since ? relative(it.locked_since, nowMs) : "—"}
                     </span>
                   )}
                   {it.status === "error" && it.error && (
@@ -1156,13 +1277,16 @@ function ActiveJobCard({
                     </span>
                   )}
                   {it.status === "complete" && it.finished_at && (
-                    <span className="text-[11px] text-muted-foreground">
-                      Done {relative(it.finished_at)}
+                    <span
+                      className="text-[11px] text-muted-foreground"
+                      title={tzTooltip(it.finished_at)}
+                    >
+                      Done {relative(it.finished_at, nowMs)}
                     </span>
                   )}
-                  {it.status === "running" && it.started_at && (
+                  {it.status === "skipped" && (
                     <span className="text-[11px] text-muted-foreground">
-                      Since {relative(it.started_at)}
+                      Skipped this run
                     </span>
                   )}
                 </TableCell>
