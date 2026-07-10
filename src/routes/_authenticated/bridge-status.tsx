@@ -20,8 +20,10 @@ import {
   getBridgeStatus,
   runBridgeSyncNow,
   sendBridgeTestPayload,
+  getBridgeSyncAttempts,
   type BridgeResourceStatus,
   type BridgeProbeResult,
+  type BridgeSyncAttempt,
 } from "@/lib/bridge-status.functions";
 import { toast } from "sonner";
 import { useState } from "react";
@@ -91,6 +93,7 @@ function BridgeStatusPage() {
   const getStatus = useServerFn(getBridgeStatus);
   const runNow = useServerFn(runBridgeSyncNow);
   const sendProbe = useServerFn(sendBridgeTestPayload);
+  const getAttempts = useServerFn(getBridgeSyncAttempts);
 
   const [probeResults, setProbeResults] = useState<BridgeProbeResult[] | null>(
     null,
@@ -102,6 +105,12 @@ function BridgeStatusPage() {
     refetchInterval: 15_000,
   });
 
+  const attemptsQuery = useQuery({
+    queryKey: ["bridge-sync-attempts"],
+    queryFn: () => getAttempts(),
+    refetchInterval: 15_000,
+  });
+
   const mutation = useMutation({
     mutationFn: () => runNow(),
     onSuccess: (res) => {
@@ -110,6 +119,7 @@ function BridgeStatusPage() {
       if (ok) toast.success(message);
       else toast.warning(message);
       query.refetch();
+      attemptsQuery.refetch();
     },
     onError: (err: unknown) => {
       toast.error("Sync failed", { description: (err as Error).message });
@@ -286,13 +296,19 @@ function BridgeStatusPage() {
             </Table>
           </Card>
 
+          <AttemptsPanel
+            attempts={attemptsQuery.data ?? []}
+            loading={attemptsQuery.isLoading}
+          />
+
           <div className="text-xs text-muted-foreground">
-            Last checked {fmt(data.ran_at)}.{" "}
+            Last checked {fmt(data.ran_at)}. Failed resources are automatically
+            retried every 5 minutes.{" "}
             <Link
               to="/notifications-audit"
               className="underline hover:text-foreground"
             >
-              View audit log →
+              View notifications audit log →
             </Link>
           </div>
         </>
@@ -378,5 +394,102 @@ function ResourceRow({ r }: { r: BridgeResourceStatus }) {
         )}
       </TableCell>
     </TableRow>
+  );
+}
+
+function sourceLabel(source: BridgeSyncAttempt["source"]) {
+  switch (source) {
+    case "sync":
+      return "Scheduled";
+    case "retry":
+      return "Auto-retry";
+    case "manual":
+      return "Manual";
+    default:
+      return source;
+  }
+}
+
+function AttemptsPanel({
+  attempts,
+  loading,
+}: {
+  attempts: BridgeSyncAttempt[];
+  loading: boolean;
+}) {
+  return (
+    <Card className="p-0 overflow-hidden">
+      <div className="px-4 py-3 border-b flex items-center justify-between">
+        <div>
+          <div className="text-sm font-medium">Sync attempts audit log</div>
+          <p className="text-xs text-muted-foreground">
+            Every scheduled sync, auto-retry, and manual run, most recent first.
+          </p>
+        </div>
+        <Badge variant="secondary">{attempts.length} shown</Badge>
+      </div>
+      {loading ? (
+        <div className="p-4 text-sm text-muted-foreground">
+          Loading audit log…
+        </div>
+      ) : attempts.length === 0 ? (
+        <div className="p-4 text-sm text-muted-foreground">
+          No sync attempts recorded yet.
+        </div>
+      ) : (
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead>When</TableHead>
+              <TableHead>Source</TableHead>
+              <TableHead>Resource</TableHead>
+              <TableHead>Result</TableHead>
+              <TableHead className="text-right">Pulled</TableHead>
+              <TableHead className="text-right">Pushed</TableHead>
+              <TableHead className="text-right">Duration</TableHead>
+              <TableHead>Error</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {attempts.map((a) => (
+              <TableRow key={a.id}>
+                <TableCell className="whitespace-nowrap">
+                  <div>{fmt(a.attempted_at)}</div>
+                  <div className="text-xs text-muted-foreground">
+                    {relative(a.attempted_at)}
+                  </div>
+                </TableCell>
+                <TableCell>
+                  <Badge variant="outline">{sourceLabel(a.source)}</Badge>
+                </TableCell>
+                <TableCell className="font-medium">{a.resource}</TableCell>
+                <TableCell>
+                  {a.ok ? (
+                    <Badge variant="secondary">OK</Badge>
+                  ) : (
+                    <Badge variant="destructive">Failed</Badge>
+                  )}
+                </TableCell>
+                <TableCell className="text-right tabular-nums">
+                  {a.pulled}
+                </TableCell>
+                <TableCell className="text-right tabular-nums">
+                  {a.pushed}
+                </TableCell>
+                <TableCell className="text-right tabular-nums text-muted-foreground">
+                  {a.duration_ms != null ? `${a.duration_ms}ms` : "—"}
+                </TableCell>
+                <TableCell
+                  className="max-w-[32ch] truncate text-xs text-muted-foreground"
+                  title={a.error ?? ""}
+                >
+                  {a.error ?? "—"}
+                </TableCell>
+              </TableRow>
+            ))}
+          </TableBody>
+        </Table>
+      )}
+    </Card>
   );
 }
