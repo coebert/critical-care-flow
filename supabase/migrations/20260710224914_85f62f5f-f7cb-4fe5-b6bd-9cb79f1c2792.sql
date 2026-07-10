@@ -1,0 +1,1 @@
+UPDATE public.bridge_sync_state SET last_error = NULL, last_error_at = NULL WHERE resource IN ('bed_occupancies','bed_outliers','bed_transfers_out');
