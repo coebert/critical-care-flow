@@ -584,8 +584,12 @@ function BedBoardPage() {
               </dd>
               <dt className="text-muted-foreground">Bed</dt>
               <dd className="col-span-2">{selected.bed ?? "—"}</dd>
-              <dt className="text-muted-foreground">Status</dt>
-              <dd className="col-span-2">{selected.status ?? "—"}</dd>
+              {selected.status != null && (
+                <>
+                  <dt className="text-muted-foreground">Status</dt>
+                  <dd className="col-span-2">{selected.status}</dd>
+                </>
+              )}
               <dt className="text-muted-foreground">Admitted</dt>
               <dd className="col-span-2">
                 {selected.admission_date
@@ -596,18 +600,29 @@ function BedBoardPage() {
                   return d != null ? ` · Day ${d}` : "";
                 })()}
               </dd>
-              <dt className="text-muted-foreground">TEP</dt>
-              <dd className="col-span-2">
-                {selected.tep_in_place ? "In place" : "Not recorded"}
-              </dd>
-              <dt className="text-muted-foreground">DNACPR</dt>
-              <dd className="col-span-2">
-                {selected.dnacpr_decision ?? "—"}
-              </dd>
-              <dt className="text-muted-foreground">Tasks</dt>
-              <dd className="col-span-2 whitespace-pre-wrap">
-                {selected.outstanding_tasks ?? "—"}
-              </dd>
+              {selected.tep_in_place != null && (
+                <>
+                  <dt className="text-muted-foreground">TEP</dt>
+                  <dd className="col-span-2">
+                    {selected.tep_in_place ? "In place" : "Not recorded"}
+                  </dd>
+                </>
+              )}
+              {selected.dnacpr_decision != null && (
+                <>
+                  <dt className="text-muted-foreground">DNACPR</dt>
+                  <dd className="col-span-2">{selected.dnacpr_decision}</dd>
+                </>
+              )}
+              {selected.outstanding_tasks != null && (
+                <>
+                  <dt className="text-muted-foreground">Tasks</dt>
+                  <dd className="col-span-2 whitespace-pre-wrap">
+                    {selected.outstanding_tasks}
+                  </dd>
+                </>
+              )}
+
               <dt className="text-muted-foreground">Updated</dt>
               <dd className="col-span-2">
                 {formatUpdated(selected.updated_at)}
