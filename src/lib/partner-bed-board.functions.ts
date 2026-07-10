@@ -214,13 +214,13 @@ export type UpdatePartnerPatientInput = {
 };
 
 export type UpdatePartnerPatientResult =
-  | { ok: true; patient: PartnerOccupant & Record<string, unknown> }
+  | { ok: true; patient: PartnerOccupant }
   | {
       ok: false;
       error: string;
       status?: number;
       conflict?: {
-        current: PartnerOccupant & Record<string, unknown>;
+        current: PartnerOccupant;
         your_expected_updated_at: string | null;
       };
     };
@@ -346,7 +346,7 @@ export const updatePartnerPatient = createServerFn({ method: "POST" })
 
     if (res.status === 409) {
       const p = (payload ?? {}) as {
-        current?: PartnerOccupant & Record<string, unknown>;
+        current?: PartnerOccupant;
         your_expected_updated_at?: string | null;
         message?: string;
       };
@@ -371,7 +371,7 @@ export const updatePartnerPatient = createServerFn({ method: "POST" })
       return { ok: false, status: res.status, error: `partner ${res.status}: ${msg}` };
     }
 
-    const p = payload as { patient?: PartnerOccupant & Record<string, unknown> } | null;
+    const p = payload as { patient?: PartnerOccupant } | null;
     if (!p?.patient) {
       return { ok: false, error: "partner returned no patient row" };
     }
