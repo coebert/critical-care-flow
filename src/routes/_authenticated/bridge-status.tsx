@@ -759,14 +759,28 @@ function ReconcilePanel({
       setLastWasDryRun(res.dry_run);
       const pulled = res.results.reduce((n, r) => n + r.pulled, 0);
       const pushed = res.results.reduce((n, r) => n + r.pushed, 0);
-      const errors = res.results.filter((r) => r.error).length;
+      const errors = res.results.filter((r) => r.error && !r.locked).length;
+      const lockedCount = res.results.filter((r) => r.locked).length;
       const prefix = res.dry_run ? "Dry-run: would" : "Reconciled";
       const msg = `${prefix} ${pulled} pulled / ${pushed} pushed across ${res.results.length} bed tables`;
-      if (errors === 0) toast.success(msg);
-      else toast.warning(`${msg} (${errors} with errors)`);
+      if (lockedCount === res.results.length) {
+        toast.warning("Reconcile already running", {
+          description:
+            "Another admin is backfilling this exact window. Try again once it completes.",
+        });
+      } else if (lockedCount > 0) {
+        toast.warning(
+          `${msg} — ${lockedCount} table(s) skipped (already running)`,
+        );
+      } else if (errors === 0) {
+        toast.success(msg);
+      } else {
+        toast.warning(`${msg} (${errors} with errors)`);
+      }
       // Dry-runs don't change anything, so no need to refresh sibling panels.
       if (!res.dry_run) onDone();
     },
+
     onError: (err: unknown) => {
       toast.error("Reconciliation failed", {
         description: (err as Error).message,
