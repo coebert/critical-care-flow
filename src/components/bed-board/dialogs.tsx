@@ -15,7 +15,8 @@ export interface OccupancyFormValue {
   hospital_number: string | null;
   patient_initials: string | null;
   admitting_consultant: string | null;
-  level: 1 | 2 | 3;
+  level: 0 | 1 | 2 | 3;
+  wardable: boolean;
   ventilated: boolean;
   nippv_cpap: boolean;
   hfno: boolean;
@@ -36,6 +37,7 @@ function emptyValue(): OccupancyFormValue {
     patient_initials: null,
     admitting_consultant: null,
     level: 3,
+    wardable: false,
     ventilated: false,
     nippv_cpap: false,
     hfno: false,
@@ -56,7 +58,8 @@ function fromOcc(o: Occ): OccupancyFormValue {
     hospital_number: o.hospital_number,
     patient_initials: o.patient_initials,
     admitting_consultant: o.admitting_consultant,
-    level: (o.level ?? 3) as 1 | 2 | 3,
+    level: (o.level ?? 3) as 0 | 1 | 2 | 3,
+    wardable: (o as { wardable?: boolean }).wardable ?? false,
     ventilated: o.ventilated,
     nippv_cpap: o.nippv_cpap,
     hfno: o.hfno,
