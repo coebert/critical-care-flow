@@ -1,0 +1,309 @@
+import { createFileRoute } from "@tanstack/react-router";
+import { jsonResponse, preflight } from "@/lib/bridge-cors";
+import { getBridgeSecrets, signWith } from "@/lib/bridge-hmac.server";
+
+/**
+ * Outbound bridge sync worker.
+ *
+ * Triggered by pg_cron (or manually) via POST with the project anon key
+ * in the `apikey` header. For each resource:
+ *   1. Pull rows updated on the partner since last_pulled_at.
+ *   2. Upsert them locally via supabaseAdmin.
+ *   3. Push local rows updated since last_pushed_at to the partner.
+ *   4. Persist cursors + any error into bridge_sync_state.
+ *
+ * Runs sequentially per resource so one failure does not abort the others.
+ */
+
+type ResourceKey =
+  | "patients"
+  | "investigations"
+  | "microbiology"
+  | "referrals";
+
+const RESOURCES: {
+  key: ResourceKey;
+  table: string;
+  conflict: string;
+  select: string;
+  pushMap?: (row: Record<string, unknown>) => Record<string, unknown>;
+}[] = [
+  { key: "patients", table: "patients", conflict: "id", select: "*" },
+  {
+    key: "investigations",
+    table: "investigations",
+    conflict: "id",
+    select: "*",
+  },
+  {
+    key: "microbiology",
+    table: "microbiology",
+    conflict: "id",
+    select: "*",
+  },
+  {
+    // Encrypted columns cannot cross the bridge — only ship the safe subset.
+    key: "referrals",
+    table: "referrals",
+    conflict: "id",
+    select: [
+      "id",
+      "age",
+      "sex",
+      "current_ward",
+      "current_bed",
+      "dnacpr_respect",
+      "referring_specialty",
+      "referral_received_at",
+      "first_seen_at",
+      "decision_at",
+      "arrived_on_unit_at",
+      "status",
+      "decline_reason",
+      "admission_urgency",
+      "consultant_to_consultant_only",
+      "accepting_consultant",
+      "discussed_with_consultant",
+      "is_test",
+      "news2_score",
+      "news2_recorded_at",
+      "ceiling_of_care",
+      "reason_category",
+      "frailty_score",
+      "anticipated_interventions",
+      "infection_status",
+      "infection_organism",
+      "weight_kg",
+      "allergies",
+      "resus_status",
+      "previous_referral_id",
+      "outcome",
+      "outcome_recorded_at",
+      "needs_ward_review",
+      "ward_review_timeframe",
+      "for_ongoing_ccot_review",
+      "updated_at",
+    ].join(","),
+  },
+];
+
+const SYSTEM_ACTOR = JSON.stringify({
+  id: "critical-care-connect-sync",
+  email: "sync@critical-care-connect.local",
+  role: "admin",
+});
+const PUSH_BATCH = 50;
+
+function signedHeaders(rawBody: string) {
+  const secrets = getBridgeSecrets();
+  const timestamp = String(Math.floor(Date.now() / 1000));
+  const signature = signWith(secrets.current, {
+    timestamp,
+    actor: SYSTEM_ACTOR,
+    rawBody,
+  });
+  return {
+    "content-type": "application/json",
+    "x-timestamp": timestamp,
+    "x-actor": SYSTEM_ACTOR,
+    "x-signature": signature,
+  };
+}
+
+async function pullResource(
+  base: string,
+  key: ResourceKey,
+  since: string | null,
+): Promise<Record<string, unknown>[]> {
+  const url = new URL(`${base.replace(/\/$/, "")}/${key}`);
+  if (since) url.searchParams.set("since", since);
+  url.searchParams.set("limit", "500");
+  const res = await fetch(url.toString(), {
+    method: "GET",
+    headers: signedHeaders(""),
+  });
+  if (!res.ok) {
+    throw new Error(
+      `pull ${key} ${res.status}: ${(await res.text()).slice(0, 200)}`,
+    );
+  }
+  const body = (await res.json()) as { records?: Record<string, unknown>[] };
+  return body.records ?? [];
+}
+
+async function pushOne(
+  base: string,
+  key: ResourceKey,
+  record: Record<string, unknown>,
+) {
+  const raw = JSON.stringify({ record });
+  const res = await fetch(`${base.replace(/\/$/, "")}/${key}`, {
+    method: "POST",
+    headers: signedHeaders(raw),
+    body: raw,
+  });
+  if (!res.ok && res.status !== 409) {
+    // 409 = partner's row is newer — acceptable, next pull will reconcile.
+    throw new Error(
+      `push ${key} ${res.status}: ${(await res.text()).slice(0, 200)}`,
+    );
+  }
+}
+
+async function syncResource(
+  admin: any,
+  base: string,
+  resource: (typeof RESOURCES)[number],
+): Promise<{
+  resource: ResourceKey;
+  pulled: number;
+  pushed: number;
+  last_pulled_at: string | null;
+  last_pushed_at: string | null;
+  error?: string;
+}> {
+  const runStartedAt = new Date().toISOString();
+  const { data: state } = await admin
+    .from("bridge_sync_state")
+    .select("*")
+    .eq("resource", resource.key)
+    .maybeSingle();
+
+  const lastPulledAt: string | null = state?.last_pulled_at ?? null;
+  const lastPushedAt: string | null = state?.last_pushed_at ?? null;
+
+  let pulled = 0;
+  let pushed = 0;
+  let newestPulled = lastPulledAt;
+  let newestPushed = lastPushedAt;
+  let error: string | undefined;
+
+  try {
+    // PULL
+    const incoming = await pullResource(base, resource.key, lastPulledAt);
+    if (incoming.length > 0) {
+      const { error: upErr } = await admin
+        .from(resource.table)
+        .upsert(incoming as any, { onConflict: resource.conflict });
+      if (upErr) throw new Error(`local upsert ${resource.key}: ${upErr.message}`);
+      pulled = incoming.length;
+      newestPulled = incoming.reduce<string | null>((acc, r) => {
+        const u = (r as any).updated_at as string | undefined;
+        return u && (!acc || u > acc) ? u : acc;
+      }, lastPulledAt);
+    }
+
+    // PUSH
+    let pushCursor = lastPushedAt;
+    let page = 0;
+    // Loop pages until we drain or hit a safety cap.
+    while (page < 20) {
+      let q = admin
+        .from(resource.table)
+        .select(resource.select)
+        .order("updated_at", { ascending: true })
+        .limit(PUSH_BATCH);
+      if (pushCursor) q = q.gt("updated_at", pushCursor);
+      const { data: batch, error: readErr } = await q;
+      if (readErr) throw new Error(`local read ${resource.key}: ${readErr.message}`);
+      if (!batch || batch.length === 0) break;
+      for (const row of batch as Record<string, unknown>[]) {
+        await pushOne(base, resource.key, row);
+        pushed += 1;
+        const u = (row as any).updated_at as string | undefined;
+        if (u && (!pushCursor || u > pushCursor)) pushCursor = u;
+      }
+      newestPushed = pushCursor;
+      if (batch.length < PUSH_BATCH) break;
+      page += 1;
+    }
+  } catch (err) {
+    error = (err as Error).message;
+  }
+
+  await admin.from("bridge_sync_state").upsert(
+    {
+      resource: resource.key,
+      last_pulled_at: newestPulled ?? lastPulledAt,
+      last_pushed_at: newestPushed ?? lastPushedAt,
+      last_error: error ?? null,
+      last_error_at: error ? runStartedAt : null,
+    },
+    { onConflict: "resource" },
+  );
+
+  return {
+    resource: resource.key,
+    pulled,
+    pushed,
+    last_pulled_at: newestPulled,
+    last_pushed_at: newestPushed,
+    error,
+  };
+}
+
+export const Route = createFileRoute("/api/public/bridge/sync")({
+  server: {
+    handlers: {
+      OPTIONS: async () => preflight(),
+
+      // Cron trigger. Also accepts GET for manual introspection.
+      GET: async ({ request }) => runSync(request),
+      POST: async ({ request }) => runSync(request),
+    },
+  },
+});
+
+async function runSync(request: Request) {
+  // Guard: caller must present the project's publishable/anon key
+  // (or the service role key) via `apikey` header. This is the
+  // canonical pattern for pg_cron -> /api/public/* invocations.
+  const apiKey = request.headers.get("apikey") ?? "";
+  const allowed = [
+    process.env.SUPABASE_PUBLISHABLE_KEY,
+    process.env.SUPABASE_SERVICE_ROLE_KEY,
+  ].filter(Boolean) as string[];
+  if (!allowed.includes(apiKey)) {
+    return jsonResponse({ error: "unauthorized" }, { status: 401 });
+  }
+
+  const partner = process.env.PARTNER_BRIDGE_URL;
+  if (!partner) {
+    return jsonResponse(
+      { error: "PARTNER_BRIDGE_URL_not_configured" },
+      { status: 500 },
+    );
+  }
+
+  try {
+    getBridgeSecrets();
+  } catch (err) {
+    return jsonResponse(
+      { error: (err as Error).message },
+      { status: 500 },
+    );
+  }
+
+  const { supabaseAdmin } = await import(
+    "@/integrations/supabase/client.server"
+  );
+
+  const results: Awaited<ReturnType<typeof syncResource>>[] = [];
+  for (const r of RESOURCES) {
+    // Sequential; per-resource failure is captured and does not abort others.
+    // eslint-disable-next-line no-await-in-loop
+    const summary = await syncResource(supabaseAdmin, partner, r);
+    results.push(summary);
+  }
+
+  const hadError = results.some((r) => r.error);
+  return jsonResponse(
+    {
+      ok: !hadError,
+      partner,
+      ran_at: new Date().toISOString(),
+      results,
+    },
+    { status: hadError ? 207 : 200 },
+  );
+}
