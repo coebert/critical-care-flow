@@ -192,7 +192,10 @@ async function pushOne(
   key: ResourceKey,
   record: Record<string, unknown>,
 ) {
-  const raw = JSON.stringify({ record });
+  // The partner bridge expects the row itself as the request body. Our inbound
+  // receivers accept both bare rows and `{ record }`, but the partner's patient
+  // and investigation validators reject the wrapped shape as an invalid payload.
+  const raw = JSON.stringify(record);
   const res = await fetch(`${base.replace(/\/$/, "")}/${key}`, {
     method: "POST",
     headers: signedHeaders(raw),
