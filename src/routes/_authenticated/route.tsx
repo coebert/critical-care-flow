@@ -304,6 +304,7 @@ function getPageTitle(pathname: string): string {
   if (pathname === "/profile") return "Profile";
   if (pathname === "/analytics") return "Analytics";
   if (pathname === "/admin") return "Admin";
+  if (pathname === "/bridge-status") return "Bridge sync";
   if (pathname === "/push-test") return "Push test";
   return "SDH Critical Care";
 }
