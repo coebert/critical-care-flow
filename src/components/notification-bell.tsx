@@ -188,6 +188,9 @@ export function NotificationBell() {
                 key={n.id}
                 to={n.referral_id ? "/referrals/$id" : "/"}
                 params={n.referral_id ? { id: n.referral_id } : undefined as any}
+                // `n=<notification.id>` lets the referral detail route
+                // record the deep-link source in audit_log.
+                search={n.referral_id ? { n: n.id } as any : undefined as any}
                 onClick={() => setOpen(false)}
                 className={`block px-3 py-2 border-b last:border-0 hover:bg-accent ${!n.read_at ? "bg-accent/40" : ""}`}
               >
@@ -197,6 +200,7 @@ export function NotificationBell() {
                 </div>
               </Link>
             ))
+
           )}
         </div>
         <div className="p-2 border-t text-center">
