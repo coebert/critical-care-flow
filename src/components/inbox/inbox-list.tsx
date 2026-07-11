@@ -154,8 +154,12 @@ export function InboxList(props: Props) {
                       onClick={(e) => {
                         e.stopPropagation();
                         if (!n.read_at) markRead(n.id);
-                        navigate({ to: "/referrals/$id", params: { id: n.referral_id! } });
+                        // Pass notification id so audit_log captures the
+                        // deep-link source. Server verifies it belongs
+                        // to this user + this referral.
+                        navigate({ to: "/referrals/$id", params: { id: n.referral_id! }, search: { n: n.id } as any });
                       }}>
+
                       <ExternalLink className="w-4 h-4" aria-hidden="true" />
                     </Button>
                   </div>
