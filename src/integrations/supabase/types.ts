@@ -1080,6 +1080,7 @@ export type Database = {
           is_test: boolean
           past_medical_history_enc: string | null
           past_surgical_history_enc: string | null
+          patient_initials: string | null
           predicted_level: Database["public"]["Enums"]["postop_level"]
           preop_signed_off_at: string | null
           preop_signed_off_by: string | null
@@ -1118,6 +1119,7 @@ export type Database = {
           is_test?: boolean
           past_medical_history_enc?: string | null
           past_surgical_history_enc?: string | null
+          patient_initials?: string | null
           predicted_level: Database["public"]["Enums"]["postop_level"]
           preop_signed_off_at?: string | null
           preop_signed_off_by?: string | null
@@ -1156,6 +1158,7 @@ export type Database = {
           is_test?: boolean
           past_medical_history_enc?: string | null
           past_surgical_history_enc?: string | null
+          patient_initials?: string | null
           predicted_level?: Database["public"]["Enums"]["postop_level"]
           preop_signed_off_at?: string | null
           preop_signed_off_by?: string | null
@@ -1490,6 +1493,7 @@ export type Database = {
           outcome: Database["public"]["Enums"]["referral_outcome"] | null
           outcome_recorded_at: string | null
           past_medical_history_enc: string | null
+          patient_initials: string | null
           previous_referral_id: string | null
           reason_category:
             | Database["public"]["Enums"]["referral_reason_category"]
@@ -1547,6 +1551,7 @@ export type Database = {
           outcome?: Database["public"]["Enums"]["referral_outcome"] | null
           outcome_recorded_at?: string | null
           past_medical_history_enc?: string | null
+          patient_initials?: string | null
           previous_referral_id?: string | null
           reason_category?:
             | Database["public"]["Enums"]["referral_reason_category"]
@@ -1604,6 +1609,7 @@ export type Database = {
           outcome?: Database["public"]["Enums"]["referral_outcome"] | null
           outcome_recorded_at?: string | null
           past_medical_history_enc?: string | null
+          patient_initials?: string | null
           previous_referral_id?: string | null
           reason_category?:
             | Database["public"]["Enums"]["referral_reason_category"]
