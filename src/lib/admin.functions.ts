@@ -229,84 +229,96 @@ export type AuditLogPage = {
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
+// Extracted so integration tests can exercise the full query pipeline
+// (clinician/specialty resolution, filter shaping, and redaction) against
+// a mocked supabaseAdmin without needing the TanStack Start runtime.
+// The server-fn handler below is a thin wrapper around this function.
+export async function runGetAuditLog(
+  data: AuditLogFilters,
+  supabaseAdmin: any,
+): Promise<AuditLogPage> {
+  const limit = data.limit ?? 50;
+  const offset = data.offset ?? 0;
+  const sortBy: AuditSortColumn = data.sortBy ?? "created_at";
+  const sortDir: "asc" | "desc" = data.sortDir ?? "desc";
+
+  // Resolve clinician query → set of user_ids. A UUID means exact match; any
+  // other string is looked up against profiles.full_name (ilike). An unknown
+  // name yields an empty set so the query returns zero rows.
+  let userIdFilter: string[] | null = null;
+  if (data.clinician) {
+    if (UUID_RE.test(data.clinician)) {
+      userIdFilter = [data.clinician];
+    } else {
+      const { data: profs, error: profErr } = await supabaseAdmin
+        .from("profiles")
+        .select("id")
+        .ilike("full_name", `%${data.clinician}%`)
+        .limit(200);
+      if (profErr) throw safeError("admin.getAuditLog.clinician", profErr, "Failed to load audit log.");
+      userIdFilter = ((profs ?? []) as Array<{ id: string }>).map((p) => p.id);
+      if (userIdFilter!.length === 0) userIdFilter = ["00000000-0000-0000-0000-000000000000"];
+    }
+  }
+
+  // Resolve specialty → referral ids. Implies entity='referral'.
+  let referralIdFilter: string[] | null = null;
+  if (data.specialty) {
+    const { data: refs, error: refErr } = await supabaseAdmin
+      .from("referrals")
+      .select("id")
+      .ilike("referring_specialty", `%${data.specialty}%`)
+      .limit(5000);
+    if (refErr) throw safeError("admin.getAuditLog.specialty", refErr, "Failed to load audit log.");
+    referralIdFilter = ((refs ?? []) as Array<{ id: string }>).map((r) => r.id);
+    if (referralIdFilter!.length === 0) referralIdFilter = ["00000000-0000-0000-0000-000000000000"];
+  }
+
+  let query = supabaseAdmin
+    .from("audit_log")
+    .select("*", { count: "exact" })
+    .order(sortBy, { ascending: sortDir === "asc" });
+  if (sortBy !== "created_at") {
+    query = query.order("created_at", { ascending: false });
+  }
+  if (data.entity) query = query.eq("entity", data.entity);
+  if (data.action) query = query.eq("action", data.action);
+  if (userIdFilter) query = query.in("user_id", userIdFilter);
+  if (referralIdFilter) {
+    query = query.eq("entity", "referral").in("entity_id", referralIdFilter);
+  }
+  if (data.from) query = query.gte("created_at", data.from);
+  if (data.to) query = query.lte("created_at", data.to);
+
+  const { data: rows, error, count } = await query.range(offset, offset + limit);
+  if (error) throw safeError("admin.getAuditLog", error, "Failed to load audit log.");
+  const list = rows ?? [];
+  const hasMore = list.length > limit;
+  const redacted = list.slice(0, limit).map((r: AuditLogEntry) => ({
+    ...r,
+    diff: redactAuditDiff(r.diff),
+  })) as AuditLogPage["rows"];
+  return {
+    rows: redacted,
+    hasMore,
+    nextOffset: offset + limit,
+    total: count ?? redacted.length,
+    limit,
+    offset,
+    sortBy,
+    sortDir,
+  };
+}
+
 export const getAuditLog = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((input: unknown) => auditLogInputSchema.parse(input ?? {}))
   .handler(async ({ data, context }): Promise<AuditLogPage> => {
     await assertAdmin(context);
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-    const limit = data.limit ?? 50;
-    const offset = data.offset ?? 0;
-    const sortBy: AuditSortColumn = data.sortBy ?? "created_at";
-    const sortDir: "asc" | "desc" = data.sortDir ?? "desc";
-
-    // Resolve clinician query → set of user_ids. A UUID means exact match; any
-    // other string is looked up against profiles.full_name (ilike). An unknown
-    // name yields an empty set so the query returns zero rows.
-    let userIdFilter: string[] | null = null;
-    if (data.clinician) {
-      if (UUID_RE.test(data.clinician)) {
-        userIdFilter = [data.clinician];
-      } else {
-        const { data: profs, error: profErr } = await supabaseAdmin
-          .from("profiles")
-          .select("id")
-          .ilike("full_name", `%${data.clinician}%`)
-          .limit(200);
-        if (profErr) throw safeError("admin.getAuditLog.clinician", profErr, "Failed to load audit log.");
-        userIdFilter = (profs ?? []).map((p) => p.id);
-        if (userIdFilter.length === 0) userIdFilter = ["00000000-0000-0000-0000-000000000000"];
-      }
-    }
-
-    // Resolve specialty → referral ids. Implies entity='referral'.
-    let referralIdFilter: string[] | null = null;
-    if (data.specialty) {
-      const { data: refs, error: refErr } = await supabaseAdmin
-        .from("referrals")
-        .select("id")
-        .ilike("referring_specialty", `%${data.specialty}%`)
-        .limit(5000);
-      if (refErr) throw safeError("admin.getAuditLog.specialty", refErr, "Failed to load audit log.");
-      referralIdFilter = (refs ?? []).map((r) => r.id);
-      if (referralIdFilter.length === 0) referralIdFilter = ["00000000-0000-0000-0000-000000000000"];
-    }
-
-    let query = supabaseAdmin
-      .from("audit_log")
-      .select("*", { count: "exact" })
-      .order(sortBy, { ascending: sortDir === "asc" });
-    if (sortBy !== "created_at") {
-      query = query.order("created_at", { ascending: false });
-    }
-    if (data.entity) query = query.eq("entity", data.entity);
-    if (data.action) query = query.eq("action", data.action);
-    if (userIdFilter) query = query.in("user_id", userIdFilter);
-    if (referralIdFilter) {
-      query = query.eq("entity", "referral").in("entity_id", referralIdFilter);
-    }
-    if (data.from) query = query.gte("created_at", data.from);
-    if (data.to) query = query.lte("created_at", data.to);
-
-    const { data: rows, error, count } = await query.range(offset, offset + limit);
-    if (error) throw safeError("admin.getAuditLog", error, "Failed to load audit log.");
-    const list = rows ?? [];
-    const hasMore = list.length > limit;
-    const redacted = list.slice(0, limit).map((r) => ({
-      ...r,
-      diff: redactAuditDiff(r.diff),
-    })) as AuditLogPage["rows"];
-    return {
-      rows: redacted,
-      hasMore,
-      nextOffset: offset + limit,
-      total: count ?? redacted.length,
-      limit,
-      offset,
-      sortBy,
-      sortDir,
-    };
+    return runGetAuditLog(data, supabaseAdmin);
   });
+
 
 
 // -----------------------------------------------------------------------------
