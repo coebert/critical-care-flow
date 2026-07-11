@@ -70,6 +70,7 @@ const ChartStyle = ({ id, config }: { id: string; config: ChartConfig }) => {
 
   return (
     <style
+      // eslint-disable-next-line no-restricted-syntax -- shadcn chart injects generated CSS variables from a static THEMES map; no user or network input reaches this string.
       dangerouslySetInnerHTML={{
         __html: Object.entries(THEMES)
           .map(
