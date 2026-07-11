@@ -459,7 +459,7 @@ const lifecycleAuditInputSchema = z
     offset: z.number().int().min(0).max(10_000).optional(),
     user_id: z.string().uuid().optional(),
     referral_id: z.string().uuid().optional(),
-    state: z.enum(["all", "unread", "read", "unused", "used"]).optional(),
+    state: z.enum(["all", "unread", "read", "unused", "used", "expired"]).optional(),
   })
   .default({});
 
@@ -472,6 +472,7 @@ export type NotificationLifecycleRow = {
   message: string | null;
   created_at: string;
   read_at: string | null;
+  expired_at: string | null;
   used_at: string | null;
   used_by_user_id: string | null;
   used_against_referral_id: string | null;
@@ -497,13 +498,14 @@ export const getNotificationLifecycleAudit = createServerFn({ method: "POST" })
 
     let q = supabaseAdmin
       .from("notifications")
-      .select("id, user_id, referral_id, kind, message, read_at, created_at")
+      .select("id, user_id, referral_id, kind, message, read_at, created_at, expired_at")
       .order("created_at", { ascending: false })
       .range(offset, offset + limit);
     if (data.user_id) q = q.eq("user_id", data.user_id);
     if (data.referral_id) q = q.eq("referral_id", data.referral_id);
     if (data.state === "unread") q = q.is("read_at", null);
     if (data.state === "read") q = q.not("read_at", "is", null);
+    if (data.state === "expired") q = q.not("expired_at", "is", null);
     const { data: notifs, error } = await q;
     if (error) {
       throw safeError("admin.getNotificationLifecycleAudit", error, "Failed to load lifecycle audit.");
@@ -519,6 +521,7 @@ export const getNotificationLifecycleAudit = createServerFn({ method: "POST" })
       message: string | null;
       read_at: string | null;
       created_at: string;
+      expired_at: string | null;
     }>;
 
     // Batch-fetch every audit_log 'view' row whose diff.notification_id
@@ -573,6 +576,7 @@ export const getNotificationLifecycleAudit = createServerFn({ method: "POST" })
         message: n.message,
         created_at: n.created_at,
         read_at: n.read_at,
+        expired_at: n.expired_at,
         used_at: used?.used_at ?? null,
         used_by_user_id: used?.used_by_user_id ?? null,
         used_against_referral_id: used?.used_against_referral_id ?? null,
