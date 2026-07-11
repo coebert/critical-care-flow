@@ -146,7 +146,7 @@ function makeSupabase(opts: {
 // (correctly) start failing — that's the point.
 // ---------------------------------------------------------------------
 async function runLogReferralView(
-  supabase: ReturnType<typeof makeSupabase>["client"],
+  supabase: any,
   userId: string,
   data: { referral_id: string },
   writeAudit: (row: unknown) => Promise<void>,
