@@ -218,6 +218,13 @@ const AUDIT_ENTITY_OPTIONS = [
 ] as const;
 const AUDIT_ACTION_OPTIONS = ["create", "update", "delete"] as const;
 
+const AUDIT_QUICK_FILTERS = [
+  { label: "Referral created", entity: "referral", action: "create" },
+  { label: "Referral updated", entity: "referral", action: "update" },
+  { label: "Referral note updated", entity: "referral_note", action: "update" },
+  { label: "Patient updated", entity: "patient", action: "update" },
+] as const;
+
 type AuditFilters = {
   entity: string;
   action: string;
