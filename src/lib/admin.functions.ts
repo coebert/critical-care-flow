@@ -521,6 +521,7 @@ export const getNotificationLifecycleAudit = createServerFn({ method: "POST" })
       message: string | null;
       read_at: string | null;
       created_at: string;
+      expired_at: string | null;
     }>;
 
     // Batch-fetch every audit_log 'view' row whose diff.notification_id
