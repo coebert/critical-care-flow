@@ -1,4 +1,4 @@
-import { createFileRoute, useNavigate } from "@tanstack/react-router";
+import { createFileRoute, useNavigate, notFound, Link } from "@tanstack/react-router";
 import { useEffect, useRef, useState } from "react";
 import { useServerFn } from "@tanstack/react-start";
 import { queryOptions, useQueryClient } from "@tanstack/react-query";
@@ -62,11 +62,30 @@ export const Route = createFileRoute("/_authenticated/referrals/$id")({
     highlight: typeof search.highlight === "string" ? search.highlight : undefined,
   }),
   head: () => ({ meta: [{ title: "Referral — SDH Critical Care" }, { name: "robots", content: "noindex" }] }),
-  loader: ({ context, params }) => {
+  loader: async ({ context, params }) => {
     context.queryClient.ensureQueryData(referralNotesQueryOptions(params.id));
-    return context.queryClient.ensureQueryData(referralDetailQueryOptions(params.id));
+    const detail = await context.queryClient.ensureQueryData(
+      referralDetailQueryOptions(params.id),
+    );
+    // Deleted / archived / never-existed → not-found, never a blank
+    // "Loading…" screen and never leaking that an id ever existed.
+    if (!detail) throw notFound();
+    return detail;
   },
   errorComponent: ({ error }) => <ReferralRouteError error={error} label="Referral" />,
+  notFoundComponent: () => (
+    <div className="max-w-2xl mx-auto p-6 space-y-3">
+      <h1 className="text-lg font-semibold">Referral unavailable</h1>
+      <p className="text-sm text-muted-foreground">
+        This referral is no longer available. It may have been deleted or
+        archived. If you followed a link from a notification, the notification
+        is out of date.
+      </p>
+      <Link to="/" className="text-sm text-primary hover:underline">
+        Back to referrals
+      </Link>
+    </div>
+  ),
   component: ReferralDetail,
 });
 

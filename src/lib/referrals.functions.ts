@@ -590,6 +590,7 @@ export const getReferralDetail = createServerFn({ method: "POST" })
       .from("referrals")
       .select("*")
       .eq("id", data.id)
+      .is("deleted_at", null)
       .maybeSingle();
     if (error) throw safeError("referrals.get", error, "Failed to load referral.");
     if (!row) return null;
@@ -602,6 +603,15 @@ export const listReferralNotesDecrypted = createServerFn({ method: "POST" })
   .handler(async ({ data, context }) => {
     const { supabase, userId } = context;
     await assertClinicalAccess(supabase, userId);
+    // Deleted / archived parent referrals must not leak their notes.
+    // Callers reaching this fn for a soft-deleted referral get [].
+    const { data: parent } = await supabase
+      .from("referrals")
+      .select("id")
+      .eq("id", data.referral_id)
+      .is("deleted_at", null)
+      .maybeSingle();
+    if (!parent) return [];
     const { data: rows, error } = await supabase
       .from("referral_notes")
       .select("*")
