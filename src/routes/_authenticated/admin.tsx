@@ -197,68 +197,206 @@ function UsersPanel() {
   );
 }
 
+type AuditSortColumn = "created_at" | "action" | "entity";
+const PAGE_SIZE_OPTIONS = [25, 50, 100, 200] as const;
+
 function AuditPanel() {
   const fetchLog = useServerFn(getAuditLog);
   const [rows, setRows] = useState<any[]>([]);
-  const [nextOffset, setNextOffset] = useState(0);
-  const [hasMore, setHasMore] = useState(false);
+  const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(true);
-  const [loadingMore, setLoadingMore] = useState(false);
+  const [pageSize, setPageSize] = useState<number>(50);
+  const [offset, setOffset] = useState(0);
+  const [sortBy, setSortBy] = useState<AuditSortColumn>("created_at");
+  const [sortDir, setSortDir] = useState<"asc" | "desc">("desc");
 
   useEffect(() => {
-    fetchLog({ data: { limit: 100, offset: 0 } })
+    let cancelled = false;
+    setLoading(true);
+    fetchLog({ data: { limit: pageSize, offset, sortBy, sortDir } })
       .then((page) => {
+        if (cancelled) return;
         setRows(page.rows);
-        setHasMore(page.hasMore);
-        setNextOffset(page.nextOffset);
+        setTotal(page.total);
       })
-      .finally(() => setLoading(false));
-  }, [fetchLog]);
+      .finally(() => {
+        if (!cancelled) setLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [fetchLog, pageSize, offset, sortBy, sortDir]);
 
-  const loadMore = async () => {
-    setLoadingMore(true);
-    try {
-      const page = await fetchLog({ data: { limit: 100, offset: nextOffset } });
-      setRows((cur) => [...cur, ...page.rows]);
-      setHasMore(page.hasMore);
-      setNextOffset(page.nextOffset);
-    } finally {
-      setLoadingMore(false);
+  const toggleSort = (col: AuditSortColumn) => {
+    if (sortBy === col) {
+      setSortDir((d) => (d === "asc" ? "desc" : "asc"));
+    } else {
+      setSortBy(col);
+      setSortDir(col === "created_at" ? "desc" : "asc");
     }
+    // Any sort change resets pagination to the first page so the visible
+    // slice matches the newly ordered dataset.
+    setOffset(0);
   };
+
+  const currentPage = Math.floor(offset / pageSize) + 1;
+  const totalPages = Math.max(1, Math.ceil(total / pageSize));
+  const rangeStart = total === 0 ? 0 : offset + 1;
+  const rangeEnd = Math.min(offset + rows.length, total);
+
+  const goPrev = () => setOffset((o) => Math.max(0, o - pageSize));
+  const goNext = () =>
+    setOffset((o) => (o + pageSize < total ? o + pageSize : o));
+  const goFirst = () => setOffset(0);
+  const goLast = () => setOffset(Math.max(0, (totalPages - 1) * pageSize));
+
+  const sortIndicator = (col: AuditSortColumn) =>
+    sortBy === col ? (sortDir === "asc" ? " ▲" : " ▼") : "";
+
+  const SortableTh = ({
+    col,
+    label,
+  }: {
+    col: AuditSortColumn;
+    label: string;
+  }) => (
+    <th className="text-left py-2">
+      <button
+        type="button"
+        onClick={() => toggleSort(col)}
+        aria-sort={
+          sortBy === col
+            ? sortDir === "asc"
+              ? "ascending"
+              : "descending"
+            : "none"
+        }
+        className="inline-flex items-center gap-1 uppercase text-xs font-medium text-muted-foreground hover:text-foreground focus:outline-none focus:underline"
+      >
+        {label}
+        <span aria-hidden="true">{sortIndicator(col)}</span>
+      </button>
+    </th>
+  );
 
   return (
     <Card className="p-5">
-      <h2 className="font-semibold mb-3">Audit log</h2>
-      {loading ? <p className="text-sm text-muted-foreground">Loading…</p> : (
+      <div className="flex items-center justify-between mb-3 gap-3 flex-wrap">
+        <h2 className="font-semibold">Audit log</h2>
+        <div className="flex items-center gap-2 text-xs text-muted-foreground">
+          <label htmlFor="audit-page-size">Rows per page</label>
+          <select
+            id="audit-page-size"
+            className="border rounded px-2 py-1 bg-background text-foreground"
+            value={pageSize}
+            onChange={(e) => {
+              setPageSize(Number(e.target.value));
+              setOffset(0);
+            }}
+          >
+            {PAGE_SIZE_OPTIONS.map((n) => (
+              <option key={n} value={n}>
+                {n}
+              </option>
+            ))}
+          </select>
+        </div>
+      </div>
+      {loading ? (
+        <p className="text-sm text-muted-foreground">Loading…</p>
+      ) : (
         <>
-          <div className="overflow-x-auto"><table className="w-full text-sm min-w-[640px]">
-            <thead className="text-xs uppercase text-muted-foreground">
-              <tr><th className="text-left py-2">When</th><th className="text-left">Action</th><th className="text-left">Entity</th><th className="text-left">ID</th><th className="text-left">User</th></tr>
-            </thead>
-            <tbody>
-              {rows.map((r) => (
-                <tr key={r.id} className="border-t">
-                  <td className="py-1.5 whitespace-nowrap" title={tzTooltip(r.created_at)}>{format(new Date(r.created_at), "dd/MM/yyyy HH:mm:ss")}</td>
-                  <td className="capitalize">{r.action}</td>
-                  <td>{r.entity}</td>
-                  <td className="font-mono text-xs">{r.entity_id?.slice(0, 8) ?? "—"}</td>
-                  <td className="font-mono text-xs">{r.user_id?.slice(0, 8) ?? "—"}</td>
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm min-w-[640px]">
+              <thead>
+                <tr>
+                  <SortableTh col="created_at" label="When" />
+                  <SortableTh col="action" label="Action" />
+                  <SortableTh col="entity" label="Entity" />
+                  <th className="text-left py-2 uppercase text-xs text-muted-foreground">ID</th>
+                  <th className="text-left py-2 uppercase text-xs text-muted-foreground">User</th>
                 </tr>
-              ))}
-            </tbody>
-          </table></div>
-          {hasMore && (
-            <div className="mt-3 flex justify-center">
-              <Button variant="outline" size="sm" onClick={loadMore} disabled={loadingMore}>
-                {loadingMore ? "Loading…" : "Load more"}
+              </thead>
+              <tbody>
+                {rows.length === 0 ? (
+                  <tr>
+                    <td colSpan={5} className="py-4 text-center text-muted-foreground">
+                      No audit entries.
+                    </td>
+                  </tr>
+                ) : (
+                  rows.map((r) => (
+                    <tr key={r.id} className="border-t">
+                      <td
+                        className="py-1.5 whitespace-nowrap"
+                        title={tzTooltip(r.created_at)}
+                      >
+                        {format(new Date(r.created_at), "dd/MM/yyyy HH:mm:ss")}
+                      </td>
+                      <td className="capitalize">{r.action}</td>
+                      <td>{r.entity}</td>
+                      <td className="font-mono text-xs">
+                        {r.entity_id?.slice(0, 8) ?? "—"}
+                      </td>
+                      <td className="font-mono text-xs">
+                        {r.user_id?.slice(0, 8) ?? "—"}
+                      </td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
+          </div>
+          <div className="mt-3 flex flex-wrap items-center justify-between gap-2 text-xs text-muted-foreground">
+            <div aria-live="polite">
+              {total === 0
+                ? "0 entries"
+                : `Showing ${rangeStart}–${rangeEnd} of ${total} — page ${currentPage} of ${totalPages}`}
+            </div>
+            <div className="flex items-center gap-1">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={goFirst}
+                disabled={offset === 0}
+                aria-label="First page"
+              >
+                « First
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={goPrev}
+                disabled={offset === 0}
+                aria-label="Previous page"
+              >
+                ‹ Prev
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={goNext}
+                disabled={offset + pageSize >= total}
+                aria-label="Next page"
+              >
+                Next ›
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={goLast}
+                disabled={offset + pageSize >= total}
+                aria-label="Last page"
+              >
+                Last »
               </Button>
             </div>
-          )}
+          </div>
         </>
       )}
     </Card>
   );
 }
+
 
 
