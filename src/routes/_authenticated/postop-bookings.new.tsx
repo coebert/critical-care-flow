@@ -45,6 +45,7 @@ function NewPostopBookingPage() {
   const [saving, setSaving] = useState(false);
 
   const [hospitalNumber, setHospitalNumber] = useState("");
+  const [initials, setInitials] = useState("");
   const [age, setAge] = useState("");
   const [sex, setSex] = useState<Sex>("");
   const [weight, setWeight] = useState("");
