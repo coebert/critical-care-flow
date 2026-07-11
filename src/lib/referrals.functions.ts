@@ -396,11 +396,12 @@ export const updateReferral = createServerFn({ method: "POST" })
   .handler(async ({ data, context }) => {
     const { supabase, userId } = context;
     await assertClinicalAccess(supabase, userId);
+    // Select "*" so the notification normalization below can compare any
+    // patched column against its prior value. Extra columns are read-only
+    // here and used purely for equality checks / audit context.
     const { data: prior } = await supabase
       .from("referrals")
-      .select(
-        "status, decline_reason, accepting_consultant, discussed_with_consultant, admission_urgency, referral_received_at, first_seen_at, decision_at, arrived_on_unit_at, created_by, deleted_at",
-      )
+      .select("*")
       .eq("id", data.id)
       .maybeSingle();
 
