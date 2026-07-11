@@ -15,6 +15,7 @@ export type DraftForm = {
   age: string;
   sex: "male" | "female" | "other" | "unknown";
   hospital_number: string;
+  patient_initials: string;
   current_ward: string;
   current_bed: string;
   past_medical_history: string;
