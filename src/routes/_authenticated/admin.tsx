@@ -12,10 +12,16 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
+import { Calendar } from "@/components/ui/calendar";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { CalendarIcon } from "lucide-react";
+import { cn } from "@/lib/utils";
+import type { DateRange } from "react-day-picker";
 import { BedsAdminPanel } from "@/components/bed-board/beds-admin-panel";
 import { MessageTemplatesPanel } from "@/components/admin/message-templates-panel";
 import { toast } from "sonner";
 import { format } from "date-fns";
+
 
 export const Route = createFileRoute("/_authenticated/admin")({
   head: () => ({ meta: [{ title: "Admin — SDH Critical Care" }, { name: "robots", content: "noindex" }] }),
@@ -229,12 +235,22 @@ const EMPTY_FILTERS: AuditFilters = {
   to: "",
 };
 
-// datetime-local (YYYY-MM-DDTHH:mm) → ISO string. Empty stays empty.
-const toIso = (v: string): string | undefined => {
+// Date-only string (YYYY-MM-DD) → ISO. `endOfDay` extends the upper bound
+// to 23:59:59.999 so the range is inclusive of the selected end date.
+const dateToIso = (v: string, endOfDay = false): string | undefined => {
   if (!v) return undefined;
-  const d = new Date(v);
+  const d = new Date(`${v}T${endOfDay ? "23:59:59.999" : "00:00:00.000"}`);
   return isNaN(d.getTime()) ? undefined : d.toISOString();
 };
+const isoToDate = (v: string): Date | undefined => {
+  if (!v) return undefined;
+  const [y, m, d] = v.split("-").map((n) => parseInt(n, 10));
+  if (!y || !m || !d) return undefined;
+  return new Date(y, m - 1, d);
+};
+const dateToIsoDay = (d: Date): string =>
+  `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+
 
 function AuditPanel() {
   const fetchLog = useServerFn(getAuditLog);
@@ -263,8 +279,9 @@ function AuditPanel() {
         action: (applied.action || undefined) as any,
         clinician: applied.clinician || undefined,
         specialty: applied.specialty || undefined,
-        from: toIso(applied.from),
-        to: toIso(applied.to),
+        from: dateToIso(applied.from),
+        to: dateToIso(applied.to, true),
+
       },
     })
       .then((page) => {
@@ -418,24 +435,20 @@ function AuditPanel() {
             onChange={(e) => setDraft((d) => ({ ...d, specialty: e.target.value }))}
           />
         </div>
-        <div className="flex flex-col gap-1">
-          <Label htmlFor="audit-filter-from" className="text-xs">From</Label>
-          <Input
-            id="audit-filter-from"
-            type="datetime-local"
-            value={draft.from}
-            onChange={(e) => setDraft((d) => ({ ...d, from: e.target.value }))}
+        <div className="flex flex-col gap-1 sm:col-span-2">
+          <Label className="text-xs" id="audit-filter-range-label">Referral date range</Label>
+          <AuditDateRangePicker
+            value={{ from: isoToDate(draft.from), to: isoToDate(draft.to) }}
+            onChange={(range) =>
+              setDraft((d) => ({
+                ...d,
+                from: range?.from ? dateToIsoDay(range.from) : "",
+                to: range?.to ? dateToIsoDay(range.to) : "",
+              }))
+            }
           />
         </div>
-        <div className="flex flex-col gap-1">
-          <Label htmlFor="audit-filter-to" className="text-xs">To</Label>
-          <Input
-            id="audit-filter-to"
-            type="datetime-local"
-            value={draft.to}
-            onChange={(e) => setDraft((d) => ({ ...d, to: e.target.value }))}
-          />
-        </div>
+
         <div className="sm:col-span-2 lg:col-span-3 flex items-center gap-2">
           <Button type="submit" size="sm">Apply filters</Button>
           <Button type="button" size="sm" variant="outline" onClick={onReset}>
@@ -539,6 +552,70 @@ function AuditPanel() {
     </Card>
   );
 }
+
+/**
+ * Popover-anchored range calendar for the Audit tab. The trigger shows
+ * the current selection in "dd MMM yyyy" or a "Pick a date range"
+ * placeholder. Selecting a range fires `onChange`; clearing it fires
+ * `onChange(undefined)`.
+ */
+function AuditDateRangePicker({
+  value,
+  onChange,
+}: {
+  value: DateRange | undefined;
+  onChange: (range: DateRange | undefined) => void;
+}) {
+  const label = value?.from
+    ? value.to
+      ? `${format(value.from, "dd MMM yyyy")} – ${format(value.to, "dd MMM yyyy")}`
+      : format(value.from, "dd MMM yyyy")
+    : "Pick a date range";
+  const hasValue = Boolean(value?.from || value?.to);
+  return (
+    <div className="flex items-center gap-2">
+      <Popover>
+        <PopoverTrigger asChild>
+          <Button
+            id="audit-filter-range"
+            type="button"
+            variant="outline"
+            aria-labelledby="audit-filter-range-label"
+            className={cn(
+              "justify-start text-left font-normal w-full sm:w-[280px]",
+              !hasValue && "text-muted-foreground",
+            )}
+          >
+            <CalendarIcon className="mr-2 h-4 w-4" />
+            {label}
+          </Button>
+        </PopoverTrigger>
+        <PopoverContent className="w-auto p-0" align="start">
+          <Calendar
+            mode="range"
+            selected={value}
+            onSelect={onChange}
+            numberOfMonths={2}
+            initialFocus
+            className={cn("p-3 pointer-events-auto")}
+          />
+        </PopoverContent>
+      </Popover>
+      {hasValue && (
+        <Button
+          type="button"
+          variant="ghost"
+          size="sm"
+          onClick={() => onChange(undefined)}
+          aria-label="Clear date range"
+        >
+          Clear
+        </Button>
+      )}
+    </div>
+  );
+}
+
 
 
 
