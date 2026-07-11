@@ -187,7 +187,7 @@ export function computePartnerHandoverPrefill(
   for (const k of textFields) {
     const val = proposed[k];
     if (val == null || val === "") continue;
-    if (isBlank((patient as Record<string, unknown>)[k])) {
+    if (isBlank((patient as unknown as Record<string, unknown>)[k])) {
       patch[k] = val as string;
       applied.push(k);
     } else {
