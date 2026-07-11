@@ -488,7 +488,6 @@ export const updateReferral = createServerFn({ method: "POST" })
     }
     // A status change is now definitional: the key survived normalization.
     const statusChanged = "status" in effectivePatch;
-    const statusChanged = "status" in effectivePatch;
     // Non-bookkeeping, non-status fields that actually changed. These
     // drive the "updated" push and its deep link.
     const patchKeys = Object.keys(effectivePatch).filter(
