@@ -873,6 +873,47 @@ function EditOccupantDialog({
           </DialogDescription>
         </DialogHeader>
 
+        {occupant && sourceReferralId && (
+          <div
+            className="rounded-md border border-primary/30 bg-primary/5 px-3 py-2 text-sm"
+            role="region"
+            aria-label="Prefill handover from referral"
+          >
+            <div className="flex items-start gap-2">
+              <Sparkles
+                className="w-4 h-4 mt-0.5 text-primary"
+                aria-hidden="true"
+              />
+              <div className="flex-1">
+                <div className="font-medium">Prefill handover from referral</div>
+                <div className="text-xs text-muted-foreground mt-0.5">
+                  Copies TEP / DNACPR status, past medical history, reason for
+                  admission and anticipated management from the linked referral.
+                  Fields that already have content on the partner are left
+                  untouched.
+                </div>
+              </div>
+              <Button
+                type="button"
+                size="sm"
+                onClick={() => prefillMutation.mutate()}
+                disabled={prefillMutation.isPending}
+              >
+                {prefillMutation.isPending ? (
+                  <Loader2
+                    className="w-3.5 h-3.5 mr-1 animate-spin"
+                    aria-hidden="true"
+                  />
+                ) : (
+                  <Sparkles className="w-3.5 h-3.5 mr-1" aria-hidden="true" />
+                )}
+                Prefill
+              </Button>
+            </div>
+          </div>
+        )}
+
+
         {conflict && (
           <div
             className="rounded-md border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-sm"
