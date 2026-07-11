@@ -113,6 +113,109 @@ function composeDnacprDetails(
   return null;
 }
 
+/**
+ * Pure mapping: given the decrypted referral fields and the current partner
+ * patient row, decide which fields to fill (fill-blanks only) and the exact
+ * patch we would send across the bridge. Exported for unit tests.
+ */
+export interface ReferralPrefillSource {
+  past_medical_history: string | null;
+  baseline_function: string | null;
+  reason_for_referral: string | null;
+  allergies: string | null;
+  weight_kg: number | null;
+  anticipated_interventions: string[] | null;
+  ceiling_of_care: string | null;
+  resus_status: string | null;
+  dnacpr_respect: boolean | null;
+}
+
+export interface PartnerPatientCurrent {
+  tep_in_place: boolean | null;
+  tep_details: string | null;
+  dnacpr_decision: boolean | null;
+  dnacpr_details: string | null;
+  past_medical_history: string | null;
+  current_admission: string | null;
+  current_management: string | null;
+}
+
+export interface PartnerHandoverPrefillPlan {
+  patch: Record<string, string | boolean>;
+  applied_fields: string[];
+  skipped_fields: string[];
+}
+
+export function computePartnerHandoverPrefill(
+  ref: ReferralPrefillSource,
+  patient: PartnerPatientCurrent,
+): PartnerHandoverPrefillPlan {
+  const wantsDnacpr =
+    ref.resus_status === "dnacpr" || ref.dnacpr_respect === true;
+  const wantsTep =
+    !!ref.ceiling_of_care ||
+    !!ref.resus_status ||
+    wantsDnacpr ||
+    (ref.anticipated_interventions?.length ?? 0) > 0;
+
+  const proposed: Record<string, string | boolean | null | undefined> = {
+    tep_in_place: wantsTep ? true : undefined,
+    tep_details: composeTepDetails(ref.ceiling_of_care, ref.resus_status),
+    dnacpr_decision: wantsDnacpr ? true : undefined,
+    dnacpr_details: composeDnacprDetails(ref.resus_status, ref.dnacpr_respect),
+    past_medical_history: ref.past_medical_history,
+    current_admission: ref.reason_for_referral,
+    current_management: composeCurrentManagement({
+      baseline_function: ref.baseline_function,
+      allergies: ref.allergies,
+      weight_kg: ref.weight_kg,
+      anticipated_interventions: ref.anticipated_interventions,
+    }),
+  };
+
+  const applied: string[] = [];
+  const skipped: string[] = [];
+  const patch: Record<string, string | boolean> = {};
+
+  const textFields = [
+    "tep_details",
+    "dnacpr_details",
+    "past_medical_history",
+    "current_admission",
+    "current_management",
+  ] as const;
+  for (const k of textFields) {
+    const val = proposed[k];
+    if (val == null || val === "") continue;
+    if (isBlank((patient as Record<string, unknown>)[k])) {
+      patch[k] = val as string;
+      applied.push(k);
+    } else {
+      skipped.push(k);
+    }
+  }
+
+  if (proposed.tep_in_place === true) {
+    if (!patient.tep_in_place) {
+      patch.tep_in_place = true;
+      applied.push("tep_in_place");
+    } else {
+      skipped.push("tep_in_place");
+    }
+  }
+  if (proposed.dnacpr_decision === true) {
+    if (!patient.dnacpr_decision) {
+      patch.dnacpr_decision = true;
+      applied.push("dnacpr_decision");
+    } else {
+      skipped.push("dnacpr_decision");
+    }
+  }
+
+  return { patch, applied_fields: applied, skipped_fields: skipped };
+}
+
+
 export const prefillPartnerHandoverFromReferral = createServerFn({
   method: "POST",
 })
