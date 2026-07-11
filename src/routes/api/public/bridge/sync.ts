@@ -1,7 +1,10 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { jsonResponse, preflight } from "@/lib/bridge-cors";
 import { getBridgeSecrets, signWith } from "@/lib/bridge-hmac.server";
-import { normalizeIncomingBridgeRecord } from "@/lib/bridge-normalize";
+import {
+  auditBridgeNormalizationEvents,
+  normalizeIncomingBridgeRecord,
+} from "@/lib/bridge-normalize";
 
 /**
  * Outbound bridge sync worker.
