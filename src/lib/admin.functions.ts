@@ -183,23 +183,53 @@ export const AUDIT_SORT_COLUMNS = ["created_at", "action", "entity"] as const;
 export type AuditSortColumn = (typeof AUDIT_SORT_COLUMNS)[number];
 export const AUDIT_ACTIONS = ["create", "update", "delete"] as const;
 
+// Custom error messages that DELIBERATELY omit the caller-supplied value.
+// Zod's default enum / datetime / string errors echo the received value
+// verbatim (e.g. `received 'H-1234567'`), which turns any accidentally-
+// sensitive filter value into a leak via error logs & client toasts. Fixed
+// messages keep the validation surface stable and value-free.
 const auditLogInputSchema = z
   .object({
-    limit: z.number().int().min(1).max(200).optional(),
-    offset: z.number().int().min(0).max(100_000).optional(),
-    sortBy: z.enum(AUDIT_SORT_COLUMNS).optional(),
-    sortDir: z.enum(["asc", "desc"]).optional(),
+    limit: z
+      .number({ message: "Invalid limit" })
+      .int({ message: "Invalid limit" })
+      .min(1, { message: "Invalid limit" })
+      .max(200, { message: "Invalid limit" })
+      .optional(),
+    offset: z
+      .number({ message: "Invalid offset" })
+      .int({ message: "Invalid offset" })
+      .min(0, { message: "Invalid offset" })
+      .max(100_000, { message: "Invalid offset" })
+      .optional(),
+    sortBy: z.enum(AUDIT_SORT_COLUMNS, { message: "Invalid sortBy" }).optional(),
+    sortDir: z.enum(["asc", "desc"], { message: "Invalid sortDir" }).optional(),
     // --- filters ---
-    entity: z.string().trim().min(1).max(64).optional(),
-    action: z.enum(AUDIT_ACTIONS).optional(),
+    entity: z
+      .string({ message: "Invalid entity" })
+      .trim()
+      .min(1, { message: "Invalid entity" })
+      .max(64, { message: "Invalid entity" })
+      .optional(),
+    action: z.enum(AUDIT_ACTIONS, { message: "Invalid action" }).optional(),
     // Free-text clinician search: matched against profiles.full_name (ilike).
     // A UUID is treated as a direct user_id filter for exact lookups.
-    clinician: z.string().trim().min(1).max(120).optional(),
+    clinician: z
+      .string({ message: "Invalid clinician" })
+      .trim()
+      .min(1, { message: "Invalid clinician" })
+      .max(120, { message: "Invalid clinician" })
+      .optional(),
     // Filter referral-entity rows whose linked referral has this specialty.
-    specialty: z.string().trim().min(1).max(120).optional(),
+    specialty: z
+      .string({ message: "Invalid specialty" })
+      .trim()
+      .min(1, { message: "Invalid specialty" })
+      .max(120, { message: "Invalid specialty" })
+      .optional(),
     // ISO datetimes bounding audit_log.created_at.
-    from: z.string().datetime().optional(),
-    to: z.string().datetime().optional(),
+    from: z.string().datetime({ message: "Invalid from" }).optional(),
+    to: z.string().datetime({ message: "Invalid to" }).optional(),
   })
   .default({});
 
