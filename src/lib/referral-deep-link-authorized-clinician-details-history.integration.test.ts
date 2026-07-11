@@ -140,10 +140,6 @@ function makeSupabase(opts: {
     auditSelect: ReturnType<typeof vi.fn> & (() => void);
   };
 }) {
-    notesSelect: ReturnType<typeof vi.fn>;
-    auditSelect: ReturnType<typeof vi.fn>;
-  };
-}) {
   const from = (table: string) => {
     const chain: any = {
       _table: table,
