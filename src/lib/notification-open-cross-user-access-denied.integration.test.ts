@@ -137,7 +137,7 @@ function makeSupabaseWithRLS(opts: {
             const filters: Record<string, unknown> = {};
             const b: any = {
               eq(col: string, v: unknown) {
-                filters[`eq:${col}`] = v;
+                filters[col] = v;
                 return b;
               },
               then(resolve: (v: { data: null; error: null }) => void) {
