@@ -3,6 +3,7 @@ import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { safeError } from "./safe-error";
 import { assertAdmin } from "./auth-guards";
+import { redactAuditDiff } from "./audit-redact";
 import type { Tables } from "@/integrations/supabase/types";
 
 export const inviteClinician = createServerFn({ method: "POST" })
