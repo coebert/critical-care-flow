@@ -316,6 +316,9 @@ export const updatePartnerPatient = createServerFn({ method: "POST" })
       "dnacpr_decision",
       "dnacpr_details",
       "outstanding_tasks",
+      "past_medical_history",
+      "current_admission",
+      "current_management",
     ] as const) {
       const v = (data as Record<string, unknown>)[key];
       if (v !== undefined) bodyObj[key] = v;
