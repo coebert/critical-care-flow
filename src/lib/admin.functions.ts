@@ -181,6 +181,7 @@ export const setUserRole = createServerFn({ method: "POST" })
 
 export const AUDIT_SORT_COLUMNS = ["created_at", "action", "entity"] as const;
 export type AuditSortColumn = (typeof AUDIT_SORT_COLUMNS)[number];
+export const AUDIT_ACTIONS = ["create", "update", "delete"] as const;
 
 const auditLogInputSchema = z
   .object({
@@ -188,8 +189,21 @@ const auditLogInputSchema = z
     offset: z.number().int().min(0).max(100_000).optional(),
     sortBy: z.enum(AUDIT_SORT_COLUMNS).optional(),
     sortDir: z.enum(["asc", "desc"]).optional(),
+    // --- filters ---
+    entity: z.string().trim().min(1).max(64).optional(),
+    action: z.enum(AUDIT_ACTIONS).optional(),
+    // Free-text clinician search: matched against profiles.full_name (ilike).
+    // A UUID is treated as a direct user_id filter for exact lookups.
+    clinician: z.string().trim().min(1).max(120).optional(),
+    // Filter referral-entity rows whose linked referral has this specialty.
+    specialty: z.string().trim().min(1).max(120).optional(),
+    // ISO datetimes bounding audit_log.created_at.
+    from: z.string().datetime().optional(),
+    to: z.string().datetime().optional(),
   })
   .default({});
+
+export type AuditLogFilters = z.infer<typeof auditLogInputSchema>;
 
 export type AuditLogEntry = {
   id: string;
@@ -213,38 +227,71 @@ export type AuditLogPage = {
   sortDir: "asc" | "desc";
 };
 
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
 export const getAuditLog = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((input: unknown) => auditLogInputSchema.parse(input ?? {}))
   .handler(async ({ data, context }): Promise<AuditLogPage> => {
     await assertAdmin(context);
-    // Use the admin client so RLS on audit_log cannot silently hide rows from
-    // admins (e.g. entries written by service_role or by users whose scope
-    // no longer matches the policy). Access is gated by assertAdmin above.
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const limit = data.limit ?? 50;
     const offset = data.offset ?? 0;
     const sortBy: AuditSortColumn = data.sortBy ?? "created_at";
     const sortDir: "asc" | "desc" = data.sortDir ?? "desc";
-    // Ask PostgREST for an exact row count so the UI can render "Page X of Y"
-    // and disable Next past the end without a second round trip.
-    // Fetch limit+1 to detect whether more rows exist without another query.
+
+    // Resolve clinician query → set of user_ids. A UUID means exact match; any
+    // other string is looked up against profiles.full_name (ilike). An unknown
+    // name yields an empty set so the query returns zero rows.
+    let userIdFilter: string[] | null = null;
+    if (data.clinician) {
+      if (UUID_RE.test(data.clinician)) {
+        userIdFilter = [data.clinician];
+      } else {
+        const { data: profs, error: profErr } = await supabaseAdmin
+          .from("profiles")
+          .select("id")
+          .ilike("full_name", `%${data.clinician}%`)
+          .limit(200);
+        if (profErr) throw safeError("admin.getAuditLog.clinician", profErr, "Failed to load audit log.");
+        userIdFilter = (profs ?? []).map((p) => p.id);
+        if (userIdFilter.length === 0) userIdFilter = ["00000000-0000-0000-0000-000000000000"];
+      }
+    }
+
+    // Resolve specialty → referral ids. Implies entity='referral'.
+    let referralIdFilter: string[] | null = null;
+    if (data.specialty) {
+      const { data: refs, error: refErr } = await supabaseAdmin
+        .from("referrals")
+        .select("id")
+        .ilike("referring_specialty", `%${data.specialty}%`)
+        .limit(5000);
+      if (refErr) throw safeError("admin.getAuditLog.specialty", refErr, "Failed to load audit log.");
+      referralIdFilter = (refs ?? []).map((r) => r.id);
+      if (referralIdFilter.length === 0) referralIdFilter = ["00000000-0000-0000-0000-000000000000"];
+    }
+
     let query = supabaseAdmin
       .from("audit_log")
       .select("*", { count: "exact" })
       .order(sortBy, { ascending: sortDir === "asc" });
-    // Deterministic tiebreaker so equal action/entity rows keep a stable
-    // order across pages (created_at DESC is unique enough in practice).
     if (sortBy !== "created_at") {
       query = query.order("created_at", { ascending: false });
     }
+    if (data.entity) query = query.eq("entity", data.entity);
+    if (data.action) query = query.eq("action", data.action);
+    if (userIdFilter) query = query.in("user_id", userIdFilter);
+    if (referralIdFilter) {
+      query = query.eq("entity", "referral").in("entity_id", referralIdFilter);
+    }
+    if (data.from) query = query.gte("created_at", data.from);
+    if (data.to) query = query.lte("created_at", data.to);
+
     const { data: rows, error, count } = await query.range(offset, offset + limit);
     if (error) throw safeError("admin.getAuditLog", error, "Failed to load audit log.");
     const list = rows ?? [];
     const hasMore = list.length > limit;
-    // Redact ciphertext / hash / nonce columns and known-sensitive plaintext
-    // fields from every diff BEFORE the payload leaves the server, so the
-    // Audit tab can't reveal them even to admins inspecting the response.
     const redacted = list.slice(0, limit).map((r) => ({
       ...r,
       diff: redactAuditDiff(r.diff),
@@ -260,6 +307,7 @@ export const getAuditLog = createServerFn({ method: "POST" })
       sortDir,
     };
   });
+
 
 // -----------------------------------------------------------------------------
 // Notification delivery audit

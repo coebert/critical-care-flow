@@ -199,6 +199,42 @@ function UsersPanel() {
 
 type AuditSortColumn = "created_at" | "action" | "entity";
 const PAGE_SIZE_OPTIONS = [25, 50, 100, 200] as const;
+const AUDIT_ENTITY_OPTIONS = [
+  "referral",
+  "referral_note",
+  "patient",
+  "postop_booking",
+  "microbiology",
+  "investigation",
+  "user",
+  "user_keypair",
+  "patient_acuity",
+] as const;
+const AUDIT_ACTION_OPTIONS = ["create", "update", "delete"] as const;
+
+type AuditFilters = {
+  entity: string;
+  action: string;
+  clinician: string;
+  specialty: string;
+  from: string;
+  to: string;
+};
+const EMPTY_FILTERS: AuditFilters = {
+  entity: "",
+  action: "",
+  clinician: "",
+  specialty: "",
+  from: "",
+  to: "",
+};
+
+// datetime-local (YYYY-MM-DDTHH:mm) → ISO string. Empty stays empty.
+const toIso = (v: string): string | undefined => {
+  if (!v) return undefined;
+  const d = new Date(v);
+  return isNaN(d.getTime()) ? undefined : d.toISOString();
+};
 
 function AuditPanel() {
   const fetchLog = useServerFn(getAuditLog);
@@ -209,11 +245,28 @@ function AuditPanel() {
   const [offset, setOffset] = useState(0);
   const [sortBy, setSortBy] = useState<AuditSortColumn>("created_at");
   const [sortDir, setSortDir] = useState<"asc" | "desc">("desc");
+  // Draft filters are what the user is typing; applied filters are what's
+  // actually sent to the server. Applying resets pagination to page 1.
+  const [draft, setDraft] = useState<AuditFilters>(EMPTY_FILTERS);
+  const [applied, setApplied] = useState<AuditFilters>(EMPTY_FILTERS);
 
   useEffect(() => {
     let cancelled = false;
     setLoading(true);
-    fetchLog({ data: { limit: pageSize, offset, sortBy, sortDir } })
+    fetchLog({
+      data: {
+        limit: pageSize,
+        offset,
+        sortBy,
+        sortDir,
+        entity: applied.entity || undefined,
+        action: (applied.action || undefined) as any,
+        clinician: applied.clinician || undefined,
+        specialty: applied.specialty || undefined,
+        from: toIso(applied.from),
+        to: toIso(applied.to),
+      },
+    })
       .then((page) => {
         if (cancelled) return;
         setRows(page.rows);
@@ -225,7 +278,20 @@ function AuditPanel() {
     return () => {
       cancelled = true;
     };
-  }, [fetchLog, pageSize, offset, sortBy, sortDir]);
+  }, [fetchLog, pageSize, offset, sortBy, sortDir, applied]);
+
+  const applyFilters = (next: AuditFilters) => {
+    setApplied(next);
+    setOffset(0);
+  };
+  const onApply = (e: React.FormEvent) => {
+    e.preventDefault();
+    applyFilters(draft);
+  };
+  const onReset = () => {
+    setDraft(EMPTY_FILTERS);
+    applyFilters(EMPTY_FILTERS);
+  };
 
   const toggleSort = (col: AuditSortColumn) => {
     if (sortBy === col) {
@@ -234,8 +300,6 @@ function AuditPanel() {
       setSortBy(col);
       setSortDir(col === "created_at" ? "desc" : "asc");
     }
-    // Any sort change resets pagination to the first page so the visible
-    // slice matches the newly ordered dataset.
     setOffset(0);
   };
 
@@ -302,6 +366,84 @@ function AuditPanel() {
           </select>
         </div>
       </div>
+
+      <form
+        onSubmit={onApply}
+        aria-label="Filter audit log"
+        className="mb-4 grid gap-2 sm:grid-cols-2 lg:grid-cols-3"
+      >
+        <div className="flex flex-col gap-1">
+          <Label htmlFor="audit-filter-entity" className="text-xs">Entity</Label>
+          <select
+            id="audit-filter-entity"
+            className="border rounded px-2 py-1.5 text-sm bg-background text-foreground"
+            value={draft.entity}
+            onChange={(e) => setDraft((d) => ({ ...d, entity: e.target.value }))}
+          >
+            <option value="">All entities</option>
+            {AUDIT_ENTITY_OPTIONS.map((v) => (
+              <option key={v} value={v}>{v}</option>
+            ))}
+          </select>
+        </div>
+        <div className="flex flex-col gap-1">
+          <Label htmlFor="audit-filter-action" className="text-xs">Action</Label>
+          <select
+            id="audit-filter-action"
+            className="border rounded px-2 py-1.5 text-sm bg-background text-foreground"
+            value={draft.action}
+            onChange={(e) => setDraft((d) => ({ ...d, action: e.target.value }))}
+          >
+            <option value="">All actions</option>
+            {AUDIT_ACTION_OPTIONS.map((v) => (
+              <option key={v} value={v}>{v}</option>
+            ))}
+          </select>
+        </div>
+        <div className="flex flex-col gap-1">
+          <Label htmlFor="audit-filter-clinician" className="text-xs">Clinician</Label>
+          <Input
+            id="audit-filter-clinician"
+            placeholder="Name or user ID"
+            value={draft.clinician}
+            onChange={(e) => setDraft((d) => ({ ...d, clinician: e.target.value }))}
+          />
+        </div>
+        <div className="flex flex-col gap-1">
+          <Label htmlFor="audit-filter-specialty" className="text-xs">Specialty (referrals)</Label>
+          <Input
+            id="audit-filter-specialty"
+            placeholder="e.g. General Surgery"
+            value={draft.specialty}
+            onChange={(e) => setDraft((d) => ({ ...d, specialty: e.target.value }))}
+          />
+        </div>
+        <div className="flex flex-col gap-1">
+          <Label htmlFor="audit-filter-from" className="text-xs">From</Label>
+          <Input
+            id="audit-filter-from"
+            type="datetime-local"
+            value={draft.from}
+            onChange={(e) => setDraft((d) => ({ ...d, from: e.target.value }))}
+          />
+        </div>
+        <div className="flex flex-col gap-1">
+          <Label htmlFor="audit-filter-to" className="text-xs">To</Label>
+          <Input
+            id="audit-filter-to"
+            type="datetime-local"
+            value={draft.to}
+            onChange={(e) => setDraft((d) => ({ ...d, to: e.target.value }))}
+          />
+        </div>
+        <div className="sm:col-span-2 lg:col-span-3 flex items-center gap-2">
+          <Button type="submit" size="sm">Apply filters</Button>
+          <Button type="button" size="sm" variant="outline" onClick={onReset}>
+            Reset
+          </Button>
+        </div>
+      </form>
+
       {loading ? (
         <p className="text-sm text-muted-foreground">Loading…</p>
       ) : (
