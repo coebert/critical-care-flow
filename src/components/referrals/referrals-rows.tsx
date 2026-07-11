@@ -26,6 +26,9 @@ interface Props {
   loading: boolean;
   timerSort: "none" | "desc" | "asc";
   onToggleTimerSort: () => void;
+  /** Map of referral id → count of unread in-app notifications for the
+   *  current user. Missing / 0 renders no badge. */
+  unreadByReferral?: Record<string, number>;
 }
 
 /**
@@ -33,8 +36,10 @@ interface Props {
  * card list on phones. Rows are keyboard-activatable — Enter or Space
  * navigates to the referral detail, matching mouse click behaviour.
  */
-export function ReferralsRows({ rows, loading, timerSort, onToggleTimerSort }: Props) {
+export function ReferralsRows({ rows, loading, timerSort, onToggleTimerSort, unreadByReferral }: Props) {
   const navigate = useNavigate();
+  const unreadCount = (id: string) => unreadByReferral?.[id] ?? 0;
+
 
   return (
     <>
