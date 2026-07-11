@@ -9,6 +9,7 @@ import {
   Loader2,
   RefreshCcw,
   ShieldCheck,
+  Sparkles,
   UserRound,
 } from "lucide-react";
 import { formatDistanceToNowStrict } from "date-fns";
