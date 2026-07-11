@@ -441,6 +441,155 @@ export const getNotificationDeliveryAudit = createServerFn({ method: "POST" })
   });
 
 
+// -----------------------------------------------------------------------------
+// Notification lifecycle audit — per-user, per-notification_id timeline.
+// For every notification row we show: when it was created, the referral it
+// was attached to, when (or if) it was consumed by a deep-link view
+// (audit_log.action='view' with diff->>notification_id = notifications.id),
+// and when it was marked read. The single-use guarantee enforced in
+// logReferralView means there is at most one "used" audit row per
+// notification_id; if it appears against a referral other than the
+// notification's own referral_id we surface that as a mismatch for
+// investigation.
+// -----------------------------------------------------------------------------
+
+const lifecycleAuditInputSchema = z
+  .object({
+    limit: z.number().int().min(1).max(200).optional(),
+    offset: z.number().int().min(0).max(10_000).optional(),
+    user_id: z.string().uuid().optional(),
+    referral_id: z.string().uuid().optional(),
+    state: z.enum(["all", "unread", "read", "unused", "used"]).optional(),
+  })
+  .default({});
+
+export type NotificationLifecycleRow = {
+  notification_id: string;
+  user_id: string;
+  user_name: string | null;
+  referral_id: string;
+  kind: string;
+  message: string | null;
+  created_at: string;
+  read_at: string | null;
+  used_at: string | null;
+  used_by_user_id: string | null;
+  used_against_referral_id: string | null;
+  mismatch: boolean;
+};
+
+export type NotificationLifecycleAuditPage = {
+  rows: NotificationLifecycleRow[];
+  hasMore: boolean;
+  nextOffset: number;
+};
+
+export const getNotificationLifecycleAudit = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input: unknown) => lifecycleAuditInputSchema.parse(input ?? {}))
+  .handler(async ({ data, context }): Promise<NotificationLifecycleAuditPage> => {
+    await assertAdmin(context);
+    // Admin-only view. Uses the service-role client because RLS on
+    // notifications restricts each row to its recipient.
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const limit = data.limit ?? 100;
+    const offset = data.offset ?? 0;
+
+    let q = supabaseAdmin
+      .from("notifications")
+      .select("id, user_id, referral_id, kind, message, read_at, created_at")
+      .order("created_at", { ascending: false })
+      .range(offset, offset + limit);
+    if (data.user_id) q = q.eq("user_id", data.user_id);
+    if (data.referral_id) q = q.eq("referral_id", data.referral_id);
+    if (data.state === "unread") q = q.is("read_at", null);
+    if (data.state === "read") q = q.not("read_at", "is", null);
+    const { data: notifs, error } = await q;
+    if (error) {
+      throw safeError("admin.getNotificationLifecycleAudit", error, "Failed to load lifecycle audit.");
+    }
+
+    const list = notifs ?? [];
+    const hasMore = list.length > limit;
+    const page = list.slice(0, limit) as Array<{
+      id: string;
+      user_id: string;
+      referral_id: string;
+      kind: string;
+      message: string | null;
+      read_at: string | null;
+      created_at: string;
+    }>;
+
+    // Batch-fetch every audit_log 'view' row whose diff.notification_id
+    // matches one of this page's notifications. A notification_id is
+    // single-use per user, so we expect at most one hit per id.
+    const ids = page.map((n) => n.id);
+    const usedByNotificationId = new Map<
+      string,
+      { used_at: string; used_by_user_id: string | null; used_against_referral_id: string | null }
+    >();
+    if (ids.length) {
+      const { data: audit, error: auditErr } = await supabaseAdmin
+        .from("audit_log")
+        .select("user_id, entity_id, created_at, diff")
+        .eq("action", "view")
+        .eq("entity", "referral")
+        .in("diff->>notification_id", ids)
+        .order("created_at", { ascending: true });
+      if (auditErr) {
+        throw safeError("admin.getNotificationLifecycleAudit.audit", auditErr, "Failed to load lifecycle audit.");
+      }
+      for (const row of audit ?? []) {
+        const nid = (row as any).diff?.notification_id as string | null;
+        if (!nid || usedByNotificationId.has(nid)) continue; // first (earliest) wins
+        usedByNotificationId.set(nid, {
+          used_at: (row as any).created_at,
+          used_by_user_id: (row as any).user_id,
+          used_against_referral_id: (row as any).entity_id,
+        });
+      }
+    }
+
+    // Hydrate recipient display names.
+    const userIds = Array.from(new Set(page.map((n) => n.user_id)));
+    const nameById = new Map<string, string | null>();
+    if (userIds.length) {
+      const { data: profiles } = await supabaseAdmin
+        .from("profiles")
+        .select("id, full_name")
+        .in("id", userIds);
+      for (const p of profiles ?? []) nameById.set((p as any).id, (p as any).full_name);
+    }
+
+    let rows: NotificationLifecycleRow[] = page.map((n) => {
+      const used = usedByNotificationId.get(n.id) ?? null;
+      return {
+        notification_id: n.id,
+        user_id: n.user_id,
+        user_name: nameById.get(n.user_id) ?? null,
+        referral_id: n.referral_id,
+        kind: n.kind,
+        message: n.message,
+        created_at: n.created_at,
+        read_at: n.read_at,
+        used_at: used?.used_at ?? null,
+        used_by_user_id: used?.used_by_user_id ?? null,
+        used_against_referral_id: used?.used_against_referral_id ?? null,
+        mismatch: !!used && used.used_against_referral_id !== n.referral_id,
+      };
+    });
+
+    if (data.state === "used") rows = rows.filter((r) => r.used_at !== null);
+    if (data.state === "unused") rows = rows.filter((r) => r.used_at === null);
+
+    return { rows, hasMore, nextOffset: offset + limit };
+  });
+
+
+
+
+
 export const updateIcnarcTargets = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((d: unknown) =>

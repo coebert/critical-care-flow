@@ -1,4 +1,4 @@
-import { createFileRoute, redirect } from "@tanstack/react-router";
+import { createFileRoute, redirect, Link } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { useServerFn } from "@tanstack/react-start";
 import { format } from "date-fns";
@@ -113,7 +113,10 @@ function NotificationsAuditPage() {
           <h1 className="text-2xl font-semibold tracking-tight">Notification delivery audit</h1>
           <p className="text-sm text-muted-foreground mt-1">
             When each notification was attempted (<em>generated_at</em>) and delivered
-            (<em>delivered_at</em>), the channel it went through, and which actor triggered it.
+            (<em>delivered_at</em>), the channel it went through, and which actor triggered it.{" "}
+            <Link to="/notifications-lifecycle" className="underline hover:text-foreground">
+              Lifecycle audit →
+            </Link>
           </p>
         </div>
         <div className="flex gap-2 items-center">

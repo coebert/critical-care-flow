@@ -20,6 +20,7 @@ import { Route as AuthenticatedIndexRouteImport } from './routes/_authenticated/
 import { Route as AuthenticatedPushTestRouteImport } from './routes/_authenticated/push-test'
 import { Route as AuthenticatedProfileRouteImport } from './routes/_authenticated/profile'
 import { Route as AuthenticatedPermissionsRouteImport } from './routes/_authenticated/permissions'
+import { Route as AuthenticatedNotificationsLifecycleRouteImport } from './routes/_authenticated/notifications-lifecycle'
 import { Route as AuthenticatedNotificationsAuditRouteImport } from './routes/_authenticated/notifications-audit'
 import { Route as AuthenticatedNotificationsRouteImport } from './routes/_authenticated/notifications'
 import { Route as AuthenticatedInboxRouteImport } from './routes/_authenticated/inbox'
@@ -107,6 +108,12 @@ const AuthenticatedPermissionsRoute =
   AuthenticatedPermissionsRouteImport.update({
     id: '/permissions',
     path: '/permissions',
+    getParentRoute: () => AuthenticatedRouteRoute,
+  } as any)
+const AuthenticatedNotificationsLifecycleRoute =
+  AuthenticatedNotificationsLifecycleRouteImport.update({
+    id: '/notifications-lifecycle',
+    path: '/notifications-lifecycle',
     getParentRoute: () => AuthenticatedRouteRoute,
   } as any)
 const AuthenticatedNotificationsAuditRoute =
@@ -313,6 +320,7 @@ export interface FileRoutesByFullPath {
   '/inbox': typeof AuthenticatedInboxRouteWithChildren
   '/notifications': typeof AuthenticatedNotificationsRoute
   '/notifications-audit': typeof AuthenticatedNotificationsAuditRoute
+  '/notifications-lifecycle': typeof AuthenticatedNotificationsLifecycleRoute
   '/permissions': typeof AuthenticatedPermissionsRoute
   '/profile': typeof AuthenticatedProfileRoute
   '/push-test': typeof AuthenticatedPushTestRoute
@@ -357,6 +365,7 @@ export interface FileRoutesByTo {
   '/inbox': typeof AuthenticatedInboxRouteWithChildren
   '/notifications': typeof AuthenticatedNotificationsRoute
   '/notifications-audit': typeof AuthenticatedNotificationsAuditRoute
+  '/notifications-lifecycle': typeof AuthenticatedNotificationsLifecycleRoute
   '/permissions': typeof AuthenticatedPermissionsRoute
   '/profile': typeof AuthenticatedProfileRoute
   '/push-test': typeof AuthenticatedPushTestRoute
@@ -404,6 +413,7 @@ export interface FileRoutesById {
   '/_authenticated/inbox': typeof AuthenticatedInboxRouteWithChildren
   '/_authenticated/notifications': typeof AuthenticatedNotificationsRoute
   '/_authenticated/notifications-audit': typeof AuthenticatedNotificationsAuditRoute
+  '/_authenticated/notifications-lifecycle': typeof AuthenticatedNotificationsLifecycleRoute
   '/_authenticated/permissions': typeof AuthenticatedPermissionsRoute
   '/_authenticated/profile': typeof AuthenticatedProfileRoute
   '/_authenticated/push-test': typeof AuthenticatedPushTestRoute
@@ -452,6 +462,7 @@ export interface FileRouteTypes {
     | '/inbox'
     | '/notifications'
     | '/notifications-audit'
+    | '/notifications-lifecycle'
     | '/permissions'
     | '/profile'
     | '/push-test'
@@ -496,6 +507,7 @@ export interface FileRouteTypes {
     | '/inbox'
     | '/notifications'
     | '/notifications-audit'
+    | '/notifications-lifecycle'
     | '/permissions'
     | '/profile'
     | '/push-test'
@@ -542,6 +554,7 @@ export interface FileRouteTypes {
     | '/_authenticated/inbox'
     | '/_authenticated/notifications'
     | '/_authenticated/notifications-audit'
+    | '/_authenticated/notifications-lifecycle'
     | '/_authenticated/permissions'
     | '/_authenticated/profile'
     | '/_authenticated/push-test'
@@ -675,6 +688,13 @@ declare module '@tanstack/react-router' {
       path: '/permissions'
       fullPath: '/permissions'
       preLoaderRoute: typeof AuthenticatedPermissionsRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/notifications-lifecycle': {
+      id: '/_authenticated/notifications-lifecycle'
+      path: '/notifications-lifecycle'
+      fullPath: '/notifications-lifecycle'
+      preLoaderRoute: typeof AuthenticatedNotificationsLifecycleRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
     '/_authenticated/notifications-audit': {
@@ -942,6 +962,7 @@ interface AuthenticatedRouteRouteChildren {
   AuthenticatedInboxRoute: typeof AuthenticatedInboxRouteWithChildren
   AuthenticatedNotificationsRoute: typeof AuthenticatedNotificationsRoute
   AuthenticatedNotificationsAuditRoute: typeof AuthenticatedNotificationsAuditRoute
+  AuthenticatedNotificationsLifecycleRoute: typeof AuthenticatedNotificationsLifecycleRoute
   AuthenticatedPermissionsRoute: typeof AuthenticatedPermissionsRoute
   AuthenticatedProfileRoute: typeof AuthenticatedProfileRoute
   AuthenticatedPushTestRoute: typeof AuthenticatedPushTestRoute
@@ -965,6 +986,8 @@ const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedInboxRoute: AuthenticatedInboxRouteWithChildren,
   AuthenticatedNotificationsRoute: AuthenticatedNotificationsRoute,
   AuthenticatedNotificationsAuditRoute: AuthenticatedNotificationsAuditRoute,
+  AuthenticatedNotificationsLifecycleRoute:
+    AuthenticatedNotificationsLifecycleRoute,
   AuthenticatedPermissionsRoute: AuthenticatedPermissionsRoute,
   AuthenticatedProfileRoute: AuthenticatedProfileRoute,
   AuthenticatedPushTestRoute: AuthenticatedPushTestRoute,
