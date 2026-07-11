@@ -46,13 +46,8 @@ function makeHandler(opts: { now: number; notifs: Notif[]; referralExists: boole
     if (!opts.referralExists) throw new Error("Referral not found");
 
     let verifiedNotificationId: string | null = null;
-    let notificationStatus:
-      | "attributed"
-      | "expired"
-      | "reused"
-      | "read"
-      | "invalid"
-      | "none" = "none";
+    let notificationStatus: "attributed" | "expired" | "reused" | "read" | "invalid" | "none" =
+      "none";
 
     if (input.notification_id) {
       notificationStatus = "invalid";
@@ -72,9 +67,7 @@ function makeHandler(opts: { now: number; notifs: Notif[]; referralExists: boole
           notificationStatus = "expired";
         } else {
           const prior = audit.find(
-            (a) =>
-              a.user_id === input.userId &&
-              a.diff.notification_id === input.notification_id,
+            (a) => a.user_id === input.userId && a.diff.notification_id === input.notification_id,
           );
           if (prior) {
             notificationStatus = "reused";
