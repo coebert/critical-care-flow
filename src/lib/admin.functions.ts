@@ -256,8 +256,8 @@ export async function runGetAuditLog(
         .ilike("full_name", `%${data.clinician}%`)
         .limit(200);
       if (profErr) throw safeError("admin.getAuditLog.clinician", profErr, "Failed to load audit log.");
-      userIdFilter = (profs ?? []).map((p: { id: string }) => p.id);
-      if (userIdFilter.length === 0) userIdFilter = ["00000000-0000-0000-0000-000000000000"];
+      userIdFilter = ((profs ?? []) as Array<{ id: string }>).map((p) => p.id);
+      if (userIdFilter!.length === 0) userIdFilter = ["00000000-0000-0000-0000-000000000000"];
     }
   }
 
