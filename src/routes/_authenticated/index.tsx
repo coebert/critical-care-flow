@@ -168,11 +168,18 @@ function ReferralsList() {
       .on("postgres_changes", { event: "*", schema: "public", table: "referrals" }, () => {
         queryClient.invalidateQueries({ queryKey: REFERRALS_LIST_QUERY_KEY });
       })
+      // Unread badge stays in sync as notifications are inserted (new
+      // fanout) or marked read (via /referrals/{id} → logReferralView).
+      // RLS scopes rows to this user, so we get exactly our own events.
+      .on("postgres_changes", { event: "*", schema: "public", table: "notifications" }, () => {
+        queryClient.invalidateQueries({ queryKey: REFERRALS_UNREAD_COUNTS_QUERY_KEY });
+      })
       .subscribe();
     return () => {
       supabase.removeChannel(ch);
     };
   }, [queryClient]);
+
 
   const topWards = useMemo(() => computeTopWards(rows), [rows]);
 
