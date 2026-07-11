@@ -250,6 +250,15 @@ export function ReferralsRows({ rows, loading, timerSort, onToggleTimerSort, unr
                   {format(new Date(r.referral_received_at), "dd/MM/yyyy HH:mm")}
                 </span>
                 <div className="flex items-center gap-1.5">
+                  {unreadCount(r.id) > 0 && (
+                    <Badge
+                      className="bg-primary text-primary-foreground text-[10px] px-1.5 py-0 h-4 min-w-4 rounded-full flex items-center justify-center"
+                      title={`${unreadCount(r.id)} unread notification${unreadCount(r.id) === 1 ? "" : "s"} — clears when you open this referral`}
+                      aria-label={`${unreadCount(r.id)} unread notifications`}
+                    >
+                      {unreadCount(r.id) > 9 ? "9+" : unreadCount(r.id)}
+                    </Badge>
+                  )}
                   {(r as any).is_test && (
                     <Badge
                       variant="outline"
@@ -263,6 +272,7 @@ export function ReferralsRows({ rows, loading, timerSort, onToggleTimerSort, unr
                     {r.status}
                   </Badge>
                 </div>
+
               </div>
               <div className="flex items-center justify-between gap-2 flex-wrap">
                 <ReferralTimer r={r} />
