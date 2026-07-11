@@ -297,79 +297,34 @@ export const prefillPartnerHandoverFromReferral = createServerFn({
         };
       }
 
-      // Compute proposed values.
-      const resus = (refRow as any).resus_status as string | null;
-      const ceiling = (refRow as any).ceiling_of_care as string | null;
-      const dnacprRespect = (refRow as any).dnacpr_respect as boolean | null;
-      const interventions =
-        ((refRow as any).anticipated_interventions as string[] | null) ?? null;
-
-      const wantsDnacpr = resus === "dnacpr" || dnacprRespect === true;
-      const wantsTep =
-        !!ceiling ||
-        !!resus ||
-        wantsDnacpr ||
-        (interventions?.length ?? 0) > 0;
-
-      const proposed: Record<
-        string,
-        string | boolean | number | null | undefined
-      > = {
-        tep_in_place: wantsTep ? true : undefined,
-        tep_details: composeTepDetails(ceiling, resus),
-        dnacpr_decision: wantsDnacpr ? true : undefined,
-        dnacpr_details: composeDnacprDetails(resus, dnacprRespect),
-        past_medical_history: past_medical_history,
-        current_admission: reason_for_referral,
-        current_management: composeCurrentManagement({
-          baseline_function,
-          allergies: (refRow as any).allergies ?? null,
-          weight_kg: (refRow as any).weight_kg ?? null,
-          anticipated_interventions: interventions,
-        }),
-      };
-
-      // Fill-blanks only: skip anything already populated on the partner.
-      const applied: string[] = [];
-      const skipped: string[] = [];
-      const patch: Record<string, unknown> = {};
-
-      const textFields = [
-        "tep_details",
-        "dnacpr_details",
-        "past_medical_history",
-        "current_admission",
-        "current_management",
-      ] as const;
-      for (const k of textFields) {
-        const proposedVal = proposed[k];
-        if (proposedVal == null || proposedVal === "") continue;
-        if (isBlank((patientRow as any)[k])) {
-          patch[k] = proposedVal;
-          applied.push(k);
-        } else {
-          skipped.push(k);
-        }
-      }
-
-      // Boolean flags — only set true when currently falsy/null and we have a
-      // reason to set them. Never flip an existing true back to false.
-      if (proposed.tep_in_place === true) {
-        if (!(patientRow as any).tep_in_place) {
-          patch.tep_in_place = true;
-          applied.push("tep_in_place");
-        } else {
-          skipped.push("tep_in_place");
-        }
-      }
-      if (proposed.dnacpr_decision === true) {
-        if (!(patientRow as any).dnacpr_decision) {
-          patch.dnacpr_decision = true;
-          applied.push("dnacpr_decision");
-        } else {
-          skipped.push("dnacpr_decision");
-        }
-      }
+      const { patch, applied_fields: applied, skipped_fields: skipped } =
+        computePartnerHandoverPrefill(
+          {
+            past_medical_history,
+            baseline_function,
+            reason_for_referral,
+            allergies: (refRow as any).allergies ?? null,
+            weight_kg: (refRow as any).weight_kg ?? null,
+            anticipated_interventions:
+              ((refRow as any).anticipated_interventions as
+                | string[]
+                | null) ?? null,
+            ceiling_of_care: (refRow as any).ceiling_of_care ?? null,
+            resus_status: (refRow as any).resus_status ?? null,
+            dnacpr_respect: (refRow as any).dnacpr_respect ?? null,
+          },
+          {
+            tep_in_place: (patientRow as any).tep_in_place ?? null,
+            tep_details: (patientRow as any).tep_details ?? null,
+            dnacpr_decision: (patientRow as any).dnacpr_decision ?? null,
+            dnacpr_details: (patientRow as any).dnacpr_details ?? null,
+            past_medical_history:
+              (patientRow as any).past_medical_history ?? null,
+            current_admission: (patientRow as any).current_admission ?? null,
+            current_management:
+              (patientRow as any).current_management ?? null,
+          },
+        );
 
       if (applied.length === 0) {
         return {
@@ -378,6 +333,7 @@ export const prefillPartnerHandoverFromReferral = createServerFn({
           skipped_fields: skipped,
           updated_at: (patientRow as any).updated_at ?? null,
         };
+
       }
 
       // Push over the signed partner bridge.
