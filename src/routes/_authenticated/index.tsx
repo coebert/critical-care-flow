@@ -6,10 +6,12 @@ import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Plus, Trash2 } from "lucide-react";
 import {
+  getUnreadReferralCounts,
   listDeletedReferrals,
   listReferralsForList,
   restoreReferral,
 } from "@/lib/referrals.functions";
+
 import type { AdmissionUrgency } from "@/lib/admission-urgency";
 import { toast } from "sonner";
 
