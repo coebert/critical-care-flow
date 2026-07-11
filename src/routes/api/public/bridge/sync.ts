@@ -33,7 +33,11 @@ type ResourceKey =
 const PUSH_ALLOW: Record<ResourceKey, readonly string[]> = {
   patients: [
     "id",
-    "full_name",
+    // NOTE: `full_name` is intentionally NOT allowlisted. Outbound push
+    // never emits full names — `toPortable` renames the stored
+    // (already-normalised) `full_name` value to `patient_initials` on the
+    // wire so the partner only ever receives initials.
+    "patient_initials",
     "hospital_number",
     "nhs_number",
     "dob",
