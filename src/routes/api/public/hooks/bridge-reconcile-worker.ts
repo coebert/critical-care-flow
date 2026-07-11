@@ -356,7 +356,7 @@ export const Route = createFileRoute("/api/public/hooks/bridge-reconcile-worker"
   server: {
     handlers: {
       POST: async ({ request }) => {
-        if (!isAuthorized(request)) {
+        if (!(await isBridgeCallerAuthorized(request))) {
           return new Response("Unauthorized", { status: 401 });
         }
 
