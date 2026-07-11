@@ -1,6 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { jsonResponse, preflight } from "@/lib/bridge-cors";
 import { getBridgeSecrets, signWith } from "@/lib/bridge-hmac.server";
+import { normalizeIncomingBridgeRecord } from "@/lib/bridge-normalize";
 
 /**
  * Outbound bridge sync worker.
@@ -354,12 +355,18 @@ async function syncResource(
     // PULL
     const incoming = await pullResource(base, resource.key, lastPulledAt);
     if (incoming.length > 0) {
+      // Normalise identifier fields BEFORE the upsert so a partner-side
+      // full name never overwrites our stored initials. See
+      // `normalizeIncomingBridgeRecord` for the exact rules.
+      const normalised = incoming.map((r) =>
+        normalizeIncomingBridgeRecord(resource.key, r),
+      );
       const { error: upErr } = await admin
         .from(resource.table)
-        .upsert(incoming as any, { onConflict: resource.conflict });
+        .upsert(normalised as any, { onConflict: resource.conflict });
       if (upErr) throw new Error(`local upsert ${resource.key}: ${upErr.message}`);
-      pulled = incoming.length;
-      newestPulled = incoming.reduce<string | null>((acc, r) => {
+      pulled = normalised.length;
+      newestPulled = normalised.reduce<string | null>((acc, r) => {
         const u = (r as any).updated_at as string | undefined;
         return u && (!acc || u > acc) ? u : acc;
       }, lastPulledAt);
