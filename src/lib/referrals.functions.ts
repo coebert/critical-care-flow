@@ -461,11 +461,22 @@ export const updateReferral = createServerFn({ method: "POST" })
 
     const decrypted = decryptReferralRow(row as any);
 
-    const statusChanged =
-      data.patch.status !== undefined && prior?.status !== row.status;
+    // Normalize the patch for notification decisions ONLY. A `status` key
+    // whose value equals the current row status is a no-op write (e.g.
+    // client resubmits the same status alongside an unrelated edit, or
+    // an offline queue replays a stale write). Strip it here so it can
+    // never influence the fanout branch below — same-value status keys
+    // are treated identically to `status` being absent from the patch.
+    const rawPatch = (data.patch ?? {}) as Record<string, unknown>;
+    const effectivePatch: Record<string, unknown> = { ...rawPatch };
+    if ("status" in effectivePatch && prior?.status === row.status) {
+      delete effectivePatch.status;
+    }
+    // A status change is now definitional: the key survived normalization.
+    const statusChanged = "status" in effectivePatch;
     // Non-bookkeeping, non-status fields that actually changed. These
     // drive the "updated" push and its deep link.
-    const patchKeys = Object.keys((data.patch ?? {}) as object).filter(
+    const patchKeys = Object.keys(effectivePatch).filter(
       (k) => k !== "updated_by" && k !== "status",
     );
     const summary = `${decrypted.referring_specialty ?? "Referral"} — ${decrypted.current_ward ?? "ward unknown"}`;
