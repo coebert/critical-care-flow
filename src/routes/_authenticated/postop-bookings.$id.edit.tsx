@@ -87,6 +87,7 @@ function EditPostopBookingPage() {
       .then((row: any) => {
         if (cancelled) return;
         setHospitalNumber(row.hospital_number ?? "");
+        setInitials(row.patient_initials ?? "");
         setAge(row.age != null ? String(row.age) : "");
         setSex((row.sex ?? "") as Sex);
         setWeight(row.weight_kg != null ? String(row.weight_kg) : "");
