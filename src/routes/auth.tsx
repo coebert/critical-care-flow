@@ -44,7 +44,10 @@ function downgradeSessionToTabOnly() {
 }
 
 export const Route = createFileRoute("/auth")({
-  ssr: false,
+  // No `ssr: false`. The component is SSR-safe (all window/supabase access is
+  // inside useEffect); ssr:false made the server render a Suspense fallback
+  // while the client rendered the full tree, producing a React 19 hydration
+  // mismatch that briefly flashes unauthenticated UI.
   validateSearch: (search: Record<string, unknown>) => {
     const raw = typeof search.redirect === "string" ? search.redirect : "";
     // Only accept same-origin relative paths to prevent open redirects.
