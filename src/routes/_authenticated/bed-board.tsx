@@ -25,6 +25,7 @@ import {
   setPatientAcuity,
   type AcuityLevel,
 } from "@/lib/patient-acuity.functions";
+import { toInitials } from "@/lib/patient-initials";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -922,12 +923,13 @@ function EditOccupantDialog({
                 id="full_name"
                 value={form.full_name}
                 onChange={(e) => setForm({ ...form, full_name: e.target.value })}
-                maxLength={10}
-                placeholder="e.g. J.S."
+                onBlur={(e) => setForm({ ...form, full_name: toInitials(e.target.value) })}
+                maxLength={40}
+                placeholder="e.g. JS"
               />
               <p className="text-[11px] text-muted-foreground mt-1">
-                Record initials only — do not enter the patient's full name.
-                Shared with ICU Handover Hub over the signed bridge.
+                Initials only (max 10 letters). Full names are automatically converted
+                before saving and sharing with ICU Handover Hub over the signed bridge.
               </p>
             </div>
             <div>
