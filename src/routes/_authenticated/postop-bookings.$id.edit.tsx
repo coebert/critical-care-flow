@@ -147,6 +147,7 @@ function EditPostopBookingPage() {
         data: {
           id,
           hospital_number: hospitalNumber.trim() || null,
+          patient_initials: initials.trim() || null,
           age: age.trim() ? parseInt(age, 10) : null,
           sex: (sex || null) as any,
           weight_kg: weight.trim() ? parseFloat(weight) : null,
