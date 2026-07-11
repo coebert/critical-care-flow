@@ -1004,6 +1004,17 @@ export const logReferralView = createServerFn({ method: "POST" })
       entity: "referral",
       entity_id: data.referral_id,
     });
+
+    // Mark any unread in-app notifications for this user + referral as read.
+    // Scoped strictly to the current user so we never touch someone else's
+    // notification row (RLS also enforces this, but the filter is defensive).
+    await supabase
+      .from("notifications")
+      .update({ read_at: new Date().toISOString() })
+      .eq("user_id", userId)
+      .eq("referral_id", data.referral_id)
+      .is("read_at", null);
+
     return { ok: true };
   });
 
