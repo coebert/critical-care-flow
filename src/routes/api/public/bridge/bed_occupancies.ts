@@ -138,6 +138,14 @@ export const Route = createFileRoute("/api/public/bridge/bed_occupancies")({
           },
         });
 
+        await auditBridgeNormalizationEvents(supabaseAdmin, {
+          resource: "bed_occupancies",
+          entityId: data.id,
+          actor: verified.actor,
+          source: "bridge_push",
+          events,
+        });
+
         return jsonResponse({ record: data });
       },
     },
