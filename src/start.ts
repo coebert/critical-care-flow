@@ -24,9 +24,12 @@ const errorMiddleware = createMiddleware().server(async ({ next }) => {
 // so error pages get them too. Existing headers on the response are kept.
 const securityHeadersMiddleware = createMiddleware().server(async ({ next }) => {
   const result = await next();
-  const response = (result as { response?: Response }).response;
-  if (response instanceof Response) {
-    (result as { response: Response }).response = withSecurityHeaders(response);
+  if (result instanceof Response) {
+    return withSecurityHeaders(result);
+  }
+  const bag = result as { response?: Response };
+  if (bag.response instanceof Response) {
+    bag.response = withSecurityHeaders(bag.response);
   }
   return result;
 });
