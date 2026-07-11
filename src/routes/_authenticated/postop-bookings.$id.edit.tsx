@@ -239,6 +239,10 @@ function EditPostopBookingPage() {
                 <Input id="hn" value={hospitalNumber} onChange={(e) => setHospitalNumber(e.target.value)} maxLength={50} />
               </div>
               <div className="space-y-1.5">
+                <Label htmlFor="initials">Patient initials</Label>
+                <Input id="initials" value={initials} onChange={(e) => setInitials(e.target.value)} maxLength={10} placeholder="e.g. J.S." />
+              </div>
+              <div className="space-y-1.5">
                 <Label htmlFor="age">Age (years)</Label>
                 <Input id="age" type="number" min={0} max={130} value={age} onChange={(e) => setAge(e.target.value)} />
               </div>
