@@ -129,6 +129,14 @@ export const Route = createFileRoute("/api/public/bridge/bed_outliers")({
           },
         });
 
+        await auditBridgeNormalizationEvents(supabaseAdmin, {
+          resource: "bed_outliers",
+          entityId: data.id,
+          actor: verified.actor,
+          source: "bridge_push",
+          events,
+        });
+
         return jsonResponse({ record: data });
       },
     },
