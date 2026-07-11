@@ -459,7 +459,7 @@ const lifecycleAuditInputSchema = z
     offset: z.number().int().min(0).max(10_000).optional(),
     user_id: z.string().uuid().optional(),
     referral_id: z.string().uuid().optional(),
-    state: z.enum(["all", "unread", "read", "unused", "used"]).optional(),
+    state: z.enum(["all", "unread", "read", "unused", "used", "expired"]).optional(),
   })
   .default({});
 
