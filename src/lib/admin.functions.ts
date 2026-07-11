@@ -270,8 +270,8 @@ export async function runGetAuditLog(
       .ilike("referring_specialty", `%${data.specialty}%`)
       .limit(5000);
     if (refErr) throw safeError("admin.getAuditLog.specialty", refErr, "Failed to load audit log.");
-    referralIdFilter = (refs ?? []).map((r: { id: string }) => r.id);
-    if (referralIdFilter.length === 0) referralIdFilter = ["00000000-0000-0000-0000-000000000000"];
+    referralIdFilter = ((refs ?? []) as Array<{ id: string }>).map((r) => r.id);
+    if (referralIdFilter!.length === 0) referralIdFilter = ["00000000-0000-0000-0000-000000000000"];
   }
 
   let query = supabaseAdmin
