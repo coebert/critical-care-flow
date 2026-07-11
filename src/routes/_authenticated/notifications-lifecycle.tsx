@@ -174,7 +174,7 @@ function NotificationsLifecyclePage() {
           <TableBody>
             {rows.length === 0 && !loading && (
               <TableRow>
-                <TableCell colSpan={8} className="text-center text-muted-foreground py-8">
+                <TableCell colSpan={9} className="text-center text-muted-foreground py-8">
                   No notifications match the current filters.
                 </TableCell>
               </TableRow>
