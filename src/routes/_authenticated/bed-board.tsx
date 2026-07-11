@@ -917,13 +917,18 @@ function EditOccupantDialog({
             }}
           >
             <div className="col-span-2">
-              <Label htmlFor="full_name">Full name</Label>
+              <Label htmlFor="full_name">Patient initials</Label>
               <Input
                 id="full_name"
                 value={form.full_name}
                 onChange={(e) => setForm({ ...form, full_name: e.target.value })}
-                required
+                maxLength={10}
+                placeholder="e.g. J.S."
               />
+              <p className="text-[11px] text-muted-foreground mt-1">
+                Record initials only — do not enter the patient's full name.
+                Shared with ICU Handover Hub over the signed bridge.
+              </p>
             </div>
             <div>
               <Label htmlFor="hospital_number">Hospital #</Label>
