@@ -211,6 +211,12 @@ export type UpdatePartnerPatientInput = {
   dnacpr_decision?: boolean;
   dnacpr_details?: string | null;
   outstanding_tasks?: string | null;
+  // Extended handover fields — used by the referral-prefill flow to seed the
+  // partner handover form when a referred patient is first admitted. Kept
+  // optional so nothing changes for callers that only edit the basic set.
+  past_medical_history?: string | null;
+  current_admission?: string | null;
+  current_management?: string | null;
 };
 
 export type UpdatePartnerPatientResult =
