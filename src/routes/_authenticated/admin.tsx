@@ -218,6 +218,13 @@ const AUDIT_ENTITY_OPTIONS = [
 ] as const;
 const AUDIT_ACTION_OPTIONS = ["create", "update", "delete"] as const;
 
+const AUDIT_QUICK_FILTERS = [
+  { label: "Referral created", entity: "referral", action: "create" },
+  { label: "Referral updated", entity: "referral", action: "update" },
+  { label: "Referral note updated", entity: "referral_note", action: "update" },
+  { label: "Patient updated", entity: "patient", action: "update" },
+] as const;
+
 type AuditFilters = {
   entity: string;
   action: string;
@@ -382,6 +389,46 @@ function AuditPanel() {
             ))}
           </select>
         </div>
+      </div>
+
+      <div className="mb-4 flex flex-wrap items-center gap-2">
+        <span className="text-xs text-muted-foreground">Quick filters:</span>
+        {AUDIT_QUICK_FILTERS.map((preset) => {
+          const active =
+            applied.entity === preset.entity &&
+            applied.action === preset.action;
+          return (
+            <Button
+              key={preset.label}
+              type="button"
+              size="sm"
+              variant={active ? "default" : "outline"}
+              aria-pressed={active}
+              onClick={() => {
+                const next = {
+                  ...EMPTY_FILTERS,
+                  entity: active ? "" : preset.entity,
+                  action: active ? "" : preset.action,
+                };
+                setDraft(next);
+                applyFilters(next);
+              }}
+            >
+              {preset.label}
+            </Button>
+          );
+        })}
+        {(applied.entity || applied.action) && (
+          <Button
+            type="button"
+            size="sm"
+            variant="ghost"
+            onClick={onReset}
+            aria-label="Clear quick filters"
+          >
+            Clear
+          </Button>
+        )}
       </div>
 
       <form
