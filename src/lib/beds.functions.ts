@@ -4,6 +4,7 @@ import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { safeError } from "./safe-error";
 import { assertAdmin } from "./auth-guards";
 import { computeCapacity, type CapacitySnapshot } from "./bed-capacity";
+import { patientInitialsField } from "./patient-initials";
 
 async function fireCapacityAlert(): Promise<void> {
   try {
@@ -37,7 +38,7 @@ const transferStatus = z.enum([
 
 const occupancyFields = z.object({
   hospital_number: z.string().trim().max(50).nullable().optional(),
-  patient_initials: z.string().trim().max(10).nullable().optional(),
+  patient_initials: patientInitialsField,
   admitting_consultant: z.string().trim().max(120).nullable().optional(),
   admitted_at: z.string().datetime().optional(),
   level: z.number().int().min(0).max(3).optional(),
@@ -69,7 +70,7 @@ const moveSchema = z.object({ id: z.string().uuid(), new_bed_id: z.string().uuid
 
 const outlierFields = z.object({
   hospital_number: z.string().trim().max(50).nullable().optional(),
-  patient_initials: z.string().trim().max(10).nullable().optional(),
+  patient_initials: patientInitialsField,
   ward: z.string().trim().min(1).max(120),
   admitting_consultant: z.string().trim().max(120).nullable().optional(),
   started_at: z.string().datetime().optional(),

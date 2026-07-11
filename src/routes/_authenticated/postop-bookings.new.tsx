@@ -22,6 +22,7 @@ import {
   SURGICAL_SPECIALTY_OPTIONS,
   type SurgicalSpecialty,
 } from "@/lib/surgical-specialties";
+import { toInitials } from "@/lib/patient-initials";
 
 export const Route = createFileRoute("/_authenticated/postop-bookings/new")({
   head: () => ({
@@ -78,7 +79,7 @@ function NewPostopBookingPage() {
     try {
       const payload = {
         hospital_number: hospitalNumber.trim() || null,
-        patient_initials: initials.trim() || null,
+        patient_initials: toInitials(initials) || null,
         age: age.trim() ? parseInt(age, 10) : null,
         sex: (sex || null) as any,
         weight_kg: weight.trim() ? parseFloat(weight) : null,
@@ -129,8 +130,18 @@ function NewPostopBookingPage() {
             </div>
             <div className="space-y-1.5">
               <Label htmlFor="initials">Patient initials</Label>
-              <Input id="initials" value={initials} onChange={(e) => setInitials(e.target.value)} maxLength={10} placeholder="e.g. J.S." />
-            </div>
+                <Input
+                  id="initials"
+                  value={initials}
+                  onChange={(e) => setInitials(e.target.value)}
+                  onBlur={() => setInitials(toInitials(initials))}
+                  maxLength={40}
+                  placeholder="e.g. JS"
+                />
+                <p className="text-[11px] text-muted-foreground">
+                  Initials only (max 10 letters). Full names are automatically converted.
+                </p>
+              </div>
             <div className="space-y-1.5">
               <Label htmlFor="age">Age (years)</Label>
               <Input id="age" type="number" min={0} max={130} value={age} onChange={(e) => setAge(e.target.value)} />

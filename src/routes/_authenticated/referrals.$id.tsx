@@ -18,6 +18,7 @@ import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
+import { toInitials } from "@/lib/patient-initials";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -331,7 +332,7 @@ function ReferralDetail() {
               </Select>
             </Field>
             <Field label="Hospital number"><Input value={ref.hospital_number ?? ""} onChange={(e) => set("hospital_number", e.target.value)} /></Field>
-            <Field label="Patient initials"><Input value={ref.patient_initials ?? ""} maxLength={10} placeholder="e.g. J.S." onChange={(e) => set("patient_initials", e.target.value)} /></Field>
+            <Field label="Patient initials"><Input value={ref.patient_initials ?? ""} maxLength={40} placeholder="e.g. JS" onChange={(e) => set("patient_initials", e.target.value)} onBlur={(e) => set("patient_initials", toInitials(e.target.value))} /></Field>
             <Field label="Referring specialty"><ComboboxAdd value={ref.referring_specialty ?? ""} onChange={(v) => set("referring_specialty", v)} options={specialties} /></Field>
             <Field label="Ward"><ComboboxAdd value={ref.current_ward ?? ""} onChange={(v) => set("current_ward", v)} options={wards} /></Field>
             <Field label="Bed"><Input value={ref.current_bed ?? ""} onChange={(e) => set("current_bed", e.target.value)} /></Field>
