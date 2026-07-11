@@ -211,6 +211,12 @@ export type UpdatePartnerPatientInput = {
   dnacpr_decision?: boolean;
   dnacpr_details?: string | null;
   outstanding_tasks?: string | null;
+  // Extended handover fields — used by the referral-prefill flow to seed the
+  // partner handover form when a referred patient is first admitted. Kept
+  // optional so nothing changes for callers that only edit the basic set.
+  past_medical_history?: string | null;
+  current_admission?: string | null;
+  current_management?: string | null;
 };
 
 export type UpdatePartnerPatientResult =
@@ -266,6 +272,9 @@ export const updatePartnerPatient = createServerFn({ method: "POST" })
         typeof data.dnacpr_decision === "boolean" ? data.dnacpr_decision : undefined,
       dnacpr_details: normStr(data.dnacpr_details),
       outstanding_tasks: normStr(data.outstanding_tasks),
+      past_medical_history: normStr(data.past_medical_history),
+      current_admission: normStr(data.current_admission),
+      current_management: normStr(data.current_management),
     } satisfies UpdatePartnerPatientInput;
   })
   .handler(async ({ data, context }): Promise<UpdatePartnerPatientResult> => {
@@ -307,6 +316,9 @@ export const updatePartnerPatient = createServerFn({ method: "POST" })
       "dnacpr_decision",
       "dnacpr_details",
       "outstanding_tasks",
+      "past_medical_history",
+      "current_admission",
+      "current_management",
     ] as const) {
       const v = (data as Record<string, unknown>)[key];
       if (v !== undefined) bodyObj[key] = v;

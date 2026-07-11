@@ -9,6 +9,7 @@ import {
   Loader2,
   RefreshCcw,
   ShieldCheck,
+  Sparkles,
   UserRound,
 } from "lucide-react";
 import { formatDistanceToNowStrict } from "date-fns";
@@ -25,6 +26,7 @@ import {
   setPatientAcuity,
   type AcuityLevel,
 } from "@/lib/patient-acuity.functions";
+import { prefillPartnerHandoverFromReferral } from "@/lib/partner-handover-prefill.functions";
 import { toInitials } from "@/lib/patient-initials";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -678,6 +680,7 @@ function BedBoardPage() {
       <EditOccupantDialog
         occupant={selected}
         currentLevel={selected ? acuityMap.get(selected.id) ?? null : null}
+        sourceReferralId={search.source_referral_id ?? null}
         onClose={() => setSelected(null)}
         onSaved={(updated) => {
           setSelected(updated);
@@ -759,18 +762,21 @@ function buildDiff(
 function EditOccupantDialog({
   occupant,
   currentLevel,
+  sourceReferralId,
   onClose,
   onSaved,
   onAcuityChanged,
 }: {
   occupant: PartnerOccupant | null;
   currentLevel: AcuityLevel | null;
+  sourceReferralId: string | null;
   onClose: () => void;
   onSaved: (updated: PartnerOccupant) => void;
   onAcuityChanged: () => void;
 }) {
   const save = useServerFn(updatePartnerPatient);
   const saveAcuity = useServerFn(setPatientAcuity);
+  const runPrefill = useServerFn(prefillPartnerHandoverFromReferral);
   const acuityMutation = useMutation({
     mutationFn: (level: AcuityLevel | null) =>
       saveAcuity({ data: { partner_patient_id: occupant!.id, level } }),
@@ -783,6 +789,40 @@ function EditOccupantDialog({
       }
     },
     onError: (err) => toast.error(err instanceof Error ? err.message : "Could not save level"),
+  });
+  const prefillMutation = useMutation({
+    mutationFn: () =>
+      runPrefill({
+        data: {
+          referral_id: sourceReferralId!,
+          partner_patient_id: occupant!.id,
+        },
+      }),
+    onSuccess: (result) => {
+      if (!result.ok) {
+        toast.error(result.error || "Could not prefill handover");
+        return;
+      }
+      if (result.applied_fields.length === 0) {
+        toast.info(
+          result.skipped_fields.length > 0
+            ? "Handover fields already populated — nothing to prefill."
+            : "Referral had no clinical detail to prefill.",
+        );
+        return;
+      }
+      toast.success(
+        `Prefilled ${result.applied_fields.length} handover field${
+          result.applied_fields.length === 1 ? "" : "s"
+        } from the referral`,
+      );
+      onSaved({
+        ...(occupant as PartnerOccupant),
+        updated_at: result.updated_at ?? (occupant as PartnerOccupant).updated_at,
+      });
+    },
+    onError: (err) =>
+      toast.error(err instanceof Error ? err.message : "Prefill failed"),
   });
   const initial = useMemo(
     () => (occupant ? occupantToForm(occupant) : null),
@@ -832,6 +872,47 @@ function EditOccupantDialog({
             Changes write back to ICU Handover Hub over the signed bridge.
           </DialogDescription>
         </DialogHeader>
+
+        {occupant && sourceReferralId && (
+          <div
+            className="rounded-md border border-primary/30 bg-primary/5 px-3 py-2 text-sm"
+            role="region"
+            aria-label="Prefill handover from referral"
+          >
+            <div className="flex items-start gap-2">
+              <Sparkles
+                className="w-4 h-4 mt-0.5 text-primary"
+                aria-hidden="true"
+              />
+              <div className="flex-1">
+                <div className="font-medium">Prefill handover from referral</div>
+                <div className="text-xs text-muted-foreground mt-0.5">
+                  Copies TEP / DNACPR status, past medical history, reason for
+                  admission and anticipated management from the linked referral.
+                  Fields that already have content on the partner are left
+                  untouched.
+                </div>
+              </div>
+              <Button
+                type="button"
+                size="sm"
+                onClick={() => prefillMutation.mutate()}
+                disabled={prefillMutation.isPending}
+              >
+                {prefillMutation.isPending ? (
+                  <Loader2
+                    className="w-3.5 h-3.5 mr-1 animate-spin"
+                    aria-hidden="true"
+                  />
+                ) : (
+                  <Sparkles className="w-3.5 h-3.5 mr-1" aria-hidden="true" />
+                )}
+                Prefill
+              </Button>
+            </div>
+          </div>
+        )}
+
 
         {conflict && (
           <div
