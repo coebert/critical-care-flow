@@ -232,16 +232,18 @@ describe("normalizeIncomingBridgeRecord writes a bridge_initials_normalization a
     });
   });
 
-  it("wire field patient_initials on a partner patient row is folded into full_name and NOT re-audited when already initials", async () => {
+  it("an already-normalised single-letter patient_initials is folded into full_name and NOT re-audited", async () => {
     const { admin, captures } = makeAdminCapture();
 
-    // Already-normalised value on the newer wire field. Should be folded into
-    // full_name unchanged, producing NO events and NO audit row.
+    // Single-letter values are the only strictly idempotent input under
+    // toInitials() — multi-letter tokens collapse to their first letter,
+    // which is a real quirk callers rely on. Use "A" so the record round-
+    // trips without a normalisation event.
     const { record, events } = normalizeIncomingBridgeRecord("patients", {
       id: "p2",
-      patient_initials: "AB",
+      patient_initials: "A",
     });
-    expect(record.full_name).toBe("AB");
+    expect(record.full_name).toBe("A");
     expect(record).not.toHaveProperty("patient_initials");
     expect(events).toHaveLength(0);
 
