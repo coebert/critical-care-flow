@@ -1046,8 +1046,25 @@ export const logReferralView = createServerFn({ method: "POST" })
     // Any failed check silently scrubs the id to null so the audit row
     // still records the view but without a forged/reused/expired
     // deep-link source.
+    // Classify the notification_id outcome so the caller can render an
+    // appropriate UI hint (e.g. "This link has expired" toast) without
+    // exposing which specific check failed.
+    //   - "attributed": id verified and credited
+    //   - "expired":    id belongs to caller + referral but past TTL
+    //   - "reused":     id already consumed by a prior view
+    //   - "read":       id belongs to caller + referral but already read
+    //   - "invalid":    id does not match caller + referral (forged / wrong ref)
+    //   - "none":       no notification_id supplied
     let verifiedNotificationId: string | null = null;
+    let notificationStatus:
+      | "attributed"
+      | "expired"
+      | "reused"
+      | "read"
+      | "invalid"
+      | "none" = "none";
     if (data.notification_id) {
+      notificationStatus = "invalid";
       const { data: n } = await supabase
         .from("notifications")
         .select("id, read_at, created_at")
@@ -1055,20 +1072,30 @@ export const logReferralView = createServerFn({ method: "POST" })
         .eq("user_id", userId)
         .eq("referral_id", data.referral_id)
         .maybeSingle();
-      const withinTtl =
-        !!n &&
-        Date.now() - new Date(n.created_at).getTime() <= NOTIFICATION_DEEP_LINK_TTL_MS;
-      if (n && n.read_at === null && withinTtl) {
-        const { data: prior } = await supabase
-          .from("audit_log")
-          .select("id")
-          .eq("user_id", userId)
-          .eq("action", "view")
-          .eq("entity", "referral")
-          .filter("diff->>notification_id", "eq", data.notification_id)
-          .limit(1)
-          .maybeSingle();
-        if (!prior) verifiedNotificationId = n.id;
+      if (n) {
+        const withinTtl =
+          Date.now() - new Date(n.created_at).getTime() <= NOTIFICATION_DEEP_LINK_TTL_MS;
+        if (n.read_at !== null) {
+          notificationStatus = "read";
+        } else if (!withinTtl) {
+          notificationStatus = "expired";
+        } else {
+          const { data: prior } = await supabase
+            .from("audit_log")
+            .select("id")
+            .eq("user_id", userId)
+            .eq("action", "view")
+            .eq("entity", "referral")
+            .filter("diff->>notification_id", "eq", data.notification_id)
+            .limit(1)
+            .maybeSingle();
+          if (prior) {
+            notificationStatus = "reused";
+          } else {
+            verifiedNotificationId = n.id;
+            notificationStatus = "attributed";
+          }
+        }
       }
     }
 
@@ -1096,7 +1123,7 @@ export const logReferralView = createServerFn({ method: "POST" })
       .eq("referral_id", data.referral_id)
       .is("read_at", null);
 
-    return { ok: true };
+    return { ok: true, notificationStatus };
   });
 
 
