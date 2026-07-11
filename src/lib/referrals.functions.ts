@@ -168,7 +168,9 @@ function decryptReferralRow<T extends Record<string, any>>(row: T): T & Decrypte
 
 // Audit diffs must not contain plaintext for encrypted fields, otherwise
 // a DB leak of audit_log would reveal what the referral columns hide.
-function redactEncryptedFromDiff(diff: Record<string, unknown>): Record<string, unknown> {
+// Exported so integration tests can assert redaction behaviour without
+// duplicating the field list.
+export function redactEncryptedFromDiff(diff: Record<string, unknown>): Record<string, unknown> {
   const out: Record<string, unknown> = { ...diff };
   for (const k of ENCRYPTED_TEXT_FIELDS) {
     if (k in out && out[k] != null && out[k] !== "") {
@@ -182,7 +184,7 @@ function redactEncryptedFromDiff(diff: Record<string, unknown>): Record<string, 
 }
 
 
-async function writeAudit(entry: {
+export interface AuditEntry {
   user_id: string;
   action: string;
   entity: string;
@@ -196,8 +198,23 @@ async function writeAudit(entry: {
   author_id?: string | null;
   recipient_count?: number | null;
   edited_at?: string | null;
-}) {
-  const admin = await getAdmin();
+}
+
+/**
+ * Persist an audit_log row for a referral / referral_note action. Called
+ * from every referral create/update/delete site so the audit trail is a
+ * complete replay log.
+ *
+ * `adminClient` is optional — production callers omit it and we resolve the
+ * privileged Supabase client via `getAdmin()`. Integration tests inject a
+ * fake `{ from(table).insert(row) }` capture so they can assert the row
+ * shape without touching the real database.
+ */
+export async function writeAudit(
+  entry: AuditEntry,
+  adminClient?: { from: (table: string) => { insert: (row: any) => any } },
+) {
+  const admin = adminClient ?? (await getAdmin());
   let workingDiff = entry.diff;
   if (entry.entity === "referral" && workingDiff && typeof workingDiff === "object") {
     workingDiff = redactEncryptedFromDiff(workingDiff as Record<string, unknown>);
