@@ -23,6 +23,7 @@ import { ComboboxAdd } from "@/components/combobox-add";
 import { useReferralOptions } from "@/hooks/use-referral-options";
 import { toast } from "sonner";
 import { format } from "date-fns";
+import { toInitials } from "@/lib/patient-initials";
 import { validateReferralAll, validateReferralTimings } from "@/lib/referral-validation";
 import {
   ADMISSION_URGENCY_OPTIONS,
