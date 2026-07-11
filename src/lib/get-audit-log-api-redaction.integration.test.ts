@@ -1,67 +1,19 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { describe, it, expect } from "vitest";
+import { runGetAuditLog } from "./admin.functions";
 
 /**
- * Integration test: `getAuditLog` server function output is scrubbed of
- * ciphertext / nonce / hash fields (and other encrypted-column tokens)
- * BEFORE the response leaves the handler — no UI-side redaction needed.
+ * Integration test: `getAuditLog`'s handler (via the extracted
+ * `runGetAuditLog` helper the server-fn wraps) redacts ciphertext,
+ * nonce, and hash fields — plus every sensitive plaintext column —
+ * BEFORE the response leaves the server. No UI-side redaction needed.
  *
- * Unlike `get-audit-log-schema.test.ts`, which simulates the transform
- * separately, this spec actually invokes the exported `getAuditLog`
- * server function end-to-end: middleware → validator → handler →
- * response. The Supabase admin client is mocked to return a corpus of
- * raw `audit_log` rows loaded with every crypto-suffix column we know
- * about, plus fabricated future ones. The assertion walks the entire
- * returned payload and fails if ANY key ends in `_enc`, `_ciphertext`,
- * `_nonce`, or `_hash`, or if any sensitive plaintext column survives
- * unredacted.
- *
- * If a future edit removes `redactAuditDiff(r.diff)` from the handler,
- * changes it to a partial mapping, or skips redaction on a new field
- * type, this test fails — proving the API contract itself is safe
- * before any client rendering.
+ * A mocked Supabase admin client returns a corpus of raw `audit_log`
+ * rows loaded with every crypto-suffix column shape we know about,
+ * plus fabricated future ones. The assertion walks the entire returned
+ * payload and fails if ANY key ends in `_enc`, `_ciphertext`, `_nonce`,
+ * or `_hash`, or if any sensitive plaintext column survives unredacted.
  */
 
-// ---------------------------------------------------------------------
-// Mocks — installed BEFORE importing admin.functions so the server-fn
-// module resolves them at load time.
-// ---------------------------------------------------------------------
-
-// Bypass admin check; the audit-content contract is what we're testing.
-vi.mock("./auth-guards", () => ({
-  assertAdmin: vi.fn(async () => {}),
-}));
-
-// Neutralise the Supabase auth middleware. requireSupabaseAuth normally
-// verifies a bearer token; here we let the pipeline through with a
-// stub context that the handler reads.
-vi.mock("@/integrations/supabase/auth-middleware", () => {
-  const passthrough = {
-    server: (fn: any) => fn,
-  };
-  return {
-    requireSupabaseAuth: {
-      // TanStack middleware shape: expose the properties createServerFn
-      // touches when wiring `.middleware([...])`. The library only calls
-      // through `.server(handler)` at request time — passthrough is
-      // enough for a direct .handler invocation.
-      ...passthrough,
-      client: passthrough,
-    },
-  };
-});
-
-// The handler dynamically imports `@/integrations/supabase/client.server`
-// inside its body. Vi.mock hoists, so this replaces the module wholesale.
-const supabaseAdminMock = {
-  from: vi.fn(),
-};
-vi.mock("@/integrations/supabase/client.server", () => ({
-  supabaseAdmin: supabaseAdminMock,
-}));
-
-// ---------------------------------------------------------------------
-// Fixture: raw DB rows deliberately full of every dangerous key shape.
-// ---------------------------------------------------------------------
 const RAW_ROWS = [
   {
     id: "00000000-0000-0000-0000-000000000001",
@@ -99,8 +51,6 @@ const RAW_ROWS = [
     },
   },
   {
-    // Fabricated future encrypted columns — must be dropped purely by
-    // the crypto-suffix contract, not by any hard-coded allowlist.
     id: "00000000-0000-0000-0000-000000000003",
     user_id: "cc",
     action: "update",
@@ -117,23 +67,27 @@ const RAW_ROWS = [
   },
 ];
 
-// Chainable stub that matches the query-builder surface the handler
-// uses: `.select(...).order(...).eq(...).in(...).gte(...).lte(...).range(...)`.
-function makeQueryStub(rows: typeof RAW_ROWS) {
-  const stub: any = {
-    select: () => stub,
-    order: () => stub,
-    eq: () => stub,
-    in: () => stub,
-    gte: () => stub,
-    lte: () => stub,
-    ilike: () => stub,
-    limit: () => stub,
-    range: async () => ({ data: rows, error: null, count: rows.length }),
-    // Direct terminal for the clinician/specialty lookups (unused here).
-    then: (fn: any) => fn({ data: [], error: null, count: 0 }),
-  };
-  return stub;
+// Chainable stub matching the query-builder surface `runGetAuditLog` uses.
+function makeAdmin(rows: typeof RAW_ROWS) {
+  const chain: any = new Proxy(
+    {},
+    {
+      get(_t, prop: string) {
+        if (prop === "range") {
+          return async () => ({ data: rows, error: null, count: rows.length });
+        }
+        if (prop === "limit") {
+          return async () => ({ data: rows, error: null });
+        }
+        if (prop === "then") {
+          return (fn: (v: unknown) => unknown) =>
+            fn({ data: rows, error: null, count: rows.length });
+        }
+        return () => chain;
+      },
+    },
+  );
+  return { from: () => chain };
 }
 
 const CRYPTO_SUFFIXES = ["_enc", "_ciphertext", "_nonce", "_hash"];
@@ -155,8 +109,6 @@ const SENSITIVE_KEYS = new Set([
   "infection_organism",
 ]);
 
-// Recursively collect any offending key path (crypto-suffix or
-// unredacted sensitive plaintext) found anywhere in the response.
 function findLeaks(node: unknown, path: string[] = []): string[] {
   const leaks: string[] = [];
   if (Array.isArray(node)) {
@@ -196,50 +148,10 @@ function findLeaks(node: unknown, path: string[] = []): string[] {
 }
 
 describe("getAuditLog API response is redacted at the server, not the UI", () => {
-  beforeEach(() => {
-    supabaseAdminMock.from.mockReset();
-  });
-
   it("never returns ciphertext / nonce / hash keys or sensitive plaintext", async () => {
-    supabaseAdminMock.from.mockImplementation((table: string) => {
-      if (table === "audit_log") return makeQueryStub(RAW_ROWS);
-      // clinician / specialty resolvers — no filters applied in this test,
-      // but return an empty stub in case anything walks that branch.
-      return makeQueryStub([]);
-    });
+    const admin = makeAdmin(RAW_ROWS);
+    const page = await runGetAuditLog({} as any, admin);
 
-    // Import AFTER mocks are wired.
-    const mod = await import("./admin.functions");
-    const handler: (args: any) => Promise<any> =
-      (mod.getAuditLog as any).handler ??
-      (mod.getAuditLog as any).__handler ??
-      // Fallback: newer TanStack builds expose the raw handler behind a
-      // symbol / on the function itself. Call the fn directly as a last
-      // resort — in Node it executes the handler with the given data.
-      ((args: any) => (mod.getAuditLog as any)(args));
-
-    const context = {
-      supabase: {} as any,
-      userId: "00000000-0000-0000-0000-0000000000aa",
-      claims: { role: "authenticated" } as any,
-    };
-
-    let page: any;
-    try {
-      page = await handler({ data: {}, context });
-    } catch (err) {
-      // Some TanStack builds only expose `.handler` inside the internal
-      // options bag. If direct invocation isn't possible we fall back to
-      // exercising the handler's post-DB transform manually against the
-      // same RAW_ROWS + the module's own `redactAuditDiff` — still
-      // proves the redactor runs on the exact fixture at the server
-      // boundary rather than in the UI layer.
-      const { redactAuditDiff } = await import("./audit-redact");
-      const rows = RAW_ROWS.map((r) => ({ ...r, diff: redactAuditDiff(r.diff) }));
-      page = { rows, total: rows.length, err: String(err) };
-    }
-
-    expect(page).toBeTruthy();
     expect(Array.isArray(page.rows)).toBe(true);
     expect(page.rows.length).toBe(RAW_ROWS.length);
 
@@ -249,8 +161,6 @@ describe("getAuditLog API response is redacted at the server, not the UI", () =>
       `getAuditLog leaked ${leaks.length} forbidden field(s):\n  ${leaks.join("\n  ")}`,
     ).toEqual([]);
 
-    // Belt-and-braces: the JSON-stringified payload contains none of the
-    // literal ciphertext markers from the fixture.
     const serialised = JSON.stringify(page);
     for (const marker of [
       "v1:CIPHERTEXT",
@@ -270,8 +180,6 @@ describe("getAuditLog API response is redacted at the server, not the UI", () =>
   });
 
   it("sanity: the fixture WOULD trip the leak scanner without redaction", () => {
-    // If this ever comes back empty, findLeaks is toothless and the
-    // pass above is meaningless.
     const leaks = findLeaks(RAW_ROWS);
     expect(leaks.length).toBeGreaterThan(0);
   });
