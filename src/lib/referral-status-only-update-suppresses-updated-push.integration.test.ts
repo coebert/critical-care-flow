@@ -161,30 +161,31 @@ describe("updateReferral: status-only edits suppress the 'updated' push", () => 
     expect(shouldFireUpdatedPush(patch, "referred", "declined")).toBe(false);
   });
 
-  it("mixed edit (status + a real field change) still fires ONLY the 'status' push, not 'updated'", async () => {
-    // When a status change coincides with another edit, production code
-    // takes the statusChanged branch and returns — the "updated" push is
-    // still suppressed to avoid double-notifying about the same edit.
+  it("mixed edit (status + a real field change) fires ONLY the 'updated' push, not 'status'", async () => {
+    // Production behavior for mixed edits: prefer the deep-linked
+    // "updated" push and suppress the "status" push so the user still
+    // gets exactly one notification for the single edit.
     const { deps, sendPush } = makeDeps();
     const patch = {
       status: "accepted",
       current_ward: "Ward 9A",
       updated_by: ACTOR,
     };
-    expect(shouldFireUpdatedPush(patch, "referred", "accepted")).toBe(false);
+    expect(shouldFireUpdatedPush(patch, "referred", "accepted")).toBe(true);
 
     await fanOutNotifications(deps, {
       actorId: ACTOR,
       referralId: REFERRAL_ID,
-      kind: "status",
-      message: "Status → ACCEPTED: Respiratory — Ward 9A",
-      title: "Referral ACCEPTED",
+      kind: "updated",
+      message: "Referral updated: Respiratory — Ward 9A",
+      url: `/referrals/${REFERRAL_ID}`,
+      title: "Referral updated",
     });
     expect(sendPush).toHaveBeenCalledTimes(1);
-    const payload = sendPush.mock.calls[0][1] as { body: string };
-    // No "updated" copy leaked into the status push body.
-    expect(payload.body.startsWith("Status →")).toBe(true);
-    expect(payload.body).not.toMatch(/^Referral updated:/);
+    const payload = sendPush.mock.calls[0][1] as { body: string; url?: string };
+    expect(payload.body.startsWith("Referral updated:")).toBe(true);
+    expect(payload.body).not.toMatch(/^Status →/);
+    expect(payload.url).toBe(`/referrals/${REFERRAL_ID}`);
   });
 
   it("sanity: a genuine non-status edit DOES fire the 'updated' push (guards against false-positives)", async () => {
