@@ -5,7 +5,10 @@ import {
   pickAllowed,
   verifyBridgeRequest,
 } from "@/lib/bridge-verify.server";
-import { normalizeIncomingBridgeRecord } from "@/lib/bridge-normalize";
+import {
+  auditBridgeNormalizationEvents,
+  normalizeIncomingBridgeRecord,
+} from "@/lib/bridge-normalize";
 
 const BED_OUTLIER_COLUMNS = [
   "id",
@@ -70,7 +73,7 @@ export const Route = createFileRoute("/api/public/bridge/bed_outliers")({
 
         const picked = pickAllowed(parsed.record, BED_OUTLIER_COLUMNS);
         if ("error" in picked) return jsonResponse(picked, { status: 400 });
-        const record = normalizeIncomingBridgeRecord(
+        const { record, events } = normalizeIncomingBridgeRecord(
           "bed_outliers",
           picked.data,
         );
@@ -124,6 +127,14 @@ export const Route = createFileRoute("/api/public/bridge/bed_outliers")({
             actor: verified.actor,
             record: record as any,
           },
+        });
+
+        await auditBridgeNormalizationEvents(supabaseAdmin, {
+          resource: "bed_outliers",
+          entityId: data.id,
+          actor: verified.actor,
+          source: "bridge_push",
+          events,
         });
 
         return jsonResponse({ record: data });

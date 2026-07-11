@@ -1,7 +1,10 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { jsonResponse, preflight } from "@/lib/bridge-cors";
 import { getBridgeSecrets, signWith } from "@/lib/bridge-hmac.server";
-import { normalizeIncomingBridgeRecord } from "@/lib/bridge-normalize";
+import {
+  auditBridgeNormalizationEvents,
+  normalizeIncomingBridgeRecord,
+} from "@/lib/bridge-normalize";
 
 /**
  * Outbound bridge sync worker.
@@ -370,9 +373,10 @@ async function syncResource(
       // Normalise identifier fields BEFORE the upsert so a partner-side
       // full name never overwrites our stored initials. See
       // `normalizeIncomingBridgeRecord` for the exact rules.
-      const normalised = incoming.map((r) =>
+      const results = incoming.map((r) =>
         normalizeIncomingBridgeRecord(resource.key, r),
       );
+      const normalised = results.map((r) => r.record);
       const { error: upErr } = await admin
         .from(resource.table)
         .upsert(normalised as any, { onConflict: resource.conflict });
@@ -382,6 +386,20 @@ async function syncResource(
         const u = (r as any).updated_at as string | undefined;
         return u && (!acc || u > acc) ? u : acc;
       }, lastPulledAt);
+
+      // Audit any full_name → initials conversions that happened on pull, so
+      // partner-origin identifier changes are traceable.
+      for (let i = 0; i < results.length; i++) {
+        const { record, events } = results[i];
+        if (events.length === 0) continue;
+        await auditBridgeNormalizationEvents(admin, {
+          resource: resource.key,
+          entityId: (record as any).id ?? null,
+          actor: { source: "bridge-sync", direction: "pull" },
+          source: "bridge_pull",
+          events,
+        });
+      }
     }
 
     // PUSH
