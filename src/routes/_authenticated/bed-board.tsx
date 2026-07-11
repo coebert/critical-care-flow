@@ -680,6 +680,7 @@ function BedBoardPage() {
       <EditOccupantDialog
         occupant={selected}
         currentLevel={selected ? acuityMap.get(selected.id) ?? null : null}
+        sourceReferralId={search.source_referral_id ?? null}
         onClose={() => setSelected(null)}
         onSaved={(updated) => {
           setSelected(updated);
