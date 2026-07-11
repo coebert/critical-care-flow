@@ -603,6 +603,15 @@ export const listReferralNotesDecrypted = createServerFn({ method: "POST" })
   .handler(async ({ data, context }) => {
     const { supabase, userId } = context;
     await assertClinicalAccess(supabase, userId);
+    // Deleted / archived parent referrals must not leak their notes.
+    // Callers reaching this fn for a soft-deleted referral get [].
+    const { data: parent } = await supabase
+      .from("referrals")
+      .select("id")
+      .eq("id", data.referral_id)
+      .is("deleted_at", null)
+      .maybeSingle();
+    if (!parent) return [];
     const { data: rows, error } = await supabase
       .from("referral_notes")
       .select("*")
