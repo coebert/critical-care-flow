@@ -60,7 +60,13 @@ const referralDetailQueryOptions = (id: string) =>
 export const Route = createFileRoute("/_authenticated/referrals/$id")({
   validateSearch: (search: Record<string, unknown>) => ({
     highlight: typeof search.highlight === "string" ? search.highlight : undefined,
+    // `n` = notification id when the user arrived via a deep-link from the
+    // bell / inbox. Recorded in audit_log so we can trace which notification
+    // drove which view. Coerced to string | undefined; server verifies it
+    // belongs to the caller before writing.
+    n: typeof search.n === "string" ? search.n : undefined,
   }),
+
   head: () => ({ meta: [{ title: "Referral — SDH Critical Care" }, { name: "robots", content: "noindex" }] }),
   loader: async ({ context, params }) => {
     context.queryClient.ensureQueryData(referralNotesQueryOptions(params.id));
