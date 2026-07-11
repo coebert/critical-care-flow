@@ -162,7 +162,19 @@ function ReferralDetail() {
       },
     })
       .then((res: any) => {
-        if (!notificationId) return;
+        // Only show notification-related UI feedback when the `n` search
+        // parameter was actually present in the URL. A normal direct view
+        // (no `n` at all) should be silent.
+        if (notificationId === undefined) return;
+        // An empty `n` value (e.g. `/referrals/:id?n=`) is a malformed
+        // notification deep link — treat it the same as an invalid/forged
+        // id so the missing attribution is not silently swallowed.
+        if (notificationId === "") {
+          toast.error("This notification link isn't valid for this referral.", {
+            description: "You're viewing the referral, but the link wasn't recorded.",
+          });
+          return;
+        }
         const status: string | undefined = res?.notificationStatus;
         if (status === "expired") {
           toast.warning("This notification link has expired.", {
@@ -186,8 +198,8 @@ function ReferralDetail() {
       .catch(() => {});
     // Strip the `n=` param from the URL after logging so a shared link
     // or a back-button revisit doesn't re-attribute the view to the same
-    // notification.
-    if (notificationId) {
+    // notification. This also cleans up an empty/malformed `n=` value.
+    if (notificationId !== undefined) {
       navigate({
         to: "/referrals/$id",
         params: { id },
