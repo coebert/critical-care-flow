@@ -1815,6 +1815,7 @@ export type Database = {
         Args: { _attempt_id: number; _success: boolean }
         Returns: undefined
       }
+      get_bridge_cron_secret: { Args: never; Returns: string }
       get_bridge_cron_state: {
         Args: never
         Returns: {

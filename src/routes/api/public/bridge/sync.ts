@@ -1,5 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { jsonResponse, preflight } from "@/lib/bridge-cors";
+import { isBridgeCallerAuthorized } from "@/lib/bridge-caller-auth.server";
 import { getBridgeSecrets, signWith } from "@/lib/bridge-hmac.server";
 import {
   auditBridgeNormalizationEvents,
@@ -485,12 +486,7 @@ export async function runBridgeSync(
   const failedOnly = Boolean(opts.failedOnly);
   const bedsOnly = Boolean(opts.bedsOnly);
 
-  const apiKey = request.headers.get("apikey") ?? "";
-  const allowed = [
-    process.env.SUPABASE_PUBLISHABLE_KEY,
-    process.env.SUPABASE_SERVICE_ROLE_KEY,
-  ].filter(Boolean) as string[];
-  if (!allowed.includes(apiKey)) {
+  if (!(await isBridgeCallerAuthorized(request))) {
     return jsonResponse({ error: "unauthorized" }, { status: 401 });
   }
 
