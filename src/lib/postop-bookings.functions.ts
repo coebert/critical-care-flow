@@ -66,6 +66,7 @@ const ENC_FIELDS = [
 // the encrypted columns hide.
 const AUDITED_FIELDS = [
   "hospital_number",
+  "patient_initials",
   "age",
   "sex",
   "weight_kg",
