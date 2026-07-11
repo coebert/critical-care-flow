@@ -1031,18 +1031,26 @@ export const logReferralView = createServerFn({ method: "POST" })
     //      any referral view by this user in the audit log. This blocks
     //      reuse across referrals and repeat attribution on the same
     //      referral (e.g. reload / back-button).
+    //   4. The notification must be within the deep-link expiry window
+    //      (NOTIFICATION_DEEP_LINK_TTL_MS from created_at). Stale ids
+    //      cannot be replayed weeks later from an archived email/push
+    //      payload.
     // Any failed check silently scrubs the id to null so the audit row
-    // still records the view but without a forged/reused deep-link source.
+    // still records the view but without a forged/reused/expired
+    // deep-link source.
     let verifiedNotificationId: string | null = null;
     if (data.notification_id) {
       const { data: n } = await supabase
         .from("notifications")
-        .select("id, read_at")
+        .select("id, read_at, created_at")
         .eq("id", data.notification_id)
         .eq("user_id", userId)
         .eq("referral_id", data.referral_id)
         .maybeSingle();
-      if (n && n.read_at === null) {
+      const withinTtl =
+        !!n &&
+        Date.now() - new Date(n.created_at).getTime() <= NOTIFICATION_DEEP_LINK_TTL_MS;
+      if (n && n.read_at === null && withinTtl) {
         const { data: prior } = await supabase
           .from("audit_log")
           .select("id")
@@ -1055,6 +1063,7 @@ export const logReferralView = createServerFn({ method: "POST" })
         if (!prior) verifiedNotificationId = n.id;
       }
     }
+
 
     const source = data.source ?? (verifiedNotificationId ? "notification" : "direct");
 
