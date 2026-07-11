@@ -96,7 +96,7 @@ function makeSupabaseWithRLS(opts: {
                 filters[`eq:${col}`] = v;
                 return b;
               },
-              async then(
+              then(
                 resolve: (v: { data: null; error: { code: string; message: string } | null }) => void,
               ) {
                 let affected = 0;
@@ -140,7 +140,7 @@ function makeSupabaseWithRLS(opts: {
                 filters[`eq:${col}`] = v;
                 return b;
               },
-              async then(resolve: (v: { data: null; error: null }) => void) {
+              then(resolve: (v: { data: null; error: null }) => void) {
                 if (!opts.callerIsAdmin) {
                   // USING (has_role(...,'admin')): non-admins match zero
                   // rows. Return 0-affected, not an error, mirroring PG.
