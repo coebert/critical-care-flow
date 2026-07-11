@@ -150,13 +150,40 @@ function ReferralDetail() {
     // pass the notification id so the audit_log entry captures source =
     // "notification" and the exact notification_id. The server verifies
     // the notification belongs to this user AND references this
-    // referral before trusting the id.
+    // referral before trusting the id, and returns a status telling us
+    // whether attribution succeeded or the link was expired / reused /
+    // read / invalid. The referral still opens regardless — we only
+    // surface the outcome to the clinician so an expired link is not
+    // silently swallowed.
     logView({
       data: {
         referral_id: id,
         ...(notificationId ? { notification_id: notificationId, source: "notification" as const } : {}),
       },
-    }).catch(() => {});
+    })
+      .then((res: any) => {
+        if (!notificationId) return;
+        const status: string | undefined = res?.notificationStatus;
+        if (status === "expired") {
+          toast.warning("This notification link has expired.", {
+            description:
+              "You're viewing the referral, but the link is older than the 7-day window so it wasn't recorded as a notification click.",
+          });
+        } else if (status === "reused") {
+          toast.info("This notification link has already been used.", {
+            description: "You're viewing the referral, but the link can only attribute one click.",
+          });
+        } else if (status === "read") {
+          toast.info("This notification has already been read.", {
+            description: "You're viewing the referral, but the link can no longer attribute a click.",
+          });
+        } else if (status === "invalid") {
+          toast.error("This notification link isn't valid for this referral.", {
+            description: "You're viewing the referral, but the link wasn't recorded.",
+          });
+        }
+      })
+      .catch(() => {});
     // Strip the `n=` param from the URL after logging so a shared link
     // or a back-button revisit doesn't re-attribute the view to the same
     // notification.
