@@ -435,24 +435,20 @@ function AuditPanel() {
             onChange={(e) => setDraft((d) => ({ ...d, specialty: e.target.value }))}
           />
         </div>
-        <div className="flex flex-col gap-1">
-          <Label htmlFor="audit-filter-from" className="text-xs">From</Label>
-          <Input
-            id="audit-filter-from"
-            type="datetime-local"
-            value={draft.from}
-            onChange={(e) => setDraft((d) => ({ ...d, from: e.target.value }))}
+        <div className="flex flex-col gap-1 sm:col-span-2">
+          <Label className="text-xs" id="audit-filter-range-label">Referral date range</Label>
+          <AuditDateRangePicker
+            value={{ from: isoToDate(draft.from), to: isoToDate(draft.to) }}
+            onChange={(range) =>
+              setDraft((d) => ({
+                ...d,
+                from: range?.from ? dateToIsoDay(range.from) : "",
+                to: range?.to ? dateToIsoDay(range.to) : "",
+              }))
+            }
           />
         </div>
-        <div className="flex flex-col gap-1">
-          <Label htmlFor="audit-filter-to" className="text-xs">To</Label>
-          <Input
-            id="audit-filter-to"
-            type="datetime-local"
-            value={draft.to}
-            onChange={(e) => setDraft((d) => ({ ...d, to: e.target.value }))}
-          />
-        </div>
+
         <div className="sm:col-span-2 lg:col-span-3 flex items-center gap-2">
           <Button type="submit" size="sm">Apply filters</Button>
           <Button type="button" size="sm" variant="outline" onClick={onReset}>
