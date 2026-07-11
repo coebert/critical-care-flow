@@ -12,10 +12,16 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
+import { Calendar } from "@/components/ui/calendar";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { CalendarIcon } from "lucide-react";
+import { cn } from "@/lib/utils";
+import type { DateRange } from "react-day-picker";
 import { BedsAdminPanel } from "@/components/bed-board/beds-admin-panel";
 import { MessageTemplatesPanel } from "@/components/admin/message-templates-panel";
 import { toast } from "sonner";
 import { format } from "date-fns";
+
 
 export const Route = createFileRoute("/_authenticated/admin")({
   head: () => ({ meta: [{ title: "Admin — SDH Critical Care" }, { name: "robots", content: "noindex" }] }),
