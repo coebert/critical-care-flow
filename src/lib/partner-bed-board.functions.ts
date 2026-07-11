@@ -272,6 +272,9 @@ export const updatePartnerPatient = createServerFn({ method: "POST" })
         typeof data.dnacpr_decision === "boolean" ? data.dnacpr_decision : undefined,
       dnacpr_details: normStr(data.dnacpr_details),
       outstanding_tasks: normStr(data.outstanding_tasks),
+      past_medical_history: normStr(data.past_medical_history),
+      current_admission: normStr(data.current_admission),
+      current_management: normStr(data.current_management),
     } satisfies UpdatePartnerPatientInput;
   })
   .handler(async ({ data, context }): Promise<UpdatePartnerPatientResult> => {
