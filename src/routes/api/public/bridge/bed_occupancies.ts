@@ -5,7 +5,10 @@ import {
   pickAllowed,
   verifyBridgeRequest,
 } from "@/lib/bridge-verify.server";
-import { normalizeIncomingBridgeRecord } from "@/lib/bridge-normalize";
+import {
+  auditBridgeNormalizationEvents,
+  normalizeIncomingBridgeRecord,
+} from "@/lib/bridge-normalize";
 
 const BED_OCCUPANCY_COLUMNS = [
   "id",
