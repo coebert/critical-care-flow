@@ -149,6 +149,7 @@ function NotificationsLifecyclePage() {
               <SelectItem value="read">Read</SelectItem>
               <SelectItem value="unused">Unused</SelectItem>
               <SelectItem value="used">Used</SelectItem>
+              <SelectItem value="expired">Expired</SelectItem>
             </SelectContent>
           </Select>
         </div>
