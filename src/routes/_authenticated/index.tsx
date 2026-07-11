@@ -294,7 +294,9 @@ function ReferralsList() {
         onToggleTimerSort={() =>
           setTimerSort((s) => (s === "none" ? "desc" : s === "desc" ? "asc" : "none"))
         }
+        unreadByReferral={unreadByReferral as Record<string, number>}
       />
+
     </div>
     </ClinicalAccessGate>
   );
