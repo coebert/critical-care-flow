@@ -39,16 +39,41 @@ const AUDIT_ACTIONS = ["create", "update", "delete"] as const;
 
 const auditLogInputSchema = z
   .object({
-    limit: z.number().int().min(1).max(200).optional(),
-    offset: z.number().int().min(0).max(100_000).optional(),
-    sortBy: z.enum(AUDIT_SORT_COLUMNS).optional(),
-    sortDir: z.enum(["asc", "desc"]).optional(),
-    entity: z.string().trim().min(1).max(64).optional(),
-    action: z.enum(AUDIT_ACTIONS).optional(),
-    clinician: z.string().trim().min(1).max(120).optional(),
-    specialty: z.string().trim().min(1).max(120).optional(),
-    from: z.string().datetime().optional(),
-    to: z.string().datetime().optional(),
+    limit: z
+      .number({ message: "Invalid limit" })
+      .int({ message: "Invalid limit" })
+      .min(1, { message: "Invalid limit" })
+      .max(200, { message: "Invalid limit" })
+      .optional(),
+    offset: z
+      .number({ message: "Invalid offset" })
+      .int({ message: "Invalid offset" })
+      .min(0, { message: "Invalid offset" })
+      .max(100_000, { message: "Invalid offset" })
+      .optional(),
+    sortBy: z.enum(AUDIT_SORT_COLUMNS, { message: "Invalid sortBy" }).optional(),
+    sortDir: z.enum(["asc", "desc"], { message: "Invalid sortDir" }).optional(),
+    entity: z
+      .string({ message: "Invalid entity" })
+      .trim()
+      .min(1, { message: "Invalid entity" })
+      .max(64, { message: "Invalid entity" })
+      .optional(),
+    action: z.enum(AUDIT_ACTIONS, { message: "Invalid action" }).optional(),
+    clinician: z
+      .string({ message: "Invalid clinician" })
+      .trim()
+      .min(1, { message: "Invalid clinician" })
+      .max(120, { message: "Invalid clinician" })
+      .optional(),
+    specialty: z
+      .string({ message: "Invalid specialty" })
+      .trim()
+      .min(1, { message: "Invalid specialty" })
+      .max(120, { message: "Invalid specialty" })
+      .optional(),
+    from: z.string().datetime({ message: "Invalid from" }).optional(),
+    to: z.string().datetime({ message: "Invalid to" }).optional(),
   })
   .default({});
 
