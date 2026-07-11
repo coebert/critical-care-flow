@@ -135,7 +135,11 @@ function makeSupabase(opts: {
   userId: string;
   hasClinicalAccess: boolean;
   probes: {
-    referralsSelect: ReturnType<typeof vi.fn>;
+    referralsSelect: ReturnType<typeof vi.fn> & (() => void);
+    notesSelect: ReturnType<typeof vi.fn> & (() => void);
+    auditSelect: ReturnType<typeof vi.fn> & (() => void);
+  };
+}) {
     notesSelect: ReturnType<typeof vi.fn>;
     auditSelect: ReturnType<typeof vi.fn>;
   };
