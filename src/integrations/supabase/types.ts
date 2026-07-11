@@ -788,6 +788,7 @@ export type Database = {
       notifications: {
         Row: {
           created_at: string
+          expired_at: string | null
           id: string
           kind: string
           message: string
@@ -797,6 +798,7 @@ export type Database = {
         }
         Insert: {
           created_at?: string
+          expired_at?: string | null
           id?: string
           kind: string
           message: string
@@ -806,6 +808,7 @@ export type Database = {
         }
         Update: {
           created_at?: string
+          expired_at?: string | null
           id?: string
           kind?: string
           message?: string
@@ -1803,6 +1806,10 @@ export type Database = {
           p_user_agent?: string
         }
         Returns: undefined
+      }
+      expire_stale_notifications: {
+        Args: { _batch_limit?: number }
+        Returns: number
       }
       finalize_auth_attempt: {
         Args: { _attempt_id: number; _success: boolean }
