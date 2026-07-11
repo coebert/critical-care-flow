@@ -28,25 +28,6 @@ import { runGetAuditLog } from "./admin.functions";
 void vi;
 
 // ---------------------------------------------------------------------
-// Mocks (hoisted before importing admin.functions).
-// ---------------------------------------------------------------------
-vi.mock("./auth-guards", () => ({
-  assertAdmin: vi.fn(async () => {}),
-}));
-
-vi.mock("@/integrations/supabase/auth-middleware", () => {
-  const passthrough = { server: (fn: any) => fn };
-  return {
-    requireSupabaseAuth: { ...passthrough, client: passthrough },
-  };
-});
-
-const supabaseAdminMock = { from: vi.fn() };
-vi.mock("@/integrations/supabase/client.server", () => ({
-  supabaseAdmin: supabaseAdminMock,
-}));
-
-// ---------------------------------------------------------------------
 // Fixture: raw rows loaded with dangerous keys at multiple depths.
 // ---------------------------------------------------------------------
 const CLINICIAN_USER_ID = "11111111-1111-1111-1111-111111111111";
@@ -82,7 +63,6 @@ const RAW_ROWS = [
       body: "URANIUM-LEAK confidential note",
       body_ciphertext: "…body-cipher…",
       body_nonce: "IV-BODY",
-      // Fabricated future column — must be dropped by suffix only.
       unknown_future_enc: "v3:FUTURE",
       audit_wrapper: {
         nested_hash: "sha256:UNSEEN",
@@ -92,27 +72,26 @@ const RAW_ROWS = [
   },
 ];
 
-// Query-builder stub with call recording so we can verify BOTH the
-// audit_log query and the branch-specific pre-query on `profiles`.
-function makeRecordingSupabase() {
+// Recording query-builder stub. Every `.method(...)` call is captured
+// so we can assert which tables were queried and with which arguments.
+function makeRecordingAdmin(opts: {
+  profilesResult?: { data: Array<{ id: string }> | null; error: unknown };
+  auditResult?: { data: typeof RAW_ROWS | null; error: unknown; count: number };
+}) {
   const calls: Array<{ table: string; ops: Array<[string, unknown[]]> }> = [];
 
   function makeChain(table: string, terminal: unknown) {
     const ops: Array<[string, unknown[]]> = [];
-    const record = new Proxy(
+    const record: any = new Proxy(
       {},
       {
         get(_t, prop: string) {
-          // Terminal step: `.range(...)` for audit_log,
-          // `.limit(...)` for profiles.
           if (prop === "range" || prop === "limit") {
             return async (...args: unknown[]) => {
               ops.push([prop, args]);
               return terminal;
             };
           }
-          // then/catch/finally so plain `await` works if callers ever
-          // await a mid-chain builder (defensive).
           if (prop === "then") {
             return (fn: (v: unknown) => unknown) => fn(terminal);
           }
@@ -127,28 +106,24 @@ function makeRecordingSupabase() {
     return record;
   }
 
-  supabaseAdminMock.from.mockImplementation((table: string) => {
-    if (table === "audit_log") {
-      return makeChain(table, {
-        data: RAW_ROWS,
-        error: null,
-        count: RAW_ROWS.length,
-      });
-    }
-    if (table === "profiles") {
-      // Name → user_id resolution returns our clinician's id.
-      return makeChain(table, {
-        data: [{ id: CLINICIAN_USER_ID }, { id: OTHER_USER_ID }],
-        error: null,
-      });
-    }
-    if (table === "referrals") {
-      return makeChain(table, { data: [], error: null });
-    }
-    return makeChain(table, { data: [], error: null });
-  });
+  const auditResult =
+    opts.auditResult ?? { data: RAW_ROWS, error: null, count: RAW_ROWS.length };
+  const profilesResult =
+    opts.profilesResult ?? {
+      data: [{ id: CLINICIAN_USER_ID }, { id: OTHER_USER_ID }],
+      error: null,
+    };
 
-  return { calls };
+  const admin = {
+    from: (table: string) => {
+      if (table === "audit_log") return makeChain(table, auditResult);
+      if (table === "profiles") return makeChain(table, profilesResult);
+      if (table === "referrals")
+        return makeChain(table, { data: [], error: null });
+      return makeChain(table, { data: [], error: null });
+    },
+  };
+  return { admin, calls };
 }
 
 const CRYPTO_SUFFIXES = ["_enc", "_ciphertext", "_nonce", "_hash"];
@@ -218,38 +193,11 @@ const FORBIDDEN_MARKERS = [
   "asthma, HTN",
 ];
 
-async function invokeGetAuditLog(input: Record<string, unknown>) {
-  const mod = await import("./admin.functions");
-  const context = {
-    supabase: {} as any,
-    userId: "00000000-0000-0000-0000-0000000000aa",
-    claims: { role: "authenticated" } as any,
-  };
-  const fn: any = mod.getAuditLog;
-  // TanStack Start exposes `.handler` on server-fn builders; fall back
-  // to direct invocation, which in Node executes the handler with the
-  // supplied data + context.
-  const handler: (a: any) => Promise<any> =
-    fn.handler ?? fn.__handler ?? ((args: any) => fn(args));
-  try {
-    return await handler({ data: input, context });
-  } catch (err) {
-    // Fallback path: manually re-run the same transform against the
-    // fixture using the module's `redactAuditDiff`. Still proves the
-    // redactor is what the handler would apply to this filter branch.
-    const { redactAuditDiff } = await import("./audit-redact");
-    return {
-      rows: RAW_ROWS.map((r) => ({ ...r, diff: redactAuditDiff(r.diff) })),
-      total: RAW_ROWS.length,
-      _fallbackReason: String(err),
-    };
-  }
-}
-
 describe("getAuditLog clinician filter — UUID vs name, both return only redacted rows", () => {
   beforeEach(() => {
-    supabaseAdminMock.from.mockReset();
+    // no-op; each test builds its own admin.
   });
+
 
   it("UUID branch: no profiles lookup, rows returned are fully redacted", async () => {
     const { calls } = makeRecordingSupabase();
