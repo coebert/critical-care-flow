@@ -171,9 +171,18 @@ function InboxPage() {
     patchItems((cur) => cur.map((i) => (i.read_at ? i : { ...i, read_at: now })));
     const { error } = await supabase.from("notifications").update({ read_at: now }).in("id", ids);
     setBusy(false);
-    if (error) toast.error("Some notifications could not be updated");
-    else toast.success(`Marked ${ids.length} as read`);
+    if (error) {
+      toast.error("Some notifications could not be updated");
+      // Roll back optimistic patch by refetching the source of truth.
+      queryClient.invalidateQueries({ queryKey: NOTIFICATIONS_QUERY_KEY });
+      return;
+    }
+    // Refresh the referrals-list unread badge immediately rather than
+    // waiting on realtime. Keyed by tuple, so no cross-file import needed.
+    queryClient.invalidateQueries({ queryKey: ["referrals", "unreadCounts"] });
+    toast.success(`Marked ${ids.length} as read`);
   };
+
   const bulkMark = async (asRead: boolean) => {
     const ids = Array.from(selected);
     if (!ids.length) return;
