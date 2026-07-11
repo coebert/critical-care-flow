@@ -474,6 +474,28 @@ export const updateReferral = createServerFn({ method: "POST" })
         undefined,
         `Referral ${statusLabel}`,
       );
+    } else {
+      // Non-status edit to an existing referral — notify clinicians who
+      // opted in to "updated referral" pushes, with a deep link back to
+      // the referral so tapping the push opens the updated record. We
+      // intentionally skip when statusChanged fired above so a single
+      // edit doesn't produce two overlapping pushes for the same row.
+      // The push body avoids sensitive plaintext (no hospital number /
+      // reason text) — only the non-sensitive specialty + ward summary.
+      const patchKeys = Object.keys((data.patch ?? {}) as object).filter(
+        (k) => k !== "updated_by",
+      );
+      if (patchKeys.length > 0) {
+        const summary = `${decrypted.referring_specialty ?? "Referral"} — ${decrypted.current_ward ?? "ward unknown"}`;
+        await fanOutNotifications(
+          userId,
+          row.id,
+          "updated",
+          `Referral updated: ${summary}`,
+          `/referrals/${row.id}`,
+          "Referral updated",
+        );
+      }
     }
     return decrypted;
   });
