@@ -7,6 +7,14 @@ import { patientInitialsField } from "./patient-initials";
 import { decideReferralRestore, decideReferralUpdate } from "./referral-restore-authz";
 import type { Database, Tables } from "@/integrations/supabase/types";
 
+/**
+ * How long an unread notification's id remains valid for deep-link
+ * attribution. After this window, `logReferralView` scrubs the
+ * notification_id even if it is unread and unused, so a stale link
+ * from an old email/push cannot be replayed.
+ */
+export const NOTIFICATION_DEEP_LINK_TTL_MS = 7 * 24 * 60 * 60 * 1000; // 7 days
+
 const refSchema = z.object({
   age: z.number().int().min(0).max(130).nullable().optional(),
   sex: z.enum(["male", "female", "other", "unknown"]).nullable().optional(),
@@ -1031,18 +1039,26 @@ export const logReferralView = createServerFn({ method: "POST" })
     //      any referral view by this user in the audit log. This blocks
     //      reuse across referrals and repeat attribution on the same
     //      referral (e.g. reload / back-button).
+    //   4. The notification must be within the deep-link expiry window
+    //      (NOTIFICATION_DEEP_LINK_TTL_MS from created_at). Stale ids
+    //      cannot be replayed weeks later from an archived email/push
+    //      payload.
     // Any failed check silently scrubs the id to null so the audit row
-    // still records the view but without a forged/reused deep-link source.
+    // still records the view but without a forged/reused/expired
+    // deep-link source.
     let verifiedNotificationId: string | null = null;
     if (data.notification_id) {
       const { data: n } = await supabase
         .from("notifications")
-        .select("id, read_at")
+        .select("id, read_at, created_at")
         .eq("id", data.notification_id)
         .eq("user_id", userId)
         .eq("referral_id", data.referral_id)
         .maybeSingle();
-      if (n && n.read_at === null) {
+      const withinTtl =
+        !!n &&
+        Date.now() - new Date(n.created_at).getTime() <= NOTIFICATION_DEEP_LINK_TTL_MS;
+      if (n && n.read_at === null && withinTtl) {
         const { data: prior } = await supabase
           .from("audit_log")
           .select("id")
@@ -1055,6 +1071,7 @@ export const logReferralView = createServerFn({ method: "POST" })
         if (!prior) verifiedNotificationId = n.id;
       }
     }
+
 
     const source = data.source ?? (verifiedNotificationId ? "notification" : "direct");
 
