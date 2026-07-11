@@ -81,3 +81,35 @@ Essentials controls.
 - Retention windows are configurable per record type; a scheduled job
   purges records older than the configured window (see
   `docs/dtac/README.md`).
+
+## Dependency & supply-chain scanning
+
+- Automated supply-chain scans run on every push via CI and must pass
+  before merge; the CI job fails on any High or Critical advisory.
+- A scheduled scan runs weekly (Mondays) against `main` to catch
+  advisories published between releases; failures open an issue in the
+  security tracker.
+- Before each release, re-run `bun pm audit` locally and confirm the
+  Lovable supply-chain scanner is green (results dated within the last
+  7 days). Record the scan date in the release notes.
+- Rotate `HANDOVER_API_SECRET`, `HANDOVER_API_SECRET_PREVIOUS`, and
+  `bridge_cron_secret` on a 90-day cadence; log rotations in
+  `docs/dtac/README.md`.
+
+## Push notification service worker
+
+- `public/sw-push.js` validates every push payload: title / body / url /
+  tag must be strings, are length-capped, and the URL is rewritten to a
+  same-origin path drawn from an explicit allow-list before being shown
+  or opened. Cross-origin URLs and unknown paths fall back to `/`.
+- The service worker never `postMessage`s decrypted payload content to
+  page clients; deep-link routing happens only on `notificationclick`
+  via same-origin `clients.navigate` / `clients.openWindow`.
+
+## Client-side sensitive material
+
+- E2E identity keys are Argon2id-wrapped at rest in the database. The
+  unwrapped private key is cached in `sessionStorage` (tab-scoped,
+  cleared on tab close) and never written to `localStorage`. Cross-tab
+  unlock is coordinated via a same-origin `BroadcastChannel`, not
+  shared storage.
