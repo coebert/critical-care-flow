@@ -553,5 +553,69 @@ function AuditPanel() {
   );
 }
 
+/**
+ * Popover-anchored range calendar for the Audit tab. The trigger shows
+ * the current selection in "dd MMM yyyy" or a "Pick a date range"
+ * placeholder. Selecting a range fires `onChange`; clearing it fires
+ * `onChange(undefined)`.
+ */
+function AuditDateRangePicker({
+  value,
+  onChange,
+}: {
+  value: DateRange | undefined;
+  onChange: (range: DateRange | undefined) => void;
+}) {
+  const label = value?.from
+    ? value.to
+      ? `${format(value.from, "dd MMM yyyy")} – ${format(value.to, "dd MMM yyyy")}`
+      : format(value.from, "dd MMM yyyy")
+    : "Pick a date range";
+  const hasValue = Boolean(value?.from || value?.to);
+  return (
+    <div className="flex items-center gap-2">
+      <Popover>
+        <PopoverTrigger asChild>
+          <Button
+            id="audit-filter-range"
+            type="button"
+            variant="outline"
+            aria-labelledby="audit-filter-range-label"
+            className={cn(
+              "justify-start text-left font-normal w-full sm:w-[280px]",
+              !hasValue && "text-muted-foreground",
+            )}
+          >
+            <CalendarIcon className="mr-2 h-4 w-4" />
+            {label}
+          </Button>
+        </PopoverTrigger>
+        <PopoverContent className="w-auto p-0" align="start">
+          <Calendar
+            mode="range"
+            selected={value}
+            onSelect={onChange}
+            numberOfMonths={2}
+            initialFocus
+            className={cn("p-3 pointer-events-auto")}
+          />
+        </PopoverContent>
+      </Popover>
+      {hasValue && (
+        <Button
+          type="button"
+          variant="ghost"
+          size="sm"
+          onClick={() => onChange(undefined)}
+          aria-label="Clear date range"
+        >
+          Clear
+        </Button>
+      )}
+    </div>
+  );
+}
+
+
 
 
