@@ -79,7 +79,7 @@ export const Route = createFileRoute("/api/public/bridge/bed_occupancies")({
 
         const picked = pickAllowed(parsed.record, BED_OCCUPANCY_COLUMNS);
         if ("error" in picked) return jsonResponse(picked, { status: 400 });
-        const record = normalizeIncomingBridgeRecord(
+        const { record, events } = normalizeIncomingBridgeRecord(
           "bed_occupancies",
           picked.data,
         );
