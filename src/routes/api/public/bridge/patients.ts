@@ -92,10 +92,16 @@ export const Route = createFileRoute("/api/public/bridge/patients")({
         if ("error" in picked) {
           return jsonResponse(picked, { status: 400 });
         }
-        const record = picked.data;
+        const record = picked.data as Record<string, unknown>;
+        // Map wire field `patient_initials` onto the local `full_name`
+        // column. If both are present, prefer the new wire field.
+        if (record.patient_initials != null && record.patient_initials !== "") {
+          record.full_name = record.patient_initials;
+        }
+        delete record.patient_initials;
         if (!record.full_name) {
           return jsonResponse(
-            { error: "full_name_required" },
+            { error: "patient_initials_required" },
             { status: 400 },
           );
         }
