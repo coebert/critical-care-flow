@@ -86,12 +86,13 @@ function makeDeps() {
  */
 function shouldFireUpdatedPush(
   patch: Record<string, unknown>,
-  priorStatus: string | null,
-  newStatus: string | null,
+  _priorStatus: string | null,
+  _newStatus: string | null,
 ): boolean {
-  const statusChanged =
-    patch.status !== undefined && priorStatus !== newStatus;
-  if (statusChanged) return false;
+  // Production rule: fire "updated" whenever the patch contains any real
+  // content field (i.e. anything other than `updated_by` / `status`),
+  // regardless of whether status also changed. A pure status-only edit
+  // still takes the dedicated "status" branch and suppresses "updated".
   const patchKeys = Object.keys(patch).filter(
     (k) => k !== "updated_by" && k !== "status",
   );
