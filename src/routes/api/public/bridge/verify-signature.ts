@@ -20,7 +20,7 @@ import {
 export const Route = createFileRoute("/api/public/bridge/verify-signature")({
   server: {
     handlers: {
-      OPTIONS: async () => preflight(),
+      OPTIONS: async ({ request }) => preflight(request),
 
       GET: async () => {
         let secrets;

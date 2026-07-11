@@ -565,7 +565,7 @@ export async function runBridgeSync(
 export const Route = createFileRoute("/api/public/bridge/sync")({
   server: {
     handlers: {
-      OPTIONS: async () => preflight(),
+      OPTIONS: async ({ request }) => preflight(request),
 
       // Cron trigger. Also accepts GET for manual introspection.
       GET: async ({ request }) => runBridgeSync(request, { source: "sync" }),
