@@ -238,6 +238,11 @@ function NotificationsLifecyclePage() {
                     <StatusPill label="mismatch" tone="bad" />
                   ) : r.used_at ? (
                     <StatusPill label={r.read_at ? "used · read" : "used"} tone="ok" />
+                  ) : r.expired_at ? (
+                    <StatusPill
+                      label="expired"
+                      tone="warn"
+                    />
                   ) : r.read_at ? (
                     <StatusPill label="read · unused" tone="warn" />
                   ) : (
