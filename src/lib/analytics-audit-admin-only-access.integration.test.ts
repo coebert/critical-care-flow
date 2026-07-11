@@ -225,7 +225,7 @@ describe("referrals analytics + audit surfaces are admin-only", () => {
       expect((caught as Error)?.message).toBe("Permission check failed.");
       expect((caught as Error).message).not.toContain("PG-LEAK-XX");
       expect((caught as Error).message).not.toContain("42501");
-      expect(probe as unknown as vi.Mock).not.toHaveBeenCalled();
+      expect(probe as ReturnType<typeof vi.fn>).not.toHaveBeenCalled();
     }
   });
 
