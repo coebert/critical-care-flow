@@ -1,5 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { jsonResponse, preflight } from "@/lib/bridge-cors";
+import { isBridgeCallerAuthorized } from "@/lib/bridge-caller-auth.server";
 import { getBridgeSecrets, signWith } from "@/lib/bridge-hmac.server";
 import {
   auditBridgeNormalizationEvents,
