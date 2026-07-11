@@ -200,18 +200,18 @@ describe("getAuditLog clinician filter — UUID vs name, both return only redact
 
 
   it("UUID branch: no profiles lookup, rows returned are fully redacted", async () => {
-    const { calls } = makeRecordingSupabase();
-    const page = await invokeGetAuditLog({ clinician: CLINICIAN_USER_ID });
+    const { admin, calls } = makeRecordingAdmin({});
+    const page = await runGetAuditLog(
+      { clinician: CLINICIAN_USER_ID } as any,
+      admin,
+    );
 
-    // Correct branch: audit_log queried; profiles NOT queried.
     const tablesQueried = calls.map((c) => c.table);
     expect(tablesQueried).toContain("audit_log");
     expect(tablesQueried).not.toContain("profiles");
 
-    // The audit_log query should have applied an `.in("user_id", [...])`
-    // with our UUID exactly once.
     const auditCall = calls.find((c) => c.table === "audit_log")!;
-    const inOp = auditCall.ops.find(([m]) => m === "in");
+    const inOp = auditCall.ops.find(([m]: [string, unknown[]]) => m === "in");
     expect(inOp?.[1][0]).toBe("user_id");
     expect(inOp?.[1][1]).toEqual([CLINICIAN_USER_ID]);
 
@@ -234,10 +234,12 @@ describe("getAuditLog clinician filter — UUID vs name, both return only redact
   });
 
   it("name branch: profiles.full_name ilike lookup runs, rows are fully redacted", async () => {
-    const { calls } = makeRecordingSupabase();
-    const page = await invokeGetAuditLog({ clinician: "Dr Smith" });
+    const { admin, calls } = makeRecordingAdmin({});
+    const page = await runGetAuditLog(
+      { clinician: "Dr Smith" } as any,
+      admin,
+    );
 
-    // Both tables were queried. profiles resolution runs FIRST.
     const tablesQueried = calls.map((c) => c.table);
     expect(tablesQueried).toContain("profiles");
     expect(tablesQueried).toContain("audit_log");
@@ -246,16 +248,13 @@ describe("getAuditLog clinician filter — UUID vs name, both return only redact
     expect(profilesFirst).toBeGreaterThanOrEqual(0);
     expect(auditFirst).toBeGreaterThan(profilesFirst);
 
-    // profiles resolution actually used ilike on full_name with the raw
-    // text, wrapped in %…% wildcards.
     const profilesCall = calls.find((c) => c.table === "profiles")!;
-    const ilikeOp = profilesCall.ops.find(([m]) => m === "ilike");
+    const ilikeOp = profilesCall.ops.find(([m]: [string, unknown[]]) => m === "ilike");
     expect(ilikeOp?.[1][0]).toBe("full_name");
     expect(String(ilikeOp?.[1][1] ?? "")).toMatch(/^%.*Dr Smith.*%$/);
 
-    // The audit_log query then filters user_id IN the resolved id set.
     const auditCall = calls.find((c) => c.table === "audit_log")!;
-    const inOp = auditCall.ops.find(([m]) => m === "in");
+    const inOp = auditCall.ops.find(([m]: [string, unknown[]]) => m === "in");
     expect(inOp?.[1][0]).toBe("user_id");
     expect((inOp?.[1][1] as string[])?.length).toBeGreaterThanOrEqual(1);
 
@@ -277,53 +276,26 @@ describe("getAuditLog clinician filter — UUID vs name, both return only redact
   });
 
   it("name branch with unknown clinician: sentinel id set, still redacts any rows returned", async () => {
-    // The handler substitutes a zero UUID when profiles.full_name ilike
-    // yields no rows, so the audit_log query returns empty. We still
-    // exercise the redactor by having the audit_log query return rows
-    // (belt-and-braces: if that guard were ever removed and the query
-    // matched anyway, the response must remain redacted).
-    const calls: Array<{ table: string; ops: Array<[string, unknown[]]> }> = [];
-    supabaseAdminMock.from.mockImplementation((table: string) => {
-      const ops: Array<[string, unknown[]]> = [];
-      const terminal =
-        table === "profiles"
-          ? { data: [], error: null }
-          : { data: RAW_ROWS, error: null, count: RAW_ROWS.length };
-      const record: any = new Proxy(
-        {},
-        {
-          get(_t, prop: string) {
-            if (prop === "range" || prop === "limit") {
-              return async (...args: unknown[]) => {
-                ops.push([prop, args]);
-                return terminal;
-              };
-            }
-            if (prop === "then") {
-              return (fn: (v: unknown) => unknown) => fn(terminal);
-            }
-            return (...args: unknown[]) => {
-              ops.push([prop, args]);
-              return record;
-            };
-          },
-        },
-      );
-      calls.push({ table, ops });
-      return record;
+    // profiles lookup returns []. The handler substitutes the all-zero
+    // UUID so the audit_log query returns nothing in real life. We wire
+    // audit_log to return rows anyway — belt-and-braces: if the sentinel
+    // guard were ever removed and the query somehow matched, the
+    // response must remain redacted.
+    const { admin, calls } = makeRecordingAdmin({
+      profilesResult: { data: [], error: null },
+      auditResult: { data: RAW_ROWS, error: null, count: RAW_ROWS.length },
     });
+    const page = await runGetAuditLog(
+      { clinician: "Nobody With This Name" } as any,
+      admin,
+    );
 
-    const page = await invokeGetAuditLog({ clinician: "Nobody With This Name" });
-
-    // Sentinel id substitution: the audit_log .in() got the all-zero UUID.
     const auditCall = calls.find((c) => c.table === "audit_log");
-    if (auditCall) {
-      const inOp = auditCall.ops.find(([m]) => m === "in");
-      expect(inOp?.[1][0]).toBe("user_id");
-      expect(inOp?.[1][1]).toEqual(["00000000-0000-0000-0000-000000000000"]);
-    }
+    expect(auditCall).toBeTruthy();
+    const inOp = auditCall!.ops.find(([m]: [string, unknown[]]) => m === "in");
+    expect(inOp?.[1][0]).toBe("user_id");
+    expect(inOp?.[1][1]).toEqual(["00000000-0000-0000-0000-000000000000"]);
 
-    // Whatever the mock chose to return, the response must be scrubbed.
     const leaks = findLeaks(page.rows ?? []);
     expect(leaks).toEqual([]);
     const serialised = JSON.stringify(page);
@@ -335,3 +307,4 @@ describe("getAuditLog clinician filter — UUID vs name, both return only redact
     }
   });
 });
+
