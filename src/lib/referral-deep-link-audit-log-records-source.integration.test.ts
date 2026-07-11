@@ -342,7 +342,7 @@ describe("deep-link view is recorded in audit_log with actor + referral + source
         sb.client,
         NURSE,
         { referral_id: REF_A, notification_id: NOTIF_OK },
-        async (r) => audits.push(r),
+        async (r) => { audits.push(r); },
       ),
     ).rejects.toThrow(/Forbidden/);
 
@@ -366,7 +366,7 @@ describe("deep-link view is recorded in audit_log with actor + referral + source
         sb.client,
         CLIN,
         { referral_id: REF_MISSING, notification_id: NOTIF_OK },
-        async (r) => audits.push(r),
+        async (r) => { audits.push(r); },
       ),
     ).rejects.toThrow(/not found/i);
 
@@ -399,13 +399,13 @@ describe("deep-link view is recorded in audit_log with actor + referral + source
       sb1.client,
       CLIN,
       { referral_id: REF_A, notification_id: NOTIF_OK },
-      async (r) => audits.push(r),
+      async (r) => { audits.push(r); },
     );
     await runLogReferralView(
       sb2.client,
       OTHER,
       { referral_id: REF_A, notification_id: "cccccccc-cccc-cccc-cccc-cccccccccc10" },
-      async (r) => audits.push(r),
+      async (r) => { audits.push(r); },
     );
 
     expect(audits).toHaveLength(2);
