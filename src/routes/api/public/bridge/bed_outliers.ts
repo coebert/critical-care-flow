@@ -70,7 +70,7 @@ export const Route = createFileRoute("/api/public/bridge/bed_outliers")({
 
         const picked = pickAllowed(parsed.record, BED_OUTLIER_COLUMNS);
         if ("error" in picked) return jsonResponse(picked, { status: 400 });
-        const record = normalizeIncomingBridgeRecord(
+        const { record, events } = normalizeIncomingBridgeRecord(
           "bed_outliers",
           picked.data,
         );
