@@ -736,8 +736,13 @@ function buildDiff(
   ] as const;
   for (const k of strKeys) {
     if (initial[k] !== current[k]) {
-      // Empty string → null (partner coerces anyway, be explicit).
-      (out as Record<string, unknown>)[k] = current[k] === "" ? null : current[k];
+      let value: string | null = current[k] === "" ? null : current[k];
+      // Hard guarantee: the "full_name" field on the partner is used as the
+      // initials carrier. Never let a full name leak across the bridge.
+      if (k === "full_name" && typeof value === "string") {
+        value = toInitials(value) || null;
+      }
+      (out as Record<string, unknown>)[k] = value;
     }
   }
   if (initial.age !== current.age) {
