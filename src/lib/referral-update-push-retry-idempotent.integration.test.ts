@@ -76,6 +76,7 @@ function makeSendPushWithRetry(provider: (endpoint: string) => Promise<void>) {
   return vi.fn(
     async (
       subs: PushSubRow[],
+      _payload: { title: string; body: string; url?: string; tag?: string },
     ): Promise<{
       goneEndpoints: string[];
       results: PushDeliveryResult[];
