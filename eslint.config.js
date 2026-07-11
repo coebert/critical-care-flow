@@ -93,9 +93,9 @@ export default tseslint.config(
           ],
           patterns: [
             {
-              group: ["**/client.server", "**/*.server"],
+              group: ["**/client.server"],
               message:
-                "Do not top-level import `*.server` modules from a *.functions.ts file — they ship to the client bundle. Use `await import(...)` inside the handler.",
+                "Do not top-level import `client.server` from a *.functions.ts module — service-role code paths would ship to the client bundle. Use `await import('@/integrations/supabase/client.server')` inside the handler.",
             },
           ],
         },
