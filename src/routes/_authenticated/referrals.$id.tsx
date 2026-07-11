@@ -104,7 +104,7 @@ function toLocal(iso: string | null) {
 
 function ReferralDetail() {
   const { id } = Route.useParams();
-  const { highlight } = Route.useSearch();
+  const { highlight, n: notificationId } = Route.useSearch();
   const navigate = useNavigate();
   const update = useServerFn(updateReferral);
   const logView = useServerFn(logReferralView);
