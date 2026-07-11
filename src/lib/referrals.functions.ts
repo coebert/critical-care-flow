@@ -482,8 +482,13 @@ export const updateReferral = createServerFn({ method: "POST" })
       // edit doesn't produce two overlapping pushes for the same row.
       // The push body avoids sensitive plaintext (no hospital number /
       // reason text) — only the non-sensitive specialty + ward summary.
+      // Suppress "updated" pushes when the edit is purely a status change
+      // (status is delivered via the dedicated "status" push above; the
+      // outer branch already guards that case). We also drop `status`
+      // from patchKeys here so a same-value status write with no other
+      // fields cannot slip through and produce a redundant push.
       const patchKeys = Object.keys((data.patch ?? {}) as object).filter(
-        (k) => k !== "updated_by",
+        (k) => k !== "updated_by" && k !== "status",
       );
       if (patchKeys.length > 0) {
         const summary = `${decrypted.referring_specialty ?? "Referral"} — ${decrypted.current_ward ?? "ward unknown"}`;
