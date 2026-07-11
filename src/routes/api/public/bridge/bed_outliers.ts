@@ -5,6 +5,7 @@ import {
   pickAllowed,
   verifyBridgeRequest,
 } from "@/lib/bridge-verify.server";
+import { normalizeIncomingBridgeRecord } from "@/lib/bridge-normalize";
 
 const BED_OUTLIER_COLUMNS = [
   "id",
@@ -69,7 +70,10 @@ export const Route = createFileRoute("/api/public/bridge/bed_outliers")({
 
         const picked = pickAllowed(parsed.record, BED_OUTLIER_COLUMNS);
         if ("error" in picked) return jsonResponse(picked, { status: 400 });
-        const record = picked.data;
+        const record = normalizeIncomingBridgeRecord(
+          "bed_outliers",
+          picked.data,
+        );
 
         for (const required of ["ward", "started_at", "level"]) {
           if (record[required] === undefined || record[required] === null) {
