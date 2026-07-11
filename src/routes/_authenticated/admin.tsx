@@ -279,8 +279,9 @@ function AuditPanel() {
         action: (applied.action || undefined) as any,
         clinician: applied.clinician || undefined,
         specialty: applied.specialty || undefined,
-        from: toIso(applied.from),
-        to: toIso(applied.to),
+        from: dateToIso(applied.from),
+        to: dateToIso(applied.to, true),
+
       },
     })
       .then((page) => {
