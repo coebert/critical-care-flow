@@ -140,13 +140,61 @@ test.describe("bed-board prefill handover banner", () => {
     } else {
       // The partner had no DNACPR decision; our referral has
       // dnacpr_respect=true, so prefill should flip it on and reveal the
-      // DNACPR details textarea populated with the referral-origin text.
+      // DNACPR details textarea populated with the exact referral-origin
+      // reason string from composeDnacprDetails().
       await expect(dnacprSwitch).toHaveAttribute("aria-checked", "true", {
         timeout: 15_000,
       });
       const dnacprDetails = dialog.getByLabel(/DNACPR details/i);
       await expect(dnacprDetails).toBeVisible({ timeout: 10_000 });
-      await expect(dnacprDetails).toHaveValue(/DNACPR|ReSPECT/i);
+      // Exact reason wording from composeDnacprDetails() when the referral
+      // has dnacpr_respect=true (not the "DNACPR documented…" variant that
+      // fires only for resus_status='dnacpr').
+      await expect(dnacprDetails).toHaveValue(
+        /ReSPECT \/ DNACPR form recorded on critical care referral\./,
+      );
+
+      // wantsTep is true whenever DNACPR is being set, so the TEP switch
+      // should also have been flipped on by the same prefill run.
+      const tepSwitch = dialog.getByRole("switch", { name: /TEP in place/i });
+      await expect(tepSwitch).toHaveAttribute("aria-checked", "true");
+
+      // Success toast must report a numeric count. Our referral seeds
+      // past_medical_history, reason_for_referral (→ current_admission),
+      // dnacpr_decision, dnacpr_details, and tep_in_place — so at minimum
+      // three handover fields must have been applied. The exact PMH and
+      // admission-reason text lives on partner columns that this dialog
+      // does not render (they surface on the partner ICU Handover Hub
+      // UI); their mapping is verified exhaustively in
+      // src/lib/partner-handover-prefill.test.ts. Here we assert the
+      // count as the UI-observable proof that they were part of the
+      // applied set.
+      const successToast = page
+        .locator('[data-sonner-toast], [role="status"]')
+        .filter({ hasText: /Prefilled \d+ handover field/i })
+        .first();
+      await expect(successToast).toBeVisible({ timeout: 10_000 });
+      const toastText = (await successToast.textContent()) ?? "";
+      const match = toastText.match(/Prefilled (\d+) handover field/i);
+      expect(match, `toast should include applied count: ${toastText}`)
+        .not.toBeNull();
+      const appliedCount = Number(match![1]);
+      expect(appliedCount).toBeGreaterThanOrEqual(3);
+
+      // Round-trip: close and re-open the dialog to prove the DNACPR
+      // details we just saw came back from the server (not just optimistic
+      // local state).
+      await page.keyboard.press("Escape");
+      await expect(dialog).toBeHidden({ timeout: 10_000 });
+      await anyOccupied.click();
+      const dialog2 = page.getByRole("dialog", { name: /edit patient/i });
+      await expect(dialog2).toBeVisible({ timeout: 10_000 });
+      await expect(
+        dialog2.getByRole("switch", { name: /DNACPR decision/i }),
+      ).toHaveAttribute("aria-checked", "true");
+      await expect(dialog2.getByLabel(/DNACPR details/i)).toHaveValue(
+        /ReSPECT \/ DNACPR form recorded on critical care referral\./,
+      );
     }
   });
 
