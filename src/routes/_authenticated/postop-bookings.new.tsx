@@ -45,6 +45,7 @@ function NewPostopBookingPage() {
   const [saving, setSaving] = useState(false);
 
   const [hospitalNumber, setHospitalNumber] = useState("");
+  const [initials, setInitials] = useState("");
   const [age, setAge] = useState("");
   const [sex, setSex] = useState<Sex>("");
   const [weight, setWeight] = useState("");
@@ -77,6 +78,7 @@ function NewPostopBookingPage() {
     try {
       const payload = {
         hospital_number: hospitalNumber.trim() || null,
+        patient_initials: initials.trim() || null,
         age: age.trim() ? parseInt(age, 10) : null,
         sex: (sex || null) as any,
         weight_kg: weight.trim() ? parseFloat(weight) : null,
@@ -124,6 +126,10 @@ function NewPostopBookingPage() {
             <div className="space-y-1.5">
               <Label htmlFor="hn">Hospital number</Label>
               <Input id="hn" value={hospitalNumber} onChange={(e) => setHospitalNumber(e.target.value)} maxLength={50} />
+            </div>
+            <div className="space-y-1.5">
+              <Label htmlFor="initials">Patient initials</Label>
+              <Input id="initials" value={initials} onChange={(e) => setInitials(e.target.value)} maxLength={10} placeholder="e.g. J.S." />
             </div>
             <div className="space-y-1.5">
               <Label htmlFor="age">Age (years)</Label>

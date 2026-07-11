@@ -15,6 +15,7 @@ export type DraftForm = {
   age: string;
   sex: "male" | "female" | "other" | "unknown";
   hospital_number: string;
+  patient_initials: string;
   current_ward: string;
   current_bed: string;
   past_medical_history: string;
@@ -43,6 +44,7 @@ export type DraftForm = {
 // user doesn't lose their place after an accidental reload.
 export const SENSITIVE_DRAFT_KEYS = [
   "hospital_number",
+  "patient_initials",
   "past_medical_history",
   "baseline_function",
   "reason_for_referral",
@@ -67,6 +69,7 @@ export const blankForm = (): DraftForm => ({
   age: "",
   sex: "unknown",
   hospital_number: "",
+  patient_initials: "",
   current_ward: "",
   current_bed: "",
   past_medical_history: "",

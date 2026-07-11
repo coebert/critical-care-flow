@@ -15,6 +15,7 @@ function loadCrypto(): Promise<PostopCrypto> {
 
 const bookingSchema = z.object({
   hospital_number: z.string().trim().max(50).nullable().optional(),
+  patient_initials: z.string().trim().max(10).nullable().optional(),
   age: z.number().int().min(0).max(130).nullable().optional(),
   sex: z.enum(["male", "female", "other", "unknown"]).nullable().optional(),
   weight_kg: z.number().positive().max(499).nullable().optional(),
@@ -65,6 +66,7 @@ const ENC_FIELDS = [
 // the encrypted columns hide.
 const AUDITED_FIELDS = [
   "hospital_number",
+  "patient_initials",
   "age",
   "sex",
   "weight_kg",

@@ -10,6 +10,7 @@ const refSchema = z.object({
   age: z.number().int().min(0).max(130).nullable().optional(),
   sex: z.enum(["male", "female", "other", "unknown"]).nullable().optional(),
   hospital_number: z.string().trim().max(50).nullable().optional(),
+  patient_initials: z.string().trim().max(10).nullable().optional(),
   current_ward: z.string().trim().max(100).nullable().optional(),
   current_bed: z.string().trim().max(50).nullable().optional(),
   past_medical_history: z.string().trim().max(5000).nullable().optional(),

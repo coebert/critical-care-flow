@@ -26,6 +26,7 @@ export function encryptPayload(input: Record<string, any>) {
     arrived_at: input.arrived_at ?? null,
     surgical_specialty: input.surgical_specialty ?? null,
     is_test: input.is_test ?? false,
+    patient_initials: input.patient_initials ?? null,
     hospital_number_enc: encryptString(input.hospital_number ?? null),
     hospital_number_hash: hashHospitalNumber(input.hospital_number ?? null),
   };

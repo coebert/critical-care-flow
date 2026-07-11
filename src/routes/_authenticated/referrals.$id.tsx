@@ -178,6 +178,7 @@ function ReferralDetail() {
     try {
       const patch: any = {
         age: ref.age, sex: ref.sex, hospital_number: ref.hospital_number,
+        patient_initials: (ref as any).patient_initials ?? null,
         current_ward: ref.current_ward, current_bed: ref.current_bed,
         past_medical_history: ref.past_medical_history, baseline_function: ref.baseline_function,
         dnacpr_respect: ref.dnacpr_respect, referring_specialty: ref.referring_specialty,
@@ -330,6 +331,7 @@ function ReferralDetail() {
               </Select>
             </Field>
             <Field label="Hospital number"><Input value={ref.hospital_number ?? ""} onChange={(e) => set("hospital_number", e.target.value)} /></Field>
+            <Field label="Patient initials"><Input value={ref.patient_initials ?? ""} maxLength={10} placeholder="e.g. J.S." onChange={(e) => set("patient_initials", e.target.value)} /></Field>
             <Field label="Referring specialty"><ComboboxAdd value={ref.referring_specialty ?? ""} onChange={(v) => set("referring_specialty", v)} options={specialties} /></Field>
             <Field label="Ward"><ComboboxAdd value={ref.current_ward ?? ""} onChange={(v) => set("current_ward", v)} options={wards} /></Field>
             <Field label="Bed"><Input value={ref.current_bed ?? ""} onChange={(e) => set("current_bed", e.target.value)} /></Field>

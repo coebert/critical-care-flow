@@ -301,7 +301,7 @@ function NewReferralPage() {
         previous_referral_id: previousReferralId,
       };
       for (const k of [
-        "hospital_number","current_ward","current_bed","past_medical_history",
+        "hospital_number","patient_initials","current_ward","current_bed","past_medical_history",
         "baseline_function","referring_specialty","reason_for_referral","decline_reason","discussed_with_consultant","accepting_consultant",
       ]) if (!payload[k]) payload[k] = null;
 
@@ -350,6 +350,7 @@ function NewReferralPage() {
               </Select>
             </Field>
             <Field label="Hospital number"><Input value={f.hospital_number} onChange={(e) => set("hospital_number", e.target.value)} /></Field>
+            <Field label="Patient initials"><Input value={f.patient_initials} maxLength={10} placeholder="e.g. J.S." onChange={(e) => set("patient_initials", e.target.value)} /></Field>
             <Field label="Referring specialty"><ComboboxAdd value={f.referring_specialty} onChange={(v) => set("referring_specialty", v)} options={specialties} placeholder="e.g. General Surgery" /></Field>
             <Field label="Current ward"><ComboboxAdd value={f.current_ward} onChange={(v) => set("current_ward", v)} options={wards} placeholder="e.g. ED Resus, Pembroke" /></Field>
             <Field label="Bed"><Input value={f.current_bed} onChange={(e) => set("current_bed", e.target.value)} /></Field>
