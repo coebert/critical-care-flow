@@ -235,12 +235,22 @@ const EMPTY_FILTERS: AuditFilters = {
   to: "",
 };
 
-// datetime-local (YYYY-MM-DDTHH:mm) → ISO string. Empty stays empty.
-const toIso = (v: string): string | undefined => {
+// Date-only string (YYYY-MM-DD) → ISO. `endOfDay` extends the upper bound
+// to 23:59:59.999 so the range is inclusive of the selected end date.
+const dateToIso = (v: string, endOfDay = false): string | undefined => {
   if (!v) return undefined;
-  const d = new Date(v);
+  const d = new Date(`${v}T${endOfDay ? "23:59:59.999" : "00:00:00.000"}`);
   return isNaN(d.getTime()) ? undefined : d.toISOString();
 };
+const isoToDate = (v: string): Date | undefined => {
+  if (!v) return undefined;
+  const [y, m, d] = v.split("-").map((n) => parseInt(n, 10));
+  if (!y || !m || !d) return undefined;
+  return new Date(y, m - 1, d);
+};
+const dateToIsoDay = (d: Date): string =>
+  `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+
 
 function AuditPanel() {
   const fetchLog = useServerFn(getAuditLog);
