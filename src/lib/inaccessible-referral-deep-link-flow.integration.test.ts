@@ -123,7 +123,8 @@ function makeHandler(opts: {
       entity_id: input.referral_id,
       diff: { source, notification_id: verifiedNotificationId },
     });
-    return { ok: true as const, notificationStatus };
+    return { ok: true as const, notificationStatus: notificationStatus as
+      | "attributed" | "expired" | "reused" | "read" | "invalid" | "none" };
   }
 
   // Mirrors fetchDetail — throws with a single generic message for every
