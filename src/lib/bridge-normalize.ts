@@ -108,11 +108,7 @@ export function normalizeIncomingBridgeRecord(
  * write it describes.
  */
 export async function auditBridgeNormalizationEvents(
-  admin: {
-    from: (table: string) => {
-      insert: (row: unknown) => Promise<{ error: unknown }>;
-    };
-  },
+  admin: { from: (table: string) => any },
   params: {
     resource: string;
     entityId: string | null;
