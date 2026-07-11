@@ -60,6 +60,7 @@ function EditPostopBookingPage() {
   const [historyLoading, setHistoryLoading] = useState(true);
 
   const [hospitalNumber, setHospitalNumber] = useState("");
+  const [initials, setInitials] = useState("");
   const [age, setAge] = useState("");
   const [sex, setSex] = useState<Sex>("");
   const [weight, setWeight] = useState("");
