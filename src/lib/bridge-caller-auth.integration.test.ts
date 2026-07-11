@@ -82,7 +82,7 @@ describe("isBridgeCallerAuthorized", () => {
       req({ "x-cron-secret": CRON_SECRET }),
     );
     expect(ok).toBe(true);
-    expect(rpcMock).toHaveBeenCalledWith("get_bridge_cron_secret");
+    expect(rpcMock).toHaveBeenCalledWith("get_bridge_cron_secret", undefined);
   });
 
   it("rejects a same-length but mismatched x-cron-secret", async () => {
