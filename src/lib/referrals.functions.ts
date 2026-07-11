@@ -396,11 +396,12 @@ export const updateReferral = createServerFn({ method: "POST" })
   .handler(async ({ data, context }) => {
     const { supabase, userId } = context;
     await assertClinicalAccess(supabase, userId);
+    // Select "*" so the notification normalization below can compare any
+    // patched column against its prior value. Extra columns are read-only
+    // here and used purely for equality checks / audit context.
     const { data: prior } = await supabase
       .from("referrals")
-      .select(
-        "status, decline_reason, accepting_consultant, discussed_with_consultant, admission_urgency, referral_received_at, first_seen_at, decision_at, arrived_on_unit_at, created_by, deleted_at",
-      )
+      .select("*")
       .eq("id", data.id)
       .maybeSingle();
 
@@ -461,16 +462,29 @@ export const updateReferral = createServerFn({ method: "POST" })
 
     const decrypted = decryptReferralRow(row as any);
 
-    // Normalize the patch for notification decisions ONLY. A `status` key
-    // whose value equals the current row status is a no-op write (e.g.
-    // client resubmits the same status alongside an unrelated edit, or
-    // an offline queue replays a stale write). Strip it here so it can
-    // never influence the fanout branch below — same-value status keys
-    // are treated identically to `status` being absent from the patch.
+    // Normalize the patch for notification decisions ONLY. Any key whose
+    // post-write value equals its pre-write value is a no-op replay —
+    // e.g. a client resubmits the same status alongside unchanged
+    // fields, or an offline queue replays a stale write. Strip such
+    // keys so they can never influence the fanout branch below. We
+    // compare against `row` (the post-write DB row) rather than
+    // `decrypted` so encrypted-column comparisons never accidentally
+    // match across differing ciphertexts.
     const rawPatch = (data.patch ?? {}) as Record<string, unknown>;
-    const effectivePatch: Record<string, unknown> = { ...rawPatch };
-    if ("status" in effectivePatch && prior?.status === row.status) {
-      delete effectivePatch.status;
+    const priorRow = (prior ?? {}) as Record<string, unknown>;
+    const currentRow = row as unknown as Record<string, unknown>;
+    const effectivePatch: Record<string, unknown> = {};
+    for (const [k, v] of Object.entries(rawPatch)) {
+      if (k === "updated_by") continue;
+      // If the column existed on prior AND its value is the same before
+      // and after the write, this key is a no-op replay — skip it.
+      if (
+        k in priorRow &&
+        priorRow[k] === currentRow[k]
+      ) {
+        continue;
+      }
+      effectivePatch[k] = v;
     }
     // A status change is now definitional: the key survived normalization.
     const statusChanged = "status" in effectivePatch;
