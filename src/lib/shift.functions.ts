@@ -49,16 +49,27 @@ export const subscribePush = createServerFn({ method: "POST" })
     const { supabase } = context;
     // Push endpoints are globally unique. Registration goes through a
     // SECURITY DEFINER RPC so the database can atomically claim/refresh the
-    // endpoint for the authenticated user, even when the same browser endpoint
-    // was previously registered by another account. This avoids depending on
-    // service-role environment configuration from the app runtime.
+    // endpoint for the authenticated user. If the endpoint is already
+    // registered to a DIFFERENT user, the RPC rejects the claim with SQLSTATE
+    // 42501 and writes an audit row — web-push endpoints are not secret and
+    // must not be treated as proof of ownership.
     const { error } = await supabase.rpc("claim_push_subscription", {
       p_endpoint: data.endpoint,
       p_p256dh: data.p256dh,
       p_auth: data.auth,
       p_user_agent: data.user_agent,
     });
-    if (error) throw safeError("push.subscribe", error, "Failed to register for push notifications.");
+    if (error) {
+      const msg = (error.message ?? "").toLowerCase();
+      if (msg.includes("already registered to another account")) {
+        throw safeError(
+          "push.subscribe",
+          error,
+          "This device is already registered for push notifications on a different account. Please unsubscribe from the other account first.",
+        );
+      }
+      throw safeError("push.subscribe", error, "Failed to register for push notifications.");
+    }
     return { ok: true };
   });
 
