@@ -7,6 +7,14 @@ import { patientInitialsField } from "./patient-initials";
 import { decideReferralRestore, decideReferralUpdate } from "./referral-restore-authz";
 import type { Database, Tables } from "@/integrations/supabase/types";
 
+/**
+ * How long an unread notification's id remains valid for deep-link
+ * attribution. After this window, `logReferralView` scrubs the
+ * notification_id even if it is unread and unused, so a stale link
+ * from an old email/push cannot be replayed.
+ */
+export const NOTIFICATION_DEEP_LINK_TTL_MS = 7 * 24 * 60 * 60 * 1000; // 7 days
+
 const refSchema = z.object({
   age: z.number().int().min(0).max(130).nullable().optional(),
   sex: z.enum(["male", "female", "other", "unknown"]).nullable().optional(),
