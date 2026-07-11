@@ -68,6 +68,7 @@ export const blankForm = (): DraftForm => ({
   age: "",
   sex: "unknown",
   hospital_number: "",
+  patient_initials: "",
   current_ward: "",
   current_bed: "",
   past_medical_history: "",
