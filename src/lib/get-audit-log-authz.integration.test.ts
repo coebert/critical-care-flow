@@ -256,7 +256,7 @@ describe("getAuditLog authz — unauthenticated / missing-context requests", () 
     // has_role was called with _user_id: null — exactly one call, and
     // ONLY that call. No sneaky secondary lookups.
     expect(ctx.calls).toEqual([
-      { fn: "rpc", args: { _user_id: null, _role: "admin" } },
+      { fn: "has_role", args: { _user_id: null, _role: "admin" } },
     ]);
     assertNoMarkerLeaks("null-userId", (caught as Error).message);
   });
@@ -283,7 +283,7 @@ describe("getAuditLog authz — authenticated but non-admin users", () => {
       expect((caught as Error)?.message).toBe("Forbidden: admin role required.");
       expect(state.invoked, "admin reader must be untouched").toBe(false);
       expect(ctx.calls).toEqual([
-        { fn: "rpc", args: { _user_id: userId, _role: "admin" } },
+        { fn: "has_role", args: { _user_id: userId, _role: "admin" } },
       ]);
 
       // The error surface itself carries no ciphertext, hash, or
