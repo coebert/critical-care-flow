@@ -762,18 +762,21 @@ function buildDiff(
 function EditOccupantDialog({
   occupant,
   currentLevel,
+  sourceReferralId,
   onClose,
   onSaved,
   onAcuityChanged,
 }: {
   occupant: PartnerOccupant | null;
   currentLevel: AcuityLevel | null;
+  sourceReferralId: string | null;
   onClose: () => void;
   onSaved: (updated: PartnerOccupant) => void;
   onAcuityChanged: () => void;
 }) {
   const save = useServerFn(updatePartnerPatient);
   const saveAcuity = useServerFn(setPatientAcuity);
+  const runPrefill = useServerFn(prefillPartnerHandoverFromReferral);
   const acuityMutation = useMutation({
     mutationFn: (level: AcuityLevel | null) =>
       saveAcuity({ data: { partner_patient_id: occupant!.id, level } }),
@@ -786,6 +789,40 @@ function EditOccupantDialog({
       }
     },
     onError: (err) => toast.error(err instanceof Error ? err.message : "Could not save level"),
+  });
+  const prefillMutation = useMutation({
+    mutationFn: () =>
+      runPrefill({
+        data: {
+          referral_id: sourceReferralId!,
+          partner_patient_id: occupant!.id,
+        },
+      }),
+    onSuccess: (result) => {
+      if (!result.ok) {
+        toast.error(result.error || "Could not prefill handover");
+        return;
+      }
+      if (result.applied_fields.length === 0) {
+        toast.info(
+          result.skipped_fields.length > 0
+            ? "Handover fields already populated — nothing to prefill."
+            : "Referral had no clinical detail to prefill.",
+        );
+        return;
+      }
+      toast.success(
+        `Prefilled ${result.applied_fields.length} handover field${
+          result.applied_fields.length === 1 ? "" : "s"
+        } from the referral`,
+      );
+      onSaved({
+        ...(occupant as PartnerOccupant),
+        updated_at: result.updated_at ?? (occupant as PartnerOccupant).updated_at,
+      });
+    },
+    onError: (err) =>
+      toast.error(err instanceof Error ? err.message : "Prefill failed"),
   });
   const initial = useMemo(
     () => (occupant ? occupantToForm(occupant) : null),
