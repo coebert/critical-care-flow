@@ -2,6 +2,7 @@ import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { safeError } from "./safe-error";
+import { patientInitialsField } from "./patient-initials";
 // crypto helpers are loaded dynamically inside handlers via
 // ./postop-bookings-crypto.server so the Node "crypto" module never lands
 // in the client bundle (this file is part of the client module graph;
@@ -15,7 +16,7 @@ function loadCrypto(): Promise<PostopCrypto> {
 
 const bookingSchema = z.object({
   hospital_number: z.string().trim().max(50).nullable().optional(),
-  patient_initials: z.string().trim().max(10).nullable().optional(),
+  patient_initials: patientInitialsField,
   age: z.number().int().min(0).max(130).nullable().optional(),
   sex: z.enum(["male", "female", "other", "unknown"]).nullable().optional(),
   weight_kg: z.number().positive().max(499).nullable().optional(),

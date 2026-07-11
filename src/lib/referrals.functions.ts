@@ -3,6 +3,7 @@ import { safeError } from "./safe-error";
 import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { encryptString, decryptString, hashHospitalNumber } from "./crypto.server";
+import { patientInitialsField } from "./patient-initials";
 import { decideReferralRestore, decideReferralUpdate } from "./referral-restore-authz";
 import type { Database, Tables } from "@/integrations/supabase/types";
 
@@ -10,7 +11,7 @@ const refSchema = z.object({
   age: z.number().int().min(0).max(130).nullable().optional(),
   sex: z.enum(["male", "female", "other", "unknown"]).nullable().optional(),
   hospital_number: z.string().trim().max(50).nullable().optional(),
-  patient_initials: z.string().trim().max(10).nullable().optional(),
+  patient_initials: patientInitialsField,
   current_ward: z.string().trim().max(100).nullable().optional(),
   current_bed: z.string().trim().max(50).nullable().optional(),
   past_medical_history: z.string().trim().max(5000).nullable().optional(),
