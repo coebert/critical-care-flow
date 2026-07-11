@@ -39,6 +39,7 @@ import { ReferralRouteError } from "@/components/referral-route-error";
 // Cache key for the live referrals list. Kept as a stable tuple so the
 // realtime subscription can invalidate it without importing the options.
 export const REFERRALS_LIST_QUERY_KEY = ["referrals", "list"] as const;
+export const REFERRALS_UNREAD_COUNTS_QUERY_KEY = ["referrals", "unreadCounts"] as const;
 
 const referralsListQueryOptions = queryOptions({
   queryKey: REFERRALS_LIST_QUERY_KEY,
@@ -47,6 +48,13 @@ const referralsListQueryOptions = queryOptions({
   // Realtime drives invalidation; a small staleTime dedupes bursts.
   staleTime: 5_000,
 });
+
+const unreadCountsQueryOptions = queryOptions({
+  queryKey: REFERRALS_UNREAD_COUNTS_QUERY_KEY,
+  queryFn: () => getUnreadReferralCounts(),
+  staleTime: 5_000,
+});
+
 
 function ReferralsListPending() {
   return (
