@@ -228,6 +228,9 @@ function NotificationDetailPage() {
                   <Link
                     to="/referrals/$id"
                     params={{ id: n.referral_id }}
+                    // Pass notification id so the referral detail route
+                    // records the deep-link source in audit_log.
+                    search={{ n: n.id } as any}
                     onClick={() => {
                       if (!n.read_at) markRead();
                     }}
@@ -235,6 +238,7 @@ function NotificationDetailPage() {
                     Open referral <ExternalLink className="w-3 h-3 ml-1" />
                   </Link>
                 </Button>
+
               </div>
             ) : (
               <div className="text-sm text-muted-foreground">
