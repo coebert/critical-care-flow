@@ -89,7 +89,6 @@ describe("referral create/update actions write audit_log entries", () => {
 
     const diff = c.row.diff as Record<string, unknown>;
     // Non-encrypted fields pass through verbatim.
-    expect(diff.hospital_number).toBe("H123");
     expect(diff.referring_specialty).toBe("Respiratory");
     expect(diff.current_ward).toBe("Ward 7B");
     expect(diff.status).toBe("pending");
@@ -97,7 +96,9 @@ describe("referral create/update actions write audit_log entries", () => {
     // Non-encrypted allergies pass through.
     expect(diff.allergies).toBe("NKDA");
 
-    // Encrypted plaintext columns MUST be redacted.
+    // Encrypted plaintext columns MUST be redacted — including
+    // hospital_number (encrypted + hashed on write).
+    expect(diff.hospital_number).toBe("[encrypted]");
     expect(diff.reason_for_referral).toBe("[encrypted]");
     expect(diff.past_medical_history).toBe("[encrypted]");
     expect(diff.baseline_function).toBe("[encrypted]");
