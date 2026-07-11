@@ -146,7 +146,28 @@ function ReferralDetail() {
   };
 
   useEffect(() => {
-    logView({ data: { referral_id: id } }).catch(() => {});
+    // Record the view. When the user arrived via a bell/inbox deep-link,
+    // pass the notification id so the audit_log entry captures source =
+    // "notification" and the exact notification_id. The server verifies
+    // the notification belongs to this user AND references this
+    // referral before trusting the id.
+    logView({
+      data: {
+        referral_id: id,
+        ...(notificationId ? { notification_id: notificationId, source: "notification" as const } : {}),
+      },
+    }).catch(() => {});
+    // Strip the `n=` param from the URL after logging so a shared link
+    // or a back-button revisit doesn't re-attribute the view to the same
+    // notification.
+    if (notificationId) {
+      navigate({
+        to: "/referrals/$id",
+        params: { id },
+        search: (prev: Record<string, unknown>) => ({ ...prev, n: undefined }),
+        replace: true,
+      });
+    }
     loadRef();
 
     const ch = supabase
@@ -160,6 +181,7 @@ function ReferralDetail() {
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id]);
+
 
   if (!ref) return <div className="p-6 text-muted-foreground">Loading…</div>;
 
