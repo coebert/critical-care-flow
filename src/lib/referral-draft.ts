@@ -44,6 +44,7 @@ export type DraftForm = {
 // user doesn't lose their place after an accidental reload.
 export const SENSITIVE_DRAFT_KEYS = [
   "hospital_number",
+  "patient_initials",
   "past_medical_history",
   "baseline_function",
   "reason_for_referral",
