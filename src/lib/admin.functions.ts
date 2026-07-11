@@ -179,10 +179,15 @@ export const setUserRole = createServerFn({ method: "POST" })
     return { ok: true };
   });
 
+export const AUDIT_SORT_COLUMNS = ["created_at", "action", "entity"] as const;
+export type AuditSortColumn = (typeof AUDIT_SORT_COLUMNS)[number];
+
 const auditLogInputSchema = z
   .object({
     limit: z.number().int().min(1).max(200).optional(),
-    offset: z.number().int().min(0).max(10_000).optional(),
+    offset: z.number().int().min(0).max(100_000).optional(),
+    sortBy: z.enum(AUDIT_SORT_COLUMNS).optional(),
+    sortDir: z.enum(["asc", "desc"]).optional(),
   })
   .default({});
 
@@ -201,6 +206,11 @@ export type AuditLogPage = {
   rows: AuditLogEntry[];
   hasMore: boolean;
   nextOffset: number;
+  total: number;
+  limit: number;
+  offset: number;
+  sortBy: AuditSortColumn;
+  sortDir: "asc" | "desc";
 };
 
 export const getAuditLog = createServerFn({ method: "POST" })
@@ -212,14 +222,23 @@ export const getAuditLog = createServerFn({ method: "POST" })
     // admins (e.g. entries written by service_role or by users whose scope
     // no longer matches the policy). Access is gated by assertAdmin above.
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-    const limit = data.limit ?? 100;
+    const limit = data.limit ?? 50;
     const offset = data.offset ?? 0;
-    // Fetch limit+1 to detect whether more rows exist without a second query.
-    const { data: rows, error } = await supabaseAdmin
+    const sortBy: AuditSortColumn = data.sortBy ?? "created_at";
+    const sortDir: "asc" | "desc" = data.sortDir ?? "desc";
+    // Ask PostgREST for an exact row count so the UI can render "Page X of Y"
+    // and disable Next past the end without a second round trip.
+    // Fetch limit+1 to detect whether more rows exist without another query.
+    let query = supabaseAdmin
       .from("audit_log")
-      .select("*")
-      .order("created_at", { ascending: false })
-      .range(offset, offset + limit);
+      .select("*", { count: "exact" })
+      .order(sortBy, { ascending: sortDir === "asc" });
+    // Deterministic tiebreaker so equal action/entity rows keep a stable
+    // order across pages (created_at DESC is unique enough in practice).
+    if (sortBy !== "created_at") {
+      query = query.order("created_at", { ascending: false });
+    }
+    const { data: rows, error, count } = await query.range(offset, offset + limit);
     if (error) throw safeError("admin.getAuditLog", error, "Failed to load audit log.");
     const list = rows ?? [];
     const hasMore = list.length > limit;
@@ -234,6 +253,11 @@ export const getAuditLog = createServerFn({ method: "POST" })
       rows: redacted,
       hasMore,
       nextOffset: offset + limit,
+      total: count ?? redacted.length,
+      limit,
+      offset,
+      sortBy,
+      sortDir,
     };
   });
 
