@@ -1,6 +1,7 @@
 import { createStart, createMiddleware } from "@tanstack/react-start";
 
 import { renderErrorPage } from "./lib/error-page";
+import { withSecurityHeaders } from "./lib/security-headers.server";
 import { attachSupabaseAuth } from "@/integrations/supabase/auth-attacher";
 
 const errorMiddleware = createMiddleware().server(async ({ next }) => {
@@ -18,7 +19,22 @@ const errorMiddleware = createMiddleware().server(async ({ next }) => {
   }
 });
 
+// Batch B / P2 hardening: apply HSTS, nosniff, framing, referrer, and
+// Permissions-Policy headers to every response. Runs after `errorMiddleware`
+// so error pages get them too. Existing headers on the response are kept.
+const securityHeadersMiddleware = createMiddleware().server(async ({ next }) => {
+  const result = await next();
+  if (result instanceof Response) {
+    return withSecurityHeaders(result);
+  }
+  const bag = result as { response?: Response };
+  if (bag.response instanceof Response) {
+    bag.response = withSecurityHeaders(bag.response);
+  }
+  return result;
+});
+
 export const startInstance = createStart(() => ({
   functionMiddleware: [attachSupabaseAuth],
-  requestMiddleware: [errorMiddleware],
+  requestMiddleware: [errorMiddleware, securityHeadersMiddleware],
 }));
