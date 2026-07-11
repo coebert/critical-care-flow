@@ -1020,16 +1020,40 @@ export const logReferralView = createServerFn({ method: "POST" })
     // links to this referral before we credit the deep-link source. This
     // prevents a caller from forging arbitrary notification ids into the
     // audit trail.
+    //
+    // Additional single-use guarantees enforced here:
+    //   1. The notification must still be unread (read_at IS NULL). Once
+    //      marked read, its id can no longer be used to attribute a view.
+    //   2. The notification's referral_id must match the referral being
+    //      viewed — a notification cannot be replayed against a different
+    //      referral (the .eq("referral_id", ...) filter enforces this).
+    //   3. The notification id must not have been previously credited to
+    //      any referral view by this user in the audit log. This blocks
+    //      reuse across referrals and repeat attribution on the same
+    //      referral (e.g. reload / back-button).
+    // Any failed check silently scrubs the id to null so the audit row
+    // still records the view but without a forged/reused deep-link source.
     let verifiedNotificationId: string | null = null;
     if (data.notification_id) {
       const { data: n } = await supabase
         .from("notifications")
-        .select("id")
+        .select("id, read_at")
         .eq("id", data.notification_id)
         .eq("user_id", userId)
         .eq("referral_id", data.referral_id)
         .maybeSingle();
-      if (n) verifiedNotificationId = n.id;
+      if (n && n.read_at === null) {
+        const { data: prior } = await supabase
+          .from("audit_log")
+          .select("id")
+          .eq("user_id", userId)
+          .eq("action", "view")
+          .eq("entity", "referral")
+          .filter("diff->>notification_id", "eq", data.notification_id)
+          .limit(1)
+          .maybeSingle();
+        if (!prior) verifiedNotificationId = n.id;
+      }
     }
 
     const source = data.source ?? (verifiedNotificationId ? "notification" : "direct");
