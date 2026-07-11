@@ -178,6 +178,7 @@ function ReferralDetail() {
     try {
       const patch: any = {
         age: ref.age, sex: ref.sex, hospital_number: ref.hospital_number,
+        patient_initials: (ref as any).patient_initials ?? null,
         current_ward: ref.current_ward, current_bed: ref.current_bed,
         past_medical_history: ref.past_medical_history, baseline_function: ref.baseline_function,
         dnacpr_respect: ref.dnacpr_respect, referring_specialty: ref.referring_specialty,
