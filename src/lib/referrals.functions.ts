@@ -590,6 +590,7 @@ export const getReferralDetail = createServerFn({ method: "POST" })
       .from("referrals")
       .select("*")
       .eq("id", data.id)
+      .is("deleted_at", null)
       .maybeSingle();
     if (error) throw safeError("referrals.get", error, "Failed to load referral.");
     if (!row) return null;
