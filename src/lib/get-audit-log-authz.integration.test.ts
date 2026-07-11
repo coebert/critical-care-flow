@@ -365,7 +365,7 @@ describe("getAuditLog authz — admin caller reaches the reader and gets redacte
     expect(state.callCount).toBeGreaterThanOrEqual(1);
     // has_role was called with the correct arguments.
     expect(ctx.calls[0]).toEqual({
-      fn: "rpc",
+      fn: "has_role",
       args: { _user_id: adminUserId, _role: "admin" },
     });
 
