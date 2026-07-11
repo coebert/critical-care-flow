@@ -235,8 +235,16 @@ export function toPortable(
 ): Record<string, unknown> {
   const allow = PUSH_ALLOW[key];
   const out: Record<string, unknown> = {};
+  // For `patients`, the local column that carries the (already-normalised)
+  // initials is `full_name` — we reuse it as the initials carrier. On the
+  // wire we rename it to `patient_initials` so outbound payloads never
+  // contain a `full_name` key, even as an empty value.
+  const source: Record<string, unknown> =
+    key === "patients" && "full_name" in row
+      ? { ...row, patient_initials: (row as any).full_name }
+      : row;
   for (const k of allow) {
-    if (k in row) out[k] = (row as any)[k];
+    if (k in source) out[k] = (source as any)[k];
   }
   return out;
 }
