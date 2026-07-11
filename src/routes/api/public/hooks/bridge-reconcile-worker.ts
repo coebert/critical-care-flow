@@ -1,4 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
+import { isBridgeCallerAuthorized } from "@/lib/bridge-caller-auth.server";
 
 /**
  * Background worker that drains the bed reconciliation job queue.
@@ -16,16 +17,6 @@ const STALE_RUNNING_MS = 10 * 60 * 1000; // release after 10 min without finish
 const RECONCILE_LOCK_STALE_MS = 10 * 60 * 1000;
 const ID_SAMPLE_CAP = 50;
 const PROGRESS_FLUSH_EVERY = 25; // update the item row every N pushed rows
-
-function isAuthorized(request: Request): boolean {
-  const anon = process.env.SUPABASE_PUBLISHABLE_KEY;
-  if (!anon) return false;
-  const supplied =
-    request.headers.get("apikey") ??
-    request.headers.get("authorization")?.replace(/^Bearer\s+/i, "") ??
-    null;
-  return typeof supplied === "string" && supplied === anon;
-}
 
 async function claimNextJob(admin: any): Promise<any | null> {
   // Recover stale runs (worker crashed / Worker request timed out).
