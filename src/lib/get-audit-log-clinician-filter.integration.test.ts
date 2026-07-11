@@ -1,4 +1,5 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { describe, it, expect, beforeEach, vi } from "vitest";
+import { runGetAuditLog } from "./admin.functions";
 
 /**
  * Server-side integration: `getAuditLog`'s clinician filter has two
@@ -8,8 +9,10 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
  * shapes but must funnel every returned row through `redactAuditDiff`
  * before responding.
  *
- * This spec drives `getAuditLog` end-to-end with the Supabase admin
- * client mocked, exercises BOTH filter branches, and asserts:
+ * We drive the extracted `runGetAuditLog` helper (the exact code the
+ * server-fn `.handler` invokes after `assertAdmin` succeeds) with a
+ * mocked Supabase admin client, exercise BOTH filter branches, and
+ * assert:
  *   - the returned page contains no `_enc` / `_ciphertext` / `_nonce`
  *     / `_hash` keys at any depth;
  *   - every known-sensitive plaintext column is either `null`,
@@ -17,11 +20,12 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
  *   - none of the raw ciphertext markers or plaintext secrets that
  *     the mock served appear in the serialised response;
  *   - the correct branch was taken (UUID → no profiles lookup, name →
- *     profiles.full_name ilike).
- *
- * A regression that skips redaction on the name-branch, the UUID-branch,
- * or a specific filter permutation trips this test.
+ *     profiles.full_name ilike; unknown name → sentinel zero UUID).
  */
+
+// Silence the unused-import lint if it fires — kept for parity with
+// the sibling integration test's mock scaffolding style.
+void vi;
 
 // ---------------------------------------------------------------------
 // Mocks (hoisted before importing admin.functions).
