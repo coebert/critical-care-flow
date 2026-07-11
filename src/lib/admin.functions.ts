@@ -223,8 +223,15 @@ export const getAuditLog = createServerFn({ method: "POST" })
     if (error) throw safeError("admin.getAuditLog", error, "Failed to load audit log.");
     const list = rows ?? [];
     const hasMore = list.length > limit;
+    // Redact ciphertext / hash / nonce columns and known-sensitive plaintext
+    // fields from every diff BEFORE the payload leaves the server, so the
+    // Audit tab can't reveal them even to admins inspecting the response.
+    const redacted = list.slice(0, limit).map((r) => ({
+      ...r,
+      diff: redactAuditDiff(r.diff),
+    })) as AuditLogPage["rows"];
     return {
-      rows: list.slice(0, limit) as AuditLogPage["rows"],
+      rows: redacted,
       hasMore,
       nextOffset: offset + limit,
     };
