@@ -472,6 +472,7 @@ export type NotificationLifecycleRow = {
   message: string | null;
   created_at: string;
   read_at: string | null;
+  expired_at: string | null;
   used_at: string | null;
   used_by_user_id: string | null;
   used_against_referral_id: string | null;
