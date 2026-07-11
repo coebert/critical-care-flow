@@ -1067,13 +1067,17 @@ export const logReferralView = createServerFn({ method: "POST" })
       notificationStatus = "invalid";
       const { data: n } = await supabase
         .from("notifications")
-        .select("id, read_at, created_at")
+        .select("id, read_at, created_at, expired_at")
         .eq("id", data.notification_id)
         .eq("user_id", userId)
         .eq("referral_id", data.referral_id)
         .maybeSingle();
       if (n) {
+        // Prefer the persisted expiry flag stamped by the scheduled
+        // cleanup job; fall back to the wall-clock TTL for the window
+        // between the row aging past the TTL and the next cron sweep.
         const withinTtl =
+          (n as any).expired_at === null &&
           Date.now() - new Date(n.created_at).getTime() <= NOTIFICATION_DEEP_LINK_TTL_MS;
         if (n.read_at !== null) {
           notificationStatus = "read";
