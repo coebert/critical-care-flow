@@ -235,6 +235,24 @@ function NotificationsLifecyclePage() {
                     <span className="text-muted-foreground">—</span>
                   )}
                 </TableCell>
+                <TableCell
+                  className="whitespace-nowrap text-xs tabular-nums"
+                  title={
+                    r.expired_at
+                      ? r.used_at
+                        ? "Expired flag set, but a deep-link click was recorded — see Used column"
+                        : tzTooltip(r.expired_at)
+                      : "Not expired"
+                  }
+                >
+                  {r.expired_at && !r.used_at ? (
+                    <span className="text-warning-foreground">
+                      {format(new Date(r.expired_at), "dd MMM HH:mm:ss")}
+                    </span>
+                  ) : (
+                    <span className="text-muted-foreground">—</span>
+                  )}
+                </TableCell>
                 <TableCell>
                   {r.mismatch ? (
                     <StatusPill label="mismatch" tone="bad" />
@@ -242,7 +260,7 @@ function NotificationsLifecyclePage() {
                     <StatusPill label={r.read_at ? "used · read" : "used"} tone="ok" />
                   ) : r.expired_at ? (
                     <StatusPill
-                      label="expired"
+                      label={`expired ${format(new Date(r.expired_at), "dd MMM HH:mm")}`}
                       tone="warn"
                     />
                   ) : r.read_at ? (
@@ -251,6 +269,7 @@ function NotificationsLifecyclePage() {
                     <StatusPill label="pending" tone="muted" />
                   )}
                 </TableCell>
+
               </TableRow>
             ))}
           </TableBody>
