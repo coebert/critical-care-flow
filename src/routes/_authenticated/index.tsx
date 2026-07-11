@@ -83,7 +83,11 @@ export const Route = createFileRoute("/_authenticated/")({
   // `_authenticated` layout is `ssr: false`, so this runs client-side after
   // the auth gate — bearer middleware is attached and the fetch is authorised.
   loader: ({ context }) =>
-    context.queryClient.ensureQueryData(referralsListQueryOptions),
+    Promise.all([
+      context.queryClient.ensureQueryData(referralsListQueryOptions),
+      context.queryClient.ensureQueryData(unreadCountsQueryOptions),
+    ]),
+
   pendingComponent: ReferralsListPending,
   errorComponent: ReferralsListError,
   component: ReferralsList,
