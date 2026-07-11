@@ -166,7 +166,9 @@ function NotificationsLifecyclePage() {
               <TableHead>Created</TableHead>
               <TableHead>Used (deep-link)</TableHead>
               <TableHead>Read</TableHead>
+              <TableHead>Expired (unused)</TableHead>
               <TableHead>State</TableHead>
+
             </TableRow>
           </TableHeader>
           <TableBody>
