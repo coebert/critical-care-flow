@@ -125,29 +125,60 @@ export function NotificationBell() {
   const markAllRead = async () => {
     const ids = items.filter((i) => !i.read_at).map((i) => i.id);
     if (!ids.length) return;
-    await supabase.from("notifications").update({ read_at: new Date().toISOString() }).in("id", ids);
-    setItems((cur) => cur.map((i) => (i.read_at ? i : { ...i, read_at: new Date().toISOString() })));
+    setMarkingAll(true);
+    const now = new Date().toISOString();
+    // Optimistic: flip local state, then persist. On failure, roll back
+    // and surface a toast so the badge count is trustworthy.
+    const prev = items;
+    setItems((cur) => cur.map((i) => (i.read_at ? i : { ...i, read_at: now })));
+    const { error } = await supabase
+      .from("notifications")
+      .update({ read_at: now })
+      .in("id", ids);
+    setMarkingAll(false);
+    if (error) {
+      setItems(prev);
+      toast.error("Could not mark all as read");
+      return;
+    }
+    // Refresh the referrals-list unread badge (and any other consumers
+    // of these query keys) so the count updates immediately, not after
+    // the realtime UPDATE round-trips.
+    queryClient.invalidateQueries({ queryKey: ["referrals", "unreadCounts"] });
+    queryClient.invalidateQueries({ queryKey: ["notifications"] });
+    toast.success(`Marked ${ids.length} as read`);
   };
 
   return (
     <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger asChild>
-        <Button variant="ghost" size="icon" className="relative">
+        <Button variant="ghost" size="icon" className="relative" aria-label={unread > 0 ? `Notifications, ${unread} unread` : "Notifications"}>
           <Bell className="w-5 h-5" />
           {unread > 0 && (
-            <span className="absolute top-1 right-1 min-w-4 h-4 px-1 rounded-full bg-destructive text-destructive-foreground text-[10px] font-semibold flex items-center justify-center">
-              {unread}
+            <span
+              className="absolute top-1 right-1 min-w-4 h-4 px-1 rounded-full bg-destructive text-destructive-foreground text-[10px] font-semibold flex items-center justify-center"
+              aria-hidden="true"
+            >
+              {unread > 99 ? "99+" : unread}
             </span>
           )}
         </Button>
       </PopoverTrigger>
       <PopoverContent align="end" className="w-80 p-0">
         <div className="flex items-center justify-between p-3 border-b">
-          <div className="text-sm font-semibold">Notifications</div>
-          <Button variant="ghost" size="sm" onClick={markAllRead} disabled={unread === 0}>
-            Mark all read
+          <div className="text-sm font-semibold">
+            Notifications{unread > 0 ? ` · ${unread} unread` : ""}
+          </div>
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={markAllRead}
+            disabled={unread === 0 || markingAll}
+          >
+            {markingAll ? "Marking…" : "Mark all read"}
           </Button>
         </div>
+
         <div className="max-h-96 overflow-auto">
           {items.length === 0 ? (
             <div className="p-6 text-sm text-muted-foreground text-center">No notifications yet</div>
