@@ -985,7 +985,15 @@ export const getReferralHistory = createServerFn({ method: "POST" })
 
 export const logReferralView = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((d: unknown) => z.object({ referral_id: z.string().uuid() }).parse(d))
+  .inputValidator((d: unknown) =>
+    z
+      .object({
+        referral_id: z.string().uuid(),
+        notification_id: z.string().uuid().optional(),
+        source: z.enum(["notification", "direct", "list"]).optional(),
+      })
+      .parse(d),
+  )
   .handler(async ({ data, context }) => {
     const { supabase, userId } = context;
     const { data: access } = await supabase.rpc("has_clinical_access", { _user_id: userId });
@@ -998,11 +1006,33 @@ export const logReferralView = createServerFn({ method: "POST" })
       .maybeSingle();
     if (!ref) throw new Error("Referral not found");
 
+    // If a notification_id was provided, verify it belongs to this user AND
+    // links to this referral before we credit the deep-link source. This
+    // prevents a caller from forging arbitrary notification ids into the
+    // audit trail.
+    let verifiedNotificationId: string | null = null;
+    if (data.notification_id) {
+      const { data: n } = await supabase
+        .from("notifications")
+        .select("id")
+        .eq("id", data.notification_id)
+        .eq("user_id", userId)
+        .eq("referral_id", data.referral_id)
+        .maybeSingle();
+      if (n) verifiedNotificationId = n.id;
+    }
+
+    const source = data.source ?? (verifiedNotificationId ? "notification" : "direct");
+
     await writeAudit({
       user_id: userId,
       action: "view",
       entity: "referral",
       entity_id: data.referral_id,
+      diff: {
+        source,
+        notification_id: verifiedNotificationId,
+      } as any,
     });
 
     // Mark any unread in-app notifications for this user + referral as read.
