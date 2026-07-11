@@ -100,8 +100,10 @@ function ReferralsList() {
   // boundary shows `pendingComponent` until data resolves. Background
   // refetches (from realtime invalidation) are silent by design.
   const { data: rowsData } = useSuspenseQuery(referralsListQueryOptions);
+  const { data: unreadByReferral } = useSuspenseQuery(unreadCountsQueryOptions);
   const rows = rowsData as Referral[];
   const queryClient = useQueryClient();
+
 
   const [hospSearch, setHospSearch] = useState("");
   const [q, setQ] = useState("");
