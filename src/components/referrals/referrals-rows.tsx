@@ -26,6 +26,9 @@ interface Props {
   loading: boolean;
   timerSort: "none" | "desc" | "asc";
   onToggleTimerSort: () => void;
+  /** Map of referral id → count of unread in-app notifications for the
+   *  current user. Missing / 0 renders no badge. */
+  unreadByReferral?: Record<string, number>;
 }
 
 /**
@@ -33,8 +36,10 @@ interface Props {
  * card list on phones. Rows are keyboard-activatable — Enter or Space
  * navigates to the referral detail, matching mouse click behaviour.
  */
-export function ReferralsRows({ rows, loading, timerSort, onToggleTimerSort }: Props) {
+export function ReferralsRows({ rows, loading, timerSort, onToggleTimerSort, unreadByReferral }: Props) {
   const navigate = useNavigate();
+  const unreadCount = (id: string) => unreadByReferral?.[id] ?? 0;
+
 
   return (
     <>
@@ -110,6 +115,15 @@ export function ReferralsRows({ rows, loading, timerSort, onToggleTimerSort }: P
                   <td className="px-3 py-2">
                     <div className="flex items-center gap-1.5 flex-wrap">
                       <span>{r.hospital_number ?? "—"}</span>
+                      {unreadCount(r.id) > 0 && (
+                        <Badge
+                          className="bg-primary text-primary-foreground text-[10px] px-1.5 py-0 h-4 min-w-4 rounded-full flex items-center justify-center"
+                          title={`${unreadCount(r.id)} unread notification${unreadCount(r.id) === 1 ? "" : "s"} — clears when you open this referral`}
+                          aria-label={`${unreadCount(r.id)} unread notifications`}
+                        >
+                          {unreadCount(r.id) > 9 ? "9+" : unreadCount(r.id)}
+                        </Badge>
+                      )}
                       {(r as any).is_test && (
                         <Badge
                           variant="outline"
@@ -121,6 +135,7 @@ export function ReferralsRows({ rows, loading, timerSort, onToggleTimerSort }: P
                       )}
                     </div>
                   </td>
+
                   <td className="px-3 py-2">
                     <div className="flex items-center gap-1.5">
                       {r.age !== null && r.age <= 16 && (
@@ -235,6 +250,15 @@ export function ReferralsRows({ rows, loading, timerSort, onToggleTimerSort }: P
                   {format(new Date(r.referral_received_at), "dd/MM/yyyy HH:mm")}
                 </span>
                 <div className="flex items-center gap-1.5">
+                  {unreadCount(r.id) > 0 && (
+                    <Badge
+                      className="bg-primary text-primary-foreground text-[10px] px-1.5 py-0 h-4 min-w-4 rounded-full flex items-center justify-center"
+                      title={`${unreadCount(r.id)} unread notification${unreadCount(r.id) === 1 ? "" : "s"} — clears when you open this referral`}
+                      aria-label={`${unreadCount(r.id)} unread notifications`}
+                    >
+                      {unreadCount(r.id) > 9 ? "9+" : unreadCount(r.id)}
+                    </Badge>
+                  )}
                   {(r as any).is_test && (
                     <Badge
                       variant="outline"
@@ -248,6 +272,7 @@ export function ReferralsRows({ rows, loading, timerSort, onToggleTimerSort }: P
                     {r.status}
                   </Badge>
                 </div>
+
               </div>
               <div className="flex items-center justify-between gap-2 flex-wrap">
                 <ReferralTimer r={r} />

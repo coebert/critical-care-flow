@@ -1200,3 +1200,31 @@ export const findReferralsByHospitalNumber = createServerFn({ method: "POST" })
     return (rows ?? []).map((r) => decryptReferralRow(r as any));
   });
 
+/**
+ * Returns unread in-app notification counts for the current user,
+ * grouped by referral id. Powers the unread badge on the referrals list.
+ *
+ * Scoped strictly to `auth.uid()` — RLS on `public.notifications` also
+ * enforces this (SELECT USING auth.uid() = user_id). Notifications are
+ * marked read from `/referrals/{id}` via `logReferralView`, so the badge
+ * clears automatically after opening.
+ */
+export const getUnreadReferralCounts = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ context }): Promise<Record<string, number>> => {
+    const { supabase, userId } = context;
+    const { data, error } = await supabase
+      .from("notifications")
+      .select("referral_id")
+      .eq("user_id", userId)
+      .is("read_at", null)
+      .not("referral_id", "is", null);
+    if (error) throw safeError("referrals.unreadCounts", error, "Failed to load unread counts.");
+    const counts: Record<string, number> = {};
+    for (const row of (data ?? []) as Array<{ referral_id: string | null }>) {
+      if (!row.referral_id) continue;
+      counts[row.referral_id] = (counts[row.referral_id] ?? 0) + 1;
+    }
+    return counts;
+  });
+

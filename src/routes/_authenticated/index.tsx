@@ -6,10 +6,12 @@ import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Plus, Trash2 } from "lucide-react";
 import {
+  getUnreadReferralCounts,
   listDeletedReferrals,
   listReferralsForList,
   restoreReferral,
 } from "@/lib/referrals.functions";
+
 import type { AdmissionUrgency } from "@/lib/admission-urgency";
 import { toast } from "sonner";
 
@@ -37,6 +39,7 @@ import { ReferralRouteError } from "@/components/referral-route-error";
 // Cache key for the live referrals list. Kept as a stable tuple so the
 // realtime subscription can invalidate it without importing the options.
 export const REFERRALS_LIST_QUERY_KEY = ["referrals", "list"] as const;
+export const REFERRALS_UNREAD_COUNTS_QUERY_KEY = ["referrals", "unreadCounts"] as const;
 
 const referralsListQueryOptions = queryOptions({
   queryKey: REFERRALS_LIST_QUERY_KEY,
@@ -45,6 +48,13 @@ const referralsListQueryOptions = queryOptions({
   // Realtime drives invalidation; a small staleTime dedupes bursts.
   staleTime: 5_000,
 });
+
+const unreadCountsQueryOptions = queryOptions({
+  queryKey: REFERRALS_UNREAD_COUNTS_QUERY_KEY,
+  queryFn: () => getUnreadReferralCounts(),
+  staleTime: 5_000,
+});
+
 
 function ReferralsListPending() {
   return (
@@ -73,7 +83,11 @@ export const Route = createFileRoute("/_authenticated/")({
   // `_authenticated` layout is `ssr: false`, so this runs client-side after
   // the auth gate — bearer middleware is attached and the fetch is authorised.
   loader: ({ context }) =>
-    context.queryClient.ensureQueryData(referralsListQueryOptions),
+    Promise.all([
+      context.queryClient.ensureQueryData(referralsListQueryOptions),
+      context.queryClient.ensureQueryData(unreadCountsQueryOptions),
+    ]),
+
   pendingComponent: ReferralsListPending,
   errorComponent: ReferralsListError,
   component: ReferralsList,
@@ -86,8 +100,10 @@ function ReferralsList() {
   // boundary shows `pendingComponent` until data resolves. Background
   // refetches (from realtime invalidation) are silent by design.
   const { data: rowsData } = useSuspenseQuery(referralsListQueryOptions);
+  const { data: unreadByReferral } = useSuspenseQuery(unreadCountsQueryOptions);
   const rows = rowsData as Referral[];
   const queryClient = useQueryClient();
+
 
   const [hospSearch, setHospSearch] = useState("");
   const [q, setQ] = useState("");
@@ -152,11 +168,18 @@ function ReferralsList() {
       .on("postgres_changes", { event: "*", schema: "public", table: "referrals" }, () => {
         queryClient.invalidateQueries({ queryKey: REFERRALS_LIST_QUERY_KEY });
       })
+      // Unread badge stays in sync as notifications are inserted (new
+      // fanout) or marked read (via /referrals/{id} → logReferralView).
+      // RLS scopes rows to this user, so we get exactly our own events.
+      .on("postgres_changes", { event: "*", schema: "public", table: "notifications" }, () => {
+        queryClient.invalidateQueries({ queryKey: REFERRALS_UNREAD_COUNTS_QUERY_KEY });
+      })
       .subscribe();
     return () => {
       supabase.removeChannel(ch);
     };
   }, [queryClient]);
+
 
   const topWards = useMemo(() => computeTopWards(rows), [rows]);
 
@@ -271,7 +294,9 @@ function ReferralsList() {
         onToggleTimerSort={() =>
           setTimerSort((s) => (s === "none" ? "desc" : s === "desc" ? "asc" : "none"))
         }
+        unreadByReferral={unreadByReferral as Record<string, number>}
       />
+
     </div>
     </ClinicalAccessGate>
   );
