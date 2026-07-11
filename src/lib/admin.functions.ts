@@ -576,6 +576,7 @@ export const getNotificationLifecycleAudit = createServerFn({ method: "POST" })
         message: n.message,
         created_at: n.created_at,
         read_at: n.read_at,
+        expired_at: n.expired_at,
         used_at: used?.used_at ?? null,
         used_by_user_id: used?.used_by_user_id ?? null,
         used_against_referral_id: used?.used_against_referral_id ?? null,
