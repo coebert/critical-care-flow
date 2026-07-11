@@ -18,7 +18,7 @@ const NOTIFICATION_COLUMNS = [
 export const Route = createFileRoute("/api/public/bridge/notifications")({
   server: {
     handlers: {
-      OPTIONS: async () => preflight(),
+      OPTIONS: async ({ request }) => preflight(request),
 
       /** List notifications for a specific user_id (query param). */
       GET: async ({ request }) => {

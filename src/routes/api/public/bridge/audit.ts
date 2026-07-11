@@ -10,7 +10,7 @@ import { verifyBridgeRequest } from "@/lib/bridge-verify.server";
 export const Route = createFileRoute("/api/public/bridge/audit")({
   server: {
     handlers: {
-      OPTIONS: async () => preflight(),
+      OPTIONS: async ({ request }) => preflight(request),
       GET: async ({ request }) => {
         const verified = await verifyBridgeRequest(request);
         if (verified instanceof Response) return verified;

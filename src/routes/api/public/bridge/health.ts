@@ -4,7 +4,7 @@ import { jsonResponse, preflight } from "@/lib/bridge-cors";
 export const Route = createFileRoute("/api/public/bridge/health")({
   server: {
     handlers: {
-      OPTIONS: async () => preflight(),
+      OPTIONS: async ({ request }) => preflight(request),
       GET: async () => {
         return jsonResponse({
           ok: true,

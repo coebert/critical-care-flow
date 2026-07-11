@@ -11,7 +11,7 @@ import { runBridgeSync } from "./sync";
 export const Route = createFileRoute("/api/public/bridge/retry-failed")({
   server: {
     handlers: {
-      OPTIONS: async () => preflight(),
+      OPTIONS: async ({ request }) => preflight(request),
       GET: async ({ request }) =>
         runBridgeSync(request, { failedOnly: true, source: "retry" }),
       POST: async ({ request }) =>

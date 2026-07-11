@@ -17,7 +17,7 @@ const INVESTIGATION_COLUMNS = [
 export const Route = createFileRoute("/api/public/bridge/investigations")({
   server: {
     handlers: {
-      OPTIONS: async () => preflight(),
+      OPTIONS: async ({ request }) => preflight(request),
 
       GET: async ({ request }) => {
         const verified = await verifyBridgeRequest(request);
