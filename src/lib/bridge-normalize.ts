@@ -32,7 +32,20 @@ export function normalizeIncomingBridgeRecord(
     out[field] = initials.length ? initials : null;
   };
 
-  if (key === "patients") normaliseField("full_name");
+  if (key === "patients") {
+    // Newer wire format sends `patient_initials`; our local column is
+    // `full_name` (reused as the initials carrier). Fold the wire field
+    // into `full_name` before normalising, then drop it so it never
+    // reaches the DB as an unknown column.
+    if ("patient_initials" in out) {
+      const pi = out.patient_initials;
+      if (pi != null && pi !== "" && (out.full_name == null || out.full_name === "")) {
+        out.full_name = pi;
+      }
+      delete out.patient_initials;
+    }
+    normaliseField("full_name");
+  }
   if (key === "bed_occupancies" || key === "bed_outliers") {
     normaliseField("patient_initials");
   }

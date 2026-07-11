@@ -8,6 +8,12 @@ import {
 
 const PATIENT_COLUMNS = [
   "id",
+  // `patient_initials` is the wire field. It maps to the local `full_name`
+  // column (which we reuse as the initials carrier). `full_name` is kept
+  // in the allowlist purely for backwards-compat with older partner
+  // clients that have not yet switched over; new pushes only send
+  // `patient_initials`.
+  "patient_initials",
   "full_name",
   "hospital_number",
   "nhs_number",
@@ -86,10 +92,16 @@ export const Route = createFileRoute("/api/public/bridge/patients")({
         if ("error" in picked) {
           return jsonResponse(picked, { status: 400 });
         }
-        const record = picked.data;
+        const record = picked.data as Record<string, unknown>;
+        // Map wire field `patient_initials` onto the local `full_name`
+        // column. If both are present, prefer the new wire field.
+        if (record.patient_initials != null && record.patient_initials !== "") {
+          record.full_name = record.patient_initials;
+        }
+        delete record.patient_initials;
         if (!record.full_name) {
           return jsonResponse(
-            { error: "full_name_required" },
+            { error: "patient_initials_required" },
             { status: 400 },
           );
         }
