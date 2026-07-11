@@ -60,7 +60,13 @@ const referralDetailQueryOptions = (id: string) =>
 export const Route = createFileRoute("/_authenticated/referrals/$id")({
   validateSearch: (search: Record<string, unknown>) => ({
     highlight: typeof search.highlight === "string" ? search.highlight : undefined,
+    // `n` = notification id when the user arrived via a deep-link from the
+    // bell / inbox. Recorded in audit_log so we can trace which notification
+    // drove which view. Coerced to string | undefined; server verifies it
+    // belongs to the caller before writing.
+    n: typeof search.n === "string" ? search.n : undefined,
   }),
+
   head: () => ({ meta: [{ title: "Referral — SDH Critical Care" }, { name: "robots", content: "noindex" }] }),
   loader: async ({ context, params }) => {
     context.queryClient.ensureQueryData(referralNotesQueryOptions(params.id));
@@ -98,7 +104,7 @@ function toLocal(iso: string | null) {
 
 function ReferralDetail() {
   const { id } = Route.useParams();
-  const { highlight } = Route.useSearch();
+  const { highlight, n: notificationId } = Route.useSearch();
   const navigate = useNavigate();
   const update = useServerFn(updateReferral);
   const logView = useServerFn(logReferralView);
@@ -140,7 +146,28 @@ function ReferralDetail() {
   };
 
   useEffect(() => {
-    logView({ data: { referral_id: id } }).catch(() => {});
+    // Record the view. When the user arrived via a bell/inbox deep-link,
+    // pass the notification id so the audit_log entry captures source =
+    // "notification" and the exact notification_id. The server verifies
+    // the notification belongs to this user AND references this
+    // referral before trusting the id.
+    logView({
+      data: {
+        referral_id: id,
+        ...(notificationId ? { notification_id: notificationId, source: "notification" as const } : {}),
+      },
+    }).catch(() => {});
+    // Strip the `n=` param from the URL after logging so a shared link
+    // or a back-button revisit doesn't re-attribute the view to the same
+    // notification.
+    if (notificationId) {
+      navigate({
+        to: "/referrals/$id",
+        params: { id },
+        search: (prev: Record<string, unknown>) => ({ ...prev, n: undefined }),
+        replace: true,
+      });
+    }
     loadRef();
 
     const ch = supabase
@@ -154,6 +181,7 @@ function ReferralDetail() {
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id]);
+
 
   if (!ref) return <div className="p-6 text-muted-foreground">Loading…</div>;
 
