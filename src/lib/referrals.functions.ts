@@ -463,8 +463,28 @@ export const updateReferral = createServerFn({ method: "POST" })
 
     const statusChanged =
       data.patch.status !== undefined && prior?.status !== row.status;
-    if (statusChanged) {
-      const summary = `${decrypted.referring_specialty ?? "Referral"} — ${decrypted.current_ward ?? "ward unknown"}`;
+    // Non-bookkeeping, non-status fields that actually changed. These
+    // drive the "updated" push and its deep link.
+    const patchKeys = Object.keys((data.patch ?? {}) as object).filter(
+      (k) => k !== "updated_by" && k !== "status",
+    );
+    const summary = `${decrypted.referring_specialty ?? "Referral"} — ${decrypted.current_ward ?? "ward unknown"}`;
+    if (patchKeys.length > 0) {
+      // At least one real content change (with or without a coincident
+      // status change). Fire a single "updated" push with a deep link
+      // back to the referral. When status ALSO changed, we intentionally
+      // suppress the separate "status" push so a mixed edit produces
+      // exactly one notification, not two overlapping ones.
+      await fanOutNotifications(
+        userId,
+        row.id,
+        "updated",
+        `Referral updated: ${summary}`,
+        `/referrals/${row.id}`,
+        "Referral updated",
+      );
+    } else if (statusChanged) {
+      // Pure status-only transition — fire the dedicated status push.
       const statusLabel = String(row.status ?? "updated").toUpperCase();
       await fanOutNotifications(
         userId,
@@ -474,33 +494,6 @@ export const updateReferral = createServerFn({ method: "POST" })
         undefined,
         `Referral ${statusLabel}`,
       );
-    } else {
-      // Non-status edit to an existing referral — notify clinicians who
-      // opted in to "updated referral" pushes, with a deep link back to
-      // the referral so tapping the push opens the updated record. We
-      // intentionally skip when statusChanged fired above so a single
-      // edit doesn't produce two overlapping pushes for the same row.
-      // The push body avoids sensitive plaintext (no hospital number /
-      // reason text) — only the non-sensitive specialty + ward summary.
-      // Suppress "updated" pushes when the edit is purely a status change
-      // (status is delivered via the dedicated "status" push above; the
-      // outer branch already guards that case). We also drop `status`
-      // from patchKeys here so a same-value status write with no other
-      // fields cannot slip through and produce a redundant push.
-      const patchKeys = Object.keys((data.patch ?? {}) as object).filter(
-        (k) => k !== "updated_by" && k !== "status",
-      );
-      if (patchKeys.length > 0) {
-        const summary = `${decrypted.referring_specialty ?? "Referral"} — ${decrypted.current_ward ?? "ward unknown"}`;
-        await fanOutNotifications(
-          userId,
-          row.id,
-          "updated",
-          `Referral updated: ${summary}`,
-          `/referrals/${row.id}`,
-          "Referral updated",
-        );
-      }
     }
     return decrypted;
   });
