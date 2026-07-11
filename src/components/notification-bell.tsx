@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { Bell } from "lucide-react";
 import { Link, useNavigate } from "@tanstack/react-router";
 import { toast } from "sonner";
+import { useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/use-auth";
 import {
@@ -11,6 +12,7 @@ import {
 } from "@/components/ui/popover";
 import { Button } from "@/components/ui/button";
 import { formatDistanceToNow } from "date-fns";
+
 
 interface Notification {
   id: string;
