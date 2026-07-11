@@ -26,8 +26,11 @@ interface Notification {
 export function NotificationBell() {
   const { user } = useAuth();
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
   const [items, setItems] = useState<Notification[]>([]);
   const [open, setOpen] = useState(false);
+  const [markingAll, setMarkingAll] = useState(false);
+
 
   useEffect(() => {
     if (!user) return;
