@@ -498,13 +498,14 @@ export const getNotificationLifecycleAudit = createServerFn({ method: "POST" })
 
     let q = supabaseAdmin
       .from("notifications")
-      .select("id, user_id, referral_id, kind, message, read_at, created_at")
+      .select("id, user_id, referral_id, kind, message, read_at, created_at, expired_at")
       .order("created_at", { ascending: false })
       .range(offset, offset + limit);
     if (data.user_id) q = q.eq("user_id", data.user_id);
     if (data.referral_id) q = q.eq("referral_id", data.referral_id);
     if (data.state === "unread") q = q.is("read_at", null);
     if (data.state === "read") q = q.not("read_at", "is", null);
+    if (data.state === "expired") q = q.not("expired_at", "is", null);
     const { data: notifs, error } = await q;
     if (error) {
       throw safeError("admin.getNotificationLifecycleAudit", error, "Failed to load lifecycle audit.");
