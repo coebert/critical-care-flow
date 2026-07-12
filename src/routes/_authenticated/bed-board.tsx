@@ -914,6 +914,7 @@ function buildDiff(
 function EditOccupantDialog({
   occupant,
   currentLevel,
+  currentOneToOne,
   sourceReferralId,
   onClose,
   onSaved,
@@ -921,6 +922,7 @@ function EditOccupantDialog({
 }: {
   occupant: PartnerOccupant | null;
   currentLevel: AcuityLevel | null;
+  currentOneToOne: boolean;
   sourceReferralId: string | null;
   onClose: () => void;
   onSaved: (updated: PartnerOccupant) => void;
@@ -942,6 +944,21 @@ function EditOccupantDialog({
     },
     onError: (err) => toast.error(err instanceof Error ? err.message : "Could not save level"),
   });
+  const oneToOneMutation = useMutation({
+    mutationFn: (one_to_one: boolean) =>
+      saveAcuity({ data: { partner_patient_id: occupant!.id, one_to_one } }),
+    onSuccess: (result, vars) => {
+      if (result.ok) {
+        toast.success(vars ? "Marked as 1:1 nursing" : "1:1 nursing cleared");
+        onAcuityChanged();
+      } else {
+        toast.error(result.error || "Could not update 1:1 nursing");
+      }
+    },
+    onError: (err) =>
+      toast.error(err instanceof Error ? err.message : "Could not update 1:1 nursing"),
+  });
+
   const prefillMutation = useMutation({
     mutationFn: () =>
       runPrefill({
