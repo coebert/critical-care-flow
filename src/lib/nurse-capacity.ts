@@ -22,6 +22,8 @@ export interface NurseCapacitySnapshot {
   dependency: number; // total nurses required for current patients
   patient_count: number;
   one_to_one_count: number;
+  one_to_one_dependency: number; // nurses required by 1:1 patients
+  level_weighted_dependency: number; // nurses required by level-of-care weighting
   day: { available: number | null; spare: number | null } & AdmitCapacity;
   night: { available: number | null; spare: number | null } & AdmitCapacity;
 }
@@ -56,14 +58,22 @@ export function computeDependency(occupancies: Occupancy[]): {
   dependency: number;
   patient_count: number;
   one_to_one_count: number;
+  one_to_one_dependency: number;
+  level_weighted_dependency: number;
 } {
   const live = occupancies.filter((o) => !o.discharged_at);
-  const dependency = live.reduce((sum, o) => sum + nurseWeightForPatient(o), 0);
-  const one_to_one_count = live.reduce((n, o) => n + (o.one_to_one ? 1 : 0), 0);
+  const one_to_one = live.filter((o) => o.one_to_one);
+  const one_to_one_dependency = one_to_one.length * ONE_TO_ONE_WEIGHT;
+  const level_weighted_dependency = live
+    .filter((o) => !o.one_to_one)
+    .reduce((sum, o) => sum + nurseWeightForLevel(o.level), 0);
+  const dependency = one_to_one_dependency + level_weighted_dependency;
   return {
     dependency: round2(dependency),
     patient_count: live.length,
-    one_to_one_count,
+    one_to_one_count: one_to_one.length,
+    one_to_one_dependency: round2(one_to_one_dependency),
+    level_weighted_dependency: round2(level_weighted_dependency),
   };
 }
 
@@ -102,11 +112,14 @@ export function computeNurseCapacity(input: {
   day_available: number | null;
   night_available: number | null;
 }): NurseCapacitySnapshot {
-  const { dependency, patient_count, one_to_one_count } = computeDependency(input.occupancies);
+  const { dependency, patient_count, one_to_one_count, one_to_one_dependency, level_weighted_dependency } =
+    computeDependency(input.occupancies);
   return {
     dependency,
     patient_count,
     one_to_one_count,
+    one_to_one_dependency,
+    level_weighted_dependency,
     day: shiftBlock(input.day_available, dependency),
     night: shiftBlock(input.night_available, dependency),
   };
