@@ -102,13 +102,15 @@ export function computeNurseCapacity(input: {
   day_available: number | null;
   night_available: number | null;
 }): NurseCapacitySnapshot {
-  const { dependency, patient_count } = computeDependency(input.occupancies);
+  const { dependency, patient_count, one_to_one_count } = computeDependency(input.occupancies);
   return {
     dependency,
     patient_count,
+    one_to_one_count,
     day: shiftBlock(input.day_available, dependency),
     night: shiftBlock(input.night_available, dependency),
   };
+
 }
 
 function round2(n: number): number {
