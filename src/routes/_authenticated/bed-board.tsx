@@ -582,16 +582,22 @@ function BedBoardPage() {
               )}
             </div>
             <NurseCapacityPanel
-              occupancies={allOccupants.map<Occupancy>((o) => ({
-                id: o.id,
-                bed_id: o.bed ?? o.id,
-                discharged_at: null,
-                predicted_discharge_at: null,
-                level: acuityMap.get(o.id) ?? 1,
-              }))}
+              occupancies={allOccupants.map<Occupancy>((o) => {
+                const a = acuityMap.get(o.id);
+                return {
+                  id: o.id,
+                  bed_id: o.bed ?? o.id,
+                  discharged_at: null,
+                  predicted_discharge_at: null,
+                  level: a?.level ?? 1,
+                  one_to_one: a?.one_to_one === true,
+                };
+              })}
               focusShift={search.focus_shift}
               focusLevel={search.focus_level}
+              oneToOneCount={oneToOneCount}
             />
+
           </>
         );
       })()}
