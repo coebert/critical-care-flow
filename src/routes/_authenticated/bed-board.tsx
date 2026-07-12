@@ -648,18 +648,22 @@ function BedBoardPage() {
               {lastOk.unit}
             </h2>
             <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3">
-              {lastOk.bed_board.map((slot) => (
-                <BedCard
-                  key={slot.bed}
-                  slot={slot}
-                  level={slot.occupant ? acuityMap.get(slot.occupant.id) : undefined}
-                  onOccupiedClick={setSelected}
-                  onMove={handleMove}
-                  isDragTarget={dragging}
-                  onDragStateChange={setDragging}
-                />
+              {lastOk.bed_board.map((slot) => {
+                const a = slot.occupant ? acuityMap.get(slot.occupant.id) : undefined;
+                return (
+                  <BedCard
+                    key={slot.bed}
+                    slot={slot}
+                    level={a?.level}
+                    oneToOne={a?.one_to_one === true}
+                    onOccupiedClick={setSelected}
+                    onMove={handleMove}
+                    isDragTarget={dragging}
+                    onDragStateChange={setDragging}
+                  />
+                );
+              })}
 
-              ))}
               {lastOk.bed_board.length === 0 && (
                 <div className="col-span-full text-sm text-muted-foreground">
                   No beds in the partner roster.
