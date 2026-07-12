@@ -634,7 +634,11 @@ function BedBoardPage() {
                   slot={slot}
                   level={slot.occupant ? acuityMap.get(slot.occupant.id) : undefined}
                   onOccupiedClick={setSelected}
+                  onMove={handleMove}
+                  isDragTarget={dragging}
+                  onDragStateChange={setDragging}
                 />
+
               ))}
               {lastOk.bed_board.length === 0 && (
                 <div className="col-span-full text-sm text-muted-foreground">
