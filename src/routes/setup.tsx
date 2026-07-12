@@ -61,7 +61,7 @@ const bootstrapFirstAdmin = createServerFn({ method: "POST" })
       if (listErr) throw safeError("setup.listUsers", listErr, "Setup check failed.");
       if (users.users.length > 0) throw new Error("Setup already complete. Sign in instead.");
 
-      const { error } = await supabaseAdmin.auth.admin.createUser({
+      const { data: created, error } = await supabaseAdmin.auth.admin.createUser({
         email: data.email,
         password: data.password,
         email_confirm: true,
@@ -76,6 +76,20 @@ const bootstrapFirstAdmin = createServerFn({ method: "POST" })
           _success: true,
         });
       }
+
+      // Setup bootstrap is a privileged, unauthenticated action — record
+      // it in audit_log so first-admin creation is traceable for DTAC.
+      // user_id is null because there is no session yet; the newly-created
+      // admin's id lands in entity_id.
+      const newUserId = created?.user?.id ?? null;
+      await supabaseAdmin.from("audit_log").insert({
+        user_id: null,
+        action: "create",
+        entity: "setup_bootstrap",
+        entity_id: newUserId,
+        diff: { email: data.email, method: "setup_secret" },
+      });
+
       // Trigger already creates 'admin' for the first user
       return { ok: true };
     } catch (err) {
