@@ -121,17 +121,64 @@ function BedCard({
   slot,
   level,
   onOccupiedClick,
+  onMove,
+  isDragTarget,
+  onDragStateChange,
 }: {
   slot: PartnerBedSlot;
   level: AcuityLevel | undefined;
   onOccupiedClick: (o: PartnerOccupant) => void;
+  onMove: (
+    occupantId: string,
+    expected_updated_at: string | null,
+    sourceBed: string | null,
+    targetBed: string,
+  ) => void;
+  isDragTarget: boolean;
+  onDragStateChange: (dragging: boolean) => void;
 }) {
   const occ = slot.occupant;
+  const [dragOver, setDragOver] = useState(false);
+
+  const handleDragOver = (e: React.DragEvent) => {
+    if (!isDragTarget) return;
+    // Only accept our own payload type.
+    if (!e.dataTransfer.types.includes("application/x-bed-move")) return;
+    e.preventDefault();
+    e.dataTransfer.dropEffect = "move";
+    if (!dragOver) setDragOver(true);
+  };
+  const handleDragLeave = () => setDragOver(false);
+  const handleDrop = (e: React.DragEvent) => {
+    if (!isDragTarget) return;
+    e.preventDefault();
+    setDragOver(false);
+    const raw = e.dataTransfer.getData("application/x-bed-move");
+    if (!raw) return;
+    try {
+      const payload = JSON.parse(raw) as {
+        occupantId: string;
+        updatedAt: string | null;
+        sourceBed: string | null;
+      };
+      if (!payload.occupantId) return;
+      if (payload.sourceBed === slot.bed) return;
+      onMove(payload.occupantId, payload.updatedAt, payload.sourceBed, slot.bed);
+    } catch {
+      /* ignore malformed payload */
+    }
+  };
+
   if (!slot.occupied || !occ) {
     return (
       <Card
-        className="p-3 flex flex-col justify-between min-h-24 border-dashed bg-muted/20"
-        aria-label={`Empty bed ${slot.bed}`}
+        className={`p-3 flex flex-col justify-between min-h-24 border-dashed bg-muted/20 transition ${
+          dragOver && isDragTarget ? "ring-2 ring-primary bg-primary/10" : ""
+        }`}
+        aria-label={`Empty bed ${slot.bed}${isDragTarget ? " — drop to move patient here" : ""}`}
+        onDragOver={handleDragOver}
+        onDragLeave={handleDragLeave}
+        onDrop={handleDrop}
       >
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-1.5 text-sm font-semibold text-muted-foreground">
@@ -144,21 +191,37 @@ function BedCard({
             </Badge>
           )}
         </div>
-        <div className="text-center text-xs text-muted-foreground">Empty</div>
+        <div className="text-center text-xs text-muted-foreground">
+          {dragOver && isDragTarget ? "Drop to move here" : "Empty"}
+        </div>
       </Card>
     );
   }
   const day = dayOfStay(occ.admission_date);
   return (
     <Card
-      className="p-3 min-h-24 hover:bg-accent/40 cursor-pointer transition"
+      className="p-3 min-h-24 hover:bg-accent/40 cursor-grab active:cursor-grabbing transition"
       onClick={() => onOccupiedClick(occ)}
       role="button"
       tabIndex={0}
-      aria-label={`Bed ${slot.bed} — ${occ.full_name ?? "occupied"}`}
+      aria-label={`Bed ${slot.bed} — ${occ.full_name ?? "occupied"} (drag to move to another bed)`}
       onKeyDown={(e) =>
         (e.key === "Enter" || e.key === " ") && onOccupiedClick(occ)
       }
+      draggable
+      onDragStart={(e) => {
+        e.dataTransfer.effectAllowed = "move";
+        e.dataTransfer.setData(
+          "application/x-bed-move",
+          JSON.stringify({
+            occupantId: occ.id,
+            updatedAt: occ.updated_at ?? null,
+            sourceBed: slot.bed,
+          }),
+        );
+        onDragStateChange(true);
+      }}
+      onDragEnd={() => onDragStateChange(false)}
     >
       <div className="flex items-center justify-between gap-2">
         <div className="flex items-center gap-1.5 text-sm font-semibold">
@@ -211,6 +274,7 @@ function BedCard({
     </Card>
   );
 }
+
 
 function StatBlock({
   label,
