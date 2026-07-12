@@ -143,6 +143,7 @@ function BridgeStatusPage() {
   const sendProbe = useServerFn(sendBridgeTestPayload);
   const getAttempts = useServerFn(getBridgeSyncAttempts);
   const getVerification = useServerFn(getBedBoardVerification);
+  const getHealth = useServerFn(getPartnerHealth);
 
   const [probeResults, setProbeResults] = useState<BridgeProbeResult[] | null>(
     null,
