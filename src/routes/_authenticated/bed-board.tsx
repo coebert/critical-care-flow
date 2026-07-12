@@ -120,6 +120,7 @@ function dayOfStay(iso: string | null | undefined): number | null {
 function BedCard({
   slot,
   level,
+  oneToOne,
   onOccupiedClick,
   onMove,
   isDragTarget,
@@ -127,6 +128,7 @@ function BedCard({
 }: {
   slot: PartnerBedSlot;
   level: AcuityLevel | undefined;
+  oneToOne: boolean;
   onOccupiedClick: (o: PartnerOccupant) => void;
   onMove: (
     occupantId: string,
@@ -137,6 +139,7 @@ function BedCard({
   isDragTarget: boolean;
   onDragStateChange: (dragging: boolean) => void;
 }) {
+
   const occ = slot.occupant;
   const [dragOver, setDragOver] = useState(false);
 
