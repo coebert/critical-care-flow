@@ -347,11 +347,18 @@ function BedBoardPage() {
     staleTime: 5_000,
     refetchInterval: 30_000,
   });
+  type AcuityInfo = { level: AcuityLevel; one_to_one: boolean };
   const acuityMap = useMemo(() => {
-    const m = new Map<string, AcuityLevel>();
-    for (const r of acuityRows ?? []) m.set(r.partner_patient_id, r.level as AcuityLevel);
+    const m = new Map<string, AcuityInfo>();
+    for (const r of acuityRows ?? []) {
+      m.set(r.partner_patient_id, {
+        level: r.level as AcuityLevel,
+        one_to_one: r.one_to_one === true,
+      });
+    }
     return m;
   }, [acuityRows]);
+
 
   const [selected, setSelected] = useState<PartnerOccupant | null>(null);
   const [dragging, setDragging] = useState(false);
