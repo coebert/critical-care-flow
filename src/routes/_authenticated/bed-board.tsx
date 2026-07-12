@@ -314,6 +314,8 @@ function BedBoardPage() {
   // transient partner blip.
   const lastOk = data && data.ok ? data : null;
   const partnerError = data && !data.ok ? data.error : null;
+  const partnerOutage =
+    data && !data.ok && (data.partner_outage === true);
 
   useEffect(() => {
     // No local Realtime subscription: the partner data is fetched over HTTP,
