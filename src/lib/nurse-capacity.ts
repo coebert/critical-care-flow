@@ -1,12 +1,12 @@
 // Pure helpers for nurse-based admission capacity.
-// Dependency = sum of per-patient care requirement, driven by level of care.
+// Dependency = sum of per-patient care requirement, driven by level of care
+// with a bump to 1.0 when the patient is flagged as requiring 1:1 nursing.
 // Mapping (per user spec):
+//   1:1     → 1.0 nurse (any level)
 //   Level 3 → 1.0 nurse
 //   Level 2 → 0.5 nurse
 //   Level 1 → 0.25 nurse
 //   Level 0 → 0.25 nurse
-// The bed board currently stores level as 1..3 (see admitSchema),
-// so level 0 is treated identically to level 1 for completeness.
 
 import type { Occupancy } from "./bed-capacity";
 
@@ -21,6 +21,7 @@ export interface NurseStaffingEntry {
 export interface NurseCapacitySnapshot {
   dependency: number; // total nurses required for current patients
   patient_count: number;
+  one_to_one_count: number;
   day: { available: number | null; spare: number | null } & AdmitCapacity;
   night: { available: number | null; spare: number | null } & AdmitCapacity;
 }
@@ -38,19 +39,34 @@ const LEVEL_WEIGHT: Record<number, number> = {
   3: 1,
 };
 
+export const ONE_TO_ONE_WEIGHT = 1;
+
 export function nurseWeightForLevel(level: number | null | undefined): number {
   if (level == null) return 0.25;
   return LEVEL_WEIGHT[level] ?? 0.25;
 }
 
+/** Effective per-patient nurse weight, including the 1:1 override. */
+export function nurseWeightForPatient(o: Pick<Occupancy, "level" | "one_to_one">): number {
+  if (o.one_to_one) return ONE_TO_ONE_WEIGHT;
+  return nurseWeightForLevel(o.level);
+}
+
 export function computeDependency(occupancies: Occupancy[]): {
   dependency: number;
   patient_count: number;
+  one_to_one_count: number;
 } {
   const live = occupancies.filter((o) => !o.discharged_at);
-  const dependency = live.reduce((sum, o) => sum + nurseWeightForLevel(o.level), 0);
-  return { dependency: round2(dependency), patient_count: live.length };
+  const dependency = live.reduce((sum, o) => sum + nurseWeightForPatient(o), 0);
+  const one_to_one_count = live.reduce((n, o) => n + (o.one_to_one ? 1 : 0), 0);
+  return {
+    dependency: round2(dependency),
+    patient_count: live.length,
+    one_to_one_count,
+  };
 }
+
 
 export function admissionSlots(spare: number): AdmitCapacity {
   if (!isFinite(spare) || spare <= 0) {
@@ -86,13 +102,15 @@ export function computeNurseCapacity(input: {
   day_available: number | null;
   night_available: number | null;
 }): NurseCapacitySnapshot {
-  const { dependency, patient_count } = computeDependency(input.occupancies);
+  const { dependency, patient_count, one_to_one_count } = computeDependency(input.occupancies);
   return {
     dependency,
     patient_count,
+    one_to_one_count,
     day: shiftBlock(input.day_available, dependency),
     night: shiftBlock(input.night_available, dependency),
   };
+
 }
 
 function round2(n: number): number {

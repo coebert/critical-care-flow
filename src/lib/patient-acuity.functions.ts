@@ -15,6 +15,7 @@ export type AcuityLevel = 0 | 1 | 2 | 3;
 export type AcuityEntry = {
   partner_patient_id: string;
   level: AcuityLevel;
+  one_to_one: boolean;
   updated_at: string;
   updated_by: string | null;
 };
@@ -24,14 +25,17 @@ export const getPatientAcuity = createServerFn({ method: "GET" })
   .handler(async ({ context }): Promise<AcuityEntry[]> => {
     const { data, error } = await context.supabase
       .from("patient_acuity_overrides")
-      .select("partner_patient_id, level, updated_at, updated_by");
+      .select("partner_patient_id, level, one_to_one, updated_at, updated_by");
     if (error) throw new Error(error.message);
     return (data ?? []) as AcuityEntry[];
   });
 
 export type SetPatientAcuityInput = {
   partner_patient_id: string;
-  level: AcuityLevel | null; // null clears the override
+  // When both `level` is null and `one_to_one` is false/omitted, the override
+  // is cleared. When `level` is omitted, the existing level is preserved.
+  level?: AcuityLevel | null;
+  one_to_one?: boolean;
 };
 
 export type SetPatientAcuityResult =
@@ -44,8 +48,15 @@ export const setPatientAcuity = createServerFn({ method: "POST" })
     if (!data || typeof data.partner_patient_id !== "string" || !data.partner_patient_id) {
       throw new Error("partner_patient_id is required");
     }
-    if (data.level !== null && ![0, 1, 2, 3].includes(data.level as number)) {
+    if (
+      data.level !== undefined &&
+      data.level !== null &&
+      ![0, 1, 2, 3].includes(data.level as number)
+    ) {
       throw new Error("level must be 0, 1, 2, 3, or null");
+    }
+    if (data.one_to_one !== undefined && typeof data.one_to_one !== "boolean") {
+      throw new Error("one_to_one must be a boolean");
     }
     return data;
   })
@@ -57,7 +68,24 @@ export const setPatientAcuity = createServerFn({ method: "POST" })
     if (roleErr) return { ok: false, error: `authz check failed: ${roleErr.message}` };
     if (!allowed) return { ok: false, error: "forbidden: clinical role required" };
 
-    if (data.level === null) {
+    // Merge with any existing row so callers can toggle just level or just 1:1.
+    const { data: existing } = await context.supabase
+      .from("patient_acuity_overrides")
+      .select("level, one_to_one")
+      .eq("partner_patient_id", data.partner_patient_id)
+      .maybeSingle();
+
+    const nextLevel =
+      data.level === undefined
+        ? (existing?.level ?? null)
+        : data.level;
+    const nextOneToOne =
+      data.one_to_one === undefined
+        ? (existing?.one_to_one ?? false)
+        : data.one_to_one;
+
+    // Row is cleared when there's nothing left to record.
+    if (nextLevel === null && !nextOneToOne) {
       const { error } = await context.supabase
         .from("patient_acuity_overrides")
         .delete()
@@ -66,19 +94,26 @@ export const setPatientAcuity = createServerFn({ method: "POST" })
       return { ok: true, entry: null };
     }
 
+    // Level is NOT NULL on the underlying table. If a caller flags 1:1 for a
+    // patient that has never had a level scored, default to L1 so the row is
+    // valid; clinicians can adjust the level from the same dialog.
+    const levelToStore: AcuityLevel = (nextLevel ?? 1) as AcuityLevel;
+
     const { data: row, error } = await context.supabase
       .from("patient_acuity_overrides")
       .upsert(
         {
           partner_patient_id: data.partner_patient_id,
-          level: data.level,
+          level: levelToStore,
+          one_to_one: nextOneToOne,
           updated_by: context.userId,
           updated_at: new Date().toISOString(),
         },
         { onConflict: "partner_patient_id" },
       )
-      .select("partner_patient_id, level, updated_at, updated_by")
+      .select("partner_patient_id, level, one_to_one, updated_at, updated_by")
       .single();
     if (error) return { ok: false, error: error.message };
     return { ok: true, entry: row as AcuityEntry };
   });
+

@@ -120,6 +120,7 @@ function dayOfStay(iso: string | null | undefined): number | null {
 function BedCard({
   slot,
   level,
+  oneToOne,
   onOccupiedClick,
   onMove,
   isDragTarget,
@@ -127,6 +128,7 @@ function BedCard({
 }: {
   slot: PartnerBedSlot;
   level: AcuityLevel | undefined;
+  oneToOne: boolean;
   onOccupiedClick: (o: PartnerOccupant) => void;
   onMove: (
     occupantId: string,
@@ -137,6 +139,7 @@ function BedCard({
   isDragTarget: boolean;
   onDragStateChange: (dragging: boolean) => void;
 }) {
+
   const occ = slot.occupant;
   const [dragOver, setDragOver] = useState(false);
 
@@ -244,6 +247,15 @@ function BedCard({
               Side room
             </Badge>
           )}
+          {oneToOne && (
+            <Badge
+              variant="outline"
+              className="text-[10px] gap-1 bg-rose-500/10 text-rose-700 dark:text-rose-400 border-rose-500/30"
+              title="Requires 1:1 nursing"
+            >
+              1:1
+            </Badge>
+          )}
           {occ.tep_in_place && (
             <Badge
               variant="outline"
@@ -254,6 +266,7 @@ function BedCard({
               TEP
             </Badge>
           )}
+
         </div>
       </div>
       <div className="mt-1 text-sm truncate font-medium">
@@ -347,11 +360,18 @@ function BedBoardPage() {
     staleTime: 5_000,
     refetchInterval: 30_000,
   });
+  type AcuityInfo = { level: AcuityLevel; one_to_one: boolean };
   const acuityMap = useMemo(() => {
-    const m = new Map<string, AcuityLevel>();
-    for (const r of acuityRows ?? []) m.set(r.partner_patient_id, r.level as AcuityLevel);
+    const m = new Map<string, AcuityInfo>();
+    for (const r of acuityRows ?? []) {
+      m.set(r.partner_patient_id, {
+        level: r.level as AcuityLevel,
+        one_to_one: r.one_to_one === true,
+      });
+    }
     return m;
   }, [acuityRows]);
+
 
   const [selected, setSelected] = useState<PartnerOccupant | null>(null);
   const [dragging, setDragging] = useState(false);
@@ -495,10 +515,17 @@ function BedBoardPage() {
             .filter((o): o is PartnerOccupant => o !== null),
           ...lastOk.unassigned,
         ];
+        const levelMap = new Map<string, AcuityLevel>();
+        for (const [k, v] of acuityMap) levelMap.set(k, v.level);
         const { counts, unscored, mean } = computeUnitAcuity(
           allOccupants.map((o) => o.id),
-          acuityMap,
+          levelMap,
         );
+        const oneToOneCount = allOccupants.reduce(
+          (n, o) => n + (acuityMap.get(o.id)?.one_to_one ? 1 : 0),
+          0,
+        );
+
         return (
           <>
             <div
@@ -568,16 +595,22 @@ function BedBoardPage() {
               )}
             </div>
             <NurseCapacityPanel
-              occupancies={allOccupants.map<Occupancy>((o) => ({
-                id: o.id,
-                bed_id: o.bed ?? o.id,
-                discharged_at: null,
-                predicted_discharge_at: null,
-                level: acuityMap.get(o.id) ?? 1,
-              }))}
+              occupancies={allOccupants.map<Occupancy>((o) => {
+                const a = acuityMap.get(o.id);
+                return {
+                  id: o.id,
+                  bed_id: o.bed ?? o.id,
+                  discharged_at: null,
+                  predicted_discharge_at: null,
+                  level: a?.level ?? 1,
+                  one_to_one: a?.one_to_one === true,
+                };
+              })}
               focusShift={search.focus_shift}
               focusLevel={search.focus_level}
+              oneToOneCount={oneToOneCount}
             />
+
           </>
         );
       })()}
@@ -628,18 +661,22 @@ function BedBoardPage() {
               {lastOk.unit}
             </h2>
             <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3">
-              {lastOk.bed_board.map((slot) => (
-                <BedCard
-                  key={slot.bed}
-                  slot={slot}
-                  level={slot.occupant ? acuityMap.get(slot.occupant.id) : undefined}
-                  onOccupiedClick={setSelected}
-                  onMove={handleMove}
-                  isDragTarget={dragging}
-                  onDragStateChange={setDragging}
-                />
+              {lastOk.bed_board.map((slot) => {
+                const a = slot.occupant ? acuityMap.get(slot.occupant.id) : undefined;
+                return (
+                  <BedCard
+                    key={slot.bed}
+                    slot={slot}
+                    level={a?.level}
+                    oneToOne={a?.one_to_one === true}
+                    onOccupiedClick={setSelected}
+                    onMove={handleMove}
+                    isDragTarget={dragging}
+                    onDragStateChange={setDragging}
+                  />
+                );
+              })}
 
-              ))}
               {lastOk.bed_board.length === 0 && (
                 <div className="col-span-full text-sm text-muted-foreground">
                   No beds in the partner roster.
@@ -792,7 +829,8 @@ function BedBoardPage() {
 
       <EditOccupantDialog
         occupant={selected}
-        currentLevel={selected ? acuityMap.get(selected.id) ?? null : null}
+        currentLevel={selected ? acuityMap.get(selected.id)?.level ?? null : null}
+        currentOneToOne={selected ? acuityMap.get(selected.id)?.one_to_one === true : false}
         sourceReferralId={search.source_referral_id ?? null}
         onClose={() => setSelected(null)}
         onSaved={(updated) => {
@@ -801,6 +839,7 @@ function BedBoardPage() {
         }}
         onAcuityChanged={() => refetchAcuity()}
       />
+
 
     </div>
   );
@@ -875,6 +914,7 @@ function buildDiff(
 function EditOccupantDialog({
   occupant,
   currentLevel,
+  currentOneToOne,
   sourceReferralId,
   onClose,
   onSaved,
@@ -882,6 +922,7 @@ function EditOccupantDialog({
 }: {
   occupant: PartnerOccupant | null;
   currentLevel: AcuityLevel | null;
+  currentOneToOne: boolean;
   sourceReferralId: string | null;
   onClose: () => void;
   onSaved: (updated: PartnerOccupant) => void;
@@ -903,6 +944,21 @@ function EditOccupantDialog({
     },
     onError: (err) => toast.error(err instanceof Error ? err.message : "Could not save level"),
   });
+  const oneToOneMutation = useMutation({
+    mutationFn: (one_to_one: boolean) =>
+      saveAcuity({ data: { partner_patient_id: occupant!.id, one_to_one } }),
+    onSuccess: (result, vars) => {
+      if (result.ok) {
+        toast.success(vars ? "Marked as 1:1 nursing" : "1:1 nursing cleared");
+        onAcuityChanged();
+      } else {
+        toast.error(result.error || "Could not update 1:1 nursing");
+      }
+    },
+    onError: (err) =>
+      toast.error(err instanceof Error ? err.message : "Could not update 1:1 nursing"),
+  });
+
   const prefillMutation = useMutation({
     mutationFn: () =>
       runPrefill({
@@ -1093,12 +1149,31 @@ function EditOccupantDialog({
                 );
               })}
             </div>
+            <div className="mt-3 flex items-center justify-between gap-2 rounded-md border bg-muted/30 px-2.5 py-2">
+              <div className="min-w-0">
+                <Label htmlFor="one-to-one-switch" className="text-sm">
+                  Requires 1:1 nursing
+                </Label>
+                <div className="text-[11px] text-muted-foreground">
+                  Forces this patient to count as a full nurse in unit dependency,
+                  regardless of level of care.
+                </div>
+              </div>
+              <Switch
+                id="one-to-one-switch"
+                checked={currentOneToOne}
+                disabled={oneToOneMutation.isPending}
+                onCheckedChange={(v) => oneToOneMutation.mutate(v === true)}
+                aria-label="Requires 1:1 nursing"
+              />
+            </div>
             <div className="text-[11px] text-muted-foreground mt-1.5">
               Level of care is stored in this app and feeds unit acuity. Other
               patient details write back to ICU Handover Hub.
             </div>
           </div>
         )}
+
 
 
         {occupant && form && (

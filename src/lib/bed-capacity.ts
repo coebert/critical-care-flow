@@ -18,7 +18,10 @@ export interface Occupancy {
   discharged_at: string | null;
   predicted_discharge_at: string | null;
   level: number;
+  /** Optional flag: patient requires 1:1 nursing regardless of level of care. */
+  one_to_one?: boolean;
 }
+
 
 export interface CapacityCounts {
   total: number;

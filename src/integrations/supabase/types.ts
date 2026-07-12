@@ -937,18 +937,21 @@ export type Database = {
       patient_acuity_overrides: {
         Row: {
           level: number
+          one_to_one: boolean
           partner_patient_id: string
           updated_at: string
           updated_by: string | null
         }
         Insert: {
           level: number
+          one_to_one?: boolean
           partner_patient_id: string
           updated_at?: string
           updated_by?: string | null
         }
         Update: {
           level?: number
+          one_to_one?: boolean
           partner_patient_id?: string
           updated_at?: string
           updated_by?: string | null
