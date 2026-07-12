@@ -354,6 +354,39 @@ function BedBoardPage() {
   }, [acuityRows]);
 
   const [selected, setSelected] = useState<PartnerOccupant | null>(null);
+  const [dragging, setDragging] = useState(false);
+
+  const moveBed = useServerFn(updatePartnerPatient);
+  const moveMutation = useMutation({
+    mutationFn: (input: {
+      id: string;
+      expected_updated_at: string | null;
+      bed: string;
+    }) => moveBed({ data: input }),
+    onSuccess: (result, vars) => {
+      if (result.ok) {
+        toast.success(`Moved patient to bed ${vars.bed}`);
+        refetch();
+      } else if (result.status === 409) {
+        toast.warning("Bed changed elsewhere — refreshing");
+        refetch();
+      } else {
+        toast.error(result.error || "Could not move patient");
+      }
+    },
+    onError: (err) =>
+      toast.error(err instanceof Error ? err.message : "Could not move patient"),
+  });
+
+  const handleMove = (
+    occupantId: string,
+    expected_updated_at: string | null,
+    _sourceBed: string | null,
+    targetBed: string,
+  ) => {
+    moveMutation.mutate({ id: occupantId, expected_updated_at, bed: targetBed });
+  };
+
 
   const arrivedFromSource =
     search.source_referral_id || search.source_postop_booking_id;
