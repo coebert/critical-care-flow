@@ -1185,6 +1185,30 @@ export type Database = {
           },
         ]
       }
+      privileged_action_throttle: {
+        Row: {
+          action: string
+          attempted_at: string
+          id: number
+          success: boolean
+          user_id: string
+        }
+        Insert: {
+          action: string
+          attempted_at?: string
+          id?: number
+          success?: boolean
+          user_id: string
+        }
+        Update: {
+          action?: string
+          attempted_at?: string
+          id?: number
+          success?: boolean
+          user_id?: string
+        }
+        Relationships: []
+      }
       profiles: {
         Row: {
           created_at: string
@@ -1798,6 +1822,15 @@ export type Database = {
         Args: { _attempt_type: string; _email: string }
         Returns: Json
       }
+      begin_privileged_action: {
+        Args: {
+          _action: string
+          _max_attempts?: number
+          _user_id: string
+          _window_seconds?: number
+        }
+        Returns: Json
+      }
       claim_push_subscription: {
         Args: {
           p_auth: string
@@ -1812,6 +1845,10 @@ export type Database = {
         Returns: number
       }
       finalize_auth_attempt: {
+        Args: { _attempt_id: number; _success: boolean }
+        Returns: undefined
+      }
+      finalize_privileged_action: {
         Args: { _attempt_id: number; _success: boolean }
         Returns: undefined
       }
