@@ -7,13 +7,14 @@ import {
 } from "./nurse-capacity";
 import type { Occupancy } from "./bed-capacity";
 
-function occ(id: string, level: number, discharged = false): Occupancy {
+function occ(id: string, level: number, discharged = false, oneToOne = false): Occupancy {
   return {
     id,
     bed_id: id,
     discharged_at: discharged ? new Date().toISOString() : null,
     predicted_discharge_at: null,
     level,
+    one_to_one: oneToOne,
   };
 }
 
@@ -41,11 +42,29 @@ describe("computeDependency", () => {
     // 1 + 1 + 0.5 + 0.25 = 2.75
     expect(r.dependency).toBe(2.75);
     expect(r.patient_count).toBe(4);
+    expect(r.one_to_one_count).toBe(0);
+    expect(r.one_to_one_dependency).toBe(0);
+    expect(r.level_weighted_dependency).toBe(2.75);
   });
   it("ignores discharged patients", () => {
     const r = computeDependency([occ("a", 3), occ("b", 3, true)]);
     expect(r.dependency).toBe(1);
     expect(r.patient_count).toBe(1);
+    expect(r.one_to_one_dependency).toBe(0);
+    expect(r.level_weighted_dependency).toBe(1);
+  });
+  it("breaks out 1:1 dependency from level-weighted dependency", () => {
+    const r = computeDependency([
+      occ("a", 3, false, true), // 1:1 → 1.0
+      occ("b", 3, false, true), // 1:1 → 1.0
+      occ("c", 2),              // 0.5
+      occ("d", 1),              // 0.25
+    ]);
+    expect(r.dependency).toBe(2.75);
+    expect(r.patient_count).toBe(4);
+    expect(r.one_to_one_count).toBe(2);
+    expect(r.one_to_one_dependency).toBe(2);
+    expect(r.level_weighted_dependency).toBe(0.75);
   });
 });
 
@@ -78,6 +97,8 @@ describe("computeNurseCapacity", () => {
       night_available: 10,
     });
     expect(snap.dependency).toBe(8);
+    expect(snap.one_to_one_dependency).toBe(0);
+    expect(snap.level_weighted_dependency).toBe(8);
     expect(snap.day.spare).toBe(2);
     expect(snap.day.level3_slots).toBe(2);
     expect(snap.day.level2_slots).toBe(4);
@@ -92,5 +113,7 @@ describe("computeNurseCapacity", () => {
     expect(snap.day.spare).toBeNull();
     expect(snap.day.level3_slots).toBeNull();
     expect(snap.dependency).toBe(1);
+    expect(snap.one_to_one_dependency).toBe(0);
+    expect(snap.level_weighted_dependency).toBe(1);
   });
 });
