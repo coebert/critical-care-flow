@@ -502,10 +502,17 @@ function BedBoardPage() {
             .filter((o): o is PartnerOccupant => o !== null),
           ...lastOk.unassigned,
         ];
+        const levelMap = new Map<string, AcuityLevel>();
+        for (const [k, v] of acuityMap) levelMap.set(k, v.level);
         const { counts, unscored, mean } = computeUnitAcuity(
           allOccupants.map((o) => o.id),
-          acuityMap,
+          levelMap,
         );
+        const oneToOneCount = allOccupants.reduce(
+          (n, o) => n + (acuityMap.get(o.id)?.one_to_one ? 1 : 0),
+          0,
+        );
+
         return (
           <>
             <div
