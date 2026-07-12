@@ -247,6 +247,15 @@ function BedCard({
               Side room
             </Badge>
           )}
+          {oneToOne && (
+            <Badge
+              variant="outline"
+              className="text-[10px] gap-1 bg-rose-500/10 text-rose-700 dark:text-rose-400 border-rose-500/30"
+              title="Requires 1:1 nursing"
+            >
+              1:1
+            </Badge>
+          )}
           {occ.tep_in_place && (
             <Badge
               variant="outline"
@@ -257,6 +266,7 @@ function BedCard({
               TEP
             </Badge>
           )}
+
         </div>
       </div>
       <div className="mt-1 text-sm truncate font-medium">
