@@ -126,6 +126,7 @@ export const runBridgeSyncNow = createServerFn({ method: "POST" })
       "https://critical-care-flow.lovable.app";
     void url;
     const apikey = process.env.SUPABASE_PUBLISHABLE_KEY ?? "";
+    const startedAt = Date.now();
     const res = await fetch(`${base}/api/public/bridge/sync`, {
       method: "POST",
       headers: {
@@ -135,6 +136,26 @@ export const runBridgeSyncNow = createServerFn({ method: "POST" })
       body: "{}",
     });
     const body = await res.json().catch(() => ({}));
+
+    // DTAC evidence: admin-triggered bridge runs are a privileged action
+    // and must appear in audit_log alongside role/keypair changes.
+    const { supabaseAdmin } = await import(
+      "@/integrations/supabase/client.server"
+    );
+    await supabaseAdmin.from("audit_log").insert({
+      user_id: context.userId,
+      action: "update",
+      entity: "bridge_sync",
+      entity_id: null,
+      diff: {
+        source: "manual",
+        scope: "all",
+        http_status: res.status,
+        duration_ms: Date.now() - startedAt,
+        ok: res.ok,
+      },
+    });
+
     return { status: res.status, body };
   });
 
@@ -160,11 +181,30 @@ export const runBridgeSyncBedsOnly = createServerFn({ method: "POST" })
     const { runBridgeSync } = await import(
       "@/routes/api/public/bridge/sync"
     );
+    const startedAt = Date.now();
     const res = await runBridgeSync(req, {
       bedsOnly: true,
       source: "manual",
     });
     const body = await res.json().catch(() => ({}));
+
+    const { supabaseAdmin } = await import(
+      "@/integrations/supabase/client.server"
+    );
+    await supabaseAdmin.from("audit_log").insert({
+      user_id: context.userId,
+      action: "update",
+      entity: "bridge_sync",
+      entity_id: null,
+      diff: {
+        source: "manual",
+        scope: "beds_only",
+        http_status: res.status,
+        duration_ms: Date.now() - startedAt,
+        ok: res.ok,
+      },
+    });
+
     return { status: res.status, body };
   });
 
