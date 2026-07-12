@@ -256,9 +256,17 @@ export function NurseCapacityPanel({
               nurses required for {snapshot.patient_count} patient{snapshot.patient_count === 1 ? "" : "s"}
             </div>
           </div>
+          {(oneToOneCount ?? snapshot.one_to_one_count) > 0 && (
+            <div className="mt-1 text-[11px] text-rose-700 dark:text-rose-400">
+              Includes {oneToOneCount ?? snapshot.one_to_one_count} patient
+              {(oneToOneCount ?? snapshot.one_to_one_count) === 1 ? "" : "s"} on 1:1 nursing
+              (counted as a full nurse each).
+            </div>
+          )}
           <div className="mt-1 text-[11px] text-muted-foreground leading-snug">
-            L3 = 1 · L2 = 0.5 · L1/L0 = 0.25 nurse per patient
+            1:1 = 1 · L3 = 1 · L2 = 0.5 · L1/L0 = 0.25 nurse per patient
           </div>
+
         </div>
 
         {isLoading ? (
