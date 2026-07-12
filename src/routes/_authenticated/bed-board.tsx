@@ -829,7 +829,8 @@ function BedBoardPage() {
 
       <EditOccupantDialog
         occupant={selected}
-        currentLevel={selected ? acuityMap.get(selected.id) ?? null : null}
+        currentLevel={selected ? acuityMap.get(selected.id)?.level ?? null : null}
+        currentOneToOne={selected ? acuityMap.get(selected.id)?.one_to_one === true : false}
         sourceReferralId={search.source_referral_id ?? null}
         onClose={() => setSelected(null)}
         onSaved={(updated) => {
@@ -838,6 +839,7 @@ function BedBoardPage() {
         }}
         onAcuityChanged={() => refetchAcuity()}
       />
+
 
     </div>
   );
