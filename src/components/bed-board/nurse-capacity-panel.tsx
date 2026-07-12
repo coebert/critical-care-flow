@@ -187,11 +187,14 @@ export function NurseCapacityPanel({
   occupancies,
   focusShift,
   focusLevel,
+  oneToOneCount,
 }: {
   occupancies: Occupancy[];
   focusShift?: Shift;
   focusLevel?: 1 | 2 | 3;
+  oneToOneCount?: number;
 }) {
+
   const today = todayIsoDate();
   const qc = useQueryClient();
   const fetchStaffing = useServerFn(getNurseStaffingForDate);
