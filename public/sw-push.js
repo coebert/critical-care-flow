@@ -34,8 +34,11 @@ function safeSameOriginPath(rawUrl) {
     const u = new URL(rawUrl, self.location.origin);
     if (u.origin !== self.location.origin) return "/";
     const path = u.pathname || "/";
+    // Strict allow-list: either exact match, OR a proper sub-path
+    // (`/inbox/123`). A trailing `startsWith(p)` fallback here would
+    // let `/inboxevil` through — do not add it back.
     const ok = ALLOWED_PATH_PREFIXES.some(
-      (p) => path === p || path.startsWith(p === "/" ? "/" : p + "/") || path.startsWith(p),
+      (p) => path === p || (p !== "/" && path.startsWith(p + "/")),
     );
     return ok ? u.pathname + u.search : "/";
   } catch (_) {
