@@ -1149,12 +1149,31 @@ function EditOccupantDialog({
                 );
               })}
             </div>
+            <div className="mt-3 flex items-center justify-between gap-2 rounded-md border bg-muted/30 px-2.5 py-2">
+              <div className="min-w-0">
+                <Label htmlFor="one-to-one-switch" className="text-sm">
+                  Requires 1:1 nursing
+                </Label>
+                <div className="text-[11px] text-muted-foreground">
+                  Forces this patient to count as a full nurse in unit dependency,
+                  regardless of level of care.
+                </div>
+              </div>
+              <Switch
+                id="one-to-one-switch"
+                checked={currentOneToOne}
+                disabled={oneToOneMutation.isPending}
+                onCheckedChange={(v) => oneToOneMutation.mutate(v === true)}
+                aria-label="Requires 1:1 nursing"
+              />
+            </div>
             <div className="text-[11px] text-muted-foreground mt-1.5">
               Level of care is stored in this app and feeds unit acuity. Other
               patient details write back to ICU Handover Hub.
             </div>
           </div>
         )}
+
 
 
         {occupant && form && (
