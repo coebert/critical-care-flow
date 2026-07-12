@@ -314,6 +314,8 @@ function BedBoardPage() {
   // transient partner blip.
   const lastOk = data && data.ok ? data : null;
   const partnerError = data && !data.ok ? data.error : null;
+  const partnerOutage =
+    data && !data.ok && (data.partner_outage === true);
 
   useEffect(() => {
     // No local Realtime subscription: the partner data is fetched over HTTP,
@@ -485,14 +487,24 @@ function BedBoardPage() {
 
       {partnerError && (
         <div
-          className="mb-4 rounded-md border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-sm text-amber-900 dark:text-amber-200"
+          className={
+            partnerOutage
+              ? "mb-4 rounded-md border border-destructive/40 bg-destructive/10 px-3 py-2 text-sm text-destructive"
+              : "mb-4 rounded-md border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-sm text-amber-900 dark:text-amber-200"
+          }
           role="alert"
         >
           <div className="flex items-center gap-2 font-medium">
             <AlertTriangle className="w-4 h-4" aria-hidden="true" />
-            Bed board did not refresh
+            {partnerOutage
+              ? "ICU Handover Hub is currently unavailable"
+              : "Bed board did not refresh"}
           </div>
-          <div className="text-xs mt-1 break-words">{partnerError}</div>
+          <div className="text-xs mt-1 break-words">
+            {partnerOutage
+              ? "The partner service is down or unreachable. The bed board will resume automatically once it is back online."
+              : partnerError}
+          </div>
           {lastOk && (
             <div className="text-xs mt-1 text-muted-foreground">
               Showing last successful snapshot from{" "}

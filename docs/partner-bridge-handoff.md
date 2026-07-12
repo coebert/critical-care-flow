@@ -466,3 +466,36 @@ GET  https://icu-compass-care.lovable.app/api/public/bridge/bed_transfers_out
 
 Once live, this app's every-2-min reconcile will start populating the
 bed board automatically — no further changes needed on our side.
+
+---
+
+## Partner-outage notice (2026-07-12)
+
+On 2026-07-12 the partner project (`icu-compass-care.lovable.app`) began
+returning HTTP 500 with Lovable's generic *"This page didn't load"* HTML
+shell on every bridge endpoint (`/health`, `/beds`, and all `POST`
+receivers). Symptoms on our side:
+
+- Bed board banner: *"ICU Handover Hub is currently unavailable"* (falls
+  back to last successful snapshot).
+- `bridge_sync_attempts` shows `ok=false` for every resource with a
+  compact error like `pull beds: Partner Handover Hub is currently
+  unavailable (HTTP 500, platform error page).`
+- Bridge-status "Partner reachability" card is red with the same message.
+
+Nothing in this repo can fix a downed partner — the partner owner must
+restart / republish `icu-compass-care`. Copy-pasteable ping:
+
+> **Subject:** ICU Compass Care bridge appears to be down
+>
+> Hi — the ICU Handover Hub (`icu-compass-care.lovable.app`) has been
+> returning HTTP 500 on every `/api/public/bridge/*` endpoint (including
+> `/health`) since ~08:30 UTC on 2026-07-12. Our 2-minute bed-board sync
+> and live bed board have both stopped receiving data as a result. Could
+> you check the deployment / redeploy the project when you get a moment?
+> Once it's back up our reconcile will catch up automatically. Happy to
+> share logs if useful. Thanks!
+
+If the partner project has moved to a different URL, update
+`PARTNER_BRIDGE_URL` in Lovable Cloud secrets and the bed board will
+recover on the next sync tick.

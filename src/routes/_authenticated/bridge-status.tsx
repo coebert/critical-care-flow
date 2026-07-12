@@ -23,6 +23,7 @@ import {
   sendBridgeTestPayload,
   getBridgeSyncAttempts,
   getBedBoardVerification,
+  getPartnerHealth,
   enqueueBedReconciliation,
   cancelBedReconciliationJob,
   getBedReconciliationJob,
@@ -35,6 +36,7 @@ import {
   type BedReconcileJobItem,
   type BedReconcileJobDetail,
   type BedReconcileJobSummary,
+  type PartnerHealth,
 } from "@/lib/bridge-status.functions";
 import { supabase } from "@/integrations/supabase/client";
 import { Input } from "@/components/ui/input";
@@ -141,6 +143,7 @@ function BridgeStatusPage() {
   const sendProbe = useServerFn(sendBridgeTestPayload);
   const getAttempts = useServerFn(getBridgeSyncAttempts);
   const getVerification = useServerFn(getBedBoardVerification);
+  const getHealth = useServerFn(getPartnerHealth);
 
   const [probeResults, setProbeResults] = useState<BridgeProbeResult[] | null>(
     null,
@@ -163,6 +166,14 @@ function BridgeStatusPage() {
     queryFn: () => getVerification(),
     refetchInterval: 15_000,
   });
+
+  const healthQuery = useQuery({
+    queryKey: ["bridge-partner-health"],
+    queryFn: () => getHealth(),
+    refetchInterval: 30_000,
+  });
+
+
 
   const mutation = useMutation({
     mutationFn: () => runNow(),
@@ -357,6 +368,15 @@ function BridgeStatusPage() {
             />
           </div>
 
+          <PartnerHealthCard
+            health={healthQuery.data ?? null}
+            loading={healthQuery.isLoading}
+            refreshing={healthQuery.isFetching}
+            error={healthQuery.error as Error | null}
+            onRefresh={() => healthQuery.refetch()}
+          />
+
+
           <Card className="p-0 overflow-hidden">
             <Table>
               <TableHeader>
@@ -423,6 +443,96 @@ function BridgeStatusPage() {
     </div>
   );
 }
+
+function PartnerHealthCard({
+  health,
+  loading,
+  refreshing,
+  error,
+  onRefresh,
+}: {
+  health: PartnerHealth | null;
+  loading: boolean;
+  refreshing: boolean;
+  error: Error | null;
+  onRefresh: () => void;
+}) {
+  const ok = health?.ok === true;
+  return (
+    <Card
+      className={
+        ok
+          ? "p-4 border-emerald-500/30 bg-emerald-500/5"
+          : health
+            ? "p-4 border-destructive/40 bg-destructive/5"
+            : "p-4"
+      }
+    >
+      <div className="flex items-start justify-between gap-2">
+        <div className="flex items-center gap-2">
+          {ok ? (
+            <CheckCircle2 className="h-4 w-4 text-emerald-600" />
+          ) : (
+            <AlertCircle className="h-4 w-4 text-destructive" />
+          )}
+          <div>
+            <div className="text-sm font-semibold">
+              Partner reachability{" "}
+              <span className="text-xs text-muted-foreground">
+                (ICU Handover Hub /health)
+              </span>
+            </div>
+            <div className="text-xs text-muted-foreground mt-0.5">
+              {loading && !health
+                ? "Probing partner…"
+                : error
+                  ? `Probe failed: ${error.message}`
+                  : health
+                    ? health.message
+                    : "No probe run yet."}
+            </div>
+            {health && (
+              <div className="text-xs text-muted-foreground mt-0.5">
+                Checked{" "}
+                <span title={tzTooltip(health.checked_at)}>
+                  {new Date(health.checked_at).toLocaleTimeString()}
+                </span>
+                {health.latency_ms != null && (
+                  <> · {health.latency_ms} ms</>
+                )}
+                {health.partner_url && (
+                  <> ·{" "}
+                    <a
+                      href={health.partner_url}
+                      className="underline underline-offset-2 break-all"
+                      target="_blank"
+                      rel="noreferrer"
+                    >
+                      {health.partner_url}
+                    </a>
+                  </>
+                )}
+              </div>
+            )}
+          </div>
+        </div>
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={onRefresh}
+          disabled={refreshing}
+        >
+          <RefreshCcw
+            className={`h-3.5 w-3.5 mr-1 ${refreshing ? "animate-spin" : ""}`}
+          />
+          Re-probe
+        </Button>
+      </div>
+    </Card>
+  );
+}
+
+
 
 function SummaryStat({
   label,

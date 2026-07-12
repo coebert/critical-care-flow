@@ -54,7 +54,13 @@ export type PartnerBedBoardOk = {
 
 export type PartnerBedBoardResult =
   | PartnerBedBoardOk
-  | { ok: false; error: string; fetched_at: string };
+  | {
+      ok: false;
+      error: string;
+      fetched_at: string;
+      partner_outage?: boolean;
+      status?: number;
+    };
 
 export const getPartnerBedBoard = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
@@ -102,7 +108,12 @@ export const getPartnerBedBoard = createServerFn({ method: "GET" })
       s === 408 || s === 429 || (s >= 500 && s < 600);
     const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
+    const { classifyPartnerHttpFailure, classifyPartnerNetworkFailure } =
+      await import("@/lib/partner-outage");
+
     let lastError = "unknown partner error";
+    let lastOutage = false;
+    let lastStatus: number | undefined;
     for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
       let res: Response;
       try {
@@ -116,24 +127,42 @@ export const getPartnerBedBoard = createServerFn({ method: "GET" })
           },
         });
       } catch (err) {
-        lastError = `partner unreachable: ${(err as Error).message}`;
+        const cls = classifyPartnerNetworkFailure(err);
+        lastError = cls.message;
+        lastOutage = cls.is_outage;
+        lastStatus = 0;
         if (attempt < MAX_ATTEMPTS) {
           const cap = Math.min(BASE_DELAY_MS * 2 ** (attempt - 1), MAX_DELAY_MS);
           await sleep(Math.floor(Math.random() * cap));
           continue;
         }
-        return { ok: false, error: lastError, fetched_at: fetchedAt };
+        return {
+          ok: false,
+          error: lastError,
+          fetched_at: fetchedAt,
+          partner_outage: lastOutage,
+          status: lastStatus,
+        };
       }
 
       if (!res.ok) {
         const body = await res.text().catch(() => "");
-        lastError = `partner responded ${res.status}: ${body.slice(0, 200) || res.statusText}`;
+        const cls = classifyPartnerHttpFailure(res.status, body);
+        lastError = cls.message;
+        lastOutage = cls.is_outage;
+        lastStatus = res.status;
         if (isTransientStatus(res.status) && attempt < MAX_ATTEMPTS) {
           const cap = Math.min(BASE_DELAY_MS * 2 ** (attempt - 1), MAX_DELAY_MS);
           await sleep(Math.floor(Math.random() * cap));
           continue;
         }
-        return { ok: false, error: lastError, fetched_at: fetchedAt };
+        return {
+          ok: false,
+          error: lastError,
+          fetched_at: fetchedAt,
+          partner_outage: lastOutage,
+          status: lastStatus,
+        };
       }
 
       let payload: unknown;
@@ -141,18 +170,32 @@ export const getPartnerBedBoard = createServerFn({ method: "GET" })
         payload = await res.json();
       } catch (err) {
         lastError = `partner returned invalid JSON: ${(err as Error).message}`;
+        lastOutage = false;
+        lastStatus = res.status;
         if (attempt < MAX_ATTEMPTS) {
           const cap = Math.min(BASE_DELAY_MS * 2 ** (attempt - 1), MAX_DELAY_MS);
           await sleep(Math.floor(Math.random() * cap));
           continue;
         }
-        return { ok: false, error: lastError, fetched_at: fetchedAt };
+        return {
+          ok: false,
+          error: lastError,
+          fetched_at: fetchedAt,
+          partner_outage: lastOutage,
+          status: lastStatus,
+        };
       }
 
       return mapPartnerPayload(payload, fetchedAt);
     }
 
-    return { ok: false, error: lastError, fetched_at: fetchedAt };
+    return {
+      ok: false,
+      error: lastError,
+      fetched_at: fetchedAt,
+      partner_outage: lastOutage,
+      status: lastStatus,
+    };
   });
 
 /**
