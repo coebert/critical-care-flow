@@ -256,14 +256,51 @@ export function NurseCapacityPanel({
               nurses required for {snapshot.patient_count} patient{snapshot.patient_count === 1 ? "" : "s"}
             </div>
           </div>
-          {(oneToOneCount ?? snapshot.one_to_one_count) > 0 && (
-            <div className="mt-1 text-[11px] text-rose-700 dark:text-rose-400">
-              Includes {oneToOneCount ?? snapshot.one_to_one_count} patient
-              {(oneToOneCount ?? snapshot.one_to_one_count) === 1 ? "" : "s"} on 1:1 nursing
-              (counted as a full nurse each).
+
+          {snapshot.dependency > 0 && (
+            <div
+              className="mt-2 h-1.5 w-full overflow-hidden rounded-full bg-muted"
+              aria-hidden="true"
+            >
+              <div className="flex h-full">
+                <div
+                  className="h-full bg-rose-500"
+                  style={{
+                    width: `${(snapshot.one_to_one_dependency / snapshot.dependency) * 100}%`,
+                  }}
+                />
+                <div
+                  className="h-full bg-primary"
+                  style={{
+                    width: `${(snapshot.level_weighted_dependency / snapshot.dependency) * 100}%`,
+                  }}
+                />
+              </div>
             </div>
           )}
-          <div className="mt-1 text-[11px] text-muted-foreground leading-snug">
+
+          <div className="mt-2 space-y-0.5">
+            <div className="flex items-center justify-between text-[11px]">
+              <span className="flex items-center gap-1.5 text-muted-foreground">
+                <span className="inline-block h-1.5 w-1.5 rounded-full bg-rose-500" />
+                From 1:1 patients ({oneToOneCount ?? snapshot.one_to_one_count})
+              </span>
+              <span className="font-medium tabular-nums">
+                {snapshot.one_to_one_dependency.toFixed(2)}
+              </span>
+            </div>
+            <div className="flex items-center justify-between text-[11px]">
+              <span className="flex items-center gap-1.5 text-muted-foreground">
+                <span className="inline-block h-1.5 w-1.5 rounded-full bg-primary" />
+                From level-of-care weighting
+              </span>
+              <span className="font-medium tabular-nums">
+                {snapshot.level_weighted_dependency.toFixed(2)}
+              </span>
+            </div>
+          </div>
+
+          <div className="mt-2 text-[11px] text-muted-foreground leading-snug">
             1:1 = 1 · L3 = 1 · L2 = 0.5 · L1/L0 = 0.25 nurse per patient
           </div>
 
