@@ -110,6 +110,91 @@ export const getBridgeStatus = createServerFn({ method: "GET" })
     };
   });
 
+export type PartnerHealth = {
+  ok: boolean;
+  reachable: boolean;
+  partner_url: string | null;
+  status: number | null;
+  latency_ms: number | null;
+  message: string;
+  checked_at: string;
+};
+
+/**
+ * Lightweight partner reachability probe (admin-only). Hits the partner's
+ * unauthenticated `/health` endpoint and classifies the response so the
+ * bridge-status page can render a red "partner unavailable" card at a
+ * glance instead of forcing admins to eyeball every sync attempt.
+ */
+export const getPartnerHealth = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ context }): Promise<PartnerHealth> => {
+    await assertAdmin(context);
+    const checkedAt = new Date().toISOString();
+    const base = process.env.PARTNER_BRIDGE_URL ?? null;
+    if (!base) {
+      return {
+        ok: false,
+        reachable: false,
+        partner_url: null,
+        status: null,
+        latency_ms: null,
+        message: "PARTNER_BRIDGE_URL is not configured.",
+        checked_at: checkedAt,
+      };
+    }
+    const url = `${base.replace(/\/$/, "")}/health`;
+    const { classifyPartnerHttpFailure, classifyPartnerNetworkFailure } =
+      await import("@/lib/partner-outage");
+    const started = Date.now();
+    let res: Response;
+    try {
+      res = await fetch(url, {
+        method: "GET",
+        headers: { "cache-control": "no-store" },
+        signal: AbortSignal.timeout(5_000),
+      });
+    } catch (err) {
+      const cls = classifyPartnerNetworkFailure(err);
+      return {
+        ok: false,
+        reachable: false,
+        partner_url: base,
+        status: null,
+        latency_ms: Date.now() - started,
+        message: cls.message,
+        checked_at: checkedAt,
+      };
+    }
+    const latency = Date.now() - started;
+    if (!res.ok) {
+      const body = await res.text().catch(() => "");
+      const cls = classifyPartnerHttpFailure(res.status, body);
+      return {
+        ok: false,
+        reachable: !cls.is_outage,
+        partner_url: base,
+        status: res.status,
+        latency_ms: latency,
+        message: cls.message,
+        checked_at: checkedAt,
+      };
+    }
+    // Best-effort parse; the partner's /health returns JSON but we don't
+    // fail the probe if the body isn't parseable.
+    await res.text().catch(() => "");
+    return {
+      ok: true,
+      reachable: true,
+      partner_url: base,
+      status: res.status,
+      latency_ms: latency,
+      message: `Partner responded ${res.status} in ${latency} ms.`,
+      checked_at: checkedAt,
+    };
+  });
+
+
 export const runBridgeSyncNow = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .handler(async ({ context }) => {
