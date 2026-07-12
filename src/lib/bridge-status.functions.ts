@@ -304,6 +304,25 @@ export const sendBridgeTestPayload = createServerFn({ method: "POST" })
         }
       }
 
+      // Probe hits partner endpoints with our HMAC — audit for DTAC evidence.
+      const { supabaseAdmin } = await import(
+        "@/integrations/supabase/client.server"
+      );
+      await supabaseAdmin.from("audit_log").insert({
+        user_id: context.userId,
+        action: "create",
+        entity: "bridge_probe",
+        entity_id: null,
+        diff: {
+          partner,
+          results: probes.map((p) => ({
+            resource: p.resource,
+            status: p.status,
+            ok: p.ok,
+          })),
+        },
+      });
+
       return {
         ok: probes.every((p) => p.ok),
         ran_at: new Date().toISOString(),
