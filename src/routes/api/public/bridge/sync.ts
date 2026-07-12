@@ -292,19 +292,27 @@ export async function pullResource(
   const url = new URL(`${base.replace(/\/$/, "")}/${key}`);
   if (since) url.searchParams.set("since", since);
   url.searchParams.set("limit", "500");
-  const res = await fetch(url.toString(), {
-    method: "GET",
-    headers: signedHeaders(""),
-  });
+  const { classifyPartnerHttpFailure, classifyPartnerNetworkFailure } =
+    await import("@/lib/partner-outage");
+  let res: Response;
+  try {
+    res = await fetch(url.toString(), {
+      method: "GET",
+      headers: signedHeaders(""),
+    });
+  } catch (err) {
+    const cls = classifyPartnerNetworkFailure(err);
+    throw new Error(`pull ${key}: ${cls.message}`);
+  }
   if (res.status === 404) {
     // Consume body to free the connection, then signal "not implemented".
     await res.text().catch(() => "");
     throw new PartnerEndpointMissingError(key);
   }
   if (!res.ok) {
-    throw new Error(
-      `pull ${key} ${res.status}: ${(await res.text()).slice(0, 200)}`,
-    );
+    const body = await res.text().catch(() => "");
+    const cls = classifyPartnerHttpFailure(res.status, body);
+    throw new Error(`pull ${key}: ${cls.message}`);
   }
   const body = (await res.json()) as { records?: Record<string, unknown>[] };
   return body.records ?? [];
@@ -319,20 +327,28 @@ export async function pushOne(
   // receivers accept both bare rows and `{ record }`, but the partner's patient
   // and investigation validators reject the wrapped shape as an invalid payload.
   const raw = JSON.stringify(record);
-  const res = await fetch(`${base.replace(/\/$/, "")}/${key}`, {
-    method: "POST",
-    headers: signedHeaders(raw),
-    body: raw,
-  });
+  const { classifyPartnerHttpFailure, classifyPartnerNetworkFailure } =
+    await import("@/lib/partner-outage");
+  let res: Response;
+  try {
+    res = await fetch(`${base.replace(/\/$/, "")}/${key}`, {
+      method: "POST",
+      headers: signedHeaders(raw),
+      body: raw,
+    });
+  } catch (err) {
+    const cls = classifyPartnerNetworkFailure(err);
+    throw new Error(`push ${key}: ${cls.message}`);
+  }
   if (res.status === 404) {
     await res.text().catch(() => "");
     throw new PartnerEndpointMissingError(key);
   }
   if (!res.ok && res.status !== 409) {
     // 409 = partner's row is newer — acceptable, next pull will reconcile.
-    throw new Error(
-      `push ${key} ${res.status}: ${(await res.text()).slice(0, 200)}`,
-    );
+    const body = await res.text().catch(() => "");
+    const cls = classifyPartnerHttpFailure(res.status, body);
+    throw new Error(`push ${key}: ${cls.message}`);
   }
 }
 
