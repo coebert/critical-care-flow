@@ -167,6 +167,14 @@ function BridgeStatusPage() {
     refetchInterval: 15_000,
   });
 
+  const healthQuery = useQuery({
+    queryKey: ["bridge-partner-health"],
+    queryFn: () => getHealth(),
+    refetchInterval: 30_000,
+  });
+
+
+
   const mutation = useMutation({
     mutationFn: () => runNow(),
     onSuccess: (res) => {
