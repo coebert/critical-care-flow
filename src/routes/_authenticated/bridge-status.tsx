@@ -368,6 +368,15 @@ function BridgeStatusPage() {
             />
           </div>
 
+          <PartnerHealthCard
+            health={healthQuery.data ?? null}
+            loading={healthQuery.isLoading}
+            refreshing={healthQuery.isFetching}
+            error={healthQuery.error as Error | null}
+            onRefresh={() => healthQuery.refetch()}
+          />
+
+
           <Card className="p-0 overflow-hidden">
             <Table>
               <TableHeader>
