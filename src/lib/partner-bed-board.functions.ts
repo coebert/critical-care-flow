@@ -54,7 +54,13 @@ export type PartnerBedBoardOk = {
 
 export type PartnerBedBoardResult =
   | PartnerBedBoardOk
-  | { ok: false; error: string; fetched_at: string };
+  | {
+      ok: false;
+      error: string;
+      fetched_at: string;
+      partner_outage?: boolean;
+      status?: number;
+    };
 
 export const getPartnerBedBoard = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
