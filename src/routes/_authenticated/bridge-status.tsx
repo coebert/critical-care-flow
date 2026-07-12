@@ -23,6 +23,7 @@ import {
   sendBridgeTestPayload,
   getBridgeSyncAttempts,
   getBedBoardVerification,
+  getPartnerHealth,
   enqueueBedReconciliation,
   cancelBedReconciliationJob,
   getBedReconciliationJob,
@@ -35,6 +36,7 @@ import {
   type BedReconcileJobItem,
   type BedReconcileJobDetail,
   type BedReconcileJobSummary,
+  type PartnerHealth,
 } from "@/lib/bridge-status.functions";
 import { supabase } from "@/integrations/supabase/client";
 import { Input } from "@/components/ui/input";
