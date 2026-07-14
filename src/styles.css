@@ -171,3 +171,13 @@
 [data-density="compact"] .mt-1 {
   margin-top: 0.125rem;
 }
+
+/* Realtime-update highlight for bed cards — 1.6s ease-out pulse. */
+@keyframes bed-pulse {
+  0% { box-shadow: 0 0 0 0 color-mix(in oklab, var(--primary) 55%, transparent); }
+  60% { box-shadow: 0 0 0 6px color-mix(in oklab, var(--primary) 0%, transparent); }
+  100% { box-shadow: 0 0 0 0 transparent; }
+}
+.animate-bed-pulse {
+  animation: bed-pulse 1.6s ease-out 1;
+}
