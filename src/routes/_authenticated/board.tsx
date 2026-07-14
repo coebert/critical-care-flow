@@ -284,8 +284,8 @@ function CapCell({ label, a, b, p }: { label: string; a: number; b: number; p: P
   const full = a >= b;
   return (
     <div className={`px-3 py-1 rounded ${full ? p.capFull : p.capOk}`}>
-      <span className={`text-xs uppercase tracking-wider mr-2 ${p.eyebrow}`}>{label}</span>
-      <span className="font-mono tabular-nums text-xl">{a}/{b}</span>
+      <span className={`text-sm uppercase tracking-wider mr-2 ${p.eyebrow}`}>{label}</span>
+      <span className="font-mono tabular-nums text-2xl">{a}/{b}</span>
     </div>
   );
 }
@@ -381,9 +381,9 @@ function Flag({ children, tone, p }: { children: React.ReactNode; tone?: "red" |
 function PendingColumn({ rows, now, p }: { rows: Referral[]; now: number; p: Palette }) {
   return (
     <div className="p-3">
-      <h2 className={`text-xs uppercase tracking-widest mb-2 ${p.eyebrow}`}>Pending referrals · {rows.length}</h2>
-      {rows.length === 0 && <div className={p.cardEmpty}>No pending referrals.</div>}
-      <ul className="space-y-1.5">
+      <h2 className={`text-sm uppercase tracking-widest mb-2 ${p.eyebrow}`}>Pending referrals · {rows.length}</h2>
+      {rows.length === 0 && <div className={`text-base ${p.cardEmpty}`}>No pending referrals.</div>}
+      <ul className="space-y-2">
         {rows.map((r) => {
           const waitMs = r.status === "pending"
             ? now - new Date(r.referral_received_at).getTime()
@@ -393,10 +393,10 @@ function PendingColumn({ rows, now, p }: { rows: Referral[]; now: number; p: Pal
             <li key={r.id} className={`rounded border p-2 ${p.chip}`}>
               <div className="flex items-center justify-between gap-2">
                 <div className="min-w-0">
-                  <div className="text-base font-semibold truncate">{r.hospital_number ?? "—"}</div>
-                  <div className={`text-[11px] truncate ${p.muted}`}>{r.referring_specialty ?? "Unknown"} · {r.current_ward ?? ""}</div>
+                  <div className="text-xl font-semibold truncate">{r.hospital_number ?? "—"}</div>
+                  <div className={`text-sm truncate ${p.muted}`}>{r.referring_specialty ?? "Unknown"} · {r.current_ward ?? ""}</div>
                 </div>
-                <div className={`text-xl font-mono tabular-nums ${critical ? p.timerCritical : p.timerWarn}`}>
+                <div className={`text-3xl font-mono tabular-nums ${critical ? p.timerCritical : p.timerWarn}`}>
                   {formatElapsed(waitMs)}
                 </div>
               </div>
