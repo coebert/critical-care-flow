@@ -1007,6 +1007,10 @@ function BedBoardPage() {
                     slot={slot}
                     level={a?.level}
                     oneToOne={a?.one_to_one === true}
+                    hasTracheostomy={
+                      slot.occupant?.id != null &&
+                      tracheostomySet.has(slot.occupant.id)
+                    }
                     wardable={w?.wardable === true}
                     wardableAt={w?.wardable_at ?? null}
                     dischargedAt={w?.discharged_at ?? null}
