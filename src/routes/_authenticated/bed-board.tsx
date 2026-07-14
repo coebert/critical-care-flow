@@ -530,6 +530,7 @@ function BedBoardPage() {
   const navigate = Route.useNavigate();
   const fetchBoard = useServerFn(getPartnerBedBoard);
   const fetchAcuity = useServerFn(getPatientAcuity);
+  const fetchAirways = useServerFn(getPatientAirways);
   const qc = useQueryClient();
   const { data, isLoading, isFetching, error, refetch } = useQuery({
     queryKey: QK,
