@@ -535,6 +535,7 @@ function BedBoardPage() {
   const fetchBoard = useServerFn(getPartnerBedBoard);
   const fetchAcuity = useServerFn(getPatientAcuity);
   const fetchAirways = useServerFn(getPatientAirways);
+  const fetchIsolations = useServerFn(getPatientIsolations);
   const qc = useQueryClient();
   const { data, isLoading, isFetching, error, refetch } = useQuery({
     queryKey: QK,
