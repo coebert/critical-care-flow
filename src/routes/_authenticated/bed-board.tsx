@@ -1211,6 +1211,10 @@ function BedBoardPage() {
                   violenceMutation.isPending &&
                   (violenceMutation.variables as { partner_patient_id?: string } | undefined)
                     ?.partner_patient_id;
+                const endOfLifePendingId =
+                  endOfLifeMutation.isPending &&
+                  (endOfLifeMutation.variables as { partner_patient_id?: string } | undefined)
+                    ?.partner_patient_id;
                 return (
                   <BedCard
                     key={slot.bed}
