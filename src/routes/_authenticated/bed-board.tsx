@@ -26,6 +26,11 @@ import {
   setPatientAcuity,
   type AcuityLevel,
 } from "@/lib/patient-acuity.functions";
+import {
+  listWardableStatus,
+  setWardableStatus,
+  type WardableStatus,
+} from "@/lib/wardable-status.functions";
 import { prefillPartnerHandoverFromReferral } from "@/lib/partner-handover-prefill.functions";
 import { toInitials } from "@/lib/patient-initials";
 import { Card } from "@/components/ui/card";
@@ -117,10 +122,72 @@ function dayOfStay(iso: string | null | undefined): number | null {
   return Math.max(1, Math.floor((Date.now() - t) / 86_400_000) + 1);
 }
 
+function WardableToggle({
+  wardable,
+  wardableAt,
+  pending,
+  onToggle,
+}: {
+  wardable: boolean;
+  wardableAt: string | null;
+  pending: boolean;
+  onToggle: () => void;
+}) {
+  // Live-updating "since" label — tick once a minute while marked wardable.
+  const [, force] = useState(0);
+  useEffect(() => {
+    if (!wardable || !wardableAt) return;
+    const id = setInterval(() => force((n) => n + 1), 60_000);
+    return () => clearInterval(id);
+  }, [wardable, wardableAt]);
+  const elapsed =
+    wardable && wardableAt
+      ? formatDistanceToNowStrict(new Date(wardableAt))
+      : null;
+  const title = wardable && wardableAt
+    ? `Wardable since ${new Date(wardableAt).toLocaleString()} — click to clear`
+    : "Mark ready for discharge to the ward";
+  return (
+    <button
+      type="button"
+      aria-pressed={wardable}
+      onClick={(e) => {
+        e.stopPropagation();
+        if (!pending) onToggle();
+      }}
+      onKeyDown={(e) => e.stopPropagation()}
+      onMouseDown={(e) => e.stopPropagation()}
+      onDragStart={(e) => e.preventDefault()}
+      draggable={false}
+      disabled={pending}
+      title={title}
+      className={
+        "mt-1 inline-flex items-center gap-1 rounded border px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide transition disabled:opacity-60 " +
+        (wardable
+          ? "bg-emerald-500/15 text-emerald-800 border-emerald-500/40 dark:text-emerald-300 dark:border-emerald-400/40 hover:bg-emerald-500/25"
+          : "bg-transparent text-muted-foreground border-dashed hover:bg-accent hover:text-foreground")
+      }
+    >
+      <span aria-hidden="true">{wardable ? "✓" : "○"}</span>
+      <span>
+        {wardable
+          ? elapsed
+            ? `Wardable · ${elapsed}`
+            : "Wardable"
+          : "Wardable"}
+      </span>
+    </button>
+  );
+}
+
 function BedCard({
   slot,
   level,
   oneToOne,
+  wardable,
+  wardableAt,
+  wardablePending,
+  onToggleWardable,
   onOccupiedClick,
   onMove,
   isDragTarget,
@@ -129,6 +196,10 @@ function BedCard({
   slot: PartnerBedSlot;
   level: AcuityLevel | undefined;
   oneToOne: boolean;
+  wardable: boolean;
+  wardableAt: string | null;
+  wardablePending: boolean;
+  onToggleWardable: (occupantId: string, next: boolean) => void;
   onOccupiedClick: (o: PartnerOccupant) => void;
   onMove: (
     occupantId: string,
@@ -283,6 +354,13 @@ function BedCard({
           {occ.dnacpr_details ? ` — ${occ.dnacpr_details}` : ""}
         </div>
       )}
+      <WardableToggle
+        wardable={wardable}
+        wardableAt={wardableAt}
+        pending={wardablePending}
+        onToggle={() => onToggleWardable(occ.id, !wardable)}
+      />
+
 
     </Card>
   );
@@ -406,6 +484,73 @@ function BedBoardPage() {
   ) => {
     moveMutation.mutate({ id: occupantId, expected_updated_at, bed: targetBed });
   };
+
+  // ---- Wardable status (local source of truth) ----
+  const fetchWardable = useServerFn(listWardableStatus);
+  const wardableQuery = useQuery({
+    queryKey: ["patient-wardable-status"],
+    queryFn: () => fetchWardable(),
+    staleTime: 15_000,
+    refetchInterval: 60_000,
+  });
+  const wardableMap = useMemo(() => {
+    const m = new Map<string, WardableStatus>();
+    for (const r of wardableQuery.data ?? []) m.set(r.partner_patient_id, r);
+    return m;
+  }, [wardableQuery.data]);
+
+  const setWardable = useServerFn(setWardableStatus);
+  const wardableMutation = useMutation({
+    mutationFn: (input: { partner_patient_id: string; wardable: boolean }) =>
+      setWardable({ data: input }),
+    onMutate: async (input) => {
+      // Optimistic update so the timer starts ticking the instant the user
+      // clicks — the round-trip to the partner shouldn't delay the stamp.
+      await qc.cancelQueries({ queryKey: ["patient-wardable-status"] });
+      const previous = qc.getQueryData<WardableStatus[]>([
+        "patient-wardable-status",
+      ]);
+      qc.setQueryData<WardableStatus[]>(
+        ["patient-wardable-status"],
+        (rows) => {
+          const list = rows ? [...rows] : [];
+          const idx = list.findIndex(
+            (r) => r.partner_patient_id === input.partner_patient_id,
+          );
+          const existing = idx >= 0 ? list[idx] : undefined;
+          const now = new Date().toISOString();
+          const next: WardableStatus = {
+            partner_patient_id: input.partner_patient_id,
+            wardable: input.wardable,
+            wardable_at: input.wardable
+              ? existing?.wardable && existing.wardable_at
+                ? existing.wardable_at
+                : now
+              : null,
+            updated_at: now,
+          };
+          if (idx >= 0) list[idx] = next;
+          else list.push(next);
+          return list;
+        },
+      );
+      return { previous };
+    },
+    onError: (err, _input, ctx) => {
+      if (ctx?.previous) {
+        qc.setQueryData(["patient-wardable-status"], ctx.previous);
+      }
+      toast.error(err instanceof Error ? err.message : "Could not update wardable status");
+    },
+    onSettled: () => {
+      wardableQuery.refetch();
+    },
+  });
+
+  const handleToggleWardable = (occupantId: string, next: boolean) => {
+    wardableMutation.mutate({ partner_patient_id: occupantId, wardable: next });
+  };
+
 
 
   const arrivedFromSource =
@@ -663,12 +808,23 @@ function BedBoardPage() {
             <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3">
               {lastOk.bed_board.map((slot) => {
                 const a = slot.occupant ? acuityMap.get(slot.occupant.id) : undefined;
+                const w = slot.occupant ? wardableMap.get(slot.occupant.id) : undefined;
+                const pendingId =
+                  wardableMutation.isPending &&
+                  (wardableMutation.variables as { partner_patient_id?: string } | undefined)
+                    ?.partner_patient_id;
                 return (
                   <BedCard
                     key={slot.bed}
                     slot={slot}
                     level={a?.level}
                     oneToOne={a?.one_to_one === true}
+                    wardable={w?.wardable === true}
+                    wardableAt={w?.wardable_at ?? null}
+                    wardablePending={
+                      slot.occupant?.id != null && pendingId === slot.occupant.id
+                    }
+                    onToggleWardable={handleToggleWardable}
                     onOccupiedClick={setSelected}
                     onMove={handleMove}
                     isDragTarget={dragging}
