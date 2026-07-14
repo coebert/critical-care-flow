@@ -314,15 +314,23 @@ function BoardPage() {
               <ZoomIn className="w-4 h-4" />
             </button>
           </div>
-          <button
-            onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
-            className={`text-base rounded-md border px-3 py-1.5 flex items-center gap-2 ${p.toggle}`}
-            aria-label={`Switch to ${theme === "dark" ? "light" : "dark"} mode`}
-            title={`Switch to ${theme === "dark" ? "light" : "dark"} mode`}
-          >
-            {theme === "dark" ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
-            {theme === "dark" ? "Light" : "Dark"}
-          </button>
+          {(() => {
+            const order: Theme[] = ["dark", "light", "hc"];
+            const labels: Record<Theme, string> = { dark: "Dark", light: "Light", hc: "High contrast" };
+            const next = order[(order.indexOf(theme) + 1) % order.length];
+            const Icon = theme === "dark" ? Sun : theme === "light" ? Contrast : Moon;
+            return (
+              <button
+                onClick={() => setTheme(next)}
+                className={`text-base rounded-md border px-3 py-1.5 flex items-center gap-2 ${p.toggle}`}
+                aria-label={`Switch to ${labels[next]} mode (currently ${labels[theme]})`}
+                title={`Switch to ${labels[next]} mode`}
+              >
+                <Icon className="w-4 h-4" />
+                {labels[next]}
+              </button>
+            );
+          })()}
           <button
             onClick={toggleFullscreen}
             className={`text-base rounded-md border px-3 py-1.5 flex items-center gap-2 ${p.toggle}`}
