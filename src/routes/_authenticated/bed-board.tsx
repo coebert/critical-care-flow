@@ -26,6 +26,11 @@ import {
   setPatientAcuity,
   type AcuityLevel,
 } from "@/lib/patient-acuity.functions";
+import {
+  listWardableStatus,
+  setWardableStatus,
+  type WardableStatus,
+} from "@/lib/wardable-status.functions";
 import { prefillPartnerHandoverFromReferral } from "@/lib/partner-handover-prefill.functions";
 import { toInitials } from "@/lib/patient-initials";
 import { Card } from "@/components/ui/card";
