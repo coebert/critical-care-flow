@@ -137,6 +137,25 @@ function useClock() {
   return now;
 }
 
+function useBoardFullscreen() {
+  const [active, setActive] = useState(false);
+  useEffect(() => {
+    const sync = () => setActive(Boolean(document.fullscreenElement));
+    sync();
+    document.addEventListener("fullscreenchange", sync);
+    return () => document.removeEventListener("fullscreenchange", sync);
+  }, []);
+  const toggle = () => {
+    if (typeof document === "undefined") return;
+    if (document.fullscreenElement) {
+      document.exitFullscreen().catch(() => {});
+    } else {
+      document.documentElement.requestFullscreen().catch(() => {});
+    }
+  };
+  return [active, toggle] as const;
+}
+
 function BoardPage() {
   const navigate = useNavigate();
   const now = useClock();
