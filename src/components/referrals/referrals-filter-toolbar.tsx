@@ -130,7 +130,7 @@ export function ReferralsFilterToolbar(props: Props) {
               <SheetTitle>Filter referrals</SheetTitle>
             </SheetHeader>
             <div className="mt-4">
-              <ReferralsFilters {...props} />
+              <ReferralsFilters {...props} hideSearchInputs />
             </div>
             {activeCount > 0 && (
               <div className="mt-4">
