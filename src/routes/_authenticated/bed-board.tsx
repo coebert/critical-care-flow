@@ -1234,6 +1234,15 @@ function BedBoardPage() {
                       violencePendingId === slot.occupant.id
                     }
                     onToggleViolenceRisk={handleToggleViolence}
+                    endOfLife={
+                      slot.occupant?.id != null &&
+                      endOfLifeSet.has(slot.occupant.id)
+                    }
+                    endOfLifePending={
+                      slot.occupant?.id != null &&
+                      endOfLifePendingId === slot.occupant.id
+                    }
+                    onToggleEndOfLife={handleToggleEndOfLife}
                     isolation={
                       (slot.occupant?.id != null &&
                         isolationMap.get(slot.occupant.id)?.isolation) ||
