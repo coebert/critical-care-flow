@@ -192,7 +192,7 @@ function BoardPage() {
   return (
     <div className={`fixed inset-0 z-50 flex flex-col overflow-hidden ${p.root}`}>
       {/* Top bar */}
-      <div className={`flex items-center justify-between px-6 py-3 border-b ${p.border}`}>
+      <div className={`flex items-center justify-between px-4 py-2 border-b ${p.border}`}>
         <div className="flex items-center gap-6">
           <div>
             <div className={`text-xs uppercase tracking-widest ${p.eyebrow}`}>SDH Critical Care</div>
