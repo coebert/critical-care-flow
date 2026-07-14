@@ -582,14 +582,13 @@ function BedCard({
           >
             <Badge
               variant="outline"
-              className={`text-[10px] gap-1 cursor-pointer transition ${
+              className={`text-[10px] p-0.5 cursor-pointer transition ${
                 needsScanTransfer
                   ? "bg-indigo-500/15 text-indigo-700 dark:text-indigo-400 border-indigo-500/40"
                   : "bg-transparent text-muted-foreground border-dashed opacity-60 hover:opacity-100"
               } ${scanTransferPending ? "opacity-50" : ""}`}
             >
               <ScanLine className="w-3 h-3" aria-hidden="true" />
-              {needsScanTransfer ? "For scan" : "Scan?"}
             </Badge>
           </button>
 
