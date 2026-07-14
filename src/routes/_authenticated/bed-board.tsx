@@ -276,6 +276,9 @@ function BedCard({
   hasTracheostomy,
   isolation,
   isolationReason,
+  violenceRisk,
+  violencePending,
+  onToggleViolenceRisk,
   wardable,
   wardableAt,
   dischargedAt,
@@ -294,6 +297,9 @@ function BedCard({
   hasTracheostomy: boolean;
   isolation: "contact" | "droplet" | "airborne" | null;
   isolationReason: string | null;
+  violenceRisk: boolean;
+  violencePending: boolean;
+  onToggleViolenceRisk: (occupantId: string, next: boolean) => void;
   wardable: boolean;
   wardableAt: string | null;
   dischargedAt: string | null;
