@@ -1070,7 +1070,7 @@ function BedBoardPage() {
   }, [qc]);
 
   return (
-    <div className="p-4 sm:p-6 max-w-7xl mx-auto">
+    <div className="p-4 sm:p-6 max-w-7xl mx-auto" data-density={density}>
       <div className="mb-4 flex items-start justify-between gap-4 flex-wrap">
         <div>
           <h1 className="text-2xl font-semibold tracking-tight">Bed board</h1>
@@ -1086,6 +1086,23 @@ function BedBoardPage() {
           </p>
         </div>
         <div className="flex items-center gap-2 text-sm">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={toggleDensity}
+            className="gap-1"
+            aria-label={`Switch to ${density === "comfortable" ? "compact" : "comfortable"} card density`}
+            title={`Switch to ${density === "comfortable" ? "compact" : "comfortable"} density`}
+          >
+            {density === "comfortable" ? (
+              <Rows2 className="w-4 h-4" aria-hidden="true" />
+            ) : (
+              <Rows3 className="w-4 h-4" aria-hidden="true" />
+            )}
+            <span className="hidden sm:inline">
+              {density === "comfortable" ? "Compact" : "Comfortable"}
+            </span>
+          </Button>
           <Button
             variant="outline"
             size="sm"
