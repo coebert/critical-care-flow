@@ -263,6 +263,34 @@ function BoardPage() {
         </div>
         <div className="flex items-center gap-6">
           <div className="text-6xl font-mono tabular-nums">{now.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}</div>
+          <div className={`inline-flex items-center rounded-md border overflow-hidden ${p.toggle}`}>
+            <button
+              onClick={() => setZoom(zoom - ZOOM_STEP)}
+              disabled={zoom <= ZOOM_MIN + 0.001}
+              className="px-2 py-1.5 disabled:opacity-40"
+              aria-label="Decrease zoom"
+              title="Decrease zoom"
+            >
+              <ZoomOut className="w-4 h-4" />
+            </button>
+            <button
+              onClick={() => setZoom(1)}
+              className="px-2 py-1.5 text-sm font-mono tabular-nums min-w-[3rem] border-x border-inherit"
+              aria-label={`Reset zoom (currently ${Math.round(zoom * 100)}%)`}
+              title="Reset zoom to 100%"
+            >
+              {Math.round(zoom * 100)}%
+            </button>
+            <button
+              onClick={() => setZoom(zoom + ZOOM_STEP)}
+              disabled={zoom >= ZOOM_MAX - 0.001}
+              className="px-2 py-1.5 disabled:opacity-40"
+              aria-label="Increase zoom"
+              title="Increase zoom"
+            >
+              <ZoomIn className="w-4 h-4" />
+            </button>
+          </div>
           <button
             onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
             className={`text-base rounded-md border px-3 py-1.5 flex items-center gap-2 ${p.toggle}`}
