@@ -560,6 +560,24 @@ function BedBoardPage() {
     return m;
   }, [acuityRows]);
 
+  // Tracheostomy indicator source: partner-mirrored `patients.airway_type`.
+  // Pulled by the scheduled bridge sync — we just look it up per occupant.
+  const { data: airwayRows } = useQuery({
+    queryKey: ["patient-airways"],
+    queryFn: () => fetchAirways(),
+    staleTime: 15_000,
+    refetchInterval: 60_000,
+  });
+  const tracheostomySet = useMemo(() => {
+    const s = new Set<string>();
+    for (const r of airwayRows ?? []) {
+      if ((r.airway_type ?? "").toLowerCase() === "tracheostomy") {
+        s.add(r.partner_patient_id);
+      }
+    }
+    return s;
+  }, [airwayRows]);
+
 
   const [selected, setSelected] = useState<PartnerOccupant | null>(null);
   const [dragging, setDragging] = useState(false);
