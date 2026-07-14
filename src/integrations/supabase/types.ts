@@ -961,6 +961,30 @@ export type Database = {
         }
         Relationships: []
       }
+      patient_end_of_life: {
+        Row: {
+          end_of_life: boolean
+          note: string | null
+          partner_patient_id: string
+          updated_at: string
+          updated_by: string | null
+        }
+        Insert: {
+          end_of_life?: boolean
+          note?: string | null
+          partner_patient_id: string
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Update: {
+          end_of_life?: boolean
+          note?: string | null
+          partner_patient_id?: string
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Relationships: []
+      }
       patient_violence_risk: {
         Row: {
           note: string | null
