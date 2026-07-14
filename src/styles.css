@@ -182,18 +182,14 @@
   animation: bed-pulse 1.6s ease-out 1;
 }
 
-/* Honour prefers-reduced-motion across all decorative motion. Radix and
- * shadcn primitives already gate their entrance/exit transitions on this,
- * but our custom keyframe animations need an explicit override. */
+/* Honour prefers-reduced-motion for decorative animations. Radix / shadcn
+ * primitives already gate their own transitions on this preference, so we
+ * only silence our own custom keyframe animations. Spinners are treated as
+ * essential progress feedback and intentionally left running. */
 @media (prefers-reduced-motion: reduce) {
   .animate-bed-pulse,
   .animate-fade-in,
-  .animate-pulse,
-  .animate-spin {
+  .animate-pulse {
     animation: none !important;
-  }
-  * {
-    transition-duration: 0.001ms !important;
-    scroll-behavior: auto !important;
   }
 }
