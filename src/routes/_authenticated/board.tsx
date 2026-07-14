@@ -240,7 +240,7 @@ function BoardPage() {
       {/* Body */}
       <div className="flex-1 grid grid-cols-1 lg:grid-cols-[2fr_1fr] overflow-hidden">
         <div className={`overflow-auto border-r ${p.border}`}>
-          <BedsColumn data={bedBoard.data} now={now.getTime()} p={p} />
+          <BedsColumn data={partner} acuityMap={acuityMap} now={now.getTime()} p={p} />
         </div>
         <div className="overflow-auto">
           <PendingColumn rows={pending} now={now.getTime()} p={p} />
