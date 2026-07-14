@@ -2,42 +2,47 @@ import { createServerFn } from "@tanstack/react-start";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 
 /**
- * Read infection status + organism recorded on the partner-mirrored
- * `patients` table. Used by the bed board to render an isolation
- * indicator when `infection_status` is `suspected` or `confirmed`.
+ * Read isolation status for currently admitted patients from the local
+ * `bed_occupancies` mirror. Any occupancy with `isolation` other than
+ * `none` — contact, droplet, or airborne — indicates the patient has (or
+ * is suspected of having) an infection and requires isolation. This
+ * powers the bed board's infection/isolation badge.
  *
- * Mirrors the shape of `getPatientAirways` — the value is populated by
- * the scheduled bridge pull, so no partner-side API changes are needed.
+ * We use `patient_id` as the join key because the local `patients` table
+ * mirrors the partner ID as its primary key (see `bridge/sync.ts`), so
+ * `patient_id` on `bed_occupancies` matches the partner's occupant id
+ * used by `PartnerOccupant.id`.
  */
-export type PatientInfectionEntry = {
+export type PatientIsolationEntry = {
   partner_patient_id: string;
-  infection_status: "none" | "suspected" | "confirmed" | "unknown" | null;
-  infection_organism: string | null;
+  isolation: "contact" | "droplet" | "airborne";
+  isolation_reason: string | null;
 };
 
-export const getPatientInfections = createServerFn({ method: "GET" })
+export const getPatientIsolations = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
-  .handler(async ({ context }): Promise<PatientInfectionEntry[]> => {
+  .handler(async ({ context }): Promise<PatientIsolationEntry[]> => {
     const { data, error } = await context.supabase
-      .from("patients")
-      .select("id, infection_status, infection_organism")
-      .in("infection_status", ["suspected", "confirmed"]);
+      .from("bed_occupancies")
+      .select("patient_id, isolation, isolation_reason")
+      .is("discharged_at", null)
+      .in("isolation", ["contact", "droplet", "airborne"]);
     if (error) throw new Error(error.message);
-    return (data ?? []).map((r) => {
-      const row = r as {
-        id: string;
-        infection_status:
-          | "none"
-          | "suspected"
-          | "confirmed"
-          | "unknown"
-          | null;
-        infection_organism: string | null;
+    const seen = new Set<string>();
+    const out: PatientIsolationEntry[] = [];
+    for (const raw of data ?? []) {
+      const row = raw as {
+        patient_id: string | null;
+        isolation: "contact" | "droplet" | "airborne";
+        isolation_reason: string | null;
       };
-      return {
-        partner_patient_id: row.id,
-        infection_status: row.infection_status,
-        infection_organism: row.infection_organism,
-      };
-    });
+      if (!row.patient_id || seen.has(row.patient_id)) continue;
+      seen.add(row.patient_id);
+      out.push({
+        partner_patient_id: row.patient_id,
+        isolation: row.isolation,
+        isolation_reason: row.isolation_reason,
+      });
+    }
+    return out;
   });
