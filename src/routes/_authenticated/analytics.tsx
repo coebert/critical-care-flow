@@ -104,6 +104,7 @@ function AnalyticsPage() {
           <TabsTrigger value="nurse-capacity">Nurse capacity</TabsTrigger>
           <TabsTrigger value="capacity-alerts">Capacity alerts</TabsTrigger>
           <TabsTrigger value="acuity">Acuity</TabsTrigger>
+          <TabsTrigger value="wardable">Wardable</TabsTrigger>
         </TabsList>
         <TabsContent value="referrals">
           <ReferralsAnalyticsPanel />
