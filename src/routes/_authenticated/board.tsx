@@ -39,6 +39,29 @@ function useBoardTheme(): [Theme, (t: Theme) => void] {
   return [theme, update];
 }
 
+const ZOOM_KEY = "sdh-board-zoom";
+const ZOOM_MIN = 0.7;
+const ZOOM_MAX = 1.8;
+const ZOOM_STEP = 0.1;
+const clampZoom = (z: number) => Math.min(ZOOM_MAX, Math.max(ZOOM_MIN, Math.round(z * 100) / 100));
+
+function useBoardZoom(): [number, (z: number) => void] {
+  const [zoom, setZoom] = useState<number>(1);
+  useEffect(() => {
+    try {
+      const stored = window.localStorage.getItem(ZOOM_KEY);
+      const n = stored ? parseFloat(stored) : NaN;
+      if (isFinite(n)) setZoom(clampZoom(n));
+    } catch { /* ignore */ }
+  }, []);
+  const update = (z: number) => {
+    const c = clampZoom(z);
+    setZoom(c);
+    try { window.localStorage.setItem(ZOOM_KEY, String(c)); } catch { /* ignore */ }
+  };
+  return [zoom, update];
+}
+
 // Palette per theme. Keeps JSX readable and avoids `dark:` variants that
 // depend on the app-wide theme class (the board is a fixed overlay).
 type Palette = {
