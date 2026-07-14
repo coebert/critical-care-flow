@@ -1288,7 +1288,7 @@ function BedBoardPage() {
       )}
 
       {isLoading && !data && (
-        <div className="text-sm text-muted-foreground">Loading bed board…</div>
+        <BedGridSkeleton />
       )}
       {error && !data && (
         <div className="text-sm text-destructive" role="alert">
