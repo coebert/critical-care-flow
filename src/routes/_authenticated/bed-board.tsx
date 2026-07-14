@@ -10,6 +10,7 @@ import {
   RefreshCcw,
   ShieldCheck,
   Sparkles,
+  Stethoscope,
   UserRound,
 } from "lucide-react";
 import { formatDistanceToNowStrict, formatDistanceStrict } from "date-fns";
