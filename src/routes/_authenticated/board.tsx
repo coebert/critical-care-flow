@@ -143,14 +143,16 @@ function BoardPage() {
   const [theme, setTheme] = useBoardTheme();
   const p = PALETTES[theme];
 
+  const fetchBoard = useServerFn(getPartnerBedBoard);
+  const fetchAcuity = useServerFn(getPatientAcuity);
   const bedBoard = useQuery({
-    queryKey: ["board", "bed-board"],
-    queryFn: () => getBedBoard(),
-    refetchInterval: 30_000,
+    queryKey: ["board", "partner-bed-board"],
+    queryFn: () => fetchBoard(),
+    refetchInterval: 20_000,
   });
-  const capacity = useQuery({
-    queryKey: ["board", "capacity"],
-    queryFn: () => getCapacitySnapshot(),
+  const acuity = useQuery({
+    queryKey: ["board", "patient-acuity"],
+    queryFn: () => fetchAcuity(),
     refetchInterval: 30_000,
   });
   const referrals = useQuery({
@@ -160,17 +162,13 @@ function BoardPage() {
   });
 
   useEffect(() => {
-    const refreshBeds = () => { bedBoard.refetch(); capacity.refetch(); };
     const ch = supabase
       .channel("board-refresh")
       .on("postgres_changes", { event: "*", schema: "public", table: "referrals" }, () => referrals.refetch())
-      .on("postgres_changes", { event: "*", schema: "public", table: "bed_occupancies" }, refreshBeds)
-      .on("postgres_changes", { event: "*", schema: "public", table: "beds" }, refreshBeds)
-      .on("postgres_changes", { event: "*", schema: "public", table: "bed_outliers" }, refreshBeds)
-      .on("postgres_changes", { event: "*", schema: "public", table: "bed_transfers_out" }, refreshBeds)
+      .on("postgres_changes", { event: "*", schema: "public", table: "patient_acuity_overrides" }, () => acuity.refetch())
       .subscribe();
     return () => { supabase.removeChannel(ch); };
-  }, [bedBoard, capacity, referrals]);
+  }, [acuity, referrals]);
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -180,7 +178,14 @@ function BoardPage() {
     return () => window.removeEventListener("keydown", onKey);
   }, [navigate]);
 
-  const cap = capacity.data;
+  const partner = bedBoard.data && bedBoard.data.ok ? bedBoard.data : null;
+  const acuityMap = new Map<string, { level: number; one_to_one: boolean }>();
+  for (const r of acuity.data ?? []) {
+    acuityMap.set(r.partner_patient_id, {
+      level: Number(r.level),
+      one_to_one: r.one_to_one === true,
+    });
+  }
   const pending = (referrals.data ?? []).filter((r) => r.status === "pending" || (r.status === "accepted" && !r.arrived_on_unit_at));
   pending.sort((a, b) => new Date(a.referral_received_at).getTime() - new Date(b.referral_received_at).getTime());
 
