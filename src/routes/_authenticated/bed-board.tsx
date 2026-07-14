@@ -12,6 +12,7 @@ import {
   ShieldCheck,
   Sparkles,
   Stethoscope,
+  Swords,
   UserRound,
 } from "lucide-react";
 import { formatDistanceToNowStrict, formatDistanceStrict } from "date-fns";
@@ -33,6 +34,10 @@ import {
   getPatientIsolations,
   type PatientIsolationEntry,
 } from "@/lib/patient-infection.functions";
+import {
+  listViolenceRisk,
+  setViolenceRisk,
+} from "@/lib/patient-violence-risk.functions";
 import {
   listWardableStatus,
   setWardableStatus,
@@ -271,6 +276,9 @@ function BedCard({
   hasTracheostomy,
   isolation,
   isolationReason,
+  violenceRisk,
+  violencePending,
+  onToggleViolenceRisk,
   wardable,
   wardableAt,
   dischargedAt,
@@ -289,6 +297,9 @@ function BedCard({
   hasTracheostomy: boolean;
   isolation: "contact" | "droplet" | "airborne" | null;
   isolationReason: string | null;
+  violenceRisk: boolean;
+  violencePending: boolean;
+  onToggleViolenceRisk: (occupantId: string, next: boolean) => void;
   wardable: boolean;
   wardableAt: string | null;
   dischargedAt: string | null;
@@ -459,6 +470,40 @@ function BedCard({
                   : "Airborne"}
             </Badge>
           )}
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              if (!violencePending) onToggleViolenceRisk(occ.id, !violenceRisk);
+            }}
+            disabled={violencePending}
+            title={
+              violenceRisk
+                ? "Violence risk flagged — click to clear"
+                : "Flag as potentially violent or aggressive"
+            }
+            aria-pressed={violenceRisk}
+            aria-label={
+              violenceRisk
+                ? "Clear violence-risk flag"
+                : "Flag patient as potentially violent or aggressive"
+            }
+            className="focus:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded"
+          >
+            <Badge
+              variant="outline"
+              className={`text-[10px] gap-1 cursor-pointer transition ${
+                violenceRisk
+                  ? "bg-red-500/15 text-red-700 dark:text-red-400 border-red-500/40"
+                  : "bg-transparent text-muted-foreground border-dashed opacity-60 hover:opacity-100"
+              } ${violencePending ? "opacity-50" : ""}`}
+            >
+              <Swords className="w-3 h-3" aria-hidden="true" />
+              {violenceRisk ? "Violence risk" : "Violence?"}
+            </Badge>
+          </button>
+
+
 
         </div>
       </div>
@@ -556,6 +601,8 @@ function BedBoardPage() {
   const fetchAcuity = useServerFn(getPatientAcuity);
   const fetchAirways = useServerFn(getPatientAirways);
   const fetchIsolations = useServerFn(getPatientIsolations);
+  const fetchViolence = useServerFn(listViolenceRisk);
+  const writeViolence = useServerFn(setViolenceRisk);
   const qc = useQueryClient();
   const { data, isLoading, isFetching, error, refetch } = useQuery({
     queryKey: QK,
@@ -618,6 +665,38 @@ function BedBoardPage() {
     }
     return m;
   }, [isolationRows]);
+  // Violence-risk flag (user-toggleable, local source of truth).
+  const { data: violenceRows } = useQuery({
+    queryKey: ["patient-violence-risk"],
+    queryFn: () => fetchViolence(),
+    staleTime: 15_000,
+    refetchInterval: 60_000,
+  });
+  const violenceSet = useMemo(() => {
+    const s = new Set<string>();
+    for (const r of violenceRows ?? []) {
+      if (r.violence_risk) s.add(r.partner_patient_id);
+    }
+    return s;
+  }, [violenceRows]);
+
+  const violenceMutation = useMutation({
+    mutationFn: (v: { partner_patient_id: string; violence_risk: boolean }) =>
+      writeViolence({ data: v }),
+    onSuccess: (_r, vars) => {
+      toast.success(
+        vars.violence_risk
+          ? "Flagged as potentially violent / aggressive"
+          : "Violence-risk flag cleared",
+      );
+      qc.invalidateQueries({ queryKey: ["patient-violence-risk"] });
+    },
+    onError: (err) =>
+      toast.error(err instanceof Error ? err.message : "Could not update flag"),
+  });
+  const handleToggleViolence = (occupantId: string, next: boolean) => {
+    violenceMutation.mutate({ partner_patient_id: occupantId, violence_risk: next });
+  };
 
 
 
@@ -1043,6 +1122,10 @@ function BedBoardPage() {
                   dischargeMutation.isPending &&
                   (dischargeMutation.variables as { partner_patient_id?: string } | undefined)
                     ?.partner_patient_id;
+                const violencePendingId =
+                  violenceMutation.isPending &&
+                  (violenceMutation.variables as { partner_patient_id?: string } | undefined)
+                    ?.partner_patient_id;
                 return (
                   <BedCard
                     key={slot.bed}
@@ -1053,6 +1136,15 @@ function BedBoardPage() {
                       slot.occupant?.id != null &&
                       tracheostomySet.has(slot.occupant.id)
                     }
+                    violenceRisk={
+                      slot.occupant?.id != null &&
+                      violenceSet.has(slot.occupant.id)
+                    }
+                    violencePending={
+                      slot.occupant?.id != null &&
+                      violencePendingId === slot.occupant.id
+                    }
+                    onToggleViolenceRisk={handleToggleViolence}
                     isolation={
                       (slot.occupant?.id != null &&
                         isolationMap.get(slot.occupant.id)?.isolation) ||
