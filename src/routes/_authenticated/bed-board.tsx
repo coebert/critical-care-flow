@@ -12,7 +12,7 @@ import {
   Sparkles,
   UserRound,
 } from "lucide-react";
-import { formatDistanceToNowStrict } from "date-fns";
+import { formatDistanceToNowStrict, formatDistanceStrict } from "date-fns";
 import { toast } from "sonner";
 import {
   getPartnerBedBoard,
@@ -29,6 +29,8 @@ import {
 import {
   listWardableStatus,
   setWardableStatus,
+  dischargePatient,
+  clearDischarge,
   type WardableStatus,
 } from "@/lib/wardable-status.functions";
 import { prefillPartnerHandoverFromReferral } from "@/lib/partner-handover-prefill.functions";
@@ -180,14 +182,92 @@ function WardableToggle({
   );
 }
 
+function DischargeControl({
+  wardable,
+  wardableAt,
+  dischargedAt,
+  pending,
+  onDischarge,
+  onClear,
+}: {
+  wardable: boolean;
+  wardableAt: string | null;
+  dischargedAt: string | null;
+  pending: boolean;
+  onDischarge: () => void;
+  onClear: () => void;
+}) {
+  const [, force] = useState(0);
+  useEffect(() => {
+    // Tick while wardable and not yet discharged so the elapsed timer
+    // updates in the corner of the board.
+    if (dischargedAt || !wardable || !wardableAt) return;
+    const id = setInterval(() => force((n) => n + 1), 60_000);
+    return () => clearInterval(id);
+  }, [wardable, wardableAt, dischargedAt]);
+
+  if (dischargedAt) {
+    const window =
+      wardableAt
+        ? formatDistanceStrict(new Date(wardableAt), new Date(dischargedAt))
+        : null;
+    return (
+      <button
+        type="button"
+        onClick={(e) => {
+          e.stopPropagation();
+          if (!pending) onClear();
+        }}
+        onKeyDown={(e) => e.stopPropagation()}
+        onMouseDown={(e) => e.stopPropagation()}
+        disabled={pending}
+        draggable={false}
+        title={`Discharged ${new Date(dischargedAt).toLocaleString()}${
+          window ? ` — ${window} from wardable` : ""
+        }. Click to undo.`}
+        className="mt-1 inline-flex items-center gap-1 rounded border border-sky-500/40 bg-sky-500/15 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-sky-800 dark:text-sky-300 hover:bg-sky-500/25 transition disabled:opacity-60"
+      >
+        <span aria-hidden="true">✓</span>
+        <span>Discharged{window ? ` · ${window}` : ""}</span>
+      </button>
+    );
+  }
+
+  return (
+    <button
+      type="button"
+      onClick={(e) => {
+        e.stopPropagation();
+        if (!pending) onDischarge();
+      }}
+      onKeyDown={(e) => e.stopPropagation()}
+      onMouseDown={(e) => e.stopPropagation()}
+      disabled={pending}
+      draggable={false}
+      title={
+        wardable && wardableAt
+          ? `Record discharge — will log time from wardable (${new Date(wardableAt).toLocaleString()})`
+          : "Record discharge from critical care"
+      }
+      className="mt-1 inline-flex items-center gap-1 rounded border border-dashed px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground hover:bg-accent hover:text-foreground transition disabled:opacity-60"
+    >
+      <span aria-hidden="true">→</span>
+      <span>Discharge</span>
+    </button>
+  );
+}
+
 function BedCard({
   slot,
   level,
   oneToOne,
   wardable,
   wardableAt,
+  dischargedAt,
   wardablePending,
+  dischargePending,
   onToggleWardable,
+  onDischarge,
   onOccupiedClick,
   onMove,
   isDragTarget,
@@ -198,8 +278,11 @@ function BedCard({
   oneToOne: boolean;
   wardable: boolean;
   wardableAt: string | null;
+  dischargedAt: string | null;
   wardablePending: boolean;
+  dischargePending: boolean;
   onToggleWardable: (occupantId: string, next: boolean) => void;
+  onDischarge: (occupantId: string, undo: boolean) => void;
   onOccupiedClick: (o: PartnerOccupant) => void;
   onMove: (
     occupantId: string,
@@ -354,12 +437,23 @@ function BedCard({
           {occ.dnacpr_details ? ` — ${occ.dnacpr_details}` : ""}
         </div>
       )}
-      <WardableToggle
-        wardable={wardable}
-        wardableAt={wardableAt}
-        pending={wardablePending}
-        onToggle={() => onToggleWardable(occ.id, !wardable)}
-      />
+      <div className="flex flex-wrap items-center gap-1.5">
+        <WardableToggle
+          wardable={wardable}
+          wardableAt={wardableAt}
+          pending={wardablePending}
+          onToggle={() => onToggleWardable(occ.id, !wardable)}
+        />
+        <DischargeControl
+          wardable={wardable}
+          wardableAt={wardableAt}
+          dischargedAt={dischargedAt}
+          pending={dischargePending}
+          onDischarge={() => onDischarge(occ.id, false)}
+          onClear={() => onDischarge(occ.id, true)}
+        />
+      </div>
+
 
 
     </Card>
@@ -527,6 +621,7 @@ function BedBoardPage() {
                 ? existing.wardable_at
                 : now
               : null,
+            discharged_at: null,
             updated_at: now,
           };
           if (idx >= 0) list[idx] = next;
@@ -550,6 +645,61 @@ function BedBoardPage() {
   const handleToggleWardable = (occupantId: string, next: boolean) => {
     wardableMutation.mutate({ partner_patient_id: occupantId, wardable: next });
   };
+
+  // ---- Discharge (records elapsed time from wardable_at → discharged_at) ----
+  const dischargeFn = useServerFn(dischargePatient);
+  const clearDischargeFn = useServerFn(clearDischarge);
+  const dischargeMutation = useMutation({
+    mutationFn: (input: { partner_patient_id: string; undo?: boolean }) =>
+      input.undo
+        ? clearDischargeFn({ data: { partner_patient_id: input.partner_patient_id } })
+        : dischargeFn({ data: { partner_patient_id: input.partner_patient_id } }),
+    onMutate: async (input) => {
+      await qc.cancelQueries({ queryKey: ["patient-wardable-status"] });
+      const previous = qc.getQueryData<WardableStatus[]>([
+        "patient-wardable-status",
+      ]);
+      qc.setQueryData<WardableStatus[]>(
+        ["patient-wardable-status"],
+        (rows) => {
+          const list = rows ? [...rows] : [];
+          const idx = list.findIndex(
+            (r) => r.partner_patient_id === input.partner_patient_id,
+          );
+          const now = new Date().toISOString();
+          const existing = idx >= 0 ? list[idx] : undefined;
+          const next: WardableStatus = {
+            partner_patient_id: input.partner_patient_id,
+            wardable: existing?.wardable ?? false,
+            wardable_at: existing?.wardable_at ?? null,
+            discharged_at: input.undo ? null : now,
+            updated_at: now,
+          };
+          if (idx >= 0) list[idx] = next;
+          else list.push(next);
+          return list;
+        },
+      );
+      return { previous };
+    },
+    onError: (err, _input, ctx) => {
+      if (ctx?.previous) {
+        qc.setQueryData(["patient-wardable-status"], ctx.previous);
+      }
+      toast.error(err instanceof Error ? err.message : "Could not record discharge");
+    },
+    onSuccess: (_r, input) => {
+      toast.success(input.undo ? "Discharge cleared" : "Discharge recorded");
+    },
+    onSettled: () => {
+      wardableQuery.refetch();
+    },
+  });
+
+  const handleDischarge = (occupantId: string, undo: boolean) => {
+    dischargeMutation.mutate({ partner_patient_id: occupantId, undo });
+  };
+
 
 
 
@@ -813,6 +963,10 @@ function BedBoardPage() {
                   wardableMutation.isPending &&
                   (wardableMutation.variables as { partner_patient_id?: string } | undefined)
                     ?.partner_patient_id;
+                const dischargePendingId =
+                  dischargeMutation.isPending &&
+                  (dischargeMutation.variables as { partner_patient_id?: string } | undefined)
+                    ?.partner_patient_id;
                 return (
                   <BedCard
                     key={slot.bed}
@@ -821,10 +975,16 @@ function BedBoardPage() {
                     oneToOne={a?.one_to_one === true}
                     wardable={w?.wardable === true}
                     wardableAt={w?.wardable_at ?? null}
+                    dischargedAt={w?.discharged_at ?? null}
                     wardablePending={
                       slot.occupant?.id != null && pendingId === slot.occupant.id
                     }
+                    dischargePending={
+                      slot.occupant?.id != null &&
+                      dischargePendingId === slot.occupant.id
+                    }
                     onToggleWardable={handleToggleWardable}
+                    onDischarge={handleDischarge}
                     onOccupiedClick={setSelected}
                     onMove={handleMove}
                     isDragTarget={dragging}
