@@ -160,7 +160,9 @@ function BoardPage() {
   const navigate = useNavigate();
   const now = useClock();
   const [theme, setTheme] = useBoardTheme();
+  const [isFullscreen, toggleFullscreen] = useBoardFullscreen();
   const p = PALETTES[theme];
+
 
   const fetchBoard = useServerFn(getPartnerBedBoard);
   const fetchAcuity = useServerFn(getPatientAcuity);
