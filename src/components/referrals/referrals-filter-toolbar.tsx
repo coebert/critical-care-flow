@@ -143,6 +143,24 @@ export function ReferralsFilterToolbar(props: Props) {
             )}
           </SheetContent>
         </Sheet>
+        <SavedViewsMenu
+          currentParams={{
+            status: statusFilter,
+            date: dateFilter,
+            urgency: urgencyFilter,
+            location: locFilter,
+            pediatric: pediatricFilter,
+          }}
+          onApply={(p) => {
+            if (typeof p.status === "string") onStatusFilterChange(p.status as StatusKey);
+            if (typeof p.date === "string") onDateFilterChange(p.date as DateKey);
+            if (typeof p.urgency === "string")
+              onUrgencyFilterChange(p.urgency as "all" | AdmissionUrgency);
+            if (typeof p.location === "string") onLocFilterChange(p.location);
+            if (typeof p.pediatric === "string")
+              onPediatricFilterChange(p.pediatric as PediatricKey);
+          }}
+        />
       </div>
 
       {activeCount > 0 && (
