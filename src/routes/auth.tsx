@@ -62,6 +62,10 @@ export const Route = createFileRoute("/auth")({
     ],
   }),
   component: AuthPage,
+  // Explicit null pending component so SSR + client agree on the Suspense
+  // fallback while the split route chunk resolves; avoids the React 19
+  // "server rendered <Suspense> / client rendered <div>" hydration mismatch.
+  pendingComponent: () => null,
 });
 
 function AuthPage() {
