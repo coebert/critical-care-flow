@@ -263,6 +263,7 @@ function BedCard({
   slot,
   level,
   oneToOne,
+  hasTracheostomy,
   wardable,
   wardableAt,
   dischargedAt,
@@ -278,6 +279,7 @@ function BedCard({
   slot: PartnerBedSlot;
   level: AcuityLevel | undefined;
   oneToOne: boolean;
+  hasTracheostomy: boolean;
   wardable: boolean;
   wardableAt: string | null;
   dischargedAt: string | null;
