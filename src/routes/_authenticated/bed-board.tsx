@@ -10,6 +10,7 @@ import {
   RefreshCcw,
   ShieldCheck,
   Sparkles,
+  Stethoscope,
   UserRound,
 } from "lucide-react";
 import { formatDistanceToNowStrict, formatDistanceStrict } from "date-fns";
@@ -26,6 +27,7 @@ import {
   setPatientAcuity,
   type AcuityLevel,
 } from "@/lib/patient-acuity.functions";
+import { getPatientAirways } from "@/lib/patient-airway.functions";
 import {
   listWardableStatus,
   setWardableStatus,
@@ -261,6 +263,7 @@ function BedCard({
   slot,
   level,
   oneToOne,
+  hasTracheostomy,
   wardable,
   wardableAt,
   dischargedAt,
@@ -276,6 +279,7 @@ function BedCard({
   slot: PartnerBedSlot;
   level: AcuityLevel | undefined;
   oneToOne: boolean;
+  hasTracheostomy: boolean;
   wardable: boolean;
   wardableAt: string | null;
   dischargedAt: string | null;
@@ -420,6 +424,17 @@ function BedCard({
               TEP
             </Badge>
           )}
+          {hasTracheostomy && (
+            <Badge
+              variant="outline"
+              className="text-[10px] gap-1 bg-sky-500/10 text-sky-700 dark:text-sky-400 border-sky-500/30"
+              title="Tracheostomy in situ"
+              aria-label="Tracheostomy in situ"
+            >
+              <Stethoscope className="w-3 h-3" aria-hidden="true" />
+              Trache
+            </Badge>
+          )}
 
         </div>
       </div>
@@ -515,6 +530,7 @@ function BedBoardPage() {
   const navigate = Route.useNavigate();
   const fetchBoard = useServerFn(getPartnerBedBoard);
   const fetchAcuity = useServerFn(getPatientAcuity);
+  const fetchAirways = useServerFn(getPatientAirways);
   const qc = useQueryClient();
   const { data, isLoading, isFetching, error, refetch } = useQuery({
     queryKey: QK,
@@ -543,6 +559,24 @@ function BedBoardPage() {
     }
     return m;
   }, [acuityRows]);
+
+  // Tracheostomy indicator source: partner-mirrored `patients.airway_type`.
+  // Pulled by the scheduled bridge sync — we just look it up per occupant.
+  const { data: airwayRows } = useQuery({
+    queryKey: ["patient-airways"],
+    queryFn: () => fetchAirways(),
+    staleTime: 15_000,
+    refetchInterval: 60_000,
+  });
+  const tracheostomySet = useMemo(() => {
+    const s = new Set<string>();
+    for (const r of airwayRows ?? []) {
+      if ((r.airway_type ?? "").toLowerCase() === "tracheostomy") {
+        s.add(r.partner_patient_id);
+      }
+    }
+    return s;
+  }, [airwayRows]);
 
 
   const [selected, setSelected] = useState<PartnerOccupant | null>(null);
@@ -973,6 +1007,10 @@ function BedBoardPage() {
                     slot={slot}
                     level={a?.level}
                     oneToOne={a?.one_to_one === true}
+                    hasTracheostomy={
+                      slot.occupant?.id != null &&
+                      tracheostomySet.has(slot.occupant.id)
+                    }
                     wardable={w?.wardable === true}
                     wardableAt={w?.wardable_at ?? null}
                     dischargedAt={w?.discharged_at ?? null}
