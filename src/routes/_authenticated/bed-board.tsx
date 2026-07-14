@@ -665,6 +665,38 @@ function BedBoardPage() {
     }
     return m;
   }, [isolationRows]);
+  // Violence-risk flag (user-toggleable, local source of truth).
+  const { data: violenceRows } = useQuery({
+    queryKey: ["patient-violence-risk"],
+    queryFn: () => fetchViolence(),
+    staleTime: 15_000,
+    refetchInterval: 60_000,
+  });
+  const violenceSet = useMemo(() => {
+    const s = new Set<string>();
+    for (const r of violenceRows ?? []) {
+      if (r.violence_risk) s.add(r.partner_patient_id);
+    }
+    return s;
+  }, [violenceRows]);
+
+  const violenceMutation = useMutation({
+    mutationFn: (v: { partner_patient_id: string; violence_risk: boolean }) =>
+      writeViolence({ data: v }),
+    onSuccess: (_r, vars) => {
+      toast.success(
+        vars.violence_risk
+          ? "Flagged as potentially violent / aggressive"
+          : "Violence-risk flag cleared",
+      );
+      qc.invalidateQueries({ queryKey: ["patient-violence-risk"] });
+    },
+    onError: (err) =>
+      toast.error(err instanceof Error ? err.message : "Could not update flag"),
+  });
+  const handleToggleViolence = (occupantId: string, next: boolean) => {
+    violenceMutation.mutate({ partner_patient_id: occupantId, violence_risk: next });
+  };
 
 
 
