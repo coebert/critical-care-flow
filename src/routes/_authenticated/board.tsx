@@ -274,6 +274,7 @@ function BoardPage() {
         </div>
         <div className="overflow-auto">
           <PendingColumn rows={pending} now={now.getTime()} p={p} />
+        </div>
       </div>
     </div>
   );
