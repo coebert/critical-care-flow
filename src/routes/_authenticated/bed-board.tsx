@@ -1122,6 +1122,10 @@ function BedBoardPage() {
                   dischargeMutation.isPending &&
                   (dischargeMutation.variables as { partner_patient_id?: string } | undefined)
                     ?.partner_patient_id;
+                const violencePendingId =
+                  violenceMutation.isPending &&
+                  (violenceMutation.variables as { partner_patient_id?: string } | undefined)
+                    ?.partner_patient_id;
                 return (
                   <BedCard
                     key={slot.bed}
@@ -1132,6 +1136,15 @@ function BedBoardPage() {
                       slot.occupant?.id != null &&
                       tracheostomySet.has(slot.occupant.id)
                     }
+                    violenceRisk={
+                      slot.occupant?.id != null &&
+                      violenceSet.has(slot.occupant.id)
+                    }
+                    violencePending={
+                      slot.occupant?.id != null &&
+                      violencePendingId === slot.occupant.id
+                    }
+                    onToggleViolenceRisk={handleToggleViolence}
                     isolation={
                       (slot.occupant?.id != null &&
                         isolationMap.get(slot.occupant.id)?.isolation) ||
