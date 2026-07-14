@@ -1334,6 +1334,15 @@ function BedBoardPage() {
                       endOfLifePendingId === slot.occupant.id
                     }
                     onToggleEndOfLife={handleToggleEndOfLife}
+                    needsScanTransfer={
+                      slot.occupant?.id != null &&
+                      scanTransferSet.has(slot.occupant.id)
+                    }
+                    scanTransferPending={
+                      slot.occupant?.id != null &&
+                      scanTransferPendingId === slot.occupant.id
+                    }
+                    onToggleScanTransfer={handleToggleScanTransfer}
                     isolation={
                       (slot.occupant?.id != null &&
                         isolationMap.get(slot.occupant.id)?.isolation) ||
