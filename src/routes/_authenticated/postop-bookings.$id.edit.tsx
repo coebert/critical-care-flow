@@ -366,7 +366,7 @@ function EditPostopBookingPage() {
           </Card>
 
 
-          <div className="flex gap-2 justify-end">
+          <div className="sticky bottom-0 -mx-4 sm:-mx-6 px-4 sm:px-6 py-3 mt-6 flex gap-2 justify-end bg-background/95 backdrop-blur border-t supports-[backdrop-filter]:bg-background/80 z-10 flex-wrap">
             <Button type="button" variant="ghost" asChild disabled={saving}>
               <Link to="/postop-bookings">Cancel</Link>
             </Button>
