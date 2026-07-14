@@ -584,7 +584,7 @@ function ReferralDetail() {
         </Card>
 
         {!isViewer && (
-          <div className="flex flex-wrap gap-2 justify-end">
+          <div className="sticky bottom-0 -mx-4 sm:-mx-6 px-4 sm:px-6 py-3 mt-4 flex flex-wrap gap-2 justify-end bg-background/95 backdrop-blur border-t supports-[backdrop-filter]:bg-background/80 z-10">
             {(ref.status === "accepted" || ref.status === "admitted") && (
               <Button
                 variant="outline"
