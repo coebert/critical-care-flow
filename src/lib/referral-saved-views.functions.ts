@@ -9,10 +9,13 @@ import { safeError } from "./safe-error";
  * and writes to `auth.uid()`; a UNIQUE (user_id, name) constraint means one
  * name per user.
  */
+/** Only URL-safe scalars are stored — mirrors what the referrals list encodes. */
+export type SavedViewParams = Record<string, string | number | boolean | null>;
+
 export type ReferralSavedView = {
   id: string;
   name: string;
-  params: Record<string, unknown>;
+  params: SavedViewParams;
   updated_at: string;
 };
 
@@ -38,7 +41,12 @@ export const upsertReferralSavedView = createServerFn({ method: "POST" })
     z
       .object({
         name: z.string().trim().min(1).max(NAME_MAX),
-        params: z.record(z.string(), z.unknown()).default({}),
+        params: z
+          .record(
+            z.string(),
+            z.union([z.string(), z.number(), z.boolean(), z.null()]),
+          )
+          .default({}),
       })
       .parse(data),
   )
