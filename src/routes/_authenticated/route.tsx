@@ -255,18 +255,42 @@ function AuthedShell() {
             {pageTitle}
           </h1>
           <div className="flex items-center gap-1.5 sm:gap-2 shrink-0 justify-end">
+            <Button
+              variant="ghost"
+              size="sm"
+              className="hidden sm:inline-flex h-9 gap-2 text-muted-foreground"
+              onClick={() => setPaletteOpen(true)}
+              aria-label="Open command palette"
+              title="Search & actions (⌘K)"
+            >
+              <Search className="w-4 h-4" />
+              <span className="hidden md:inline">Search</span>
+              <kbd className="hidden md:inline-flex items-center rounded border bg-muted px-1.5 py-0.5 text-[10px] font-mono">⌘K</kbd>
+            </Button>
+            <Button
+              variant="ghost"
+              size="icon"
+              className="sm:hidden h-9 w-9"
+              onClick={() => setPaletteOpen(true)}
+              aria-label="Open command palette"
+            >
+              <Search className="w-5 h-5" />
+            </Button>
             <ShiftToggle />
             {supported && permission === "granted" && subscribed && <TestPushButton />}
             <AlertToggle />
             <NotificationBell />
           </div>
         </header>
+        <Breadcrumbs pathname={pathname} />
+        <GlobalBannerSlot />
         <PushPermissionPrompt visible={supported && permission !== "granted" && atWork === true} />
         <E2EUnlockBanner />
         <main className="flex-1 overflow-auto">
           <Outlet />
         </main>
       </div>
+      <CommandPalette open={paletteOpen} onOpenChange={setPaletteOpen} />
       <Toaster />
       <IdleTimeoutModal
         open={idle.warning && !signingOut}
