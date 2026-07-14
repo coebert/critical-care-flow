@@ -27,6 +27,7 @@ import {
   setPatientAcuity,
   type AcuityLevel,
 } from "@/lib/patient-acuity.functions";
+import { getPatientAirways } from "@/lib/patient-airway.functions";
 import {
   listWardableStatus,
   setWardableStatus,
