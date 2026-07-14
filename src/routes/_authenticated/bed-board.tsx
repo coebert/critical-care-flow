@@ -269,6 +269,8 @@ function BedCard({
   level,
   oneToOne,
   hasTracheostomy,
+  isolation,
+  isolationReason,
   wardable,
   wardableAt,
   dischargedAt,
@@ -285,6 +287,8 @@ function BedCard({
   level: AcuityLevel | undefined;
   oneToOne: boolean;
   hasTracheostomy: boolean;
+  isolation: "contact" | "droplet" | "airborne" | null;
+  isolationReason: string | null;
   wardable: boolean;
   wardableAt: string | null;
   dischargedAt: string | null;
