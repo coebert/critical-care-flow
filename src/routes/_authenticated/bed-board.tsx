@@ -470,6 +470,40 @@ function BedCard({
                   : "Airborne"}
             </Badge>
           )}
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              if (!violencePending) onToggleViolenceRisk(occ.id, !violenceRisk);
+            }}
+            disabled={violencePending}
+            title={
+              violenceRisk
+                ? "Violence risk flagged — click to clear"
+                : "Flag as potentially violent or aggressive"
+            }
+            aria-pressed={violenceRisk}
+            aria-label={
+              violenceRisk
+                ? "Clear violence-risk flag"
+                : "Flag patient as potentially violent or aggressive"
+            }
+            className="focus:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded"
+          >
+            <Badge
+              variant="outline"
+              className={`text-[10px] gap-1 cursor-pointer transition ${
+                violenceRisk
+                  ? "bg-red-500/15 text-red-700 dark:text-red-400 border-red-500/40"
+                  : "bg-transparent text-muted-foreground border-dashed opacity-60 hover:opacity-100"
+              } ${violencePending ? "opacity-50" : ""}`}
+            >
+              <Swords className="w-3 h-3" aria-hidden="true" />
+              {violenceRisk ? "Violence risk" : "Violence?"}
+            </Badge>
+          </button>
+
+
 
         </div>
       </div>
