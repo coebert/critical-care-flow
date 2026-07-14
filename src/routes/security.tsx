@@ -90,6 +90,7 @@ function SecurityPage() {
 
         <p className="text-sm text-muted-foreground">
           Last reviewed: {new Date().toISOString().slice(0, 10)}. See also our{" "}
+          <Link to="/security-faq">security FAQ</Link>,{" "}
           <Link to="/privacy">privacy notice</Link>,{" "}
           <Link to="/clinical-safety">clinical safety</Link> page, and the{" "}
           project&rsquo;s public <code>SECURITY.md</code>.
