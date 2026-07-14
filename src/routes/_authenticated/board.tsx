@@ -184,6 +184,7 @@ function BoardPage() {
   const now = useClock();
   const [theme, setTheme] = useBoardTheme();
   const [isFullscreen, toggleFullscreen] = useBoardFullscreen();
+  const [zoom, setZoom] = useBoardZoom();
   const p = PALETTES[theme];
 
 
