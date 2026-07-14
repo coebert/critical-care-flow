@@ -11,6 +11,7 @@ import {
   RefreshCcw,
   ShieldCheck,
   Sparkles,
+  Heart,
   Stethoscope,
   Swords,
   UserRound,
