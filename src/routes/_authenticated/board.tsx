@@ -361,13 +361,13 @@ function PendingColumn({ rows, now, p }: { rows: Referral[]; now: number; p: Pal
             : now - new Date(r.decision_at ?? r.updated_at ?? r.referral_received_at).getTime();
           const critical = waitMs > 4 * 60 * 60 * 1000;
           return (
-            <li key={r.id} className={`rounded border p-3 ${p.chip}`}>
+            <li key={r.id} className={`rounded border p-2 ${p.chip}`}>
               <div className="flex items-center justify-between gap-2">
                 <div className="min-w-0">
-                  <div className="text-lg font-semibold truncate">{r.hospital_number ?? "—"}</div>
-                  <div className={`text-xs truncate ${p.muted}`}>{r.referring_specialty ?? "Unknown"} · {r.current_ward ?? ""}</div>
+                  <div className="text-base font-semibold truncate">{r.hospital_number ?? "—"}</div>
+                  <div className={`text-[11px] truncate ${p.muted}`}>{r.referring_specialty ?? "Unknown"} · {r.current_ward ?? ""}</div>
                 </div>
-                <div className={`text-2xl font-mono tabular-nums ${critical ? p.timerCritical : p.timerWarn}`}>
+                <div className={`text-xl font-mono tabular-nums ${critical ? p.timerCritical : p.timerWarn}`}>
                   {formatElapsed(waitMs)}
                 </div>
               </div>
