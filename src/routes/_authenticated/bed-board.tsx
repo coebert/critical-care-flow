@@ -554,6 +554,61 @@ function BedBoardPage() {
     wardableMutation.mutate({ partner_patient_id: occupantId, wardable: next });
   };
 
+  // ---- Discharge (records elapsed time from wardable_at → discharged_at) ----
+  const dischargeFn = useServerFn(dischargePatient);
+  const clearDischargeFn = useServerFn(clearDischarge);
+  const dischargeMutation = useMutation({
+    mutationFn: (input: { partner_patient_id: string; undo?: boolean }) =>
+      input.undo
+        ? clearDischargeFn({ data: { partner_patient_id: input.partner_patient_id } })
+        : dischargeFn({ data: { partner_patient_id: input.partner_patient_id } }),
+    onMutate: async (input) => {
+      await qc.cancelQueries({ queryKey: ["patient-wardable-status"] });
+      const previous = qc.getQueryData<WardableStatus[]>([
+        "patient-wardable-status",
+      ]);
+      qc.setQueryData<WardableStatus[]>(
+        ["patient-wardable-status"],
+        (rows) => {
+          const list = rows ? [...rows] : [];
+          const idx = list.findIndex(
+            (r) => r.partner_patient_id === input.partner_patient_id,
+          );
+          const now = new Date().toISOString();
+          const existing = idx >= 0 ? list[idx] : undefined;
+          const next: WardableStatus = {
+            partner_patient_id: input.partner_patient_id,
+            wardable: existing?.wardable ?? false,
+            wardable_at: existing?.wardable_at ?? null,
+            discharged_at: input.undo ? null : now,
+            updated_at: now,
+          };
+          if (idx >= 0) list[idx] = next;
+          else list.push(next);
+          return list;
+        },
+      );
+      return { previous };
+    },
+    onError: (err, _input, ctx) => {
+      if (ctx?.previous) {
+        qc.setQueryData(["patient-wardable-status"], ctx.previous);
+      }
+      toast.error(err instanceof Error ? err.message : "Could not record discharge");
+    },
+    onSuccess: (_r, input) => {
+      toast.success(input.undo ? "Discharge cleared" : "Discharge recorded");
+    },
+    onSettled: () => {
+      wardableQuery.refetch();
+    },
+  });
+
+  const handleDischarge = (occupantId: string, undo: boolean) => {
+    dischargeMutation.mutate({ partner_patient_id: occupantId, undo });
+  };
+
+
 
 
   const arrivedFromSource =
