@@ -11,6 +11,8 @@ import {
   HelpCircle,
   Loader2,
   RefreshCcw,
+  Rows2,
+  Rows3,
   ShieldCheck,
   Sparkles,
   Heart,
@@ -19,6 +21,8 @@ import {
   Swords,
   UserRound,
 } from "lucide-react";
+import { useDensity } from "@/hooks/use-density";
+import { BedGridSkeleton } from "@/components/bed-board/bed-grid-skeleton";
 import { formatDistanceToNowStrict, formatDistanceStrict } from "date-fns";
 import { toast } from "sonner";
 import {
