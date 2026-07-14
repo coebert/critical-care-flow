@@ -337,7 +337,7 @@ function NewReferralPage() {
       </div>
       <form onSubmit={submit} className="space-y-6">
         <Section title="Patient">
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
             <Field label="Age"><Input type="number" min="0" max="130" value={f.age} onChange={(e) => set("age", e.target.value)} /></Field>
             <Field label="Sex">
               <Select value={f.sex} onValueChange={(v) => set("sex", v as DraftForm["sex"])}>
@@ -372,7 +372,7 @@ function NewReferralPage() {
           <p className="text-xs text-muted-foreground -mt-2">
             ICNARC requires referral received for every record. First seen and decision are required once the patient has been reviewed; arrival is required for admitted patients.
           </p>
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
             <Field label="Referral received" required error={showErrors ? timing.fieldErrors.referral_received_at : undefined}>
               <DateTimeNow value={f.referral_received_at} onChange={(v) => set("referral_received_at", v)} invalid={showErrors && !!timing.fieldErrors.referral_received_at} />
             </Field>
@@ -470,7 +470,7 @@ function NewReferralPage() {
             </div>
           )}
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
             <Field label="Status">
               <Select value={f.status} onValueChange={(v) => {
                 const status = v as DraftForm["status"];
