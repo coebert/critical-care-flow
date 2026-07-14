@@ -1053,6 +1053,16 @@ function BedBoardPage() {
                       slot.occupant?.id != null &&
                       tracheostomySet.has(slot.occupant.id)
                     }
+                    isolation={
+                      (slot.occupant?.id != null &&
+                        isolationMap.get(slot.occupant.id)?.isolation) ||
+                      null
+                    }
+                    isolationReason={
+                      (slot.occupant?.id != null &&
+                        isolationMap.get(slot.occupant.id)?.isolation_reason) ||
+                      null
+                    }
                     wardable={w?.wardable === true}
                     wardableAt={w?.wardable_at ?? null}
                     dischargedAt={w?.discharged_at ?? null}
