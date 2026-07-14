@@ -157,6 +157,7 @@ const PUSH_ALLOW: Record<ResourceKey, readonly string[]> = {
     "source_postop_booking_id",
     "patient_id",
     "wardable",
+    "wardable_at",
   ],
   bed_outliers: [
     "id",
