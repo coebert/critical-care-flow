@@ -748,6 +748,41 @@ function BedBoardPage() {
     violenceMutation.mutate({ partner_patient_id: occupantId, violence_risk: next });
   };
 
+  // End-of-life flag (user-toggleable, local source of truth).
+  const { data: endOfLifeRows } = useQuery({
+    queryKey: ["patient-end-of-life"],
+    queryFn: () => fetchEndOfLife(),
+    staleTime: 15_000,
+    refetchInterval: 60_000,
+  });
+  const endOfLifeSet = useMemo(() => {
+    const s = new Set<string>();
+    for (const r of endOfLifeRows ?? []) {
+      if (r.end_of_life) s.add(r.partner_patient_id);
+    }
+    return s;
+  }, [endOfLifeRows]);
+
+  const endOfLifeMutation = useMutation({
+    mutationFn: (v: { partner_patient_id: string; end_of_life: boolean }) =>
+      writeEndOfLife({ data: v }),
+    onSuccess: (_r, vars) => {
+      toast.success(
+        vars.end_of_life
+          ? "Flagged as receiving end-of-life care"
+          : "End-of-life flag cleared",
+      );
+      qc.invalidateQueries({ queryKey: ["patient-end-of-life"] });
+    },
+    onError: (err) =>
+      toast.error(err instanceof Error ? err.message : "Could not update flag"),
+  });
+  const handleToggleEndOfLife = (occupantId: string, next: boolean) => {
+    endOfLifeMutation.mutate({ partner_patient_id: occupantId, end_of_life: next });
+  };
+
+
+
 
 
   const [selected, setSelected] = useState<PartnerOccupant | null>(null);
