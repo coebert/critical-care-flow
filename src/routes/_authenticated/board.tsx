@@ -12,7 +12,7 @@ import { getPatientAcuity } from "@/lib/patient-acuity.functions";
 import { listReferralsForList } from "@/lib/referrals.functions";
 import type { Referral } from "@/lib/referrals-list-utils";
 import { formatElapsed } from "@/lib/referrals-list-utils";
-import { X, Printer, Sun, Moon } from "lucide-react";
+import { X, Printer, Sun, Moon, Maximize, Minimize } from "lucide-react";
 
 export const Route = createFileRoute("/_authenticated/board")({
   head: () => ({
@@ -137,11 +137,32 @@ function useClock() {
   return now;
 }
 
+function useBoardFullscreen() {
+  const [active, setActive] = useState(false);
+  useEffect(() => {
+    const sync = () => setActive(Boolean(document.fullscreenElement));
+    sync();
+    document.addEventListener("fullscreenchange", sync);
+    return () => document.removeEventListener("fullscreenchange", sync);
+  }, []);
+  const toggle = () => {
+    if (typeof document === "undefined") return;
+    if (document.fullscreenElement) {
+      document.exitFullscreen().catch(() => {});
+    } else {
+      document.documentElement.requestFullscreen().catch(() => {});
+    }
+  };
+  return [active, toggle] as const;
+}
+
 function BoardPage() {
   const navigate = useNavigate();
   const now = useClock();
   const [theme, setTheme] = useBoardTheme();
+  const [isFullscreen, toggleFullscreen] = useBoardFullscreen();
   const p = PALETTES[theme];
+
 
   const fetchBoard = useServerFn(getPartnerBedBoard);
   const fetchAcuity = useServerFn(getPatientAcuity);
@@ -223,6 +244,15 @@ function BoardPage() {
           >
             {theme === "dark" ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
             {theme === "dark" ? "Light" : "Dark"}
+          </button>
+          <button
+            onClick={toggleFullscreen}
+            className={`text-sm rounded-md border px-2 py-1 flex items-center gap-1.5 ${p.toggle}`}
+            aria-label={isFullscreen ? "Exit full screen" : "Enter full screen"}
+            title={isFullscreen ? "Exit full screen (F11)" : "Enter full screen (F11)"}
+          >
+            {isFullscreen ? <Minimize className="w-4 h-4" /> : <Maximize className="w-4 h-4" />}
+            {isFullscreen ? "Exit" : "Full screen"}
           </button>
           <Link to="/board/ward-round" className={`${p.exit} text-sm underline flex items-center gap-1`}>
             <Printer className="w-4 h-4" /> Ward round
