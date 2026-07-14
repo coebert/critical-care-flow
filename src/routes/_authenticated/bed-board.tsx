@@ -11,6 +11,7 @@ import {
   RefreshCcw,
   ShieldCheck,
   Sparkles,
+  Heart,
   Stethoscope,
   Swords,
   UserRound,
@@ -38,6 +39,10 @@ import {
   listViolenceRisk,
   setViolenceRisk,
 } from "@/lib/patient-violence-risk.functions";
+import {
+  listEndOfLife,
+  setEndOfLife,
+} from "@/lib/patient-end-of-life.functions";
 import {
   listWardableStatus,
   setWardableStatus,
@@ -279,6 +284,9 @@ function BedCard({
   violenceRisk,
   violencePending,
   onToggleViolenceRisk,
+  endOfLife,
+  endOfLifePending,
+  onToggleEndOfLife,
   wardable,
   wardableAt,
   dischargedAt,
@@ -300,6 +308,9 @@ function BedCard({
   violenceRisk: boolean;
   violencePending: boolean;
   onToggleViolenceRisk: (occupantId: string, next: boolean) => void;
+  endOfLife: boolean;
+  endOfLifePending: boolean;
+  onToggleEndOfLife: (occupantId: string, next: boolean) => void;
   wardable: boolean;
   wardableAt: string | null;
   dischargedAt: string | null;
@@ -502,6 +513,43 @@ function BedCard({
               {violenceRisk ? "Violence risk" : "Violence?"}
             </Badge>
           </button>
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              if (!endOfLifePending) onToggleEndOfLife(occ.id, !endOfLife);
+            }}
+            disabled={endOfLifePending}
+            title={
+              endOfLife
+                ? "End-of-life care — click to clear"
+                : "Flag as receiving end-of-life care"
+            }
+            aria-pressed={endOfLife}
+            aria-label={
+              endOfLife
+                ? "Clear end-of-life-care flag"
+                : "Flag patient as receiving end-of-life care"
+            }
+            className="focus:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded"
+          >
+            <Badge
+              variant="outline"
+              className={`text-[10px] gap-1 cursor-pointer transition ${
+                endOfLife
+                  ? "bg-violet-500/15 text-violet-700 dark:text-violet-400 border-violet-500/40"
+                  : "bg-transparent text-muted-foreground border-dashed opacity-60 hover:opacity-100"
+              } ${endOfLifePending ? "opacity-50" : ""}`}
+            >
+              <Heart
+                className={`w-3 h-3 ${endOfLife ? "fill-current" : ""}`}
+                aria-hidden="true"
+              />
+              {endOfLife ? "End of life" : "EoL?"}
+            </Badge>
+          </button>
+
+
 
 
 
@@ -603,6 +651,8 @@ function BedBoardPage() {
   const fetchIsolations = useServerFn(getPatientIsolations);
   const fetchViolence = useServerFn(listViolenceRisk);
   const writeViolence = useServerFn(setViolenceRisk);
+  const fetchEndOfLife = useServerFn(listEndOfLife);
+  const writeEndOfLife = useServerFn(setEndOfLife);
   const qc = useQueryClient();
   const { data, isLoading, isFetching, error, refetch } = useQuery({
     queryKey: QK,
@@ -697,6 +747,41 @@ function BedBoardPage() {
   const handleToggleViolence = (occupantId: string, next: boolean) => {
     violenceMutation.mutate({ partner_patient_id: occupantId, violence_risk: next });
   };
+
+  // End-of-life flag (user-toggleable, local source of truth).
+  const { data: endOfLifeRows } = useQuery({
+    queryKey: ["patient-end-of-life"],
+    queryFn: () => fetchEndOfLife(),
+    staleTime: 15_000,
+    refetchInterval: 60_000,
+  });
+  const endOfLifeSet = useMemo(() => {
+    const s = new Set<string>();
+    for (const r of endOfLifeRows ?? []) {
+      if (r.end_of_life) s.add(r.partner_patient_id);
+    }
+    return s;
+  }, [endOfLifeRows]);
+
+  const endOfLifeMutation = useMutation({
+    mutationFn: (v: { partner_patient_id: string; end_of_life: boolean }) =>
+      writeEndOfLife({ data: v }),
+    onSuccess: (_r, vars) => {
+      toast.success(
+        vars.end_of_life
+          ? "Flagged as receiving end-of-life care"
+          : "End-of-life flag cleared",
+      );
+      qc.invalidateQueries({ queryKey: ["patient-end-of-life"] });
+    },
+    onError: (err) =>
+      toast.error(err instanceof Error ? err.message : "Could not update flag"),
+  });
+  const handleToggleEndOfLife = (occupantId: string, next: boolean) => {
+    endOfLifeMutation.mutate({ partner_patient_id: occupantId, end_of_life: next });
+  };
+
+
 
 
 
@@ -1126,6 +1211,10 @@ function BedBoardPage() {
                   violenceMutation.isPending &&
                   (violenceMutation.variables as { partner_patient_id?: string } | undefined)
                     ?.partner_patient_id;
+                const endOfLifePendingId =
+                  endOfLifeMutation.isPending &&
+                  (endOfLifeMutation.variables as { partner_patient_id?: string } | undefined)
+                    ?.partner_patient_id;
                 return (
                   <BedCard
                     key={slot.bed}
@@ -1145,6 +1234,15 @@ function BedBoardPage() {
                       violencePendingId === slot.occupant.id
                     }
                     onToggleViolenceRisk={handleToggleViolence}
+                    endOfLife={
+                      slot.occupant?.id != null &&
+                      endOfLifeSet.has(slot.occupant.id)
+                    }
+                    endOfLifePending={
+                      slot.occupant?.id != null &&
+                      endOfLifePendingId === slot.occupant.id
+                    }
+                    onToggleEndOfLife={handleToggleEndOfLife}
                     isolation={
                       (slot.occupant?.id != null &&
                         isolationMap.get(slot.occupant.id)?.isolation) ||
