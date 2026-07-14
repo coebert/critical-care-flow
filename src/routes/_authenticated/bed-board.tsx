@@ -12,6 +12,7 @@ import {
   ShieldCheck,
   Sparkles,
   Heart,
+  ScanLine,
   Stethoscope,
   Swords,
   UserRound,
