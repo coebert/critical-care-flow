@@ -8,6 +8,7 @@ import { tzTooltip } from "@/lib/format-timestamp";
 import {
   ADMISSION_URGENCY_BADGE,
   ADMISSION_URGENCY_LABELS,
+  ADMISSION_URGENCY_PIP,
 } from "@/lib/admission-urgency";
 import { ReferralTimer } from "./referral-timer";
 import {
@@ -177,7 +178,8 @@ export function ReferralsRows({ rows, loading, timerSort, onToggleTimerSort, unr
                   <td className="px-3 py-2"><ReferralTimer r={r} /></td>
                   <td className="px-3 py-2">
                     {r.admission_urgency ? (
-                      <Badge variant="outline" className={`whitespace-nowrap ${ADMISSION_URGENCY_BADGE[r.admission_urgency]}`}>
+                      <Badge variant="outline" className={`whitespace-nowrap ${ADMISSION_URGENCY_BADGE[r.admission_urgency]}`} aria-label={`Urgency: ${ADMISSION_URGENCY_LABELS[r.admission_urgency]}`}>
+                        <span aria-hidden="true" className="font-mono mr-1 tracking-tighter">{ADMISSION_URGENCY_PIP[r.admission_urgency]}</span>
                         {ADMISSION_URGENCY_LABELS[r.admission_urgency]}
                       </Badge>
                     ) : (
@@ -277,7 +279,8 @@ export function ReferralsRows({ rows, loading, timerSort, onToggleTimerSort, unr
               <div className="flex items-center justify-between gap-2 flex-wrap">
                 <ReferralTimer r={r} />
                 {r.admission_urgency && (
-                  <Badge variant="outline" className={`text-xs whitespace-nowrap ${ADMISSION_URGENCY_BADGE[r.admission_urgency]}`}>
+                  <Badge variant="outline" className={`text-xs whitespace-nowrap ${ADMISSION_URGENCY_BADGE[r.admission_urgency]}`} aria-label={`Urgency: ${ADMISSION_URGENCY_LABELS[r.admission_urgency]}`}>
+                    <span aria-hidden="true" className="font-mono mr-1 tracking-tighter">{ADMISSION_URGENCY_PIP[r.admission_urgency]}</span>
                     {ADMISSION_URGENCY_LABELS[r.admission_urgency]}
                   </Badge>
                 )}
