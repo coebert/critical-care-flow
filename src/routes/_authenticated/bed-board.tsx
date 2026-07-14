@@ -444,6 +444,21 @@ function BedCard({
               Trache
             </Badge>
           )}
+          {isolation && (
+            <Badge
+              variant="outline"
+              className="text-[10px] gap-1 bg-amber-500/10 text-amber-700 dark:text-amber-400 border-amber-500/30"
+              title={`Isolation: ${isolation}${isolationReason ? ` — ${isolationReason}` : ""}`}
+              aria-label={`Isolation required: ${isolation}${isolationReason ? `, ${isolationReason}` : ""}`}
+            >
+              <Biohazard className="w-3 h-3" aria-hidden="true" />
+              {isolation === "contact"
+                ? "Contact"
+                : isolation === "droplet"
+                  ? "Droplet"
+                  : "Airborne"}
+            </Badge>
+          )}
 
         </div>
       </div>
