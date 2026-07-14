@@ -118,8 +118,8 @@ function ShiftRow({
               className="h-8"
             />
           </div>
-          <Button size="sm" className="h-8" onClick={submit} disabled={saving}>
-            <Check className="w-3.5 h-3.5" />
+          <Button size="sm" className="h-8" onClick={submit} disabled={saving} aria-label="Save nurse capacity">
+            <Check className="w-3.5 h-3.5" aria-hidden="true" />
           </Button>
           {available != null && (
             <Button
