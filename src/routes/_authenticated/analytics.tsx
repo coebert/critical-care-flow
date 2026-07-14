@@ -92,7 +92,7 @@ function AnalyticsPage() {
               view:
                 v === "referrals"
                   ? undefined
-                  : (v as "postop" | "nurse-capacity" | "capacity-alerts" | "acuity"),
+                  : (v as "postop" | "nurse-capacity" | "capacity-alerts" | "acuity" | "wardable"),
             },
             replace: true,
           })
