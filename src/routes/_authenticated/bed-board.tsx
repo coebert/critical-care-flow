@@ -559,6 +559,40 @@ function BedCard({
               {endOfLife ? "End of life" : "EoL?"}
             </Badge>
           </button>
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              if (!scanTransferPending)
+                onToggleScanTransfer(occ.id, !needsScanTransfer);
+            }}
+            disabled={scanTransferPending}
+            title={
+              needsScanTransfer
+                ? "Needs transfer for a scan — click to clear"
+                : "Flag as needing transfer for a scan"
+            }
+            aria-pressed={needsScanTransfer}
+            aria-label={
+              needsScanTransfer
+                ? "Clear scan-transfer flag"
+                : "Flag patient as needing transfer for a scan"
+            }
+            className="focus:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded"
+          >
+            <Badge
+              variant="outline"
+              className={`text-[10px] gap-1 cursor-pointer transition ${
+                needsScanTransfer
+                  ? "bg-indigo-500/15 text-indigo-700 dark:text-indigo-400 border-indigo-500/40"
+                  : "bg-transparent text-muted-foreground border-dashed opacity-60 hover:opacity-100"
+              } ${scanTransferPending ? "opacity-50" : ""}`}
+            >
+              <ScanLine className="w-3 h-3" aria-hidden="true" />
+              {needsScanTransfer ? "For scan" : "Scan?"}
+            </Badge>
+          </button>
+
 
 
 
