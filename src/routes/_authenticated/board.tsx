@@ -198,14 +198,14 @@ function BoardPage() {
             <div className={`text-xs uppercase tracking-widest ${p.eyebrow}`}>SDH Critical Care</div>
             <div className="text-2xl font-semibold">Live Board</div>
           </div>
-          {cap && (
+          {partner && (
             <div className="flex items-center gap-4 text-lg">
-              <CapCell label="ICU" a={cap.icu.occupied} b={cap.icu.total} p={p} />
+              <CapCell label="ICU" a={partner.stats.occupied} b={partner.stats.total_beds} p={p} />
               <div className={p.muted}>
-                <span className={`${p.eyebrow} text-sm mr-1`}>Outliers</span>{cap.outliers_count}
+                <span className={`${p.eyebrow} text-sm mr-1`}>Available</span>{partner.stats.available}
               </div>
               <div className={p.muted}>
-                <span className={`${p.eyebrow} text-sm mr-1`}>Transfers</span>{cap.open_transfers_count}
+                <span className={`${p.eyebrow} text-sm mr-1`}>Unassigned</span>{partner.stats.unassigned}
               </div>
               <div className={p.muted}>
                 <span className={`${p.eyebrow} text-sm mr-1`}>Pending referrals</span>{pending.length}
