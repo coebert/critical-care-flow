@@ -424,6 +424,17 @@ function BedCard({
               TEP
             </Badge>
           )}
+          {hasTracheostomy && (
+            <Badge
+              variant="outline"
+              className="text-[10px] gap-1 bg-sky-500/10 text-sky-700 dark:text-sky-400 border-sky-500/30"
+              title="Tracheostomy in situ"
+              aria-label="Tracheostomy in situ"
+            >
+              <Stethoscope className="w-3 h-3" aria-hidden="true" />
+              Trache
+            </Badge>
+          )}
 
         </div>
       </div>
