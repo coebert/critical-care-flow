@@ -12,7 +12,7 @@ import { getPatientAcuity } from "@/lib/patient-acuity.functions";
 import { listReferralsForList } from "@/lib/referrals.functions";
 import type { Referral } from "@/lib/referrals-list-utils";
 import { formatElapsed } from "@/lib/referrals-list-utils";
-import { X, Printer, Sun, Moon, Maximize, Minimize, ZoomIn, ZoomOut } from "lucide-react";
+import { X, Printer, Sun, Moon, Maximize, Minimize, ZoomIn, ZoomOut, Contrast } from "lucide-react";
 
 export const Route = createFileRoute("/_authenticated/board")({
   head: () => ({
@@ -21,7 +21,7 @@ export const Route = createFileRoute("/_authenticated/board")({
   component: BoardPage,
 });
 
-type Theme = "dark" | "light";
+type Theme = "dark" | "light" | "hc";
 const THEME_KEY = "sdh-board-theme";
 
 function useBoardTheme(): [Theme, (t: Theme) => void] {
@@ -29,7 +29,7 @@ function useBoardTheme(): [Theme, (t: Theme) => void] {
   useEffect(() => {
     try {
       const stored = window.localStorage.getItem(THEME_KEY);
-      if (stored === "light" || stored === "dark") setTheme(stored);
+      if (stored === "light" || stored === "dark" || stored === "hc") setTheme(stored);
     } catch { /* ignore */ }
   }, []);
   const update = (t: Theme) => {
@@ -134,6 +134,29 @@ const PALETTES: Record<Theme, Palette> = {
     timerCritical: "text-red-700",
     exit: "text-slate-600 hover:text-slate-900",
     toggle: "border-slate-300 text-slate-700 hover:bg-slate-100",
+  },
+  hc: {
+    root: "bg-black text-white",
+    border: "border-white",
+    borderSoft: "border-white",
+    borderDashed: "border-white border-dashed text-white",
+    eyebrow: "text-yellow-300",
+    muted: "text-white",
+    subtle: "text-white",
+    cardFilled: "bg-black border-white border-2",
+    cardEmpty: "text-white",
+    pill: "bg-white text-black font-bold",
+    chip: "border-white border-2 bg-black",
+    capOk: "bg-emerald-400 text-black font-bold",
+    capFull: "bg-red-500 text-white font-bold",
+    flagDefault: "bg-white text-black font-bold",
+    flagRed: "bg-red-500 text-white font-bold",
+    flagOrange: "bg-orange-400 text-black font-bold",
+    flagBlue: "bg-sky-400 text-black font-bold",
+    timerWarn: "text-yellow-300 font-bold",
+    timerCritical: "text-red-400 font-bold",
+    exit: "text-white hover:text-yellow-300",
+    toggle: "border-white border-2 text-white hover:bg-white hover:text-black",
   },
 };
 
@@ -291,15 +314,23 @@ function BoardPage() {
               <ZoomIn className="w-4 h-4" />
             </button>
           </div>
-          <button
-            onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
-            className={`text-base rounded-md border px-3 py-1.5 flex items-center gap-2 ${p.toggle}`}
-            aria-label={`Switch to ${theme === "dark" ? "light" : "dark"} mode`}
-            title={`Switch to ${theme === "dark" ? "light" : "dark"} mode`}
-          >
-            {theme === "dark" ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
-            {theme === "dark" ? "Light" : "Dark"}
-          </button>
+          {(() => {
+            const order: Theme[] = ["dark", "light", "hc"];
+            const labels: Record<Theme, string> = { dark: "Dark", light: "Light", hc: "High contrast" };
+            const next = order[(order.indexOf(theme) + 1) % order.length];
+            const Icon = theme === "dark" ? Sun : theme === "light" ? Contrast : Moon;
+            return (
+              <button
+                onClick={() => setTheme(next)}
+                className={`text-base rounded-md border px-3 py-1.5 flex items-center gap-2 ${p.toggle}`}
+                aria-label={`Switch to ${labels[next]} mode (currently ${labels[theme]})`}
+                title={`Switch to ${labels[next]} mode`}
+              >
+                <Icon className="w-4 h-4" />
+                {labels[next]}
+              </button>
+            );
+          })()}
           <button
             onClick={toggleFullscreen}
             className={`text-base rounded-md border px-3 py-1.5 flex items-center gap-2 ${p.toggle}`}
