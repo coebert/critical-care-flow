@@ -25,6 +25,9 @@ interface Props {
 
   pediatricFilter: PediatricKey;
   onPediatricFilterChange: (v: PediatricKey) => void;
+
+  /** Hide the two search inputs when a parent toolbar already owns them. */
+  hideSearchInputs?: boolean;
 }
 
 /**
@@ -48,11 +51,14 @@ export function ReferralsFilters({
   topWards,
   pediatricFilter,
   onPediatricFilterChange,
+  hideSearchInputs = false,
 }: Props) {
   return (
     <>
       <div className="flex flex-wrap gap-2 mb-4">
-        <div className="relative flex-1 min-w-[200px]">
+        {!hideSearchInputs && (
+          <><div className="relative flex-1 min-w-[200px]">
+
           <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" aria-hidden="true" />
           <Input
             placeholder="Search by hospital number…"
