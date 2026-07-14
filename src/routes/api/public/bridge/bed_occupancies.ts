@@ -36,6 +36,7 @@ const BED_OCCUPANCY_COLUMNS = [
   "source_postop_booking_id",
   "patient_id",
   "wardable",
+  "wardable_at",
 ] as const;
 
 export const Route = createFileRoute("/api/public/bridge/bed_occupancies")({
