@@ -12,7 +12,7 @@ import { getPatientAcuity } from "@/lib/patient-acuity.functions";
 import { listReferralsForList } from "@/lib/referrals.functions";
 import type { Referral } from "@/lib/referrals-list-utils";
 import { formatElapsed } from "@/lib/referrals-list-utils";
-import { X, Printer, Sun, Moon, Maximize, Minimize } from "lucide-react";
+import { X, Printer, Sun, Moon, Maximize, Minimize, ZoomIn, ZoomOut } from "lucide-react";
 
 export const Route = createFileRoute("/_authenticated/board")({
   head: () => ({
@@ -37,6 +37,29 @@ function useBoardTheme(): [Theme, (t: Theme) => void] {
     try { window.localStorage.setItem(THEME_KEY, t); } catch { /* ignore */ }
   };
   return [theme, update];
+}
+
+const ZOOM_KEY = "sdh-board-zoom";
+const ZOOM_MIN = 0.7;
+const ZOOM_MAX = 1.8;
+const ZOOM_STEP = 0.1;
+const clampZoom = (z: number) => Math.min(ZOOM_MAX, Math.max(ZOOM_MIN, Math.round(z * 100) / 100));
+
+function useBoardZoom(): [number, (z: number) => void] {
+  const [zoom, setZoom] = useState<number>(1);
+  useEffect(() => {
+    try {
+      const stored = window.localStorage.getItem(ZOOM_KEY);
+      const n = stored ? parseFloat(stored) : NaN;
+      if (isFinite(n)) setZoom(clampZoom(n));
+    } catch { /* ignore */ }
+  }, []);
+  const update = (z: number) => {
+    const c = clampZoom(z);
+    setZoom(c);
+    try { window.localStorage.setItem(ZOOM_KEY, String(c)); } catch { /* ignore */ }
+  };
+  return [zoom, update];
 }
 
 // Palette per theme. Keeps JSX readable and avoids `dark:` variants that
@@ -161,6 +184,7 @@ function BoardPage() {
   const now = useClock();
   const [theme, setTheme] = useBoardTheme();
   const [isFullscreen, toggleFullscreen] = useBoardFullscreen();
+  const [zoom, setZoom] = useBoardZoom();
   const p = PALETTES[theme];
 
 
@@ -211,7 +235,10 @@ function BoardPage() {
   pending.sort((a, b) => new Date(a.referral_received_at).getTime() - new Date(b.referral_received_at).getTime());
 
   return (
-    <div className={`fixed inset-0 z-50 flex flex-col overflow-hidden ${p.root}`}>
+    <div
+      className={`fixed inset-0 z-50 flex flex-col overflow-hidden ${p.root}`}
+      style={{ zoom }}
+    >
       {/* Top bar */}
       <div className={`flex items-center justify-between px-4 py-2 border-b ${p.border}`}>
         <div className="flex items-center gap-6">
@@ -236,6 +263,34 @@ function BoardPage() {
         </div>
         <div className="flex items-center gap-6">
           <div className="text-6xl font-mono tabular-nums">{now.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}</div>
+          <div className={`inline-flex items-center rounded-md border overflow-hidden ${p.toggle}`}>
+            <button
+              onClick={() => setZoom(zoom - ZOOM_STEP)}
+              disabled={zoom <= ZOOM_MIN + 0.001}
+              className="px-2 py-1.5 disabled:opacity-40"
+              aria-label="Decrease zoom"
+              title="Decrease zoom"
+            >
+              <ZoomOut className="w-4 h-4" />
+            </button>
+            <button
+              onClick={() => setZoom(1)}
+              className="px-2 py-1.5 text-sm font-mono tabular-nums min-w-[3rem] border-x border-inherit"
+              aria-label={`Reset zoom (currently ${Math.round(zoom * 100)}%)`}
+              title="Reset zoom to 100%"
+            >
+              {Math.round(zoom * 100)}%
+            </button>
+            <button
+              onClick={() => setZoom(zoom + ZOOM_STEP)}
+              disabled={zoom >= ZOOM_MAX - 0.001}
+              className="px-2 py-1.5 disabled:opacity-40"
+              aria-label="Increase zoom"
+              title="Increase zoom"
+            >
+              <ZoomIn className="w-4 h-4" />
+            </button>
+          </div>
           <button
             onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
             className={`text-base rounded-md border px-3 py-1.5 flex items-center gap-2 ${p.toggle}`}
