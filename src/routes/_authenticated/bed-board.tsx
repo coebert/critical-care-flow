@@ -29,6 +29,10 @@ import {
 } from "@/lib/patient-acuity.functions";
 import { getPatientAirways } from "@/lib/patient-airway.functions";
 import {
+  getPatientIsolations,
+  type PatientIsolationEntry,
+} from "@/lib/patient-infection.functions";
+import {
   listWardableStatus,
   setWardableStatus,
   dischargePatient,
