@@ -6,6 +6,7 @@ import {
   Activity,
   AlertTriangle,
   Bed as BedIcon,
+  Biohazard,
   Loader2,
   RefreshCcw,
   ShieldCheck,
@@ -28,6 +29,10 @@ import {
   type AcuityLevel,
 } from "@/lib/patient-acuity.functions";
 import { getPatientAirways } from "@/lib/patient-airway.functions";
+import {
+  getPatientIsolations,
+  type PatientIsolationEntry,
+} from "@/lib/patient-infection.functions";
 import {
   listWardableStatus,
   setWardableStatus,
@@ -264,6 +269,8 @@ function BedCard({
   level,
   oneToOne,
   hasTracheostomy,
+  isolation,
+  isolationReason,
   wardable,
   wardableAt,
   dischargedAt,
@@ -280,6 +287,8 @@ function BedCard({
   level: AcuityLevel | undefined;
   oneToOne: boolean;
   hasTracheostomy: boolean;
+  isolation: "contact" | "droplet" | "airborne" | null;
+  isolationReason: string | null;
   wardable: boolean;
   wardableAt: string | null;
   dischargedAt: string | null;
@@ -435,6 +444,21 @@ function BedCard({
               Trache
             </Badge>
           )}
+          {isolation && (
+            <Badge
+              variant="outline"
+              className="text-[10px] gap-1 bg-amber-500/10 text-amber-700 dark:text-amber-400 border-amber-500/30"
+              title={`Isolation: ${isolation}${isolationReason ? ` — ${isolationReason}` : ""}`}
+              aria-label={`Isolation required: ${isolation}${isolationReason ? `, ${isolationReason}` : ""}`}
+            >
+              <Biohazard className="w-3 h-3" aria-hidden="true" />
+              {isolation === "contact"
+                ? "Contact"
+                : isolation === "droplet"
+                  ? "Droplet"
+                  : "Airborne"}
+            </Badge>
+          )}
 
         </div>
       </div>
@@ -531,6 +555,7 @@ function BedBoardPage() {
   const fetchBoard = useServerFn(getPartnerBedBoard);
   const fetchAcuity = useServerFn(getPatientAcuity);
   const fetchAirways = useServerFn(getPatientAirways);
+  const fetchIsolations = useServerFn(getPatientIsolations);
   const qc = useQueryClient();
   const { data, isLoading, isFetching, error, refetch } = useQuery({
     queryKey: QK,
@@ -577,6 +602,23 @@ function BedBoardPage() {
     }
     return s;
   }, [airwayRows]);
+
+  // Isolation / infection indicator source: local `bed_occupancies.isolation`.
+  // Any value other than `none` means the patient needs isolation.
+  const { data: isolationRows } = useQuery({
+    queryKey: ["patient-isolations"],
+    queryFn: () => fetchIsolations(),
+    staleTime: 15_000,
+    refetchInterval: 60_000,
+  });
+  const isolationMap = useMemo(() => {
+    const m = new Map<string, PatientIsolationEntry>();
+    for (const r of isolationRows ?? []) {
+      m.set(r.partner_patient_id, r);
+    }
+    return m;
+  }, [isolationRows]);
+
 
 
   const [selected, setSelected] = useState<PartnerOccupant | null>(null);
@@ -1010,6 +1052,16 @@ function BedBoardPage() {
                     hasTracheostomy={
                       slot.occupant?.id != null &&
                       tracheostomySet.has(slot.occupant.id)
+                    }
+                    isolation={
+                      (slot.occupant?.id != null &&
+                        isolationMap.get(slot.occupant.id)?.isolation) ||
+                      null
+                    }
+                    isolationReason={
+                      (slot.occupant?.id != null &&
+                        isolationMap.get(slot.occupant.id)?.isolation_reason) ||
+                      null
                     }
                     wardable={w?.wardable === true}
                     wardableAt={w?.wardable_at ?? null}
