@@ -35,6 +35,10 @@ import {
   type PatientIsolationEntry,
 } from "@/lib/patient-infection.functions";
 import {
+  listViolenceRisk,
+  setViolenceRisk,
+} from "@/lib/patient-violence-risk.functions";
+import {
   listWardableStatus,
   setWardableStatus,
   dischargePatient,
