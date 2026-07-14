@@ -192,7 +192,7 @@ function BoardPage() {
   return (
     <div className={`fixed inset-0 z-50 flex flex-col overflow-hidden ${p.root}`}>
       {/* Top bar */}
-      <div className={`flex items-center justify-between px-6 py-3 border-b ${p.border}`}>
+      <div className={`flex items-center justify-between px-4 py-2 border-b ${p.border}`}>
         <div className="flex items-center gap-6">
           <div>
             <div className={`text-xs uppercase tracking-widest ${p.eyebrow}`}>SDH Critical Care</div>
@@ -238,7 +238,7 @@ function BoardPage() {
       </div>
 
       {/* Body */}
-      <div className="flex-1 grid grid-cols-1 lg:grid-cols-[2fr_1fr] overflow-hidden">
+      <div className="flex-1 grid grid-cols-1 lg:grid-cols-[3fr_1fr] xl:grid-cols-[4fr_1fr] overflow-hidden">
         <div className={`overflow-auto border-r ${p.border}`}>
           <BedsColumn data={partner} acuityMap={acuityMap} now={now.getTime()} p={p} />
         </div>
@@ -246,6 +246,7 @@ function BoardPage() {
           <PendingColumn rows={pending} now={now.getTime()} p={p} />
         </div>
       </div>
+
     </div>
   );
 }
@@ -282,12 +283,12 @@ function BedsColumn({
     return Math.max(1, Math.floor((now - t) / 86_400_000) + 1);
   };
   return (
-    <div className="p-4 space-y-6">
+    <div className="p-3">
       <div>
-        <h2 className={`text-sm uppercase tracking-widest mb-2 ${p.eyebrow}`}>
+        <h2 className={`text-xs uppercase tracking-widest mb-2 ${p.eyebrow}`}>
           {data.unit} · {slots.length} beds
         </h2>
-        <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-2">
+        <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 xl:grid-cols-6 2xl:grid-cols-7 gap-1.5 auto-rows-fr">
           {slots.map((s) => {
             const occ = s.occupant;
             const info = occ ? acuityMap.get(occ.id) : undefined;
@@ -296,10 +297,10 @@ function BedsColumn({
             return (
               <div
                 key={s.bed}
-                className={`rounded border p-3 ${occ ? p.cardFilled : p.borderDashed}`}
+                className={`rounded border p-2 flex flex-col ${occ ? p.cardFilled : p.borderDashed}`}
               >
-                <div className="flex items-baseline justify-between">
-                  <div className={`text-xs uppercase tracking-wider ${p.eyebrow}`}>{s.bed}</div>
+                <div className="flex items-baseline justify-between gap-1">
+                  <div className={`text-[11px] uppercase tracking-wider ${p.eyebrow}`}>{s.bed}</div>
                   {occ && (
                     <div
                       className={`text-[10px] px-1.5 py-0.5 rounded font-semibold ${level != null ? LEVEL_PILL[level] ?? p.pill : p.pill}`}
@@ -311,14 +312,14 @@ function BedsColumn({
                 </div>
                 {occ ? (
                   <>
-                    <div className="mt-1 text-lg font-semibold truncate">
+                    <div className="mt-0.5 text-base leading-tight font-semibold truncate">
                       {occ.full_name || occ.hospital_number || "—"}
                     </div>
-                    <div className={`text-xs truncate ${p.muted}`}>
+                    <div className={`text-[11px] leading-tight truncate ${p.muted}`}>
                       {occ.hospital_number ?? ""}
                       {occ.age != null ? ` · ${occ.age}y` : ""}
                     </div>
-                    <div className="mt-1 flex gap-1 text-[10px] flex-wrap">
+                    <div className="mt-auto pt-1 flex gap-1 text-[10px] flex-wrap">
                       {info?.one_to_one && <Flag p={p} tone="red">1:1</Flag>}
                       {occ.tep_in_place && <Flag p={p} tone="blue">TEP</Flag>}
                       {occ.dnacpr_decision && <Flag p={p} tone="orange">DNACPR</Flag>}
@@ -326,7 +327,7 @@ function BedsColumn({
                     </div>
                   </>
                 ) : (
-                  <div className={`mt-2 text-sm ${p.cardEmpty}`}>Free</div>
+                  <div className={`mt-1 text-xs ${p.cardEmpty}`}>Free</div>
                 )}
               </div>
             );
@@ -334,6 +335,7 @@ function BedsColumn({
         </div>
       </div>
     </div>
+
   );
 }
 
@@ -349,23 +351,23 @@ function Flag({ children, tone, p }: { children: React.ReactNode; tone?: "red" |
 
 function PendingColumn({ rows, now, p }: { rows: Referral[]; now: number; p: Palette }) {
   return (
-    <div className="p-4">
-      <h2 className={`text-sm uppercase tracking-widest mb-2 ${p.eyebrow}`}>Pending referrals · {rows.length}</h2>
+    <div className="p-3">
+      <h2 className={`text-xs uppercase tracking-widest mb-2 ${p.eyebrow}`}>Pending referrals · {rows.length}</h2>
       {rows.length === 0 && <div className={p.cardEmpty}>No pending referrals.</div>}
-      <ul className="space-y-2">
+      <ul className="space-y-1.5">
         {rows.map((r) => {
           const waitMs = r.status === "pending"
             ? now - new Date(r.referral_received_at).getTime()
             : now - new Date(r.decision_at ?? r.updated_at ?? r.referral_received_at).getTime();
           const critical = waitMs > 4 * 60 * 60 * 1000;
           return (
-            <li key={r.id} className={`rounded border p-3 ${p.chip}`}>
+            <li key={r.id} className={`rounded border p-2 ${p.chip}`}>
               <div className="flex items-center justify-between gap-2">
                 <div className="min-w-0">
-                  <div className="text-lg font-semibold truncate">{r.hospital_number ?? "—"}</div>
-                  <div className={`text-xs truncate ${p.muted}`}>{r.referring_specialty ?? "Unknown"} · {r.current_ward ?? ""}</div>
+                  <div className="text-base font-semibold truncate">{r.hospital_number ?? "—"}</div>
+                  <div className={`text-[11px] truncate ${p.muted}`}>{r.referring_specialty ?? "Unknown"} · {r.current_ward ?? ""}</div>
                 </div>
-                <div className={`text-2xl font-mono tabular-nums ${critical ? p.timerCritical : p.timerWarn}`}>
+                <div className={`text-xl font-mono tabular-nums ${critical ? p.timerCritical : p.timerWarn}`}>
                   {formatElapsed(waitMs)}
                 </div>
               </div>
