@@ -601,6 +601,8 @@ function BedBoardPage() {
   const fetchAcuity = useServerFn(getPatientAcuity);
   const fetchAirways = useServerFn(getPatientAirways);
   const fetchIsolations = useServerFn(getPatientIsolations);
+  const fetchViolence = useServerFn(listViolenceRisk);
+  const writeViolence = useServerFn(setViolenceRisk);
   const qc = useQueryClient();
   const { data, isLoading, isFetching, error, refetch } = useQuery({
     queryKey: QK,
