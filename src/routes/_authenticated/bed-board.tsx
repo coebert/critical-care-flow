@@ -45,6 +45,10 @@ import {
   setEndOfLife,
 } from "@/lib/patient-end-of-life.functions";
 import {
+  listScanTransfer,
+  setScanTransfer,
+} from "@/lib/patient-scan-transfer.functions";
+import {
   listWardableStatus,
   setWardableStatus,
   dischargePatient,
