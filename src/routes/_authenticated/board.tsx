@@ -12,7 +12,7 @@ import { getPatientAcuity } from "@/lib/patient-acuity.functions";
 import { listReferralsForList } from "@/lib/referrals.functions";
 import type { Referral } from "@/lib/referrals-list-utils";
 import { formatElapsed } from "@/lib/referrals-list-utils";
-import { X, Printer, Sun, Moon, Maximize, Minimize } from "lucide-react";
+import { X, Printer, Sun, Moon, Maximize, Minimize, ZoomIn, ZoomOut } from "lucide-react";
 
 export const Route = createFileRoute("/_authenticated/board")({
   head: () => ({
