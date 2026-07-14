@@ -6,15 +6,17 @@ import { ReferralsAnalyticsPanel } from "@/components/analytics/referrals-panel"
 import { NurseCapacityAnalyticsPanel } from "@/components/analytics/nurse-capacity-panel";
 import { CapacityAlertHistoryPanel } from "@/components/analytics/capacity-alert-history-panel";
 import { AcuityAnalyticsPanel } from "@/components/analytics/acuity-panel";
+import { WardableAnalyticsPanel } from "@/components/analytics/wardable-panel";
 import { icnarcTargetsQueryOptions, initialAnalyticsRange } from "@/components/analytics/queries";
 import { getReferralsAnalytics, getPostopAnalytics } from "@/lib/analytics.functions";
 import { getNurseCapacityAnalytics } from "@/lib/nurse-staffing.functions";
 import { getAcuityAnalytics } from "@/lib/acuity-analytics.functions";
+import { getWardableAnalytics } from "@/lib/wardable-analytics.functions";
 import { AdminOnly } from "@/components/admin-only";
 import { RouteErrorFallback } from "@/components/route-error-fallback";
 
 const analyticsSearchSchema = z.object({
-  view: z.enum(["referrals", "postop", "nurse-capacity", "capacity-alerts", "acuity"]).optional(),
+  view: z.enum(["referrals", "postop", "nurse-capacity", "capacity-alerts", "acuity", "wardable"]).optional(),
 });
 
 export const Route = createFileRoute("/_authenticated/analytics")({
