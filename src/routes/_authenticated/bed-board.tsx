@@ -516,14 +516,13 @@ function BedCard({
           >
             <Badge
               variant="outline"
-              className={`text-[10px] gap-1 cursor-pointer transition ${
+              className={`text-[10px] p-0.5 cursor-pointer transition ${
                 violenceRisk
                   ? "bg-red-500/15 text-red-700 dark:text-red-400 border-red-500/40"
                   : "bg-transparent text-muted-foreground border-dashed opacity-60 hover:opacity-100"
               } ${violencePending ? "opacity-50" : ""}`}
             >
               <Swords className="w-3 h-3" aria-hidden="true" />
-              {violenceRisk ? "Violence risk" : "Violence?"}
             </Badge>
           </button>
           <button
