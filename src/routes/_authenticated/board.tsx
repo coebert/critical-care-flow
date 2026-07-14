@@ -1,14 +1,18 @@
 import { createFileRoute, useNavigate, Link } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
+import { useServerFn } from "@tanstack/react-start";
 import { supabase } from "@/integrations/supabase/client";
-import { getBedBoard, getCapacitySnapshot } from "@/lib/beds.functions";
+import {
+  getPartnerBedBoard,
+  type PartnerBedBoardOk,
+  type PartnerBedSlot,
+} from "@/lib/partner-bed-board.functions";
+import { getPatientAcuity } from "@/lib/patient-acuity.functions";
 import { listReferralsForList } from "@/lib/referrals.functions";
 import type { Referral } from "@/lib/referrals-list-utils";
 import { formatElapsed } from "@/lib/referrals-list-utils";
-import { dayOfStay } from "@/lib/bed-capacity";
 import { X, Printer, Sun, Moon } from "lucide-react";
-import { WardableBadge } from "@/components/bed-board/wardable-badge";
 
 export const Route = createFileRoute("/_authenticated/board")({
   head: () => ({
