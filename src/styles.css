@@ -181,3 +181,15 @@
 .animate-bed-pulse {
   animation: bed-pulse 1.6s ease-out 1;
 }
+
+/* Honour prefers-reduced-motion for decorative animations. Radix / shadcn
+ * primitives already gate their own transitions on this preference, so we
+ * only silence our own custom keyframe animations. Spinners are treated as
+ * essential progress feedback and intentionally left running. */
+@media (prefers-reduced-motion: reduce) {
+  .animate-bed-pulse,
+  .animate-fade-in,
+  .animate-pulse {
+    animation: none !important;
+  }
+}
