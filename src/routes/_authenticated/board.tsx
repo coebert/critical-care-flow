@@ -217,10 +217,10 @@ function BoardPage() {
         <div className="flex items-center gap-6">
           <div>
             <div className={`text-xs uppercase tracking-widest ${p.eyebrow}`}>SDH Critical Care</div>
-            <div className="text-2xl font-semibold">Live Board</div>
+            <div className="text-4xl font-semibold">Live Board</div>
           </div>
           {partner && (
-            <div className="flex items-center gap-4 text-lg">
+            <div className="flex items-center gap-4 text-2xl">
               <CapCell label="ICU" a={partner.stats.occupied} b={partner.stats.total_beds} p={p} />
               <div className={p.muted}>
                 <span className={`${p.eyebrow} text-sm mr-1`}>Available</span>{partner.stats.available}
@@ -235,10 +235,10 @@ function BoardPage() {
           )}
         </div>
         <div className="flex items-center gap-6">
-          <div className="text-4xl font-mono tabular-nums">{now.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}</div>
+          <div className="text-6xl font-mono tabular-nums">{now.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}</div>
           <button
             onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
-            className={`text-sm rounded-md border px-2 py-1 flex items-center gap-1.5 ${p.toggle}`}
+            className={`text-base rounded-md border px-3 py-1.5 flex items-center gap-2 ${p.toggle}`}
             aria-label={`Switch to ${theme === "dark" ? "light" : "dark"} mode`}
             title={`Switch to ${theme === "dark" ? "light" : "dark"} mode`}
           >
@@ -247,19 +247,19 @@ function BoardPage() {
           </button>
           <button
             onClick={toggleFullscreen}
-            className={`text-sm rounded-md border px-2 py-1 flex items-center gap-1.5 ${p.toggle}`}
+            className={`text-base rounded-md border px-3 py-1.5 flex items-center gap-2 ${p.toggle}`}
             aria-label={isFullscreen ? "Exit full screen" : "Enter full screen"}
             title={isFullscreen ? "Exit full screen (F11)" : "Enter full screen (F11)"}
           >
             {isFullscreen ? <Minimize className="w-4 h-4" /> : <Maximize className="w-4 h-4" />}
             {isFullscreen ? "Exit" : "Full screen"}
           </button>
-          <Link to="/board/ward-round" className={`${p.exit} text-sm underline flex items-center gap-1`}>
+          <Link to="/board/ward-round" className={`${p.exit} text-base underline flex items-center gap-2`}>
             <Printer className="w-4 h-4" /> Ward round
           </Link>
           <button
             onClick={() => navigate({ to: "/bed-board" })}
-            className={`${p.exit} text-sm underline flex items-center gap-1`}
+            className={`${p.exit} text-base underline flex items-center gap-2`}
             aria-label="Exit board mode"
           >
             <X className="w-4 h-4" /> Exit
