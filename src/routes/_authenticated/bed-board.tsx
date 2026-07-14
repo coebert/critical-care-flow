@@ -583,6 +583,23 @@ function BedBoardPage() {
     return s;
   }, [airwayRows]);
 
+  // Isolation / infection indicator source: local `bed_occupancies.isolation`.
+  // Any value other than `none` means the patient needs isolation.
+  const { data: isolationRows } = useQuery({
+    queryKey: ["patient-isolations"],
+    queryFn: () => fetchIsolations(),
+    staleTime: 15_000,
+    refetchInterval: 60_000,
+  });
+  const isolationMap = useMemo(() => {
+    const m = new Map<string, PatientIsolationEntry>();
+    for (const r of isolationRows ?? []) {
+      m.set(r.partner_patient_id, r);
+    }
+    return m;
+  }, [isolationRows]);
+
+
 
   const [selected, setSelected] = useState<PartnerOccupant | null>(null);
   const [dragging, setDragging] = useState(false);
