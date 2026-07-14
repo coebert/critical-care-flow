@@ -871,6 +871,10 @@ function BedBoardPage() {
                   wardableMutation.isPending &&
                   (wardableMutation.variables as { partner_patient_id?: string } | undefined)
                     ?.partner_patient_id;
+                const dischargePendingId =
+                  dischargeMutation.isPending &&
+                  (dischargeMutation.variables as { partner_patient_id?: string } | undefined)
+                    ?.partner_patient_id;
                 return (
                   <BedCard
                     key={slot.bed}
@@ -879,10 +883,16 @@ function BedBoardPage() {
                     oneToOne={a?.one_to_one === true}
                     wardable={w?.wardable === true}
                     wardableAt={w?.wardable_at ?? null}
+                    dischargedAt={w?.discharged_at ?? null}
                     wardablePending={
                       slot.occupant?.id != null && pendingId === slot.occupant.id
                     }
+                    dischargePending={
+                      slot.occupant?.id != null &&
+                      dischargePendingId === slot.occupant.id
+                    }
                     onToggleWardable={handleToggleWardable}
+                    onDischarge={handleDischarge}
                     onOccupiedClick={setSelected}
                     onMove={handleMove}
                     isDragTarget={dragging}
