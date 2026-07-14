@@ -122,10 +122,72 @@ function dayOfStay(iso: string | null | undefined): number | null {
   return Math.max(1, Math.floor((Date.now() - t) / 86_400_000) + 1);
 }
 
+function WardableToggle({
+  wardable,
+  wardableAt,
+  pending,
+  onToggle,
+}: {
+  wardable: boolean;
+  wardableAt: string | null;
+  pending: boolean;
+  onToggle: () => void;
+}) {
+  // Live-updating "since" label — tick once a minute while marked wardable.
+  const [, force] = useState(0);
+  useEffect(() => {
+    if (!wardable || !wardableAt) return;
+    const id = setInterval(() => force((n) => n + 1), 60_000);
+    return () => clearInterval(id);
+  }, [wardable, wardableAt]);
+  const elapsed =
+    wardable && wardableAt
+      ? formatDistanceToNowStrict(new Date(wardableAt))
+      : null;
+  const title = wardable && wardableAt
+    ? `Wardable since ${new Date(wardableAt).toLocaleString()} — click to clear`
+    : "Mark ready for discharge to the ward";
+  return (
+    <button
+      type="button"
+      aria-pressed={wardable}
+      onClick={(e) => {
+        e.stopPropagation();
+        if (!pending) onToggle();
+      }}
+      onKeyDown={(e) => e.stopPropagation()}
+      onMouseDown={(e) => e.stopPropagation()}
+      onDragStart={(e) => e.preventDefault()}
+      draggable={false}
+      disabled={pending}
+      title={title}
+      className={
+        "mt-1 inline-flex items-center gap-1 rounded border px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide transition disabled:opacity-60 " +
+        (wardable
+          ? "bg-emerald-500/15 text-emerald-800 border-emerald-500/40 dark:text-emerald-300 dark:border-emerald-400/40 hover:bg-emerald-500/25"
+          : "bg-transparent text-muted-foreground border-dashed hover:bg-accent hover:text-foreground")
+      }
+    >
+      <span aria-hidden="true">{wardable ? "✓" : "○"}</span>
+      <span>
+        {wardable
+          ? elapsed
+            ? `Wardable · ${elapsed}`
+            : "Wardable"
+          : "Wardable"}
+      </span>
+    </button>
+  );
+}
+
 function BedCard({
   slot,
   level,
   oneToOne,
+  wardable,
+  wardableAt,
+  wardablePending,
+  onToggleWardable,
   onOccupiedClick,
   onMove,
   isDragTarget,
@@ -134,6 +196,10 @@ function BedCard({
   slot: PartnerBedSlot;
   level: AcuityLevel | undefined;
   oneToOne: boolean;
+  wardable: boolean;
+  wardableAt: string | null;
+  wardablePending: boolean;
+  onToggleWardable: (occupantId: string, next: boolean) => void;
   onOccupiedClick: (o: PartnerOccupant) => void;
   onMove: (
     occupantId: string,
