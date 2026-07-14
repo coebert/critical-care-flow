@@ -1534,6 +1534,33 @@ export type Database = {
           },
         ]
       }
+      referral_saved_views: {
+        Row: {
+          created_at: string
+          id: string
+          name: string
+          params: Json
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          name: string
+          params?: Json
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          name?: string
+          params?: Json
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       referral_tasks: {
         Row: {
           assigned_role: Database["public"]["Enums"]["app_role"] | null
