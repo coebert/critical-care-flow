@@ -362,7 +362,6 @@ function BedsColumn({
               </div>
             );
           })}
-        </div>
       </div>
     </div>
 
