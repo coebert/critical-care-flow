@@ -529,6 +529,7 @@ function BedBoardPage() {
                 ? existing.wardable_at
                 : now
               : null,
+            discharged_at: null,
             updated_at: now,
           };
           if (idx >= 0) list[idx] = next;
