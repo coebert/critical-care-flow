@@ -21,7 +21,7 @@ export const Route = createFileRoute("/_authenticated/board")({
   component: BoardPage,
 });
 
-type Theme = "dark" | "light";
+type Theme = "dark" | "light" | "hc";
 const THEME_KEY = "sdh-board-theme";
 
 function useBoardTheme(): [Theme, (t: Theme) => void] {
@@ -29,7 +29,7 @@ function useBoardTheme(): [Theme, (t: Theme) => void] {
   useEffect(() => {
     try {
       const stored = window.localStorage.getItem(THEME_KEY);
-      if (stored === "light" || stored === "dark") setTheme(stored);
+      if (stored === "light" || stored === "dark" || stored === "hc") setTheme(stored);
     } catch { /* ignore */ }
   }, []);
   const update = (t: Theme) => {
