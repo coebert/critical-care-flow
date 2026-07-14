@@ -25,7 +25,7 @@ import {
   type StatusKey,
 } from "@/lib/referrals-list-utils";
 import { ReferralsDrilldownBadges } from "@/components/referrals/referrals-drilldown-badges";
-import { ReferralsFilters } from "@/components/referrals/referrals-filters";
+import { ReferralsFilterToolbar } from "@/components/referrals/referrals-filter-toolbar";
 import { ReferralsDeletedPanel } from "@/components/referrals/referrals-deleted-panel";
 import { ReferralsRows } from "@/components/referrals/referrals-rows";
 import { MiniCapacityLink } from "@/components/bed-board/mini-capacity-link";
@@ -281,7 +281,7 @@ function ReferralsList() {
         onChange={(k) => navigate({ search: ((prev: Record<string, unknown>) => ({ ...prev, quick: k === "all" ? undefined : k })) as never })}
       />
 
-      <ReferralsFilters
+      <ReferralsFilterToolbar
         hospSearch={hospSearch}
         onHospSearchChange={setHospSearch}
         q={q}
