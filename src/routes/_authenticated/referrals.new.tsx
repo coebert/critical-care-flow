@@ -562,7 +562,7 @@ function NewReferralPage() {
           </p>
         </Section>
 
-        <div className="flex justify-end gap-2">
+        <div className="sticky bottom-0 -mx-4 sm:-mx-6 px-4 sm:px-6 py-3 mt-6 flex justify-end gap-2 bg-background/95 backdrop-blur border-t supports-[backdrop-filter]:bg-background/80 z-10">
           <Button type="button" variant="outline" onClick={() => navigate({ to: "/" })}>Cancel</Button>
           <Button type="submit" disabled={saving || acceptingConsultantMissing || declineConsultantMissing}>{saving ? "Saving…" : "Save referral"}</Button>
         </div>
