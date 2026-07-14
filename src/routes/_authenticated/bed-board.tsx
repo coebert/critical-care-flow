@@ -7,6 +7,7 @@ import {
   AlertTriangle,
   Bed as BedIcon,
   Biohazard,
+  ChevronDown,
   HelpCircle,
   Loader2,
   RefreshCcw,
@@ -80,6 +81,11 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from "@/components/ui/collapsible";
 
 
 const QK = ["partner-bed-board"] as const;
@@ -1383,59 +1389,69 @@ function BedBoardPage() {
           </section>
 
           <section>
-            <h2 className="text-sm font-semibold text-muted-foreground mb-2 flex items-center gap-1">
-              <HelpCircle className="w-3.5 h-3.5" aria-hidden="true" />
-              Bed board symbols
-            </h2>
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2 text-xs">
-              <div className="flex items-center gap-2 rounded-md border px-2.5 py-1.5 bg-amber-500/10 text-amber-700 dark:text-amber-400 border-amber-500/30">
-                <Biohazard className="w-3.5 h-3.5" aria-hidden="true" />
-                <span className="font-medium">Contact</span>
-                <span className="text-muted-foreground">— contact isolation</span>
-              </div>
-              <div className="flex items-center gap-2 rounded-md border px-2.5 py-1.5 bg-amber-500/10 text-amber-700 dark:text-amber-400 border-amber-500/30">
-                <Biohazard className="w-3.5 h-3.5" aria-hidden="true" />
-                <span className="font-medium">Droplet</span>
-                <span className="text-muted-foreground">— droplet isolation</span>
-              </div>
-              <div className="flex items-center gap-2 rounded-md border px-2.5 py-1.5 bg-amber-500/10 text-amber-700 dark:text-amber-400 border-amber-500/30">
-                <Biohazard className="w-3.5 h-3.5" aria-hidden="true" />
-                <span className="font-medium">Airborne</span>
-                <span className="text-muted-foreground">— airborne isolation</span>
-              </div>
-              <div className="flex items-center gap-2 rounded-md border px-2.5 py-1.5 bg-sky-500/10 text-sky-700 dark:text-sky-400 border-sky-500/30">
-                <Stethoscope className="w-3.5 h-3.5" aria-hidden="true" />
-                <span className="font-medium">Trache</span>
-                <span className="text-muted-foreground">— tracheostomy in situ</span>
-              </div>
-              <div className="flex items-center gap-2 rounded-md border px-2.5 py-1.5 bg-rose-500/10 text-rose-700 dark:text-rose-400 border-rose-500/30">
-                <span className="font-medium">1:1</span>
-                <span className="text-muted-foreground">— requires 1:1 nursing</span>
-              </div>
-              <div className="flex items-center gap-2 rounded-md border px-2.5 py-1.5 bg-red-500/15 text-red-700 dark:text-red-400 border-red-500/40">
-                <Swords className="w-3.5 h-3.5" aria-hidden="true" />
-                <span className="font-medium">Violence risk</span>
-                <span className="text-muted-foreground">— potentially violent/aggressive</span>
-              </div>
-              <div className="flex items-center gap-2 rounded-md border px-2.5 py-1.5 bg-violet-500/15 text-violet-700 dark:text-violet-400 border-violet-500/40">
-                <Heart className="w-3.5 h-3.5 fill-current" aria-hidden="true" />
-                <span className="font-medium">End of life</span>
-                <span className="text-muted-foreground">— receiving end-of-life care</span>
-              </div>
-              <div className="flex items-center gap-2 rounded-md border px-2.5 py-1.5 bg-indigo-500/15 text-indigo-700 dark:text-indigo-400 border-indigo-500/40">
-                <ScanLine className="w-3.5 h-3.5" aria-hidden="true" />
-                <span className="font-medium">For scan</span>
-                <span className="text-muted-foreground">— needs transfer for a scan</span>
-              </div>
-              <div className="flex items-center gap-2 rounded-md border px-2.5 py-1.5 bg-emerald-500/15 text-emerald-800 dark:text-emerald-300 border-emerald-500/40">
-                <span className="font-medium">✓ Wardable</span>
-                <span className="text-muted-foreground">— ready for discharge to ward</span>
-              </div>
-              <div className="flex items-center gap-2 rounded-md border px-2.5 py-1.5 border-dashed text-muted-foreground">
-                <span className="font-medium">Dashed outline</span>
-                <span>— not active; click to toggle</span>
-              </div>
-            </div>
+            <Collapsible defaultOpen={false}>
+              <CollapsibleTrigger className="group flex items-center justify-between w-full text-left rounded-md border px-3 py-2 hover:bg-accent/40 transition">
+                <h2 className="text-sm font-semibold text-muted-foreground flex items-center gap-1">
+                  <HelpCircle className="w-3.5 h-3.5" aria-hidden="true" />
+                  Bed board symbols
+                </h2>
+                <ChevronDown
+                  className="w-4 h-4 text-muted-foreground transition-transform duration-200 group-data-[state=open]:rotate-180"
+                  aria-hidden="true"
+                />
+              </CollapsibleTrigger>
+              <CollapsibleContent>
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2 text-xs pt-2">
+                  <div className="flex items-center gap-2 rounded-md border px-2.5 py-1.5 bg-amber-500/10 text-amber-700 dark:text-amber-400 border-amber-500/30">
+                    <Biohazard className="w-3.5 h-3.5" aria-hidden="true" />
+                    <span className="font-medium">Contact</span>
+                    <span className="text-muted-foreground">— contact isolation</span>
+                  </div>
+                  <div className="flex items-center gap-2 rounded-md border px-2.5 py-1.5 bg-amber-500/10 text-amber-700 dark:text-amber-400 border-amber-500/30">
+                    <Biohazard className="w-3.5 h-3.5" aria-hidden="true" />
+                    <span className="font-medium">Droplet</span>
+                    <span className="text-muted-foreground">— droplet isolation</span>
+                  </div>
+                  <div className="flex items-center gap-2 rounded-md border px-2.5 py-1.5 bg-amber-500/10 text-amber-700 dark:text-amber-400 border-amber-500/30">
+                    <Biohazard className="w-3.5 h-3.5" aria-hidden="true" />
+                    <span className="font-medium">Airborne</span>
+                    <span className="text-muted-foreground">— airborne isolation</span>
+                  </div>
+                  <div className="flex items-center gap-2 rounded-md border px-2.5 py-1.5 bg-sky-500/10 text-sky-700 dark:text-sky-400 border-sky-500/30">
+                    <Stethoscope className="w-3.5 h-3.5" aria-hidden="true" />
+                    <span className="font-medium">Trache</span>
+                    <span className="text-muted-foreground">— tracheostomy in situ</span>
+                  </div>
+                  <div className="flex items-center gap-2 rounded-md border px-2.5 py-1.5 bg-rose-500/10 text-rose-700 dark:text-rose-400 border-rose-500/30">
+                    <span className="font-medium">1:1</span>
+                    <span className="text-muted-foreground">— requires 1:1 nursing</span>
+                  </div>
+                  <div className="flex items-center gap-2 rounded-md border px-2.5 py-1.5 bg-red-500/15 text-red-700 dark:text-red-400 border-red-500/40">
+                    <Swords className="w-3.5 h-3.5" aria-hidden="true" />
+                    <span className="font-medium">Violence risk</span>
+                    <span className="text-muted-foreground">— potentially violent/aggressive</span>
+                  </div>
+                  <div className="flex items-center gap-2 rounded-md border px-2.5 py-1.5 bg-violet-500/15 text-violet-700 dark:text-violet-400 border-violet-500/40">
+                    <Heart className="w-3.5 h-3.5 fill-current" aria-hidden="true" />
+                    <span className="font-medium">End of life</span>
+                    <span className="text-muted-foreground">— receiving end-of-life care</span>
+                  </div>
+                  <div className="flex items-center gap-2 rounded-md border px-2.5 py-1.5 bg-indigo-500/15 text-indigo-700 dark:text-indigo-400 border-indigo-500/40">
+                    <ScanLine className="w-3.5 h-3.5" aria-hidden="true" />
+                    <span className="font-medium">For scan</span>
+                    <span className="text-muted-foreground">— needs transfer for a scan</span>
+                  </div>
+                  <div className="flex items-center gap-2 rounded-md border px-2.5 py-1.5 bg-emerald-500/15 text-emerald-800 dark:text-emerald-300 border-emerald-500/40">
+                    <span className="font-medium">✓ Wardable</span>
+                    <span className="text-muted-foreground">— ready for discharge to ward</span>
+                  </div>
+                  <div className="flex items-center gap-2 rounded-md border px-2.5 py-1.5 border-dashed text-muted-foreground">
+                    <span className="font-medium">Dashed outline</span>
+                    <span>— not active; click to toggle</span>
+                  </div>
+                </div>
+              </CollapsibleContent>
+            </Collapsible>
           </section>
 
           {lastOk.unassigned.length > 0 && (
