@@ -75,10 +75,26 @@ export function TaskList({ referralId }: { referralId: string }) {
   }
 
   async function toggle(task: Task) {
-    const next: TaskStatus = task.status === "done" ? "open" : "done";
+    const prev: TaskStatus = task.status;
+    const next: TaskStatus = prev === "done" ? "open" : "done";
     try {
       await update({ data: { id: task.id, patch: { status: next } } });
       await refresh();
+      // Inline undo — one tap reverts the change without hunting for the row.
+      toast.success(next === "done" ? "Task marked done" : "Task reopened", {
+        duration: 5000,
+        action: {
+          label: "Undo",
+          onClick: async () => {
+            try {
+              await update({ data: { id: task.id, patch: { status: prev } } });
+              await refresh();
+            } catch (err) {
+              toast.error((err as Error)?.message ?? "Undo failed");
+            }
+          },
+        },
+      });
     } catch (err) {
       toast.error((err as Error)?.message ?? "Update failed");
     }

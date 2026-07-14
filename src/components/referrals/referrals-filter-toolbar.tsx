@@ -10,6 +10,8 @@ import {
 } from "@/components/ui/sheet";
 import { Badge } from "@/components/ui/badge";
 import { ReferralsFilters } from "@/components/referrals/referrals-filters";
+import { SavedViewsMenu } from "@/components/referrals/saved-views-menu";
+import type { SavedViewParams } from "@/lib/referral-saved-views.functions";
 import { ADMISSION_URGENCY_OPTIONS, type AdmissionUrgency } from "@/lib/admission-urgency";
 import type { DateKey, PediatricKey, StatusKey } from "@/lib/referrals-list-utils";
 
@@ -141,6 +143,24 @@ export function ReferralsFilterToolbar(props: Props) {
             )}
           </SheetContent>
         </Sheet>
+        <SavedViewsMenu
+          currentParams={{
+            status: statusFilter,
+            date: dateFilter,
+            urgency: urgencyFilter,
+            location: locFilter,
+            pediatric: pediatricFilter,
+          }}
+          onApply={(p) => {
+            if (typeof p.status === "string") onStatusFilterChange(p.status as StatusKey);
+            if (typeof p.date === "string") onDateFilterChange(p.date as DateKey);
+            if (typeof p.urgency === "string")
+              onUrgencyFilterChange(p.urgency as "all" | AdmissionUrgency);
+            if (typeof p.location === "string") onLocFilterChange(p.location);
+            if (typeof p.pediatric === "string")
+              onPediatricFilterChange(p.pediatric as PediatricKey);
+          }}
+        />
       </div>
 
       {activeCount > 0 && (
