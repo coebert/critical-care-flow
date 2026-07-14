@@ -216,20 +216,20 @@ function BoardPage() {
       <div className={`flex items-center justify-between px-4 py-2 border-b ${p.border}`}>
         <div className="flex items-center gap-6">
           <div>
-            <div className={`text-xs uppercase tracking-widest ${p.eyebrow}`}>SDH Critical Care</div>
+            <div className={`text-sm uppercase tracking-widest ${p.eyebrow}`}>SDH Critical Care</div>
             <div className="text-4xl font-semibold">Live Board</div>
           </div>
           {partner && (
             <div className="flex items-center gap-4 text-2xl">
               <CapCell label="ICU" a={partner.stats.occupied} b={partner.stats.total_beds} p={p} />
               <div className={p.muted}>
-                <span className={`${p.eyebrow} text-sm mr-1`}>Available</span>{partner.stats.available}
+                <span className={`${p.eyebrow} text-base mr-1`}>Available</span>{partner.stats.available}
               </div>
               <div className={p.muted}>
-                <span className={`${p.eyebrow} text-sm mr-1`}>Unassigned</span>{partner.stats.unassigned}
+                <span className={`${p.eyebrow} text-base mr-1`}>Unassigned</span>{partner.stats.unassigned}
               </div>
               <div className={p.muted}>
-                <span className={`${p.eyebrow} text-sm mr-1`}>Pending referrals</span>{pending.length}
+                <span className={`${p.eyebrow} text-base mr-1`}>Pending referrals</span>{pending.length}
               </div>
             </div>
           )}
@@ -375,7 +375,7 @@ function Flag({ children, tone, p }: { children: React.ReactNode; tone?: "red" |
     tone === "orange" ? p.flagOrange :
     tone === "blue" ? p.flagBlue :
     p.flagDefault;
-  return <span className={`px-1 py-0.5 rounded ${cls}`}>{children}</span>;
+  return <span className={`px-1.5 py-0.5 rounded text-sm ${cls}`}>{children}</span>;
 }
 
 function PendingColumn({ rows, now, p }: { rows: Referral[]; now: number; p: Palette }) {
