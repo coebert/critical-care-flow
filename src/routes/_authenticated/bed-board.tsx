@@ -6,6 +6,7 @@ import {
   Activity,
   AlertTriangle,
   Bed as BedIcon,
+  Biohazard,
   Loader2,
   RefreshCcw,
   ShieldCheck,
