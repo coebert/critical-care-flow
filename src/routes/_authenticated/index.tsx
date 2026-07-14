@@ -58,7 +58,19 @@ const unreadCountsQueryOptions = queryOptions({
 
 function ReferralsListPending() {
   return (
-    <div className="p-6 text-sm text-muted-foreground">Loading referrals…</div>
+    <div className="p-4 sm:p-6 space-y-3" aria-busy="true" aria-label="Loading referrals">
+      <div className="h-8 w-48 rounded bg-muted motion-safe:animate-pulse" />
+      <div className="flex gap-2">
+        {Array.from({ length: 5 }).map((_, i) => (
+          <div key={i} className="h-8 w-20 rounded bg-muted motion-safe:animate-pulse" />
+        ))}
+      </div>
+      <div className="space-y-2 pt-2">
+        {Array.from({ length: 8 }).map((_, i) => (
+          <div key={i} className="h-16 rounded-md border bg-muted/40 motion-safe:animate-pulse" />
+        ))}
+      </div>
+    </div>
   );
 }
 
