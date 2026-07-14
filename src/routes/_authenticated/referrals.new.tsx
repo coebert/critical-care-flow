@@ -320,7 +320,7 @@ function NewReferralPage() {
 
   return (
     <ClinicalAccessGate>
-    <div className="p-4 sm:p-6 max-w-3xl mx-auto">
+    <div className="p-4 sm:p-6 max-w-3xl lg:max-w-5xl mx-auto">
       <div className="flex items-end justify-between mb-6 gap-4 flex-wrap">
         <h1 className="text-2xl font-semibold tracking-tight">New referral</h1>
         {(draftRestored || draftSavedAt) && isSafeDraftDirty(f) && (
