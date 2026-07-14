@@ -283,12 +283,12 @@ function BedsColumn({
     return Math.max(1, Math.floor((now - t) / 86_400_000) + 1);
   };
   return (
-    <div className="p-4 space-y-6">
+    <div className="p-3">
       <div>
-        <h2 className={`text-sm uppercase tracking-widest mb-2 ${p.eyebrow}`}>
+        <h2 className={`text-xs uppercase tracking-widest mb-2 ${p.eyebrow}`}>
           {data.unit} · {slots.length} beds
         </h2>
-        <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-2">
+        <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 xl:grid-cols-6 2xl:grid-cols-7 gap-1.5 auto-rows-fr">
           {slots.map((s) => {
             const occ = s.occupant;
             const info = occ ? acuityMap.get(occ.id) : undefined;
@@ -297,10 +297,10 @@ function BedsColumn({
             return (
               <div
                 key={s.bed}
-                className={`rounded border p-3 ${occ ? p.cardFilled : p.borderDashed}`}
+                className={`rounded border p-2 flex flex-col ${occ ? p.cardFilled : p.borderDashed}`}
               >
-                <div className="flex items-baseline justify-between">
-                  <div className={`text-xs uppercase tracking-wider ${p.eyebrow}`}>{s.bed}</div>
+                <div className="flex items-baseline justify-between gap-1">
+                  <div className={`text-[11px] uppercase tracking-wider ${p.eyebrow}`}>{s.bed}</div>
                   {occ && (
                     <div
                       className={`text-[10px] px-1.5 py-0.5 rounded font-semibold ${level != null ? LEVEL_PILL[level] ?? p.pill : p.pill}`}
@@ -312,14 +312,14 @@ function BedsColumn({
                 </div>
                 {occ ? (
                   <>
-                    <div className="mt-1 text-lg font-semibold truncate">
+                    <div className="mt-0.5 text-base leading-tight font-semibold truncate">
                       {occ.full_name || occ.hospital_number || "—"}
                     </div>
-                    <div className={`text-xs truncate ${p.muted}`}>
+                    <div className={`text-[11px] leading-tight truncate ${p.muted}`}>
                       {occ.hospital_number ?? ""}
                       {occ.age != null ? ` · ${occ.age}y` : ""}
                     </div>
-                    <div className="mt-1 flex gap-1 text-[10px] flex-wrap">
+                    <div className="mt-auto pt-1 flex gap-1 text-[10px] flex-wrap">
                       {info?.one_to_one && <Flag p={p} tone="red">1:1</Flag>}
                       {occ.tep_in_place && <Flag p={p} tone="blue">TEP</Flag>}
                       {occ.dnacpr_decision && <Flag p={p} tone="orange">DNACPR</Flag>}
@@ -327,7 +327,7 @@ function BedsColumn({
                     </div>
                   </>
                 ) : (
-                  <div className={`mt-2 text-sm ${p.cardEmpty}`}>Free</div>
+                  <div className={`mt-1 text-xs ${p.cardEmpty}`}>Free</div>
                 )}
               </div>
             );
@@ -335,6 +335,7 @@ function BedsColumn({
         </div>
       </div>
     </div>
+
   );
 }
 
