@@ -1,14 +1,18 @@
 import { createFileRoute, useNavigate, Link } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
+import { useServerFn } from "@tanstack/react-start";
 import { supabase } from "@/integrations/supabase/client";
-import { getBedBoard, getCapacitySnapshot } from "@/lib/beds.functions";
+import {
+  getPartnerBedBoard,
+  type PartnerBedBoardOk,
+  type PartnerBedSlot,
+} from "@/lib/partner-bed-board.functions";
+import { getPatientAcuity } from "@/lib/patient-acuity.functions";
 import { listReferralsForList } from "@/lib/referrals.functions";
 import type { Referral } from "@/lib/referrals-list-utils";
 import { formatElapsed } from "@/lib/referrals-list-utils";
-import { dayOfStay } from "@/lib/bed-capacity";
 import { X, Printer, Sun, Moon } from "lucide-react";
-import { WardableBadge } from "@/components/bed-board/wardable-badge";
 
 export const Route = createFileRoute("/_authenticated/board")({
   head: () => ({
@@ -139,14 +143,16 @@ function BoardPage() {
   const [theme, setTheme] = useBoardTheme();
   const p = PALETTES[theme];
 
+  const fetchBoard = useServerFn(getPartnerBedBoard);
+  const fetchAcuity = useServerFn(getPatientAcuity);
   const bedBoard = useQuery({
-    queryKey: ["board", "bed-board"],
-    queryFn: () => getBedBoard(),
-    refetchInterval: 30_000,
+    queryKey: ["board", "partner-bed-board"],
+    queryFn: () => fetchBoard(),
+    refetchInterval: 20_000,
   });
-  const capacity = useQuery({
-    queryKey: ["board", "capacity"],
-    queryFn: () => getCapacitySnapshot(),
+  const acuity = useQuery({
+    queryKey: ["board", "patient-acuity"],
+    queryFn: () => fetchAcuity(),
     refetchInterval: 30_000,
   });
   const referrals = useQuery({
@@ -156,17 +162,13 @@ function BoardPage() {
   });
 
   useEffect(() => {
-    const refreshBeds = () => { bedBoard.refetch(); capacity.refetch(); };
     const ch = supabase
       .channel("board-refresh")
       .on("postgres_changes", { event: "*", schema: "public", table: "referrals" }, () => referrals.refetch())
-      .on("postgres_changes", { event: "*", schema: "public", table: "bed_occupancies" }, refreshBeds)
-      .on("postgres_changes", { event: "*", schema: "public", table: "beds" }, refreshBeds)
-      .on("postgres_changes", { event: "*", schema: "public", table: "bed_outliers" }, refreshBeds)
-      .on("postgres_changes", { event: "*", schema: "public", table: "bed_transfers_out" }, refreshBeds)
+      .on("postgres_changes", { event: "*", schema: "public", table: "patient_acuity_overrides" }, () => acuity.refetch())
       .subscribe();
     return () => { supabase.removeChannel(ch); };
-  }, [bedBoard, capacity, referrals]);
+  }, [acuity, referrals]);
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -176,7 +178,14 @@ function BoardPage() {
     return () => window.removeEventListener("keydown", onKey);
   }, [navigate]);
 
-  const cap = capacity.data;
+  const partner = bedBoard.data && bedBoard.data.ok ? bedBoard.data : null;
+  const acuityMap = new Map<string, { level: number; one_to_one: boolean }>();
+  for (const r of acuity.data ?? []) {
+    acuityMap.set(r.partner_patient_id, {
+      level: Number(r.level),
+      one_to_one: r.one_to_one === true,
+    });
+  }
   const pending = (referrals.data ?? []).filter((r) => r.status === "pending" || (r.status === "accepted" && !r.arrived_on_unit_at));
   pending.sort((a, b) => new Date(a.referral_received_at).getTime() - new Date(b.referral_received_at).getTime());
 
@@ -189,14 +198,14 @@ function BoardPage() {
             <div className={`text-xs uppercase tracking-widest ${p.eyebrow}`}>SDH Critical Care</div>
             <div className="text-2xl font-semibold">Live Board</div>
           </div>
-          {cap && (
+          {partner && (
             <div className="flex items-center gap-4 text-lg">
-              <CapCell label="ICU" a={cap.icu.occupied} b={cap.icu.total} p={p} />
+              <CapCell label="ICU" a={partner.stats.occupied} b={partner.stats.total_beds} p={p} />
               <div className={p.muted}>
-                <span className={`${p.eyebrow} text-sm mr-1`}>Outliers</span>{cap.outliers_count}
+                <span className={`${p.eyebrow} text-sm mr-1`}>Available</span>{partner.stats.available}
               </div>
               <div className={p.muted}>
-                <span className={`${p.eyebrow} text-sm mr-1`}>Transfers</span>{cap.open_transfers_count}
+                <span className={`${p.eyebrow} text-sm mr-1`}>Unassigned</span>{partner.stats.unassigned}
               </div>
               <div className={p.muted}>
                 <span className={`${p.eyebrow} text-sm mr-1`}>Pending referrals</span>{pending.length}
@@ -231,7 +240,7 @@ function BoardPage() {
       {/* Body */}
       <div className="flex-1 grid grid-cols-1 lg:grid-cols-[2fr_1fr] overflow-hidden">
         <div className={`overflow-auto border-r ${p.border}`}>
-          <BedsColumn data={bedBoard.data} now={now.getTime()} p={p} />
+          <BedsColumn data={partner} acuityMap={acuityMap} now={now.getTime()} p={p} />
         </div>
         <div className="overflow-auto">
           <PendingColumn rows={pending} now={now.getTime()} p={p} />
@@ -251,79 +260,83 @@ function CapCell({ label, a, b, p }: { label: string; a: number; b: number; p: P
   );
 }
 
-type BedBoardData = Awaited<ReturnType<typeof getBedBoard>>;
-
-function BedsColumn({ data, now, p }: { data: BedBoardData | undefined; now: number; p: Palette }) {
+function BedsColumn({
+  data,
+  acuityMap,
+  now,
+  p,
+}: {
+  data: PartnerBedBoardOk | null;
+  acuityMap: Map<string, { level: number; one_to_one: boolean }>;
+  now: number;
+  p: Palette;
+}) {
   if (!data) return <div className={`p-6 ${p.subtle}`}>Loading beds…</div>;
-  const { beds, occupancies } = data;
-  const live = occupancies.filter((o) => !o.discharged_at);
-  const byBed = new Map(live.map((o) => [o.bed_id, o]));
-  const groups: Array<{ label: string; filter: (b: (typeof beds)[number]) => boolean }> = [
-    { label: "Radnor Critical Care", filter: (b) => b.active },
-  ];
+  const slots: PartnerBedSlot[] = [...data.bed_board].sort((a, b) =>
+    a.bed.localeCompare(b.bed, undefined, { numeric: true }),
+  );
+  const dayOfStay = (iso: string | null | undefined): number | null => {
+    if (!iso) return null;
+    const t = Date.parse(iso);
+    if (!isFinite(t)) return null;
+    return Math.max(1, Math.floor((now - t) / 86_400_000) + 1);
+  };
   return (
     <div className="p-4 space-y-6">
-      {groups.map(({ label, filter }) => {
-        const unitBeds = beds.filter(filter).sort((a, b) => a.sort_order - b.sort_order);
-        return (
-          <div key={label}>
-            <h2 className={`text-sm uppercase tracking-widest mb-2 ${p.eyebrow}`}>{label} · {unitBeds.length} beds</h2>
-            <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-2">
-              {unitBeds.map((b) => {
-                const occ = byBed.get(b.id);
-                return (
-                  <div
-                    key={b.id}
-                    className={`rounded border p-3 ${occ ? p.cardFilled : p.borderDashed}`}
-                  >
-                    <div className="flex items-baseline justify-between">
-                      <div className={`text-xs uppercase tracking-wider ${p.eyebrow}`}>{b.code}</div>
-                      {occ && (
-                        <div
-                          className={`text-[10px] px-1.5 py-0.5 rounded font-semibold ${LEVEL_PILL[occ.level ?? -1] ?? p.pill}`}
-                          title={LEVEL_TITLE[occ.level ?? -1] ?? `Level ${occ.level ?? "?"}`}
-                        >
-                          L{occ.level ?? "?"} · d{dayOfStay(occ.admitted_at ?? "", now)}
-                        </div>
-                      )}
+      <div>
+        <h2 className={`text-sm uppercase tracking-widest mb-2 ${p.eyebrow}`}>
+          {data.unit} · {slots.length} beds
+        </h2>
+        <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-2">
+          {slots.map((s) => {
+            const occ = s.occupant;
+            const info = occ ? acuityMap.get(occ.id) : undefined;
+            const level = info?.level;
+            const day = occ ? dayOfStay(occ.admission_date) : null;
+            return (
+              <div
+                key={s.bed}
+                className={`rounded border p-3 ${occ ? p.cardFilled : p.borderDashed}`}
+              >
+                <div className="flex items-baseline justify-between">
+                  <div className={`text-xs uppercase tracking-wider ${p.eyebrow}`}>{s.bed}</div>
+                  {occ && (
+                    <div
+                      className={`text-[10px] px-1.5 py-0.5 rounded font-semibold ${level != null ? LEVEL_PILL[level] ?? p.pill : p.pill}`}
+                      title={level != null ? LEVEL_TITLE[level] ?? `Level ${level}` : "Acuity not set"}
+                    >
+                      L{level ?? "?"}{day != null ? ` · d${day}` : ""}
                     </div>
-                    {occ ? (
-                      <>
-                        <div className="mt-1 text-lg font-semibold truncate">
-                          {occ.hospital_number ?? occ.patient_initials ?? "—"}
-                        </div>
-                        <div className={`text-xs truncate ${p.muted}`}>{occ.admitting_consultant ?? ""}</div>
-                        <div className="mt-1 flex gap-1 text-[10px]">
-                          {occ.ventilated && <Flag p={p}>V</Flag>}
-                          {occ.nippv_cpap && <Flag p={p}>N</Flag>}
-                          {occ.hfno && <Flag p={p}>H</Flag>}
-                          {occ.vasopressors && <Flag p={p} tone="orange">P</Flag>}
-                          {occ.renal_replacement && <Flag p={p} tone="blue">R</Flag>}
-                          {occ.tracheostomy && <Flag p={p}>T</Flag>}
-                          {occ.isolation && occ.isolation !== "none" && <Flag p={p} tone="red">ISO</Flag>}
-                          {(occ as { wardable?: boolean }).wardable && (
-                            <WardableBadge className="text-[10px]" />
-                          )}
-                        </div>
-                        {occ.predicted_discharge_at && (
-                          <div className="mt-1 text-[10px] text-emerald-600 dark:text-emerald-300/80">
-                            ↗ {new Date(occ.predicted_discharge_at).toLocaleDateString([], { day: "2-digit", month: "short" })}
-                          </div>
-                        )}
-                      </>
-                    ) : (
-                      <div className={`mt-2 text-sm ${p.cardEmpty}`}>Free</div>
-                    )}
-                  </div>
-                );
-              })}
-            </div>
-          </div>
-        );
-      })}
+                  )}
+                </div>
+                {occ ? (
+                  <>
+                    <div className="mt-1 text-lg font-semibold truncate">
+                      {occ.full_name || occ.hospital_number || "—"}
+                    </div>
+                    <div className={`text-xs truncate ${p.muted}`}>
+                      {occ.hospital_number ?? ""}
+                      {occ.age != null ? ` · ${occ.age}y` : ""}
+                    </div>
+                    <div className="mt-1 flex gap-1 text-[10px] flex-wrap">
+                      {info?.one_to_one && <Flag p={p} tone="red">1:1</Flag>}
+                      {occ.tep_in_place && <Flag p={p} tone="blue">TEP</Flag>}
+                      {occ.dnacpr_decision && <Flag p={p} tone="orange">DNACPR</Flag>}
+                      {s.is_side_room && <Flag p={p}>SR</Flag>}
+                    </div>
+                  </>
+                ) : (
+                  <div className={`mt-2 text-sm ${p.cardEmpty}`}>Free</div>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      </div>
     </div>
   );
 }
+
 
 function Flag({ children, tone, p }: { children: React.ReactNode; tone?: "red" | "orange" | "blue"; p: Palette }) {
   const cls =
