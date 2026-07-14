@@ -276,7 +276,6 @@ function BoardPage() {
           <PendingColumn rows={pending} now={now.getTime()} p={p} />
         </div>
       </div>
-
     </div>
   );
 }
@@ -313,12 +312,13 @@ function BedsColumn({
     return Math.max(1, Math.floor((now - t) / 86_400_000) + 1);
   };
   return (
-    <div className="p-3">
+    <div className="p-3 min-h-full grid grid-rows-[auto_1fr]">
       <div>
         <h2 className={`text-xs uppercase tracking-widest mb-2 ${p.eyebrow}`}>
           {data.unit} · {slots.length} beds
         </h2>
-        <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 xl:grid-cols-6 2xl:grid-cols-7 gap-1.5 auto-rows-fr">
+      </div>
+      <div className="grid grid-cols-1 sm:grid-cols-[repeat(auto-fit,minmax(260px,1fr))] gap-1.5 auto-rows-[minmax(140px,1fr)]">
           {slots.map((s) => {
             const occ = s.occupant;
             const info = occ ? acuityMap.get(occ.id) : undefined;
@@ -327,7 +327,7 @@ function BedsColumn({
             return (
               <div
                 key={s.bed}
-                className={`rounded border p-2 flex flex-col ${occ ? p.cardFilled : p.borderDashed}`}
+                className={`rounded border p-2 h-full flex flex-col ${occ ? p.cardFilled : p.borderDashed}`}
               >
                 <div className="flex items-baseline justify-between gap-1">
                   <div className={`text-[11px] uppercase tracking-wider ${p.eyebrow}`}>{s.bed}</div>
@@ -362,7 +362,6 @@ function BedsColumn({
               </div>
             );
           })}
-        </div>
       </div>
     </div>
 
