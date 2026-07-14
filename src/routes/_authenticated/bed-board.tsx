@@ -513,6 +513,43 @@ function BedCard({
               {violenceRisk ? "Violence risk" : "Violence?"}
             </Badge>
           </button>
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              if (!endOfLifePending) onToggleEndOfLife(occ.id, !endOfLife);
+            }}
+            disabled={endOfLifePending}
+            title={
+              endOfLife
+                ? "End-of-life care — click to clear"
+                : "Flag as receiving end-of-life care"
+            }
+            aria-pressed={endOfLife}
+            aria-label={
+              endOfLife
+                ? "Clear end-of-life-care flag"
+                : "Flag patient as receiving end-of-life care"
+            }
+            className="focus:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded"
+          >
+            <Badge
+              variant="outline"
+              className={`text-[10px] gap-1 cursor-pointer transition ${
+                endOfLife
+                  ? "bg-violet-500/15 text-violet-700 dark:text-violet-400 border-violet-500/40"
+                  : "bg-transparent text-muted-foreground border-dashed opacity-60 hover:opacity-100"
+              } ${endOfLifePending ? "opacity-50" : ""}`}
+            >
+              <Heart
+                className={`w-3 h-3 ${endOfLife ? "fill-current" : ""}`}
+                aria-hidden="true"
+              />
+              {endOfLife ? "End of life" : "EoL?"}
+            </Badge>
+          </button>
+
+
 
 
 
