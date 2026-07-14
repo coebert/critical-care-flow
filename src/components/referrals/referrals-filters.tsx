@@ -78,6 +78,8 @@ export function ReferralsFilters({
             aria-label="Search ward, bed, specialty, or reason"
           />
         </div>
+        </>
+        )}
         {(["all", "pending", "accepted", "admitted", "declined"] as const).map((s) => (
           <Button
             key={s}
