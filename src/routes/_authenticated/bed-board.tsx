@@ -808,12 +808,23 @@ function BedBoardPage() {
             <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3">
               {lastOk.bed_board.map((slot) => {
                 const a = slot.occupant ? acuityMap.get(slot.occupant.id) : undefined;
+                const w = slot.occupant ? wardableMap.get(slot.occupant.id) : undefined;
+                const pendingId =
+                  wardableMutation.isPending &&
+                  (wardableMutation.variables as { partner_patient_id?: string } | undefined)
+                    ?.partner_patient_id;
                 return (
                   <BedCard
                     key={slot.bed}
                     slot={slot}
                     level={a?.level}
                     oneToOne={a?.one_to_one === true}
+                    wardable={w?.wardable === true}
+                    wardableAt={w?.wardable_at ?? null}
+                    wardablePending={
+                      slot.occupant?.id != null && pendingId === slot.occupant.id
+                    }
+                    onToggleWardable={handleToggleWardable}
                     onOccupiedClick={setSelected}
                     onMove={handleMove}
                     isDragTarget={dragging}
