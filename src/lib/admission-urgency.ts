@@ -5,13 +5,28 @@ export type AdmissionUrgency =
   | "within_1_2_hours"
   | "not_admitting";
 
-export const ADMISSION_URGENCY_OPTIONS: { value: AdmissionUrgency; label: string }[] = [
-  { value: "within_15_min", label: "Within 15 minutes" },
-  { value: "within_30_min", label: "Within 30 minutes" },
-  { value: "within_1_hour", label: "Within 1 hour" },
-  { value: "within_1_2_hours", label: "Within 1–2 hours" },
-  { value: "not_admitting", label: "N/A (decision not to admit)" },
+export const ADMISSION_URGENCY_OPTIONS: { value: AdmissionUrgency; label: string; short: string }[] = [
+  { value: "within_15_min", label: "Within 15 minutes", short: "15m" },
+  { value: "within_30_min", label: "Within 30 minutes", short: "30m" },
+  { value: "within_1_hour", label: "Within 1 hour", short: "1h" },
+  { value: "within_1_2_hours", label: "Within 1–2 hours", short: "1–2h" },
+  { value: "not_admitting", label: "N/A (decision not to admit)", short: "N/A" },
 ];
+
+/**
+ * Non-colour second channel for urgency. Uses a repeated pip (▲) so users
+ * with impaired colour vision can still parse severity from the badge:
+ * three pips = most urgent, one = least, and a dash for the non-admit case.
+ * Rendered as plain text so it inherits the badge colour, works in high
+ * contrast mode, and needs no additional icon dependency.
+ */
+export const ADMISSION_URGENCY_PIP: Record<AdmissionUrgency, string> = {
+  within_15_min: "▲▲▲",
+  within_30_min: "▲▲",
+  within_1_hour: "▲",
+  within_1_2_hours: "△",
+  not_admitting: "–",
+};
 
 export const ADMISSION_URGENCY_LABELS: Record<AdmissionUrgency, string> =
   Object.fromEntries(ADMISSION_URGENCY_OPTIONS.map((o) => [o.value, o.label])) as Record<
