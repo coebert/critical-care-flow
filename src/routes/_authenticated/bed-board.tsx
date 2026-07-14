@@ -690,6 +690,7 @@ function EmptyStateCard({
 }
 
 function BedBoardPage() {
+  const { density, toggle: toggleDensity } = useDensity();
 
   const search = Route.useSearch();
   const navigate = Route.useNavigate();
