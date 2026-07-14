@@ -292,6 +292,9 @@ function BedCard({
   endOfLife,
   endOfLifePending,
   onToggleEndOfLife,
+  needsScanTransfer,
+  scanTransferPending,
+  onToggleScanTransfer,
   wardable,
   wardableAt,
   dischargedAt,
@@ -316,6 +319,9 @@ function BedCard({
   endOfLife: boolean;
   endOfLifePending: boolean;
   onToggleEndOfLife: (occupantId: string, next: boolean) => void;
+  needsScanTransfer: boolean;
+  scanTransferPending: boolean;
+  onToggleScanTransfer: (occupantId: string, next: boolean) => void;
   wardable: boolean;
   wardableAt: string | null;
   dischargedAt: string | null;
