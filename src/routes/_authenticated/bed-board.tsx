@@ -12,7 +12,7 @@ import {
   Sparkles,
   UserRound,
 } from "lucide-react";
-import { formatDistanceToNowStrict } from "date-fns";
+import { formatDistanceToNowStrict, formatDistanceStrict } from "date-fns";
 import { toast } from "sonner";
 import {
   getPartnerBedBoard,
