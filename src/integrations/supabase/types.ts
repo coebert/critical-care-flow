@@ -963,6 +963,7 @@ export type Database = {
       }
       patient_wardable_status: {
         Row: {
+          discharged_at: string | null
           partner_patient_id: string
           updated_at: string
           updated_by: string | null
@@ -970,6 +971,7 @@ export type Database = {
           wardable_at: string | null
         }
         Insert: {
+          discharged_at?: string | null
           partner_patient_id: string
           updated_at?: string
           updated_by?: string | null
@@ -977,6 +979,7 @@ export type Database = {
           wardable_at?: string | null
         }
         Update: {
+          discharged_at?: string | null
           partner_patient_id?: string
           updated_at?: string
           updated_by?: string | null
