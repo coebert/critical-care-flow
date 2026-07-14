@@ -828,6 +828,46 @@ function BedBoardPage() {
     endOfLifeMutation.mutate({ partner_patient_id: occupantId, end_of_life: next });
   };
 
+  // Scan-transfer flag (user-toggleable, local source of truth).
+  const { data: scanTransferRows } = useQuery({
+    queryKey: ["patient-scan-transfer"],
+    queryFn: () => fetchScanTransfer(),
+    staleTime: 15_000,
+    refetchInterval: 60_000,
+  });
+  const scanTransferSet = useMemo(() => {
+    const s = new Set<string>();
+    for (const r of scanTransferRows ?? []) {
+      if (r.needs_scan_transfer) s.add(r.partner_patient_id);
+    }
+    return s;
+  }, [scanTransferRows]);
+
+  const scanTransferMutation = useMutation({
+    mutationFn: (v: {
+      partner_patient_id: string;
+      needs_scan_transfer: boolean;
+    }) => writeScanTransfer({ data: v }),
+    onSuccess: (_r, vars) => {
+      toast.success(
+        vars.needs_scan_transfer
+          ? "Flagged as needing transfer for a scan"
+          : "Scan-transfer flag cleared",
+      );
+      qc.invalidateQueries({ queryKey: ["patient-scan-transfer"] });
+    },
+    onError: (err) =>
+      toast.error(err instanceof Error ? err.message : "Could not update flag"),
+  });
+  const handleToggleScanTransfer = (occupantId: string, next: boolean) => {
+    scanTransferMutation.mutate({
+      partner_patient_id: occupantId,
+      needs_scan_transfer: next,
+    });
+  };
+
+
+
 
 
 
