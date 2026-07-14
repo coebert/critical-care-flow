@@ -182,14 +182,92 @@ function WardableToggle({
   );
 }
 
+function DischargeControl({
+  wardable,
+  wardableAt,
+  dischargedAt,
+  pending,
+  onDischarge,
+  onClear,
+}: {
+  wardable: boolean;
+  wardableAt: string | null;
+  dischargedAt: string | null;
+  pending: boolean;
+  onDischarge: () => void;
+  onClear: () => void;
+}) {
+  const [, force] = useState(0);
+  useEffect(() => {
+    // Tick while wardable and not yet discharged so the elapsed timer
+    // updates in the corner of the board.
+    if (dischargedAt || !wardable || !wardableAt) return;
+    const id = setInterval(() => force((n) => n + 1), 60_000);
+    return () => clearInterval(id);
+  }, [wardable, wardableAt, dischargedAt]);
+
+  if (dischargedAt) {
+    const window =
+      wardableAt
+        ? formatDistanceStrict(new Date(wardableAt), new Date(dischargedAt))
+        : null;
+    return (
+      <button
+        type="button"
+        onClick={(e) => {
+          e.stopPropagation();
+          if (!pending) onClear();
+        }}
+        onKeyDown={(e) => e.stopPropagation()}
+        onMouseDown={(e) => e.stopPropagation()}
+        disabled={pending}
+        draggable={false}
+        title={`Discharged ${new Date(dischargedAt).toLocaleString()}${
+          window ? ` — ${window} from wardable` : ""
+        }. Click to undo.`}
+        className="mt-1 inline-flex items-center gap-1 rounded border border-sky-500/40 bg-sky-500/15 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-sky-800 dark:text-sky-300 hover:bg-sky-500/25 transition disabled:opacity-60"
+      >
+        <span aria-hidden="true">✓</span>
+        <span>Discharged{window ? ` · ${window}` : ""}</span>
+      </button>
+    );
+  }
+
+  return (
+    <button
+      type="button"
+      onClick={(e) => {
+        e.stopPropagation();
+        if (!pending) onDischarge();
+      }}
+      onKeyDown={(e) => e.stopPropagation()}
+      onMouseDown={(e) => e.stopPropagation()}
+      disabled={pending}
+      draggable={false}
+      title={
+        wardable && wardableAt
+          ? `Record discharge — will log time from wardable (${new Date(wardableAt).toLocaleString()})`
+          : "Record discharge from critical care"
+      }
+      className="mt-1 inline-flex items-center gap-1 rounded border border-dashed px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground hover:bg-accent hover:text-foreground transition disabled:opacity-60"
+    >
+      <span aria-hidden="true">→</span>
+      <span>Discharge</span>
+    </button>
+  );
+}
+
 function BedCard({
   slot,
   level,
   oneToOne,
   wardable,
   wardableAt,
+  dischargedAt,
   wardablePending,
+  dischargePending,
   onToggleWardable,
+  onDischarge,
   onOccupiedClick,
   onMove,
   isDragTarget,
@@ -200,8 +278,11 @@ function BedCard({
   oneToOne: boolean;
   wardable: boolean;
   wardableAt: string | null;
+  dischargedAt: string | null;
   wardablePending: boolean;
+  dischargePending: boolean;
   onToggleWardable: (occupantId: string, next: boolean) => void;
+  onDischarge: (occupantId: string, undo: boolean) => void;
   onOccupiedClick: (o: PartnerOccupant) => void;
   onMove: (
     occupantId: string,
