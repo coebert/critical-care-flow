@@ -284,6 +284,9 @@ function BedCard({
   violenceRisk,
   violencePending,
   onToggleViolenceRisk,
+  endOfLife,
+  endOfLifePending,
+  onToggleEndOfLife,
   wardable,
   wardableAt,
   dischargedAt,
@@ -305,6 +308,9 @@ function BedCard({
   violenceRisk: boolean;
   violencePending: boolean;
   onToggleViolenceRisk: (occupantId: string, next: boolean) => void;
+  endOfLife: boolean;
+  endOfLifePending: boolean;
+  onToggleEndOfLife: (occupantId: string, next: boolean) => void;
   wardable: boolean;
   wardableAt: string | null;
   dischargedAt: string | null;
