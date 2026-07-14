@@ -354,6 +354,13 @@ function BedCard({
           {occ.dnacpr_details ? ` — ${occ.dnacpr_details}` : ""}
         </div>
       )}
+      <WardableToggle
+        wardable={wardable}
+        wardableAt={wardableAt}
+        pending={wardablePending}
+        onToggle={() => onToggleWardable(occ.id, !wardable)}
+      />
+
 
     </Card>
   );
