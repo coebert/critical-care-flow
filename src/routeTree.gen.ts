@@ -10,6 +10,7 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as SetupRouteImport } from './routes/setup'
+import { Route as SecurityFaqRouteImport } from './routes/security-faq'
 import { Route as SecurityRouteImport } from './routes/security'
 import { Route as ResetPasswordRouteImport } from './routes/reset-password'
 import { Route as PrivacyRouteImport } from './routes/privacy'
@@ -58,6 +59,11 @@ import { Route as AuthenticatedPostopBookingsIdEditRouteImport } from './routes/
 const SetupRoute = SetupRouteImport.update({
   id: '/setup',
   path: '/setup',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const SecurityFaqRoute = SecurityFaqRouteImport.update({
+  id: '/security-faq',
+  path: '/security-faq',
   getParentRoute: () => rootRouteImport,
 } as any)
 const SecurityRoute = SecurityRouteImport.update({
@@ -311,6 +317,7 @@ export interface FileRoutesByFullPath {
   '/privacy': typeof PrivacyRoute
   '/reset-password': typeof ResetPasswordRoute
   '/security': typeof SecurityRoute
+  '/security-faq': typeof SecurityFaqRoute
   '/setup': typeof SetupRoute
   '/admin': typeof AuthenticatedAdminRoute
   '/analytics': typeof AuthenticatedAnalyticsRoute
@@ -356,6 +363,7 @@ export interface FileRoutesByTo {
   '/privacy': typeof PrivacyRoute
   '/reset-password': typeof ResetPasswordRoute
   '/security': typeof SecurityRoute
+  '/security-faq': typeof SecurityFaqRoute
   '/setup': typeof SetupRoute
   '/admin': typeof AuthenticatedAdminRoute
   '/analytics': typeof AuthenticatedAnalyticsRoute
@@ -404,6 +412,7 @@ export interface FileRoutesById {
   '/privacy': typeof PrivacyRoute
   '/reset-password': typeof ResetPasswordRoute
   '/security': typeof SecurityRoute
+  '/security-faq': typeof SecurityFaqRoute
   '/setup': typeof SetupRoute
   '/_authenticated/admin': typeof AuthenticatedAdminRoute
   '/_authenticated/analytics': typeof AuthenticatedAnalyticsRoute
@@ -453,6 +462,7 @@ export interface FileRouteTypes {
     | '/privacy'
     | '/reset-password'
     | '/security'
+    | '/security-faq'
     | '/setup'
     | '/admin'
     | '/analytics'
@@ -498,6 +508,7 @@ export interface FileRouteTypes {
     | '/privacy'
     | '/reset-password'
     | '/security'
+    | '/security-faq'
     | '/setup'
     | '/admin'
     | '/analytics'
@@ -545,6 +556,7 @@ export interface FileRouteTypes {
     | '/privacy'
     | '/reset-password'
     | '/security'
+    | '/security-faq'
     | '/setup'
     | '/_authenticated/admin'
     | '/_authenticated/analytics'
@@ -593,6 +605,7 @@ export interface RootRouteChildren {
   PrivacyRoute: typeof PrivacyRoute
   ResetPasswordRoute: typeof ResetPasswordRoute
   SecurityRoute: typeof SecurityRoute
+  SecurityFaqRoute: typeof SecurityFaqRoute
   SetupRoute: typeof SetupRoute
   ApiPublicBridgeAuditRoute: typeof ApiPublicBridgeAuditRoute
   ApiPublicBridgeBed_occupanciesRoute: typeof ApiPublicBridgeBed_occupanciesRoute
@@ -618,6 +631,13 @@ declare module '@tanstack/react-router' {
       path: '/setup'
       fullPath: '/setup'
       preLoaderRoute: typeof SetupRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/security-faq': {
+      id: '/security-faq'
+      path: '/security-faq'
+      fullPath: '/security-faq'
+      preLoaderRoute: typeof SecurityFaqRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/security': {
@@ -1016,6 +1036,7 @@ const rootRouteChildren: RootRouteChildren = {
   PrivacyRoute: PrivacyRoute,
   ResetPasswordRoute: ResetPasswordRoute,
   SecurityRoute: SecurityRoute,
+  SecurityFaqRoute: SecurityFaqRoute,
   SetupRoute: SetupRoute,
   ApiPublicBridgeAuditRoute: ApiPublicBridgeAuditRoute,
   ApiPublicBridgeBed_occupanciesRoute: ApiPublicBridgeBed_occupanciesRoute,
@@ -1037,3 +1058,13 @@ const rootRouteChildren: RootRouteChildren = {
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
+
+import type { getRouter } from './router.tsx'
+import type { startInstance } from './start.ts'
+declare module '@tanstack/react-start' {
+  interface Register {
+    ssr: true
+    router: Awaited<ReturnType<typeof getRouter>>
+    config: Awaited<ReturnType<typeof startInstance.getOptions>>
+  }
+}
