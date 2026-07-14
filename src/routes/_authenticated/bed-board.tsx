@@ -29,6 +29,8 @@ import {
 import {
   listWardableStatus,
   setWardableStatus,
+  dischargePatient,
+  clearDischarge,
   type WardableStatus,
 } from "@/lib/wardable-status.functions";
 import { prefillPartnerHandoverFromReferral } from "@/lib/partner-handover-prefill.functions";
