@@ -4,7 +4,7 @@ import { useShiftStatus } from "@/hooks/use-shift-status";
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useE2ESession, initKeyStatusCrossTabSync } from "@/hooks/use-e2e-session";
-import { Activity, BarChart3, ListChecks, Shield, LogOut, Plus, Menu, Bell, BellRing, Inbox, PanelLeftClose, PanelLeftOpen, CalendarClock, UserCircle, Bed as BedIcon, RefreshCw } from "lucide-react";
+import { Activity, BarChart3, ListChecks, Shield, LogOut, Plus, Menu, Bell, BellRing, Inbox, PanelLeftClose, PanelLeftOpen, CalendarClock, UserCircle, Bed as BedIcon, RefreshCw, Search, ClipboardList } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useAuth, useRole, useClinicalAccess } from "@/hooks/use-auth";
 import { NotificationBell } from "@/components/notification-bell";
@@ -20,6 +20,9 @@ import { Toaster } from "@/components/ui/sonner";
 import { Sheet, SheetContent, SheetTrigger, SheetTitle, SheetHeader } from "@/components/ui/sheet";
 import { VisuallyHidden } from "@radix-ui/react-visually-hidden";
 import { toast } from "sonner";
+import { CommandPalette, useCommandPaletteHotkey } from "@/components/command-palette";
+import { Breadcrumbs } from "@/components/breadcrumbs";
+import { GlobalBannerSlot } from "@/components/global-banner-slot";
 
 export const Route = createFileRoute("/_authenticated")({
   ssr: false,
@@ -65,6 +68,8 @@ function AuthedShell() {
   const navigate = useNavigate();
   const [signingOut, setSigningOut] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
+  const [paletteOpen, setPaletteOpen] = useState(false);
+  useCommandPaletteHotkey(setPaletteOpen);
   const [desktopCollapsed, setDesktopCollapsed] = useState<boolean>(() => {
     if (typeof window === "undefined") return false;
     return window.localStorage.getItem("sidebar:collapsed") === "1";
@@ -142,16 +147,19 @@ function AuthedShell() {
         </div>
       </div>
       <nav className="flex-1 overflow-y-auto px-2 py-3 text-sm">
-        <NavGroup label="Work" collapsed={collapsed}>
+        <NavGroup label="Clinical" collapsed={collapsed}>
           {canAccessReferrals && (
             <>
               <NavItem to="/" icon={<ListChecks className="w-4 h-4" />} collapsed={collapsed} label="Referrals" />
               <NavItem to="/referrals/new" icon={<Plus className="w-4 h-4" />} collapsed={collapsed} label="New referral" />
+              <NavItem to="/inbox" icon={<Inbox className="w-4 h-4" />} collapsed={collapsed} label="Inbox" />
             </>
           )}
-          <NavItem to="/postop-bookings" icon={<CalendarClock className="w-4 h-4" />} collapsed={collapsed} label="Post-op bookings" />
           <NavItem to="/bed-board" icon={<BedIcon className="w-4 h-4" />} collapsed={collapsed} label="Bed board" />
-          <NavItem to="/inbox" icon={<Inbox className="w-4 h-4" />} collapsed={collapsed} label="Inbox" />
+          <NavItem to="/board/ward-round" icon={<ClipboardList className="w-4 h-4" />} collapsed={collapsed} label="Ward round" />
+        </NavGroup>
+        <NavGroup label="Planning" collapsed={collapsed}>
+          <NavItem to="/postop-bookings" icon={<CalendarClock className="w-4 h-4" />} collapsed={collapsed} label="Post-op bookings" />
         </NavGroup>
         <NavGroup label="Alerts" collapsed={collapsed}>
           <NavItem to="/notifications" icon={<Bell className="w-4 h-4" />} collapsed={collapsed} label="Notifications" />
@@ -160,8 +168,12 @@ function AuthedShell() {
           <NavItem to="/profile" icon={<UserCircle className="w-4 h-4" />} collapsed={collapsed} label="Profile" />
         </NavGroup>
         {isAdmin && (
-          <NavGroup label="Admin" collapsed={collapsed}>
+          <NavGroup label="Insight" collapsed={collapsed}>
             <NavItem to="/analytics" icon={<BarChart3 className="w-4 h-4" />} collapsed={collapsed} label="Analytics" />
+          </NavGroup>
+        )}
+        {isAdmin && (
+          <NavGroup label="Admin" collapsed={collapsed}>
             <NavItem to="/admin" icon={<Shield className="w-4 h-4" />} collapsed={collapsed} label="Admin" />
             <NavItem to="/bridge-status" icon={<RefreshCw className="w-4 h-4" />} collapsed={collapsed} label="Bridge sync" />
             <NavItem to="/push-test" icon={<BellRing className="w-4 h-4" />} collapsed={collapsed} label="Push test" />
