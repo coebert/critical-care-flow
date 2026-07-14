@@ -60,7 +60,13 @@ export const Route = createFileRoute("/_authenticated/analytics")({
 function AnalyticsPage() {
   const search = Route.useSearch();
   const navigate = Route.useNavigate();
-  const tab: "referrals" | "postop" | "nurse-capacity" | "capacity-alerts" | "acuity" =
+  const tab:
+    | "referrals"
+    | "postop"
+    | "nurse-capacity"
+    | "capacity-alerts"
+    | "acuity"
+    | "wardable" =
     search.view === "postop"
       ? "postop"
       : search.view === "nurse-capacity"
@@ -69,6 +75,8 @@ function AnalyticsPage() {
       ? "capacity-alerts"
       : search.view === "acuity"
       ? "acuity"
+      : search.view === "wardable"
+      ? "wardable"
       : "referrals";
 
   return (
