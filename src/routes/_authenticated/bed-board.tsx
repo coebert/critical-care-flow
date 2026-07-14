@@ -7,6 +7,7 @@ import {
   AlertTriangle,
   Bed as BedIcon,
   Biohazard,
+  ChevronDown,
   HelpCircle,
   Loader2,
   RefreshCcw,
