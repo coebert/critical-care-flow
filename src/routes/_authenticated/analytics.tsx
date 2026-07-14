@@ -121,6 +121,9 @@ function AnalyticsPage() {
         <TabsContent value="acuity">
           <AcuityAnalyticsPanel />
         </TabsContent>
+        <TabsContent value="wardable">
+          <WardableAnalyticsPanel />
+        </TabsContent>
       </Tabs>
     </div>
   );
