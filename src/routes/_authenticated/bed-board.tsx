@@ -437,12 +437,23 @@ function BedCard({
           {occ.dnacpr_details ? ` — ${occ.dnacpr_details}` : ""}
         </div>
       )}
-      <WardableToggle
-        wardable={wardable}
-        wardableAt={wardableAt}
-        pending={wardablePending}
-        onToggle={() => onToggleWardable(occ.id, !wardable)}
-      />
+      <div className="flex flex-wrap items-center gap-1.5">
+        <WardableToggle
+          wardable={wardable}
+          wardableAt={wardableAt}
+          pending={wardablePending}
+          onToggle={() => onToggleWardable(occ.id, !wardable)}
+        />
+        <DischargeControl
+          wardable={wardable}
+          wardableAt={wardableAt}
+          dischargedAt={dischargedAt}
+          pending={dischargePending}
+          onDischarge={() => onDischarge(occ.id, false)}
+          onClear={() => onDischarge(occ.id, true)}
+        />
+      </div>
+
 
 
     </Card>
