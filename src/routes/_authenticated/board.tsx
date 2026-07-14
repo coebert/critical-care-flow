@@ -245,6 +245,15 @@ function BoardPage() {
             {theme === "dark" ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
             {theme === "dark" ? "Light" : "Dark"}
           </button>
+          <button
+            onClick={toggleFullscreen}
+            className={`text-sm rounded-md border px-2 py-1 flex items-center gap-1.5 ${p.toggle}`}
+            aria-label={isFullscreen ? "Exit full screen" : "Enter full screen"}
+            title={isFullscreen ? "Exit full screen (F11)" : "Enter full screen (F11)"}
+          >
+            {isFullscreen ? <Minimize className="w-4 h-4" /> : <Maximize className="w-4 h-4" />}
+            {isFullscreen ? "Exit" : "Full screen"}
+          </button>
           <Link to="/board/ward-round" className={`${p.exit} text-sm underline flex items-center gap-1`}>
             <Printer className="w-4 h-4" /> Ward round
           </Link>
