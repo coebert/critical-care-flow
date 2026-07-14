@@ -698,6 +698,8 @@ function BedBoardPage() {
   const writeViolence = useServerFn(setViolenceRisk);
   const fetchEndOfLife = useServerFn(listEndOfLife);
   const writeEndOfLife = useServerFn(setEndOfLife);
+  const fetchScanTransfer = useServerFn(listScanTransfer);
+  const writeScanTransfer = useServerFn(setScanTransfer);
   const qc = useQueryClient();
   const { data, isLoading, isFetching, error, refetch } = useQuery({
     queryKey: QK,
