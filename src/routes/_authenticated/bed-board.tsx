@@ -12,6 +12,7 @@ import {
   ShieldCheck,
   Sparkles,
   Heart,
+  ScanLine,
   Stethoscope,
   Swords,
   UserRound,
@@ -43,6 +44,10 @@ import {
   listEndOfLife,
   setEndOfLife,
 } from "@/lib/patient-end-of-life.functions";
+import {
+  listScanTransfer,
+  setScanTransfer,
+} from "@/lib/patient-scan-transfer.functions";
 import {
   listWardableStatus,
   setWardableStatus,
@@ -287,6 +292,9 @@ function BedCard({
   endOfLife,
   endOfLifePending,
   onToggleEndOfLife,
+  needsScanTransfer,
+  scanTransferPending,
+  onToggleScanTransfer,
   wardable,
   wardableAt,
   dischargedAt,
@@ -311,6 +319,9 @@ function BedCard({
   endOfLife: boolean;
   endOfLifePending: boolean;
   onToggleEndOfLife: (occupantId: string, next: boolean) => void;
+  needsScanTransfer: boolean;
+  scanTransferPending: boolean;
+  onToggleScanTransfer: (occupantId: string, next: boolean) => void;
   wardable: boolean;
   wardableAt: string | null;
   dischargedAt: string | null;
@@ -548,6 +559,40 @@ function BedCard({
               {endOfLife ? "End of life" : "EoL?"}
             </Badge>
           </button>
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              if (!scanTransferPending)
+                onToggleScanTransfer(occ.id, !needsScanTransfer);
+            }}
+            disabled={scanTransferPending}
+            title={
+              needsScanTransfer
+                ? "Needs transfer for a scan — click to clear"
+                : "Flag as needing transfer for a scan"
+            }
+            aria-pressed={needsScanTransfer}
+            aria-label={
+              needsScanTransfer
+                ? "Clear scan-transfer flag"
+                : "Flag patient as needing transfer for a scan"
+            }
+            className="focus:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded"
+          >
+            <Badge
+              variant="outline"
+              className={`text-[10px] gap-1 cursor-pointer transition ${
+                needsScanTransfer
+                  ? "bg-indigo-500/15 text-indigo-700 dark:text-indigo-400 border-indigo-500/40"
+                  : "bg-transparent text-muted-foreground border-dashed opacity-60 hover:opacity-100"
+              } ${scanTransferPending ? "opacity-50" : ""}`}
+            >
+              <ScanLine className="w-3 h-3" aria-hidden="true" />
+              {needsScanTransfer ? "For scan" : "Scan?"}
+            </Badge>
+          </button>
+
 
 
 
@@ -653,6 +698,8 @@ function BedBoardPage() {
   const writeViolence = useServerFn(setViolenceRisk);
   const fetchEndOfLife = useServerFn(listEndOfLife);
   const writeEndOfLife = useServerFn(setEndOfLife);
+  const fetchScanTransfer = useServerFn(listScanTransfer);
+  const writeScanTransfer = useServerFn(setScanTransfer);
   const qc = useQueryClient();
   const { data, isLoading, isFetching, error, refetch } = useQuery({
     queryKey: QK,
@@ -780,6 +827,46 @@ function BedBoardPage() {
   const handleToggleEndOfLife = (occupantId: string, next: boolean) => {
     endOfLifeMutation.mutate({ partner_patient_id: occupantId, end_of_life: next });
   };
+
+  // Scan-transfer flag (user-toggleable, local source of truth).
+  const { data: scanTransferRows } = useQuery({
+    queryKey: ["patient-scan-transfer"],
+    queryFn: () => fetchScanTransfer(),
+    staleTime: 15_000,
+    refetchInterval: 60_000,
+  });
+  const scanTransferSet = useMemo(() => {
+    const s = new Set<string>();
+    for (const r of scanTransferRows ?? []) {
+      if (r.needs_scan_transfer) s.add(r.partner_patient_id);
+    }
+    return s;
+  }, [scanTransferRows]);
+
+  const scanTransferMutation = useMutation({
+    mutationFn: (v: {
+      partner_patient_id: string;
+      needs_scan_transfer: boolean;
+    }) => writeScanTransfer({ data: v }),
+    onSuccess: (_r, vars) => {
+      toast.success(
+        vars.needs_scan_transfer
+          ? "Flagged as needing transfer for a scan"
+          : "Scan-transfer flag cleared",
+      );
+      qc.invalidateQueries({ queryKey: ["patient-scan-transfer"] });
+    },
+    onError: (err) =>
+      toast.error(err instanceof Error ? err.message : "Could not update flag"),
+  });
+  const handleToggleScanTransfer = (occupantId: string, next: boolean) => {
+    scanTransferMutation.mutate({
+      partner_patient_id: occupantId,
+      needs_scan_transfer: next,
+    });
+  };
+
+
 
 
 
@@ -1215,6 +1302,10 @@ function BedBoardPage() {
                   endOfLifeMutation.isPending &&
                   (endOfLifeMutation.variables as { partner_patient_id?: string } | undefined)
                     ?.partner_patient_id;
+                const scanTransferPendingId =
+                  scanTransferMutation.isPending &&
+                  (scanTransferMutation.variables as { partner_patient_id?: string } | undefined)
+                    ?.partner_patient_id;
                 return (
                   <BedCard
                     key={slot.bed}
@@ -1243,6 +1334,15 @@ function BedBoardPage() {
                       endOfLifePendingId === slot.occupant.id
                     }
                     onToggleEndOfLife={handleToggleEndOfLife}
+                    needsScanTransfer={
+                      slot.occupant?.id != null &&
+                      scanTransferSet.has(slot.occupant.id)
+                    }
+                    scanTransferPending={
+                      slot.occupant?.id != null &&
+                      scanTransferPendingId === slot.occupant.id
+                    }
+                    onToggleScanTransfer={handleToggleScanTransfer}
                     isolation={
                       (slot.occupant?.id != null &&
                         isolationMap.get(slot.occupant.id)?.isolation) ||
