@@ -985,6 +985,30 @@ export type Database = {
         }
         Relationships: []
       }
+      patient_scan_transfer: {
+        Row: {
+          needs_scan_transfer: boolean
+          note: string | null
+          partner_patient_id: string
+          updated_at: string
+          updated_by: string | null
+        }
+        Insert: {
+          needs_scan_transfer?: boolean
+          note?: string | null
+          partner_patient_id: string
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Update: {
+          needs_scan_transfer?: boolean
+          note?: string | null
+          partner_patient_id?: string
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Relationships: []
+      }
       patient_violence_risk: {
         Row: {
           note: string | null
