@@ -547,7 +547,7 @@ function BedCard({
           >
             <Badge
               variant="outline"
-              className={`text-[10px] gap-1 cursor-pointer transition ${
+              className={`text-[10px] p-0.5 cursor-pointer transition ${
                 endOfLife
                   ? "bg-violet-500/15 text-violet-700 dark:text-violet-400 border-violet-500/40"
                   : "bg-transparent text-muted-foreground border-dashed opacity-60 hover:opacity-100"
@@ -557,7 +557,6 @@ function BedCard({
                 className={`w-3 h-3 ${endOfLife ? "fill-current" : ""}`}
                 aria-hidden="true"
               />
-              {endOfLife ? "End of life" : "EoL?"}
             </Badge>
           </button>
           <button
