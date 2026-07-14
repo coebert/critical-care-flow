@@ -40,6 +40,10 @@ import {
   setViolenceRisk,
 } from "@/lib/patient-violence-risk.functions";
 import {
+  listEndOfLife,
+  setEndOfLife,
+} from "@/lib/patient-end-of-life.functions";
+import {
   listWardableStatus,
   setWardableStatus,
   dischargePatient,
