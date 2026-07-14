@@ -235,7 +235,10 @@ function BoardPage() {
   pending.sort((a, b) => new Date(a.referral_received_at).getTime() - new Date(b.referral_received_at).getTime());
 
   return (
-    <div className={`fixed inset-0 z-50 flex flex-col overflow-hidden ${p.root}`}>
+    <div
+      className={`fixed inset-0 z-50 flex flex-col overflow-hidden ${p.root}`}
+      style={{ zoom }}
+    >
       {/* Top bar */}
       <div className={`flex items-center justify-between px-4 py-2 border-b ${p.border}`}>
         <div className="flex items-center gap-6">
