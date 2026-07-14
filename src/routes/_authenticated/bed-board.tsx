@@ -485,6 +485,73 @@ function BedBoardPage() {
     moveMutation.mutate({ id: occupantId, expected_updated_at, bed: targetBed });
   };
 
+  // ---- Wardable status (local source of truth) ----
+  const fetchWardable = useServerFn(listWardableStatus);
+  const wardableQuery = useQuery({
+    queryKey: ["patient-wardable-status"],
+    queryFn: () => fetchWardable(),
+    staleTime: 15_000,
+    refetchInterval: 60_000,
+  });
+  const wardableMap = useMemo(() => {
+    const m = new Map<string, WardableStatus>();
+    for (const r of wardableQuery.data ?? []) m.set(r.partner_patient_id, r);
+    return m;
+  }, [wardableQuery.data]);
+
+  const setWardable = useServerFn(setWardableStatus);
+  const wardableMutation = useMutation({
+    mutationFn: (input: { partner_patient_id: string; wardable: boolean }) =>
+      setWardable({ data: input }),
+    onMutate: async (input) => {
+      // Optimistic update so the timer starts ticking the instant the user
+      // clicks — the round-trip to the partner shouldn't delay the stamp.
+      await qc.cancelQueries({ queryKey: ["patient-wardable-status"] });
+      const previous = qc.getQueryData<WardableStatus[]>([
+        "patient-wardable-status",
+      ]);
+      qc.setQueryData<WardableStatus[]>(
+        ["patient-wardable-status"],
+        (rows) => {
+          const list = rows ? [...rows] : [];
+          const idx = list.findIndex(
+            (r) => r.partner_patient_id === input.partner_patient_id,
+          );
+          const existing = idx >= 0 ? list[idx] : undefined;
+          const now = new Date().toISOString();
+          const next: WardableStatus = {
+            partner_patient_id: input.partner_patient_id,
+            wardable: input.wardable,
+            wardable_at: input.wardable
+              ? existing?.wardable && existing.wardable_at
+                ? existing.wardable_at
+                : now
+              : null,
+            updated_at: now,
+          };
+          if (idx >= 0) list[idx] = next;
+          else list.push(next);
+          return list;
+        },
+      );
+      return { previous };
+    },
+    onError: (err, _input, ctx) => {
+      if (ctx?.previous) {
+        qc.setQueryData(["patient-wardable-status"], ctx.previous);
+      }
+      toast.error(err instanceof Error ? err.message : "Could not update wardable status");
+    },
+    onSettled: () => {
+      wardableQuery.refetch();
+    },
+  });
+
+  const handleToggleWardable = (occupantId: string, next: boolean) => {
+    wardableMutation.mutate({ partner_patient_id: occupantId, wardable: next });
+  };
+
+
 
   const arrivedFromSource =
     search.source_referral_id || search.source_postop_booking_id;
