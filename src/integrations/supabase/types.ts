@@ -101,6 +101,7 @@ export type Database = {
           vasopressors: boolean
           ventilated: boolean
           wardable: boolean
+          wardable_at: string | null
         }
         Insert: {
           actual_step_down?: Database["public"]["Enums"]["bed_step_down"] | null
@@ -134,6 +135,7 @@ export type Database = {
           vasopressors?: boolean
           ventilated?: boolean
           wardable?: boolean
+          wardable_at?: string | null
         }
         Update: {
           actual_step_down?: Database["public"]["Enums"]["bed_step_down"] | null
@@ -167,6 +169,7 @@ export type Database = {
           vasopressors?: boolean
           ventilated?: boolean
           wardable?: boolean
+          wardable_at?: string | null
         }
         Relationships: [
           {
@@ -955,6 +958,30 @@ export type Database = {
           partner_patient_id?: string
           updated_at?: string
           updated_by?: string | null
+        }
+        Relationships: []
+      }
+      patient_wardable_status: {
+        Row: {
+          partner_patient_id: string
+          updated_at: string
+          updated_by: string | null
+          wardable: boolean
+          wardable_at: string | null
+        }
+        Insert: {
+          partner_patient_id: string
+          updated_at?: string
+          updated_by?: string | null
+          wardable?: boolean
+          wardable_at?: string | null
+        }
+        Update: {
+          partner_patient_id?: string
+          updated_at?: string
+          updated_by?: string | null
+          wardable?: boolean
+          wardable_at?: string | null
         }
         Relationships: []
       }
