@@ -351,10 +351,10 @@ function Flag({ children, tone, p }: { children: React.ReactNode; tone?: "red" |
 
 function PendingColumn({ rows, now, p }: { rows: Referral[]; now: number; p: Palette }) {
   return (
-    <div className="p-4">
-      <h2 className={`text-sm uppercase tracking-widest mb-2 ${p.eyebrow}`}>Pending referrals · {rows.length}</h2>
+    <div className="p-3">
+      <h2 className={`text-xs uppercase tracking-widest mb-2 ${p.eyebrow}`}>Pending referrals · {rows.length}</h2>
       {rows.length === 0 && <div className={p.cardEmpty}>No pending referrals.</div>}
-      <ul className="space-y-2">
+      <ul className="space-y-1.5">
         {rows.map((r) => {
           const waitMs = r.status === "pending"
             ? now - new Date(r.referral_received_at).getTime()
