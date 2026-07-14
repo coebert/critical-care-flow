@@ -6,15 +6,17 @@ import { ReferralsAnalyticsPanel } from "@/components/analytics/referrals-panel"
 import { NurseCapacityAnalyticsPanel } from "@/components/analytics/nurse-capacity-panel";
 import { CapacityAlertHistoryPanel } from "@/components/analytics/capacity-alert-history-panel";
 import { AcuityAnalyticsPanel } from "@/components/analytics/acuity-panel";
+import { WardableAnalyticsPanel } from "@/components/analytics/wardable-panel";
 import { icnarcTargetsQueryOptions, initialAnalyticsRange } from "@/components/analytics/queries";
 import { getReferralsAnalytics, getPostopAnalytics } from "@/lib/analytics.functions";
 import { getNurseCapacityAnalytics } from "@/lib/nurse-staffing.functions";
 import { getAcuityAnalytics } from "@/lib/acuity-analytics.functions";
+import { getWardableAnalytics } from "@/lib/wardable-analytics.functions";
 import { AdminOnly } from "@/components/admin-only";
 import { RouteErrorFallback } from "@/components/route-error-fallback";
 
 const analyticsSearchSchema = z.object({
-  view: z.enum(["referrals", "postop", "nurse-capacity", "capacity-alerts", "acuity"]).optional(),
+  view: z.enum(["referrals", "postop", "nurse-capacity", "capacity-alerts", "acuity", "wardable"]).optional(),
 });
 
 export const Route = createFileRoute("/_authenticated/analytics")({
@@ -41,6 +43,10 @@ export const Route = createFileRoute("/_authenticated/analytics")({
       queryKey: ["analytics", "acuity", fromIso.slice(0, 10), toIso.slice(0, 10)],
       queryFn: () => getAcuityAnalytics({ data: { from: fromIso.slice(0, 10), to: toIso.slice(0, 10) } }),
     });
+    void context.queryClient.prefetchQuery({
+      queryKey: ["analytics", "wardable", fromIso.slice(0, 10), toIso.slice(0, 10)],
+      queryFn: () => getWardableAnalytics({ data: { from: fromIso.slice(0, 10), to: toIso.slice(0, 10) } }),
+    });
     void context.queryClient.prefetchQuery(icnarcTargetsQueryOptions);
   },
   errorComponent: ({ error }) => <RouteErrorFallback error={error} label="Analytics" />,
@@ -54,7 +60,13 @@ export const Route = createFileRoute("/_authenticated/analytics")({
 function AnalyticsPage() {
   const search = Route.useSearch();
   const navigate = Route.useNavigate();
-  const tab: "referrals" | "postop" | "nurse-capacity" | "capacity-alerts" | "acuity" =
+  const tab:
+    | "referrals"
+    | "postop"
+    | "nurse-capacity"
+    | "capacity-alerts"
+    | "acuity"
+    | "wardable" =
     search.view === "postop"
       ? "postop"
       : search.view === "nurse-capacity"
@@ -63,6 +75,8 @@ function AnalyticsPage() {
       ? "capacity-alerts"
       : search.view === "acuity"
       ? "acuity"
+      : search.view === "wardable"
+      ? "wardable"
       : "referrals";
 
   return (
@@ -78,7 +92,7 @@ function AnalyticsPage() {
               view:
                 v === "referrals"
                   ? undefined
-                  : (v as "postop" | "nurse-capacity" | "capacity-alerts" | "acuity"),
+                  : (v as "postop" | "nurse-capacity" | "capacity-alerts" | "acuity" | "wardable"),
             },
             replace: true,
           })
@@ -90,6 +104,7 @@ function AnalyticsPage() {
           <TabsTrigger value="nurse-capacity">Nurse capacity</TabsTrigger>
           <TabsTrigger value="capacity-alerts">Capacity alerts</TabsTrigger>
           <TabsTrigger value="acuity">Acuity</TabsTrigger>
+          <TabsTrigger value="wardable">Wardable</TabsTrigger>
         </TabsList>
         <TabsContent value="referrals">
           <ReferralsAnalyticsPanel />
@@ -105,6 +120,9 @@ function AnalyticsPage() {
         </TabsContent>
         <TabsContent value="acuity">
           <AcuityAnalyticsPanel />
+        </TabsContent>
+        <TabsContent value="wardable">
+          <WardableAnalyticsPanel />
         </TabsContent>
       </Tabs>
     </div>
