@@ -216,29 +216,29 @@ function BoardPage() {
       <div className={`flex items-center justify-between px-4 py-2 border-b ${p.border}`}>
         <div className="flex items-center gap-6">
           <div>
-            <div className={`text-xs uppercase tracking-widest ${p.eyebrow}`}>SDH Critical Care</div>
-            <div className="text-2xl font-semibold">Live Board</div>
+            <div className={`text-sm uppercase tracking-widest ${p.eyebrow}`}>SDH Critical Care</div>
+            <div className="text-4xl font-semibold">Live Board</div>
           </div>
           {partner && (
-            <div className="flex items-center gap-4 text-lg">
+            <div className="flex items-center gap-4 text-2xl">
               <CapCell label="ICU" a={partner.stats.occupied} b={partner.stats.total_beds} p={p} />
               <div className={p.muted}>
-                <span className={`${p.eyebrow} text-sm mr-1`}>Available</span>{partner.stats.available}
+                <span className={`${p.eyebrow} text-base mr-1`}>Available</span>{partner.stats.available}
               </div>
               <div className={p.muted}>
-                <span className={`${p.eyebrow} text-sm mr-1`}>Unassigned</span>{partner.stats.unassigned}
+                <span className={`${p.eyebrow} text-base mr-1`}>Unassigned</span>{partner.stats.unassigned}
               </div>
               <div className={p.muted}>
-                <span className={`${p.eyebrow} text-sm mr-1`}>Pending referrals</span>{pending.length}
+                <span className={`${p.eyebrow} text-base mr-1`}>Pending referrals</span>{pending.length}
               </div>
             </div>
           )}
         </div>
         <div className="flex items-center gap-6">
-          <div className="text-4xl font-mono tabular-nums">{now.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}</div>
+          <div className="text-6xl font-mono tabular-nums">{now.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}</div>
           <button
             onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
-            className={`text-sm rounded-md border px-2 py-1 flex items-center gap-1.5 ${p.toggle}`}
+            className={`text-base rounded-md border px-3 py-1.5 flex items-center gap-2 ${p.toggle}`}
             aria-label={`Switch to ${theme === "dark" ? "light" : "dark"} mode`}
             title={`Switch to ${theme === "dark" ? "light" : "dark"} mode`}
           >
@@ -247,19 +247,19 @@ function BoardPage() {
           </button>
           <button
             onClick={toggleFullscreen}
-            className={`text-sm rounded-md border px-2 py-1 flex items-center gap-1.5 ${p.toggle}`}
+            className={`text-base rounded-md border px-3 py-1.5 flex items-center gap-2 ${p.toggle}`}
             aria-label={isFullscreen ? "Exit full screen" : "Enter full screen"}
             title={isFullscreen ? "Exit full screen (F11)" : "Enter full screen (F11)"}
           >
             {isFullscreen ? <Minimize className="w-4 h-4" /> : <Maximize className="w-4 h-4" />}
             {isFullscreen ? "Exit" : "Full screen"}
           </button>
-          <Link to="/board/ward-round" className={`${p.exit} text-sm underline flex items-center gap-1`}>
+          <Link to="/board/ward-round" className={`${p.exit} text-base underline flex items-center gap-2`}>
             <Printer className="w-4 h-4" /> Ward round
           </Link>
           <button
             onClick={() => navigate({ to: "/bed-board" })}
-            className={`${p.exit} text-sm underline flex items-center gap-1`}
+            className={`${p.exit} text-base underline flex items-center gap-2`}
             aria-label="Exit board mode"
           >
             <X className="w-4 h-4" /> Exit
@@ -284,8 +284,8 @@ function CapCell({ label, a, b, p }: { label: string; a: number; b: number; p: P
   const full = a >= b;
   return (
     <div className={`px-3 py-1 rounded ${full ? p.capFull : p.capOk}`}>
-      <span className={`text-xs uppercase tracking-wider mr-2 ${p.eyebrow}`}>{label}</span>
-      <span className="font-mono tabular-nums text-xl">{a}/{b}</span>
+      <span className={`text-sm uppercase tracking-wider mr-2 ${p.eyebrow}`}>{label}</span>
+      <span className="font-mono tabular-nums text-2xl">{a}/{b}</span>
     </div>
   );
 }
@@ -314,11 +314,11 @@ function BedsColumn({
   return (
     <div className="p-3 min-h-full grid grid-rows-[auto_1fr]">
       <div>
-        <h2 className={`text-xs uppercase tracking-widest mb-2 ${p.eyebrow}`}>
+        <h2 className={`text-sm uppercase tracking-widest mb-2 ${p.eyebrow}`}>
           {data.unit} · {slots.length} beds
         </h2>
       </div>
-      <div className="grid grid-cols-1 sm:grid-cols-[repeat(auto-fit,minmax(260px,1fr))] gap-1.5 auto-rows-[minmax(140px,1fr)]">
+        <div className="grid grid-cols-1 sm:grid-cols-[repeat(auto-fit,minmax(320px,1fr))] gap-2 auto-rows-[minmax(160px,1fr)]">
           {slots.map((s) => {
             const occ = s.occupant;
             const info = occ ? acuityMap.get(occ.id) : undefined;
@@ -327,13 +327,13 @@ function BedsColumn({
             return (
               <div
                 key={s.bed}
-                className={`rounded border p-2 h-full flex flex-col ${occ ? p.cardFilled : p.borderDashed}`}
+                className={`rounded border p-3 h-full flex flex-col ${occ ? p.cardFilled : p.borderDashed}`}
               >
                 <div className="flex items-baseline justify-between gap-1">
                   <div className={`text-[11px] uppercase tracking-wider ${p.eyebrow}`}>{s.bed}</div>
                   {occ && (
                     <div
-                      className={`text-[10px] px-1.5 py-0.5 rounded font-semibold ${level != null ? LEVEL_PILL[level] ?? p.pill : p.pill}`}
+                      className={`text-xs px-2 py-0.5 rounded font-semibold ${level != null ? LEVEL_PILL[level] ?? p.pill : p.pill}`}
                       title={level != null ? LEVEL_TITLE[level] ?? `Level ${level}` : "Acuity not set"}
                     >
                       L{level ?? "?"}{day != null ? ` · d${day}` : ""}
@@ -342,14 +342,14 @@ function BedsColumn({
                 </div>
                 {occ ? (
                   <>
-                    <div className="mt-0.5 text-base leading-tight font-semibold truncate">
+                    <div className="mt-0.5 text-xl leading-tight font-semibold truncate">
                       {occ.full_name || occ.hospital_number || "—"}
                     </div>
-                    <div className={`text-[11px] leading-tight truncate ${p.muted}`}>
+                    <div className={`text-sm leading-tight truncate ${p.muted}`}>
                       {occ.hospital_number ?? ""}
                       {occ.age != null ? ` · ${occ.age}y` : ""}
                     </div>
-                    <div className="mt-auto pt-1 flex gap-1 text-[10px] flex-wrap">
+                    <div className="mt-auto pt-1 flex gap-1.5 text-xs flex-wrap">
                       {info?.one_to_one && <Flag p={p} tone="red">1:1</Flag>}
                       {occ.tep_in_place && <Flag p={p} tone="blue">TEP</Flag>}
                       {occ.dnacpr_decision && <Flag p={p} tone="orange">DNACPR</Flag>}
@@ -357,7 +357,7 @@ function BedsColumn({
                     </div>
                   </>
                 ) : (
-                  <div className={`mt-1 text-xs ${p.cardEmpty}`}>Free</div>
+                  <div className={`mt-1 text-base ${p.cardEmpty}`}>Free</div>
                 )}
               </div>
             );
@@ -375,15 +375,15 @@ function Flag({ children, tone, p }: { children: React.ReactNode; tone?: "red" |
     tone === "orange" ? p.flagOrange :
     tone === "blue" ? p.flagBlue :
     p.flagDefault;
-  return <span className={`px-1 py-0.5 rounded ${cls}`}>{children}</span>;
+  return <span className={`px-1.5 py-0.5 rounded text-sm ${cls}`}>{children}</span>;
 }
 
 function PendingColumn({ rows, now, p }: { rows: Referral[]; now: number; p: Palette }) {
   return (
     <div className="p-3">
-      <h2 className={`text-xs uppercase tracking-widest mb-2 ${p.eyebrow}`}>Pending referrals · {rows.length}</h2>
-      {rows.length === 0 && <div className={p.cardEmpty}>No pending referrals.</div>}
-      <ul className="space-y-1.5">
+      <h2 className={`text-sm uppercase tracking-widest mb-2 ${p.eyebrow}`}>Pending referrals · {rows.length}</h2>
+      {rows.length === 0 && <div className={`text-base ${p.cardEmpty}`}>No pending referrals.</div>}
+      <ul className="space-y-2">
         {rows.map((r) => {
           const waitMs = r.status === "pending"
             ? now - new Date(r.referral_received_at).getTime()
@@ -393,10 +393,10 @@ function PendingColumn({ rows, now, p }: { rows: Referral[]; now: number; p: Pal
             <li key={r.id} className={`rounded border p-2 ${p.chip}`}>
               <div className="flex items-center justify-between gap-2">
                 <div className="min-w-0">
-                  <div className="text-base font-semibold truncate">{r.hospital_number ?? "—"}</div>
-                  <div className={`text-[11px] truncate ${p.muted}`}>{r.referring_specialty ?? "Unknown"} · {r.current_ward ?? ""}</div>
+                  <div className="text-xl font-semibold truncate">{r.hospital_number ?? "—"}</div>
+                  <div className={`text-sm truncate ${p.muted}`}>{r.referring_specialty ?? "Unknown"} · {r.current_ward ?? ""}</div>
                 </div>
-                <div className={`text-xl font-mono tabular-nums ${critical ? p.timerCritical : p.timerWarn}`}>
+                <div className={`text-3xl font-mono tabular-nums ${critical ? p.timerCritical : p.timerWarn}`}>
                   {formatElapsed(waitMs)}
                 </div>
               </div>
