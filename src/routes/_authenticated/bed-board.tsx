@@ -487,16 +487,11 @@ function BedCard({
           {isolation && (
             <Badge
               variant="outline"
-              className="text-[10px] gap-1 bg-amber-500/10 text-amber-700 dark:text-amber-400 border-amber-500/30"
+              className="text-[10px] p-0.5 bg-amber-500/10 text-amber-700 dark:text-amber-400 border-amber-500/30"
               title={`Isolation: ${isolation}${isolationReason ? ` — ${isolationReason}` : ""}`}
               aria-label={`Isolation required: ${isolation}${isolationReason ? `, ${isolationReason}` : ""}`}
             >
               <Biohazard className="w-3 h-3" aria-hidden="true" />
-              {isolation === "contact"
-                ? "Contact"
-                : isolation === "droplet"
-                  ? "Droplet"
-                  : "Airborne"}
             </Badge>
           )}
           <button
@@ -521,14 +516,13 @@ function BedCard({
           >
             <Badge
               variant="outline"
-              className={`text-[10px] gap-1 cursor-pointer transition ${
+              className={`text-[10px] p-0.5 cursor-pointer transition ${
                 violenceRisk
                   ? "bg-red-500/15 text-red-700 dark:text-red-400 border-red-500/40"
                   : "bg-transparent text-muted-foreground border-dashed opacity-60 hover:opacity-100"
               } ${violencePending ? "opacity-50" : ""}`}
             >
               <Swords className="w-3 h-3" aria-hidden="true" />
-              {violenceRisk ? "Violence risk" : "Violence?"}
             </Badge>
           </button>
           <button
@@ -553,7 +547,7 @@ function BedCard({
           >
             <Badge
               variant="outline"
-              className={`text-[10px] gap-1 cursor-pointer transition ${
+              className={`text-[10px] p-0.5 cursor-pointer transition ${
                 endOfLife
                   ? "bg-violet-500/15 text-violet-700 dark:text-violet-400 border-violet-500/40"
                   : "bg-transparent text-muted-foreground border-dashed opacity-60 hover:opacity-100"
@@ -563,7 +557,6 @@ function BedCard({
                 className={`w-3 h-3 ${endOfLife ? "fill-current" : ""}`}
                 aria-hidden="true"
               />
-              {endOfLife ? "End of life" : "EoL?"}
             </Badge>
           </button>
           <button
@@ -589,14 +582,13 @@ function BedCard({
           >
             <Badge
               variant="outline"
-              className={`text-[10px] gap-1 cursor-pointer transition ${
+              className={`text-[10px] p-0.5 cursor-pointer transition ${
                 needsScanTransfer
                   ? "bg-indigo-500/15 text-indigo-700 dark:text-indigo-400 border-indigo-500/40"
                   : "bg-transparent text-muted-foreground border-dashed opacity-60 hover:opacity-100"
               } ${scanTransferPending ? "opacity-50" : ""}`}
             >
               <ScanLine className="w-3 h-3" aria-hidden="true" />
-              {needsScanTransfer ? "For scan" : "Scan?"}
             </Badge>
           </button>
 
