@@ -40,8 +40,10 @@ import {
 import { getPatientAirways } from "@/lib/patient-airway.functions";
 import {
   getPatientIsolations,
+  setPatientIsolation,
   type PatientIsolationEntry,
 } from "@/lib/patient-infection.functions";
+
 import {
   listViolenceRisk,
   setViolenceRisk,
