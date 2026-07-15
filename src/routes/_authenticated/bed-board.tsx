@@ -329,6 +329,12 @@ function BedCard({
   hasTracheostomy: boolean;
   isolation: "contact" | "droplet" | "airborne" | null;
   isolationReason: string | null;
+  isolationPending: boolean;
+  onCycleIsolation: (
+    occupantId: string,
+    next: "none" | "contact" | "droplet" | "airborne",
+  ) => void;
+
   violenceRisk: boolean;
   violencePending: boolean;
   onToggleViolenceRisk: (occupantId: string, next: boolean) => void;
