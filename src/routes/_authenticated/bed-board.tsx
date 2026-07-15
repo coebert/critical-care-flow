@@ -902,6 +902,32 @@ function BedBoardPage() {
     });
   };
 
+  // Isolation cycle (user-toggleable, writes to bed_occupancies.isolation).
+  const writeIsolation = useServerFn(setPatientIsolation);
+  const isolationMutation = useMutation({
+    mutationFn: (v: {
+      partner_patient_id: string;
+      isolation: "none" | "contact" | "droplet" | "airborne";
+    }) => writeIsolation({ data: v }),
+    onSuccess: (_r, vars) => {
+      toast.success(
+        vars.isolation === "none"
+          ? "Isolation cleared"
+          : `Isolation set to ${vars.isolation}`,
+      );
+      qc.invalidateQueries({ queryKey: ["patient-isolations"] });
+    },
+    onError: (err) =>
+      toast.error(err instanceof Error ? err.message : "Could not update isolation"),
+  });
+  const handleCycleIsolation = (
+    occupantId: string,
+    next: "none" | "contact" | "droplet" | "airborne",
+  ) => {
+    isolationMutation.mutate({ partner_patient_id: occupantId, isolation: next });
+  };
+
+
 
 
 
