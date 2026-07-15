@@ -1431,7 +1431,14 @@ function BedBoardPage() {
                       (slot.occupant?.id != null &&
                         isolationMap.get(slot.occupant.id)?.isolation_reason) ||
                       null
+                    isolationPending={
+                      slot.occupant?.id != null &&
+                      isolationMutation.isPending &&
+                      (isolationMutation.variables as { partner_patient_id?: string } | undefined)
+                        ?.partner_patient_id === slot.occupant.id
                     }
+                    onCycleIsolation={handleCycleIsolation}
+
                     wardable={w?.wardable === true}
                     wardableAt={w?.wardable_at ?? null}
                     dischargedAt={w?.discharged_at ?? null}
