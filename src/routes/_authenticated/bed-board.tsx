@@ -299,6 +299,9 @@ function BedCard({
   hasTracheostomy,
   isolation,
   isolationReason,
+  isolationPending,
+  onCycleIsolation,
+
   violenceRisk,
   violencePending,
   onToggleViolenceRisk,
