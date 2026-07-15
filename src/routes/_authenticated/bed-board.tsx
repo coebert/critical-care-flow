@@ -523,20 +523,37 @@ function BedCard({
       {/* Status badge row — fixed order: Isolation → EOL → Violence → Scan → Trache → TEP.
           Toggleable flags share the same 32×32 touch target. */}
       <div className="mt-2 flex flex-wrap items-center gap-0.5">
-        {isolation && (
-          <span
-            className="inline-flex items-center justify-center min-h-8 min-w-8"
-            title={`Isolation: ${isolation}${isolationReason ? ` — ${isolationReason}` : ""}`}
-            aria-label={`Isolation required: ${isolation}${isolationReason ? `, ${isolationReason}` : ""}`}
-          >
-            <Badge
-              variant="outline"
-              className="text-[10px] p-0.5 bg-amber-500/10 text-amber-700 dark:text-amber-400 border-amber-500/30"
+        {(() => {
+          const cycle = { none: "contact", contact: "droplet", droplet: "airborne", airborne: "none" } as const;
+          const current = isolation ?? "none";
+          const next = cycle[current];
+          const active = isolation != null;
+          const toneClass = active
+            ? "bg-amber-500/10 text-amber-700 dark:text-amber-400 border-amber-500/30"
+            : "bg-transparent text-muted-foreground border-dashed opacity-60";
+          const label = active
+            ? `Isolation: ${isolation}${isolationReason ? ` — ${isolationReason}` : ""}. Tap to change to ${next === "none" ? "no isolation" : next}.`
+            : `Flag as needing isolation (next: contact)`;
+          return (
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                if (!isolationPending) onCycleIsolation(occ.id, next);
+              }}
+              disabled={isolationPending}
+              title={label}
+              aria-pressed={active}
+              aria-label={label}
+              className={toggleBtnClass}
             >
-              <Biohazard className="w-3.5 h-3.5" aria-hidden="true" />
-            </Badge>
-          </span>
-        )}
+              <Badge variant="outline" className={`text-[10px] p-0.5 transition ${toneClass}`}>
+                <Biohazard className="w-3.5 h-3.5" aria-hidden="true" />
+              </Badge>
+            </button>
+          );
+        })()}
+
         <button
           type="button"
           onClick={(e) => {
