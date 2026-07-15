@@ -40,8 +40,10 @@ import {
 import { getPatientAirways } from "@/lib/patient-airway.functions";
 import {
   getPatientIsolations,
+  setPatientIsolation,
   type PatientIsolationEntry,
 } from "@/lib/patient-infection.functions";
+
 import {
   listViolenceRisk,
   setViolenceRisk,
@@ -297,6 +299,9 @@ function BedCard({
   hasTracheostomy,
   isolation,
   isolationReason,
+  isolationPending,
+  onCycleIsolation,
+
   violenceRisk,
   violencePending,
   onToggleViolenceRisk,
@@ -324,6 +329,12 @@ function BedCard({
   hasTracheostomy: boolean;
   isolation: "contact" | "droplet" | "airborne" | null;
   isolationReason: string | null;
+  isolationPending: boolean;
+  onCycleIsolation: (
+    occupantId: string,
+    next: "none" | "contact" | "droplet" | "airborne",
+  ) => void;
+
   violenceRisk: boolean;
   violencePending: boolean;
   onToggleViolenceRisk: (occupantId: string, next: boolean) => void;
@@ -512,20 +523,37 @@ function BedCard({
       {/* Status badge row — fixed order: Isolation → EOL → Violence → Scan → Trache → TEP.
           Toggleable flags share the same 32×32 touch target. */}
       <div className="mt-2 flex flex-wrap items-center gap-0.5">
-        {isolation && (
-          <span
-            className="inline-flex items-center justify-center min-h-8 min-w-8"
-            title={`Isolation: ${isolation}${isolationReason ? ` — ${isolationReason}` : ""}`}
-            aria-label={`Isolation required: ${isolation}${isolationReason ? `, ${isolationReason}` : ""}`}
-          >
-            <Badge
-              variant="outline"
-              className="text-[10px] p-0.5 bg-amber-500/10 text-amber-700 dark:text-amber-400 border-amber-500/30"
+        {(() => {
+          const cycle = { none: "contact", contact: "droplet", droplet: "airborne", airborne: "none" } as const;
+          const current = isolation ?? "none";
+          const next = cycle[current];
+          const active = isolation != null;
+          const toneClass = active
+            ? "bg-amber-500/10 text-amber-700 dark:text-amber-400 border-amber-500/30"
+            : "bg-transparent text-muted-foreground border-dashed opacity-60";
+          const label = active
+            ? `Isolation: ${isolation}${isolationReason ? ` — ${isolationReason}` : ""}. Tap to change to ${next === "none" ? "no isolation" : next}.`
+            : `Flag as needing isolation (next: contact)`;
+          return (
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                if (!isolationPending) onCycleIsolation(occ.id, next);
+              }}
+              disabled={isolationPending}
+              title={label}
+              aria-pressed={active}
+              aria-label={label}
+              className={toggleBtnClass}
             >
-              <Biohazard className="w-3.5 h-3.5" aria-hidden="true" />
-            </Badge>
-          </span>
-        )}
+              <Badge variant="outline" className={`text-[10px] p-0.5 transition ${toneClass}`}>
+                <Biohazard className="w-3.5 h-3.5" aria-hidden="true" />
+              </Badge>
+            </button>
+          );
+        })()}
+
         <button
           type="button"
           onClick={(e) => {
@@ -873,6 +901,32 @@ function BedBoardPage() {
       needs_scan_transfer: next,
     });
   };
+
+  // Isolation cycle (user-toggleable, writes to bed_occupancies.isolation).
+  const writeIsolation = useServerFn(setPatientIsolation);
+  const isolationMutation = useMutation({
+    mutationFn: (v: {
+      partner_patient_id: string;
+      isolation: "none" | "contact" | "droplet" | "airborne";
+    }) => writeIsolation({ data: v }),
+    onSuccess: (_r, vars) => {
+      toast.success(
+        vars.isolation === "none"
+          ? "Isolation cleared"
+          : `Isolation set to ${vars.isolation}`,
+      );
+      qc.invalidateQueries({ queryKey: ["patient-isolations"] });
+    },
+    onError: (err) =>
+      toast.error(err instanceof Error ? err.message : "Could not update isolation"),
+  });
+  const handleCycleIsolation = (
+    occupantId: string,
+    next: "none" | "contact" | "droplet" | "airborne",
+  ) => {
+    isolationMutation.mutate({ partner_patient_id: occupantId, isolation: next });
+  };
+
 
 
 
@@ -1378,6 +1432,15 @@ function BedBoardPage() {
                         isolationMap.get(slot.occupant.id)?.isolation_reason) ||
                       null
                     }
+                    isolationPending={
+
+                      slot.occupant?.id != null &&
+                      isolationMutation.isPending &&
+                      (isolationMutation.variables as { partner_patient_id?: string } | undefined)
+                        ?.partner_patient_id === slot.occupant.id
+                    }
+                    onCycleIsolation={handleCycleIsolation}
+
                     wardable={w?.wardable === true}
                     wardableAt={w?.wardable_at ?? null}
                     dischargedAt={w?.discharged_at ?? null}
