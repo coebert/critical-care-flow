@@ -1431,7 +1431,9 @@ function BedBoardPage() {
                       (slot.occupant?.id != null &&
                         isolationMap.get(slot.occupant.id)?.isolation_reason) ||
                       null
+                    }
                     isolationPending={
+
                       slot.occupant?.id != null &&
                       isolationMutation.isPending &&
                       (isolationMutation.variables as { partner_patient_id?: string } | undefined)
