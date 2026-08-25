@@ -85,12 +85,19 @@ export const Route = createFileRoute("/_authenticated/")({
       { name: "description", content: "Live list of critical care referrals at Salisbury District Hospital." },
     ],
   }),
-  validateSearch: (search: Record<string, unknown>) => ({
-    specialty: typeof search.specialty === "string" ? search.specialty : undefined,
-    from: typeof search.from === "string" ? search.from : undefined, // yyyy-MM-dd inclusive
-    to: typeof search.to === "string" ? search.to : undefined,       // yyyy-MM-dd inclusive
-    quick: typeof search.quick === "string" ? (search.quick as QuickFilterKey) : undefined,
-  }),
+  validateSearch: (search: Record<string, unknown>) => {
+    const parsed: {
+      specialty?: string;
+      from?: string;
+      to?: string;
+      quick?: QuickFilterKey;
+    } = {};
+    if (typeof search.specialty === "string") parsed.specialty = search.specialty;
+    if (typeof search.from === "string") parsed.from = search.from; // yyyy-MM-dd inclusive
+    if (typeof search.to === "string") parsed.to = search.to;       // yyyy-MM-dd inclusive
+    if (typeof search.quick === "string") parsed.quick = search.quick as QuickFilterKey;
+    return parsed;
+  },
   // Prime the referrals list cache before the component mounts. The parent
   // `_authenticated` layout is `ssr: false`, so this runs client-side after
   // the auth gate — bearer middleware is attached and the fetch is authorised.
