@@ -46,7 +46,7 @@ export const Route = createFileRoute("/_authenticated")({
       const target = `${location.pathname}${location.searchStr ?? ""}`;
       throw redirect({
         to: "/auth",
-        search: target && target !== "/" ? { redirect: target } : undefined,
+        search: target && target !== "/" ? { redirect: target } : {},
       });
     }
     return { user: data.session.user };
@@ -119,7 +119,7 @@ function AuthedShell() {
         description: "For patient safety, this session ended after a period of no activity.",
       });
     }
-    navigate({ to: "/auth", replace: true });
+    navigate({ to: "/auth", search: {}, replace: true });
   };
 
   // NHS DTAC / Technical Assurance — idle session timeout.

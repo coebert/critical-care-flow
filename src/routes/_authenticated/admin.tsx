@@ -33,7 +33,7 @@ export const Route = createFileRoute("/_authenticated/admin")({
   beforeLoad: async () => {
     const { data: userRes } = await supabase.auth.getUser();
     const uid = userRes.user?.id;
-    if (!uid) throw redirect({ to: "/auth" });
+    if (!uid) throw redirect({ to: "/auth", search: {} });
     const { data: isAdmin } = await supabase.rpc("has_role", {
       _user_id: uid,
       _role: "admin",
