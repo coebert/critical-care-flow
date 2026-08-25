@@ -130,17 +130,36 @@ export const Route = createFileRoute("/_authenticated/bed-board")({
       if (!Number.isFinite(n) || Math.trunc(n) !== n) return undefined;
       return n === 1 || n === 2 || n === 3 ? (n as 1 | 2 | 3) : undefined;
     };
-    return {
-      source_referral_id: str(s.source_referral_id),
-      source_postop_booking_id: str(s.source_postop_booking_id),
-      hospital_number: str(s.hospital_number),
-      patient_initials: str(s.patient_initials),
-      admitting_consultant: str(s.admitting_consultant),
-      level: parseLevel(s.level),
-      source_label: str(s.source_label),
-      focus_shift: parseShift(s.focus_shift),
-      focus_level: parseLevel(s.focus_level),
-    };
+    const parsed: {
+      source_referral_id?: string;
+      source_postop_booking_id?: string;
+      hospital_number?: string;
+      patient_initials?: string;
+      admitting_consultant?: string;
+      level?: 1 | 2 | 3;
+      source_label?: string;
+      focus_shift?: "day" | "night";
+      focus_level?: 1 | 2 | 3;
+    } = {};
+    const sourceReferralId = str(s.source_referral_id);
+    const sourcePostopBookingId = str(s.source_postop_booking_id);
+    const hospitalNumber = str(s.hospital_number);
+    const patientInitials = str(s.patient_initials);
+    const admittingConsultant = str(s.admitting_consultant);
+    const level = parseLevel(s.level);
+    const sourceLabel = str(s.source_label);
+    const focusShift = parseShift(s.focus_shift);
+    const focusLevel = parseLevel(s.focus_level);
+    if (sourceReferralId) parsed.source_referral_id = sourceReferralId;
+    if (sourcePostopBookingId) parsed.source_postop_booking_id = sourcePostopBookingId;
+    if (hospitalNumber) parsed.hospital_number = hospitalNumber;
+    if (patientInitials) parsed.patient_initials = patientInitials;
+    if (admittingConsultant) parsed.admitting_consultant = admittingConsultant;
+    if (level) parsed.level = level;
+    if (sourceLabel) parsed.source_label = sourceLabel;
+    if (focusShift) parsed.focus_shift = focusShift;
+    if (focusLevel) parsed.focus_level = focusLevel;
+    return parsed;
   },
   component: BedBoardPage,
 });

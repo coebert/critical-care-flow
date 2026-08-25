@@ -169,7 +169,7 @@ function SetupPage() {
               ? "An administrator already exists for this system."
               : "First-admin setup is not currently enabled on this deployment. Contact your administrator."}
           </p>
-          <Button onClick={() => navigate({ to: "/auth" })} className="w-full">Go to sign in</Button>
+          <Button onClick={() => navigate({ to: "/auth", search: {} })} className="w-full">Go to sign in</Button>
         </Card>
       </div>
     );

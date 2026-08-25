@@ -52,7 +52,9 @@ export const Route = createFileRoute("/auth")({
     const raw = typeof search.redirect === "string" ? search.redirect : "";
     // Only accept same-origin relative paths to prevent open redirects.
     const safe = raw.startsWith("/") && !raw.startsWith("//") ? raw : "";
-    return { redirect: safe };
+    const parsed: { redirect?: string } = {};
+    if (safe) parsed.redirect = safe;
+    return parsed;
   },
   head: () => ({
     meta: [
