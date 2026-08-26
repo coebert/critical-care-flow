@@ -81,8 +81,8 @@ function SecurityFaqPage() {
         <h2>How do you report a security issue?</h2>
         <p>
           Email{" "}
-          <a href="mailto:security@sdh-criticalcare.nhs.uk">
-            security@sdh-criticalcare.nhs.uk
+          <a href="mailto:Robert.coe1@nhs.net">
+            Robert.coe1@nhs.net
           </a>{" "}
           with the details. Our{" "}
           <Link to="/security">security disclosure</Link> page explains the

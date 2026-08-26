@@ -36,7 +36,7 @@ function SecurityPage() {
 
         <h2>How to report</h2>
         <p>
-          Email <a href="mailto:security@sdh-criticalcare.nhs.uk">security@sdh-criticalcare.nhs.uk</a>{" "}
+          Email <a href="mailto:Robert.coe1@nhs.net">Robert.coe1@nhs.net</a>{" "}
           with:
         </p>
         <ul>

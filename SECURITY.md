@@ -6,7 +6,7 @@ disclosure of security issues.
 
 ## Reporting a vulnerability
 
-Email **security@sdh-criticalcare.nhs.uk** with reproduction steps,
+Email **Robert.coe1@nhs.net** with reproduction steps,
 impact, and how you'd like to be credited.
 
 - Acknowledgement: within 2 working days
