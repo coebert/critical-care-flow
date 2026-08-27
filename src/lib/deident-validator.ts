@@ -133,10 +133,14 @@ const TEXT_DETECTORS: Detector[] = [
 ];
 
 /** Run every text detector over a single string field. */
-export function scanText(field: string, text: string | null | undefined): DeidentViolation[] {
+export function scanText(
+  field: string,
+  text: string | null | undefined,
+  skipCodes: readonly string[] = [],
+): DeidentViolation[] {
   if (!text) return [];
   const normalised = text.normalize("NFKC");
-  return TEXT_DETECTORS.filter((d) => d.test(normalised)).map((d) => ({
+  return TEXT_DETECTORS.filter((d) => !skipCodes.includes(d.code) && d.test(normalised)).map((d) => ({
     code: d.code,
     field,
     message: d.message,
@@ -301,7 +305,11 @@ export function validateDeidentifiedChartScan(payload: ChartScanPayload): Deiden
       if (key === "specialty" && !/^[A-Za-z &/-]{2,40}$/.test(value)) {
         add("metadata_value_invalid", "metadata", "Specialty contains unexpected characters.");
       }
-      violations.push(...scanText("metadata", value));
+      // Specialty names ("General Surgery") legitimately look like two
+      // capitalised words; the strict pattern above already constrains them.
+      violations.push(
+        ...scanText("metadata", value, key === "specialty" ? ["full_name"] : []),
+      );
     }
   }
 
