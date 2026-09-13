@@ -118,7 +118,7 @@ describe("analytics urgency surfaces alignment", () => {
   });
 
   it("empty days still produce a stacked-area bucket with all-zero legend keys", () => {
-    const emptyDayDisplay = format(new Date(dayKeys[6]), "dd MMM");
+    const emptyDayDisplay = format(new Date(dayKeys[6]), "dd/MM/yyyy");
     const row = perDayByUrgency.find((r) => r.date === emptyDayDisplay);
     expect(row).toBeDefined();
     for (const k of URGENCY_LEGEND_KEYS) {

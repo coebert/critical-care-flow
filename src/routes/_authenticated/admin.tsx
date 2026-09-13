@@ -602,7 +602,7 @@ function AuditPanel() {
 
 /**
  * Popover-anchored range calendar for the Audit tab. The trigger shows
- * the current selection in "dd MMM yyyy" or a "Pick a date range"
+ * the current selection in "dd/MM/yyyy" or a "Pick a date range"
  * placeholder. Selecting a range fires `onChange`; clearing it fires
  * `onChange(undefined)`.
  */
@@ -615,8 +615,8 @@ function AuditDateRangePicker({
 }) {
   const label = value?.from
     ? value.to
-      ? `${format(value.from, "dd MMM yyyy")} – ${format(value.to, "dd MMM yyyy")}`
-      : format(value.from, "dd MMM yyyy")
+      ? `${format(value.from, "dd/MM/yyyy")} – ${format(value.to, "dd/MM/yyyy")}`
+      : format(value.from, "dd/MM/yyyy")
     : "Pick a date range";
   const hasValue = Boolean(value?.from || value?.to);
   return (

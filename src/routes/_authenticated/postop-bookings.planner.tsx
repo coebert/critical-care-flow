@@ -95,7 +95,7 @@ function PlannerPage() {
             <ChevronLeft className="w-4 h-4" />
           </Button>
           <div className="text-sm w-56 text-center">
-            Week of {format(weekStart, "dd MMM yyyy")}
+            Week of {format(weekStart, "dd/MM/yyyy")}
           </div>
           <Button size="sm" variant="outline" onClick={() => setWeekStart((w) => addDays(w, 7))}>
             <ChevronRight className="w-4 h-4" />
@@ -127,7 +127,7 @@ function PlannerPage() {
                 <div className="text-xs uppercase text-muted-foreground">
                   {format(d, "EEE")}
                 </div>
-                <div className="font-medium">{format(d, "dd MMM")}</div>
+                <div className="font-medium">{format(d, "dd/MM")}</div>
                 <div className="text-[11px] text-muted-foreground mt-1">
                   Committed: {committed.length}
                   {(l3 || l2) ? (
