@@ -24,7 +24,7 @@ export async function assertAdmin(
     throw safeError(
       "auth-guards.assertAdmin",
       new Error("forbidden"),
-      "Forbidden: admin role required.",
+      forbiddenMessage,
     );
   }
 }
