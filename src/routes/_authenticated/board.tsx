@@ -174,14 +174,11 @@ const LEVEL_TITLE: Record<number, string> = {
   3: "Level 3 — ICU care",
 };
 
-// Returns null until after hydration. Reading the wall clock during render
-// would make the server-rendered markup differ from the client's first
-// render (and `toLocaleTimeString` is timezone-dependent), which React 19
-// reports as a hydration mismatch.
+// This route is client-only (`ssr: false` on the _authenticated layout), so
+// reading the wall clock during the first render is safe.
 function useClock() {
-  const [now, setNow] = useState<Date | null>(null);
+  const [now, setNow] = useState(() => new Date());
   useEffect(() => {
-    setNow(new Date());
     const id = setInterval(() => setNow(new Date()), 1000);
     return () => clearInterval(id);
   }, []);
@@ -210,8 +207,7 @@ function useBoardFullscreen() {
 function BoardPage() {
   const navigate = useNavigate();
   const qc = useQueryClient();
-  const clock = useClock();
-  const now = clock ?? new Date(0);
+  const now = useClock();
   const [theme, setTheme] = useBoardTheme();
   const [isFullscreen, toggleFullscreen] = useBoardFullscreen();
   const [zoom, setZoom] = useBoardZoom();
@@ -298,7 +294,7 @@ function BoardPage() {
           )}
         </div>
         <div className="flex items-center gap-6">
-          <div className="text-6xl font-mono tabular-nums">{clock ? clock.toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" }) : "--:--"}</div>
+          <div className="text-6xl font-mono tabular-nums">{now.toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" })}</div>
           <div className={`inline-flex items-center rounded-md border overflow-hidden ${p.toggle}`}>
             <button
               onClick={() => setZoom(zoom - ZOOM_STEP)}
@@ -369,10 +365,10 @@ function BoardPage() {
       {/* Body */}
       <div className="flex-1 grid grid-cols-1 lg:grid-cols-[3fr_1fr] xl:grid-cols-[4fr_1fr] overflow-hidden">
         <div className={`overflow-auto border-r ${p.border}`}>
-          <BedsColumn data={partner} acuityMap={acuityMap} now={clock ? clock.getTime() : 0} p={p} />
+          <BedsColumn data={partner} acuityMap={acuityMap} now={now.getTime()} p={p} />
         </div>
         <div className="overflow-auto">
-          <PendingColumn rows={pending} now={clock ? clock.getTime() : 0} p={p} />
+          <PendingColumn rows={pending} now={now.getTime()} p={p} />
         </div>
       </div>
     </div>
