@@ -14,13 +14,6 @@ export default defineConfig({
     server: { entry: "server" },
   },
   vite: {
-    // Vitest: unit tests only. The `e2e/` folder holds Playwright specs which
-    // must not be collected by Vitest (they fail at import with
-    // "Playwright Test needs to be invoked via 'npx playwright test'").
-    test: {
-      include: ["src/**/*.{test,spec}.{ts,tsx}"],
-      exclude: ["e2e/**", "node_modules/**", "dist/**", ".nitro/**"],
-    },
     resolve: {
       alias: {
         // Some WebAuthn verification dependencies require tslib's CommonJS
