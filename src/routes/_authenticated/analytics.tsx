@@ -26,7 +26,7 @@ export const Route = createFileRoute("/_authenticated/analytics")({
   // Panel `useQuery`s share these keys, so cold navigation renders without
   // a spinner. Fetches run in parallel; failures don't block the route.
   loader: ({ context }) => {
-    const { fromIso, toIso } = initialAnalyticsRange();
+    const { fromIso, toIso, fromDateKey, toDateKey } = initialAnalyticsRange();
     void context.queryClient.prefetchQuery({
       queryKey: ["analytics", "referrals", fromIso, toIso],
       queryFn: () => getReferralsAnalytics({ data: { from: fromIso, to: toIso } }),
@@ -36,16 +36,16 @@ export const Route = createFileRoute("/_authenticated/analytics")({
       queryFn: () => getPostopAnalytics({ data: { from: fromIso, to: toIso } }),
     });
     void context.queryClient.prefetchQuery({
-      queryKey: ["analytics", "nurse-capacity", fromIso.slice(0, 10), toIso.slice(0, 10)],
-      queryFn: () => getNurseCapacityAnalytics({ data: { from: fromIso.slice(0, 10), to: toIso.slice(0, 10) } }),
+      queryKey: ["analytics", "nurse-capacity", fromDateKey, toDateKey],
+      queryFn: () => getNurseCapacityAnalytics({ data: { from: fromDateKey, to: toDateKey } }),
     });
     void context.queryClient.prefetchQuery({
-      queryKey: ["analytics", "acuity", fromIso.slice(0, 10), toIso.slice(0, 10)],
-      queryFn: () => getAcuityAnalytics({ data: { from: fromIso.slice(0, 10), to: toIso.slice(0, 10) } }),
+      queryKey: ["analytics", "acuity", fromDateKey, toDateKey],
+      queryFn: () => getAcuityAnalytics({ data: { from: fromDateKey, to: toDateKey } }),
     });
     void context.queryClient.prefetchQuery({
-      queryKey: ["analytics", "wardable", fromIso.slice(0, 10), toIso.slice(0, 10)],
-      queryFn: () => getWardableAnalytics({ data: { from: fromIso.slice(0, 10), to: toIso.slice(0, 10) } }),
+      queryKey: ["analytics", "wardable", fromDateKey, toDateKey],
+      queryFn: () => getWardableAnalytics({ data: { from: fromDateKey, to: toDateKey } }),
     });
     void context.queryClient.prefetchQuery(icnarcTargetsQueryOptions);
   },

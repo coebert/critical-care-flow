@@ -3,10 +3,16 @@ import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { safeError } from "./safe-error";
 import type { Tables } from "@/integrations/supabase/types";
-import { assertAdmin } from "./auth-guards";
-// Re-export so existing unit tests importing `assertAdmin` from this module
-// keep working after the guard was consolidated into `auth-guards.ts`.
-export { assertAdmin };
+import { assertAdmin as assertAdminRole } from "./auth-guards";
+
+// Analytics-specific wrapper around the shared admin guard, so the message
+// the caller sees explains *why* access was refused on this surface.
+export function assertAdmin(context: unknown): Promise<void> {
+  return assertAdminRole(
+    context,
+    "Forbidden: analytics are restricted to administrators.",
+  );
+}
 
 /**
  * Runtime guard: verifies that every row returned by an analytics query has

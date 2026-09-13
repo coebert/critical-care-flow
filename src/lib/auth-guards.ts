@@ -11,7 +11,10 @@ import { safeError } from "./safe-error";
  * raw provider error is not leaked.
  */
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-export async function assertAdmin(context: any): Promise<void> {
+export async function assertAdmin(
+  context: any,
+  forbiddenMessage = "Forbidden: admin role required.",
+): Promise<void> {
   const { data, error } = await context.supabase.rpc("has_role", {
     _user_id: context.userId,
     _role: "admin",
@@ -21,7 +24,7 @@ export async function assertAdmin(context: any): Promise<void> {
     throw safeError(
       "auth-guards.assertAdmin",
       new Error("forbidden"),
-      "Forbidden: admin role required.",
+      forbiddenMessage,
     );
   }
 }

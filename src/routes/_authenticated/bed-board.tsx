@@ -1046,7 +1046,9 @@ function BedBoardPage() {
       toast.error(err instanceof Error ? err.message : "Could not update wardable status");
     },
     onSettled: () => {
-      wardableQuery.refetch();
+      // Invalidate (not refetch) so every observer of this key — other
+      // panels and other tabs — also picks the change up.
+      void qc.invalidateQueries({ queryKey: ["patient-wardable-status"] });
     },
   });
 
@@ -1100,7 +1102,9 @@ function BedBoardPage() {
       toast.success(input.undo ? "Discharge cleared" : "Discharge recorded");
     },
     onSettled: () => {
-      wardableQuery.refetch();
+      // Invalidate (not refetch) so every observer of this key — other
+      // panels and other tabs — also picks the change up.
+      void qc.invalidateQueries({ queryKey: ["patient-wardable-status"] });
     },
   });
 

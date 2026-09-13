@@ -1,6 +1,6 @@
 import { createFileRoute, useNavigate, Link } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { supabase } from "@/integrations/supabase/client";
 import {
@@ -174,6 +174,8 @@ const LEVEL_TITLE: Record<number, string> = {
   3: "Level 3 — ICU care",
 };
 
+// This route is client-only (`ssr: false` on the _authenticated layout), so
+// reading the wall clock during the first render is safe.
 function useClock() {
   const [now, setNow] = useState(() => new Date());
   useEffect(() => {
@@ -204,6 +206,7 @@ function useBoardFullscreen() {
 
 function BoardPage() {
   const navigate = useNavigate();
+  const qc = useQueryClient();
   const now = useClock();
   const [theme, setTheme] = useBoardTheme();
   const [isFullscreen, toggleFullscreen] = useBoardFullscreen();
@@ -232,11 +235,17 @@ function BoardPage() {
   useEffect(() => {
     const ch = supabase
       .channel("board-refresh")
-      .on("postgres_changes", { event: "*", schema: "public", table: "referrals" }, () => referrals.refetch())
-      .on("postgres_changes", { event: "*", schema: "public", table: "patient_acuity_overrides" }, () => acuity.refetch())
+      .on("postgres_changes", { event: "*", schema: "public", table: "referrals" }, () =>
+        qc.invalidateQueries({ queryKey: ["board", "referrals"] }),
+      )
+      .on("postgres_changes", { event: "*", schema: "public", table: "patient_acuity_overrides" }, () =>
+        qc.invalidateQueries({ queryKey: ["board", "patient-acuity"] }),
+      )
       .subscribe();
     return () => { supabase.removeChannel(ch); };
-  }, [acuity, referrals]);
+    // `qc` is stable; depending on the query objects re-subscribed the
+    // realtime channel on nearly every render.
+  }, [qc]);
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -285,7 +294,7 @@ function BoardPage() {
           )}
         </div>
         <div className="flex items-center gap-6">
-          <div className="text-6xl font-mono tabular-nums">{now.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}</div>
+          <div className="text-6xl font-mono tabular-nums">{now.toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" })}</div>
           <div className={`inline-flex items-center rounded-md border overflow-hidden ${p.toggle}`}>
             <button
               onClick={() => setZoom(zoom - ZOOM_STEP)}

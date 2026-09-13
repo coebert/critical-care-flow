@@ -9,7 +9,26 @@ import { endOfDay, startOfDay, subDays } from "date-fns";
 export function initialAnalyticsRange() {
   const to = endOfDay(new Date());
   const from = startOfDay(subDays(new Date(), 29));
-  return { from, to, fromIso: from.toISOString(), toIso: to.toISOString() };
+  return {
+    from,
+    to,
+    fromIso: from.toISOString(),
+    toIso: to.toISOString(),
+    // Date-only keys MUST be derived in local time. Slicing the UTC ISO
+    // string shifts the day for any non-UTC timezone (e.g. British Summer
+    // Time), which made the loader prefetch a different queryKey than the
+    // panels read — the prefetch was silently wasted and the panel refetched.
+    fromDateKey: localDateKey(from),
+    toDateKey: localDateKey(to),
+  };
+}
+
+/** yyyy-MM-dd in the viewer's local timezone. */
+export function localDateKey(d: Date): string {
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${y}-${m}-${day}`;
 }
 
 /**

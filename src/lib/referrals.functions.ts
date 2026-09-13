@@ -416,10 +416,13 @@ export const updateReferral = createServerFn({ method: "POST" })
     // Defence-in-depth: RLS already blocks non-creator/non-admin writes to
     // soft-deleted rows, but we mirror the rule here so the server returns a
     // clear error instead of a silent no-op update.
-    const { data: isAdmin } = await supabase.rpc("has_role", {
+    const { data: isAdmin, error: roleErr } = await supabase.rpc("has_role", {
       _user_id: userId,
       _role: "admin",
     });
+    // Fail closed AND loudly: a swallowed role-check error would silently
+    // demote a legitimate admin with no trace in the logs.
+    if (roleErr) throw safeError("referrals.hasRole", roleErr, "Permission check failed.");
     const gate = decideReferralUpdate({
       row: prior ? { created_by: (prior as any).created_by ?? null, deleted_at: (prior as any).deleted_at ?? null } : null,
       userId,
@@ -1145,10 +1148,13 @@ export const deleteReferral = createServerFn({ method: "POST" })
 
     if (!row) throw new Error("Referral not found");
 
-    const { data: isAdmin } = await supabase.rpc("has_role", {
+    const { data: isAdmin, error: roleErr } = await supabase.rpc("has_role", {
       _user_id: userId,
       _role: "admin",
     });
+    // Fail closed AND loudly: a swallowed role-check error would silently
+    // demote a legitimate admin with no trace in the logs.
+    if (roleErr) throw safeError("referrals.hasRole", roleErr, "Permission check failed.");
     if (row.created_by !== userId && !isAdmin) {
       throw new Error("Only the creator or an admin can delete this referral");
     }
@@ -1179,10 +1185,13 @@ export const listDeletedReferrals = createServerFn({ method: "GET" })
   .handler(async ({ context }) => {
     const { supabase, userId } = context;
     const cutoff = new Date(Date.now() - RESTORE_WINDOW_DAYS * 86400000).toISOString();
-    const { data: isAdmin } = await supabase.rpc("has_role", {
+    const { data: isAdmin, error: roleErr } = await supabase.rpc("has_role", {
       _user_id: userId,
       _role: "admin",
     });
+    // Fail closed AND loudly: a swallowed role-check error would silently
+    // demote a legitimate admin with no trace in the logs.
+    if (roleErr) throw safeError("referrals.hasRole", roleErr, "Permission check failed.");
     let query = supabase
       .from("referrals")
       .select("*")
@@ -1205,10 +1214,13 @@ export const restoreReferral = createServerFn({ method: "POST" })
       .select("*, created_by, deleted_at")
       .eq("id", data.id)
       .maybeSingle();
-    const { data: isAdmin } = await supabase.rpc("has_role", {
+    const { data: isAdmin, error: roleErr } = await supabase.rpc("has_role", {
       _user_id: userId,
       _role: "admin",
     });
+    // Fail closed AND loudly: a swallowed role-check error would silently
+    // demote a legitimate admin with no trace in the logs.
+    if (roleErr) throw safeError("referrals.hasRole", roleErr, "Permission check failed.");
     const decision = decideReferralRestore({
       row: row ? { created_by: (row as any).created_by ?? null, deleted_at: (row as any).deleted_at ?? null } : null,
       userId,

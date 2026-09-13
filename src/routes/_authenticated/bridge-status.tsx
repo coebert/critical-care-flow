@@ -495,7 +495,11 @@ function PartnerHealthCard({
               <div className="text-xs text-muted-foreground mt-0.5">
                 Checked{" "}
                 <span title={tzTooltip(health.checked_at)}>
-                  {new Date(health.checked_at).toLocaleTimeString()}
+                  {new Date(health.checked_at).toLocaleTimeString("en-GB", {
+                    hour: "2-digit",
+                    minute: "2-digit",
+                    second: "2-digit",
+                  })}
                 </span>
                 {health.latency_ms != null && (
                   <> · {health.latency_ms} ms</>

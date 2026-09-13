@@ -179,7 +179,7 @@ function NotificationsAuditPage() {
                     className="whitespace-nowrap text-xs tabular-nums"
                     title={tzTooltip(r.generated_at)}
                   >
-                    {format(attempted, "dd MMM HH:mm:ss")}
+                    {format(attempted, "dd/MM/yyyy HH:mm:ss")}
                   </TableCell>
                   <TableCell
                     className="whitespace-nowrap text-xs tabular-nums"
@@ -187,7 +187,7 @@ function NotificationsAuditPage() {
                   >
                     {delivered ? (
                       <span>
-                        {format(delivered, "dd MMM HH:mm:ss")}
+                        {format(delivered, "dd/MM/yyyy HH:mm:ss")}
                         {latencyMs !== null && (
                           <span className="text-muted-foreground ml-1">
                             (+{Math.max(0, Math.round(latencyMs / 100) / 10)}s)

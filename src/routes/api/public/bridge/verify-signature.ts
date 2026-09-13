@@ -5,6 +5,7 @@ import {
   signWith,
   verifySignature,
 } from "@/lib/bridge-hmac.server";
+import { isBridgeCallerAuthorized } from "@/lib/bridge-caller-auth.server";
 
 /**
  * Bridge signature diagnostic endpoint.
@@ -15,14 +16,21 @@ import {
  *  - POST verifies the caller's supplied signature over `payload` and
  *    returns `{ valid: true, secret_used: "current"|"previous" }` on success.
  *
- * No RBAC — this endpoint proves shared-secret parity and nothing else.
+ * GET is a signing oracle (it emits a signature produced with the live
+ * secret), so it requires the internal caller credential. POST is
+ * self-authenticating — it only succeeds for a caller that already holds a
+ * valid signature.
  */
 export const Route = createFileRoute("/api/public/bridge/verify-signature")({
   server: {
     handlers: {
       OPTIONS: async ({ request }) => preflight(request),
 
-      GET: async () => {
+      GET: async ({ request }) => {
+        // Never hand out a live signature to an anonymous caller.
+        if (!(await isBridgeCallerAuthorized(request))) {
+          return jsonResponse({ error: "unauthorized" }, { status: 401 });
+        }
         let secrets;
         try {
           secrets = getBridgeSecrets();
