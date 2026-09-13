@@ -82,7 +82,9 @@ export function useIdleTimeout(options: UseIdleTimeoutOptions): IdleTimeoutState
         /* private mode etc. */
       }
       if (broadcast) channel?.postMessage({ type: "activity", ts: now });
-      if (warning) setWarning(false);
+      // Functional updater: this closure is created once, so reading the
+      // `warning` state variable directly here would always see `false`.
+      setWarning((w) => (w ? false : w));
     };
 
     const handleUserEvent = () => recordActivity(true);
@@ -96,7 +98,7 @@ export function useIdleTimeout(options: UseIdleTimeoutOptions): IdleTimeoutState
       if (!data) return;
       if (data.type === "activity" && typeof data.ts === "number") {
         lastActivityRef.current = Math.max(lastActivityRef.current, data.ts);
-        if (warning) setWarning(false);
+        setWarning((w) => (w ? false : w));
       } else if (data.type === "signout") {
         // Sibling tab already signed out — mirror it.
         if (!firedRef.current) {
@@ -130,8 +132,8 @@ export function useIdleTimeout(options: UseIdleTimeoutOptions): IdleTimeoutState
       if (remaining <= warnMs) {
         setWarning(true);
         setSecondsLeft(Math.max(1, Math.ceil(remaining / 1000)));
-      } else if (warning) {
-        setWarning(false);
+      } else {
+        setWarning((w) => (w ? false : w));
       }
     }, 1000);
 

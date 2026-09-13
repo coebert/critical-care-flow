@@ -174,9 +174,14 @@ const LEVEL_TITLE: Record<number, string> = {
   3: "Level 3 — ICU care",
 };
 
+// Returns null until after hydration. Reading the wall clock during render
+// would make the server-rendered markup differ from the client's first
+// render (and `toLocaleTimeString` is timezone-dependent), which React 19
+// reports as a hydration mismatch.
 function useClock() {
-  const [now, setNow] = useState(() => new Date());
+  const [now, setNow] = useState<Date | null>(null);
   useEffect(() => {
+    setNow(new Date());
     const id = setInterval(() => setNow(new Date()), 1000);
     return () => clearInterval(id);
   }, []);
@@ -232,11 +237,17 @@ function BoardPage() {
   useEffect(() => {
     const ch = supabase
       .channel("board-refresh")
-      .on("postgres_changes", { event: "*", schema: "public", table: "referrals" }, () => referrals.refetch())
-      .on("postgres_changes", { event: "*", schema: "public", table: "patient_acuity_overrides" }, () => acuity.refetch())
+      .on("postgres_changes", { event: "*", schema: "public", table: "referrals" }, () =>
+        qc.invalidateQueries({ queryKey: ["board", "referrals"] }),
+      )
+      .on("postgres_changes", { event: "*", schema: "public", table: "patient_acuity_overrides" }, () =>
+        qc.invalidateQueries({ queryKey: ["board", "patient-acuity"] }),
+      )
       .subscribe();
     return () => { supabase.removeChannel(ch); };
-  }, [acuity, referrals]);
+    // `qc` is stable; depending on the query objects re-subscribed the
+    // realtime channel on nearly every render.
+  }, [qc]);
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
