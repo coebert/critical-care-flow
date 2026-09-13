@@ -213,14 +213,14 @@ function NotificationsLifecyclePage() {
                   className="whitespace-nowrap text-xs tabular-nums"
                   title={tzTooltip(r.created_at)}
                 >
-                  {format(new Date(r.created_at), "dd/MM HH:mm:ss")}
+                  {format(new Date(r.created_at), "dd/MM/yyyy HH:mm:ss")}
                 </TableCell>
                 <TableCell
                   className="whitespace-nowrap text-xs tabular-nums"
                   title={r.used_at ? tzTooltip(r.used_at) : "Not yet used"}
                 >
                   {r.used_at ? (
-                    format(new Date(r.used_at), "dd/MM HH:mm:ss")
+                    format(new Date(r.used_at), "dd/MM/yyyy HH:mm:ss")
                   ) : (
                     <span className="text-muted-foreground">—</span>
                   )}
@@ -230,7 +230,7 @@ function NotificationsLifecyclePage() {
                   title={r.read_at ? tzTooltip(r.read_at) : "Unread"}
                 >
                   {r.read_at ? (
-                    format(new Date(r.read_at), "dd/MM HH:mm:ss")
+                    format(new Date(r.read_at), "dd/MM/yyyy HH:mm:ss")
                   ) : (
                     <span className="text-muted-foreground">—</span>
                   )}
@@ -247,7 +247,7 @@ function NotificationsLifecyclePage() {
                 >
                   {r.expired_at && !r.used_at ? (
                     <span className="text-warning-foreground">
-                      {format(new Date(r.expired_at), "dd/MM HH:mm:ss")}
+                      {format(new Date(r.expired_at), "dd/MM/yyyy HH:mm:ss")}
                     </span>
                   ) : (
                     <span className="text-muted-foreground">—</span>
@@ -260,7 +260,7 @@ function NotificationsLifecyclePage() {
                     <StatusPill label={r.read_at ? "used · read" : "used"} tone="ok" />
                   ) : r.expired_at ? (
                     <StatusPill
-                      label={`expired ${format(new Date(r.expired_at), "dd/MM HH:mm")}`}
+                      label={`expired ${format(new Date(r.expired_at), "dd/MM/yyyy HH:mm")}`}
                       tone="warn"
                     />
                   ) : r.read_at ? (

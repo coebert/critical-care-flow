@@ -127,7 +127,7 @@ function PlannerPage() {
                 <div className="text-xs uppercase text-muted-foreground">
                   {format(d, "EEE")}
                 </div>
-                <div className="font-medium">{format(d, "dd/MM")}</div>
+                <div className="font-medium">{format(d, "dd/MM/yyyy")}</div>
                 <div className="text-[11px] text-muted-foreground mt-1">
                   Committed: {committed.length}
                   {(l3 || l2) ? (
