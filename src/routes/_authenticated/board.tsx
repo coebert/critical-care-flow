@@ -1,6 +1,6 @@
 import { createFileRoute, useNavigate, Link } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { supabase } from "@/integrations/supabase/client";
 import {
@@ -209,7 +209,9 @@ function useBoardFullscreen() {
 
 function BoardPage() {
   const navigate = useNavigate();
-  const now = useClock();
+  const qc = useQueryClient();
+  const clock = useClock();
+  const now = clock ?? new Date(0);
   const [theme, setTheme] = useBoardTheme();
   const [isFullscreen, toggleFullscreen] = useBoardFullscreen();
   const [zoom, setZoom] = useBoardZoom();
@@ -296,7 +298,7 @@ function BoardPage() {
           )}
         </div>
         <div className="flex items-center gap-6">
-          <div className="text-6xl font-mono tabular-nums">{now.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}</div>
+          <div className="text-6xl font-mono tabular-nums">{clock ? clock.toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" }) : "--:--"}</div>
           <div className={`inline-flex items-center rounded-md border overflow-hidden ${p.toggle}`}>
             <button
               onClick={() => setZoom(zoom - ZOOM_STEP)}
@@ -367,10 +369,10 @@ function BoardPage() {
       {/* Body */}
       <div className="flex-1 grid grid-cols-1 lg:grid-cols-[3fr_1fr] xl:grid-cols-[4fr_1fr] overflow-hidden">
         <div className={`overflow-auto border-r ${p.border}`}>
-          <BedsColumn data={partner} acuityMap={acuityMap} now={now.getTime()} p={p} />
+          <BedsColumn data={partner} acuityMap={acuityMap} now={clock ? clock.getTime() : 0} p={p} />
         </div>
         <div className="overflow-auto">
-          <PendingColumn rows={pending} now={now.getTime()} p={p} />
+          <PendingColumn rows={pending} now={clock ? clock.getTime() : 0} p={p} />
         </div>
       </div>
     </div>
