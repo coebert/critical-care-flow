@@ -2,27 +2,43 @@
 // (per care level going from zero to available or vice versa for the current
 // shift) and fan out a push notification + persistent in-app alert.
 //
+// Uses the SAME inputs and calculation as every capacity surface
+// (`deriveUnitCapacity` in unit-capacity.ts): the signed ICU Handover Hub
+// roster, CCC patient acuity, and the current shift's nurse staffing.
+// If any input is unavailable or indeterminate (Hub down/malformed, withheld
+// occupant, acuity/staffing query error, no nurse count recorded) the check
+// is SUPPRESSED: no notification, and the stored state is left untouched so
+// the next determinate run compares against the last trustworthy state.
+//
 // Idempotent by design: the previous state is stored in the
 // nurse_capacity_alert_state singleton row, so repeated calls after the same
 // underlying situation do nothing.
 
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "@/integrations/supabase/types";
-import { computeNurseCapacity, todayIsoDate, type Shift } from "./nurse-capacity";
 import { sendPushToMany } from "./push.server";
+import { currentShift as unitCurrentShift, shiftKeyString, type Shift } from "./shift-clock";
+import { availableNursesFor, deriveUnitCapacity, type AcuityRow } from "./unit-capacity";
+import type { PartnerBedBoardResult } from "./partner-bed-board-contract";
 
 type Admin = SupabaseClient<Database>;
 
+/** Re-exported for existing callers; Europe/London, see shift-clock.ts. */
 export function currentShift(now: Date = new Date()): { date: string; shift: Shift } {
-  const h = now.getHours();
-  // Day shift 08:00–19:59 local, night shift 20:00–07:59 local.
-  if (h >= 8 && h < 20) return { date: todayIsoDate(now), shift: "day" };
-  if (h >= 20) return { date: todayIsoDate(now), shift: "night" };
-  // 00:00–07:59 belongs to the night shift that started the previous evening.
-  const y = new Date(now);
-  y.setDate(y.getDate() - 1);
-  return { date: todayIsoDate(y), shift: "night" };
+  return unitCurrentShift(now);
 }
+
+export type CapacityAlertDeps = {
+  /** Signed partner fetch; injectable for tests. */
+  fetchBoard?: () => Promise<PartnerBedBoardResult>;
+  sendPush?: typeof sendPushToMany;
+};
+
+export type CapacityAlertOutcome =
+  | { kind: "suppressed"; reason: string }
+  | { kind: "no_change" }
+  | { kind: "alerted"; levels: FlippedLevel[]; recipients: number }
+  | { kind: "error" };
 
 interface LevelFlags {
   l3: boolean;
@@ -94,38 +110,57 @@ function messageFor(
  * Safe to call from any bed / staffing mutation; errors are logged and
  * swallowed so they never break the originating write.
  */
-export async function checkAndAlertNurseCapacity(admin: Admin, now: Date = new Date()): Promise<void> {
+export async function checkAndAlertNurseCapacity(
+  admin: Admin,
+  now: Date = new Date(),
+  deps: CapacityAlertDeps = {},
+): Promise<CapacityAlertOutcome> {
   try {
     const { date, shift } = currentShift(now);
-    const shiftKey = `${date}#${shift}`;
+    const shiftKey = shiftKeyString({ date, shift });
+    const sendPush = deps.sendPush ?? sendPushToMany;
+    const fetchBoard =
+      deps.fetchBoard ??
+      (async () => {
+        const { fetchPartnerBedBoardSigned } = await import("./partner-bed-board.server");
+        return fetchPartnerBedBoardSigned();
+      });
 
-    const [{ data: staffing }, { data: occs }] = await Promise.all([
-      admin
-        .from("nurse_staffing")
-        .select("shift, available_nurses")
-        .eq("shift_date", date),
-      admin
-        .from("bed_occupancies")
-        .select("id,bed_id,discharged_at,predicted_discharge_at,level")
-        .is("discharged_at", null),
+    const [board, acuityRes, staffingRes] = await Promise.all([
+      fetchBoard().catch(
+        (e): PartnerBedBoardResult => ({
+          ok: false,
+          error: e instanceof Error ? e.message : "partner fetch failed",
+          fetched_at: new Date().toISOString(),
+        }),
+      ),
+      admin.from("patient_acuity_overrides").select("partner_patient_id, level, one_to_one"),
+      admin.from("nurse_staffing").select("shift, available_nurses").eq("shift_date", date),
     ]);
 
-    const dayRow = (staffing ?? []).find((s) => s.shift === "day");
-    const nightRow = (staffing ?? []).find((s) => s.shift === "night");
-
-    const snap = computeNurseCapacity({
-      occupancies: (occs ?? []).map((o) => ({
-        id: o.id,
-        bed_id: o.bed_id,
-        discharged_at: o.discharged_at,
-        predicted_discharge_at: o.predicted_discharge_at,
-        level: (o.level ?? 3) as number,
-      })),
-      day_available: dayRow ? Number(dayRow.available_nurses) : null,
-      night_available: nightRow ? Number(nightRow.available_nurses) : null,
+    const derivation = deriveUnitCapacity({
+      board: board.ok ? { status: "ok", value: board } : { status: "error", message: board.error },
+      acuity: acuityRes.error
+        ? { status: "error" }
+        : { status: "ok", value: (acuityRes.data ?? []) as AcuityRow[] },
+      staffing: staffingRes.error
+        ? { status: "error" }
+        : { status: "ok", value: availableNursesFor(staffingRes.data ?? [], shift) },
     });
 
-    const block = shift === "day" ? snap.day : snap.night;
+    if (!derivation.determinate || derivation.nursing.state !== "ok") {
+      const reason =
+        derivation.nursing.state === "unknown"
+          ? derivation.nursing.reason
+          : derivation.nursing.state === "no_staffing"
+            ? "no_staffing"
+            : "indeterminate";
+      console.info(`[nurse-capacity-alerts] suppressed (${reason}) for ${shiftKey}`);
+      return { kind: "suppressed", reason };
+    }
+
+    const block = derivation.nursing;
+    const snap = { dependency: block.dependency };
     const next = flagsFromSnap(block.spare, block.level3_slots, block.level2_slots, block.level1_slots);
 
     // Load previous state, including per-level last-alerted timestamps used
@@ -212,7 +247,7 @@ export async function checkAndAlertNurseCapacity(admin: Admin, now: Date = new D
       { onConflict: "id" },
     );
 
-    if (!flipped.length) return;
+    if (!flipped.length) return { kind: "no_change" };
 
 
     const shiftLabel = shift === "day" ? "Day shift" : "Night shift";
@@ -260,7 +295,7 @@ export async function checkAndAlertNurseCapacity(admin: Admin, now: Date = new D
       });
     }
 
-    if (!perUser.length) return;
+    if (!perUser.length) return { kind: "alerted", levels: flipped, recipients: 0 };
 
     const recipientIds = perUser.map((u) => u.id);
     const byUser = new Map(perUser.map((u) => [u.id, u]));
@@ -292,7 +327,7 @@ export async function checkAndAlertNurseCapacity(admin: Admin, now: Date = new D
         groups.set(key, g);
       }
       for (const [, group] of groups) {
-        const res = await sendPushToMany(
+        const res = await sendPush(
           group.subs.map((s) => ({ user_id: s.user_id, endpoint: s.endpoint, p256dh: s.p256dh, auth: s.auth })),
           {
             title: `Radnor Critical Care — ${shiftLabel} capacity`,
@@ -308,8 +343,9 @@ export async function checkAndAlertNurseCapacity(admin: Admin, now: Date = new D
       }
     }
 
-
+    return { kind: "alerted", levels: flipped, recipients: perUser.length };
   } catch (e) {
     console.error("[nurse-capacity-alerts] failed", e);
+    return { kind: "error" };
   }
 }

@@ -335,42 +335,10 @@ export const cancelTransferOut = createServerFn({ method: "POST" })
 export type BedRow = Awaited<ReturnType<typeof listBeds>>[number];
 export type BedBoardData = Awaited<ReturnType<typeof getBedBoard>>;
 
-// ---- Capacity snapshot (lightweight — for the referrals list header) ----
-
-export const getCapacitySnapshot = createServerFn({ method: "GET" })
-  .middleware([requireSupabaseAuth])
-  .handler(async ({ context }): Promise<CapacitySnapshot> => {
-    const [bedsRes, occRes, outRes, xferRes] = await Promise.all([
-      context.supabase
-        .from("beds")
-        .select("id,code,unit,is_side_room,active,sort_order")
-        .eq("active", true),
-      context.supabase
-        .from("bed_occupancies")
-        .select("id,bed_id,discharged_at,predicted_discharge_at,level")
-        .is("discharged_at", null),
-      context.supabase
-        .from("bed_outliers")
-        .select("id", { count: "exact", head: true })
-        .is("deleted_at", null)
-        .is("ended_at", null),
-      context.supabase
-        .from("bed_transfers_out")
-        .select("id", { count: "exact", head: true })
-        .is("deleted_at", null)
-        .not("status", "in", "(completed,cancelled)"),
-    ]);
-    if (bedsRes.error) throw safeError("beds", bedsRes.error, "Could not load beds");
-    if (occRes.error) throw safeError("beds", occRes.error, "Could not load occupancies");
-    if (outRes.error) throw safeError("beds", outRes.error, "Could not count outliers");
-    if (xferRes.error) throw safeError("beds", xferRes.error, "Could not count transfers");
-    return computeCapacity({
-      beds: bedsRes.data ?? [],
-      occupancies: occRes.data ?? [],
-      outliers_count: outRes.count ?? 0,
-      open_transfers_count: xferRes.count ?? 0,
-    });
-  });
+// Capacity for every surface now comes from the live ICU Handover Hub roster
+// via src/lib/unit-capacity.ts + src/hooks/use-unit-capacity.ts. The local
+// bed_occupancies snapshot is not authoritative and must not be shown as
+// capacity.
 
 // ---- Bed register (admin) ----
 

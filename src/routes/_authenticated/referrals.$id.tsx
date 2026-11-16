@@ -593,14 +593,10 @@ function ReferralDetail() {
                 onClick={() =>
                   navigate({
                     to: "/bed-board",
+                    // Opaque id + neutral label only — no identifiers in the URL.
                     search: {
                       source_referral_id: id,
-                      hospital_number: ref.hospital_number ?? undefined,
-                      patient_initials: undefined,
-                      admitting_consultant: ref.accepting_consultant ?? undefined,
-                      level: undefined,
-                      source_label: `referral ${ref.hospital_number ?? ""}`.trim(),
-                      source_postop_booking_id: undefined,
+                      source_label: "referral",
                     },
                   })
                 }

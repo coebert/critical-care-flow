@@ -377,15 +377,10 @@ function EditPostopBookingPage() {
               onClick={() =>
                 navigate({
                   to: "/bed-board",
+                  // Opaque id + neutral label only — no identifiers in the URL.
                   search: {
                     source_postop_booking_id: id,
-                    hospital_number: hospitalNumber || undefined,
-                    admitting_consultant: undefined,
-                    patient_initials: undefined,
-                    level:
-                      level === "level_2" ? 2 : level === "level_3" ? 3 : level === "level_1" ? 1 : undefined,
-                    source_label: `post-op booking ${hospitalNumber ?? ""}`.trim(),
-                    source_referral_id: undefined,
+                    source_label: "post-op booking",
                   },
                 })
               }

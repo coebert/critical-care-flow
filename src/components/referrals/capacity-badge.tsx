@@ -1,121 +1,83 @@
-import { useMemo } from "react";
-import { useQuery } from "@tanstack/react-query";
-import { useServerFn } from "@tanstack/react-start";
 import { Link } from "@tanstack/react-router";
-import { Users } from "lucide-react";
+import { Bed as BedIcon, Users } from "lucide-react";
 
-import { getBedBoard } from "@/lib/beds.functions";
-import { getNurseStaffingForDate } from "@/lib/nurse-staffing.functions";
-import { computeNurseCapacity, todayIsoDate, type Shift } from "@/lib/nurse-capacity";
-
-function currentShift(now: Date = new Date()): Shift {
-  const h = now.getHours();
-  return h >= 8 && h < 20 ? "day" : "night";
-}
+import { useUnitCapacity } from "@/hooks/use-unit-capacity";
+import { shiftName } from "@/lib/shift-clock";
+import { CapacityFreshness, TONE, countTone } from "@/components/capacity/capacity-status";
 
 /**
- * Small pill-style badge shown above the referrals list summarising the
- * spare admission capacity for the current shift by level of care, so a
- * clinician can tell at a glance whether accepting a patient at a given
- * level is currently safe. Links to the bed board for the full picture.
+ * Pill summarising current-shift capacity above the referrals list. Uses the
+ * same live ICU Handover Hub occupancy + CCC acuity + staffing as the Bed
+ * Board (useUnitCapacity). Physical beds and nursing room are shown
+ * separately; unknown / stale inputs are labelled, never shown as room.
  */
 export function CapacityBadge() {
-  const today = todayIsoDate();
-  const shift = currentShift();
-  const shiftLabel = shift === "day" ? "Day" : "Night";
+  const view = useUnitCapacity();
+  const { shift, derivation, reassuring } = view;
+  const { physical, nursing } = derivation;
+  const label = shiftName(shift.shift).replace(" shift", "");
 
-  const fetchBoard = useServerFn(getBedBoard);
-  const fetchStaffing = useServerFn(getNurseStaffingForDate);
-
-  const board = useQuery({
-    queryKey: ["referrals-list-capacity", "board"],
-    queryFn: () => fetchBoard(),
-    staleTime: 30_000,
-  });
-  const staffing = useQuery({
-    queryKey: ["referrals-list-capacity", "staffing", today],
-    queryFn: () => fetchStaffing({ data: { shift_date: today } }),
-    staleTime: 30_000,
-  });
-
-  const dayAvail =
-    (staffing.data ?? []).find((r) => r.shift === "day")?.available_nurses ?? null;
-  const nightAvail =
-    (staffing.data ?? []).find((r) => r.shift === "night")?.available_nurses ?? null;
-
-  const snap = useMemo(
-    () =>
-      computeNurseCapacity({
-        occupancies: board.data?.occupancies ?? [],
-        day_available: dayAvail,
-        night_available: nightAvail,
-      }),
-    [board.data, dayAvail, nightAvail],
+  const Level = ({ text, slots, level }: { text: string; slots: number; level: 1 | 2 | 3 }) => (
+    <Link
+      to="/bed-board"
+      search={{ focus_shift: shift.shift, focus_level: level }}
+      aria-label={`${text}: room for ${slots} by nursing${reassuring ? "" : " (not current)"} — review on bed board`}
+      className={`inline-flex items-center gap-1 rounded-full border px-2 min-h-8 text-xs font-medium tabular-nums hover:opacity-90 ${countTone(slots, reassuring)}`}
+    >
+      {text}
+      <span className="font-semibold">{slots}</span>
+    </Link>
   );
-
-  const block = shift === "day" ? snap.day : snap.night;
-  const loading = board.isLoading || staffing.isLoading;
-
-  const noStaffing = !loading && block.available == null;
-
-  const Level = ({ label, slots, level }: { label: string; slots: number | null; level: 1 | 2 | 3 }) => {
-    const n = slots ?? 0;
-    const tone =
-      n <= 0
-        ? "bg-destructive/10 text-destructive border-destructive/30 hover:bg-destructive/20"
-        : "bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border-emerald-500/30 hover:bg-emerald-500/20";
-    return (
-      <Link
-        to="/bed-board"
-        search={{ focus_shift: shift, focus_level: level }}
-        aria-label={`${label} slots: ${slots ?? "unknown"} — review ${shiftLabel} shift Level ${level} on bed board`}
-        className={`inline-flex items-center gap-1 rounded-full border px-1.5 py-0.5 text-[11px] font-medium tabular-nums transition-colors ${tone}`}
-      >
-        {label}
-        <span className="font-semibold">{slots ?? "—"}</span>
-      </Link>
-    );
-  };
 
   return (
     <div
-      className="inline-flex items-center gap-2 rounded-full border bg-muted/40 px-2 py-1 text-xs"
-      aria-label="Current admission capacity by level"
+      className="inline-flex flex-wrap items-center gap-1.5 rounded-2xl border bg-muted/40 px-2 py-1 text-xs max-w-full"
+      role="group"
+      aria-label={`${label} shift admission capacity`}
     >
       <Link
         to="/bed-board"
-        search={{ focus_shift: shift }}
-        aria-label={`Review ${shiftLabel} shift capacity on bed board`}
-        className="inline-flex items-center gap-1.5 text-muted-foreground hover:text-foreground"
+        search={{ focus_shift: shift.shift }}
+        aria-label={`Review ${label.toLowerCase()} shift capacity on bed board`}
+        className="inline-flex items-center gap-1.5 min-h-8 px-1 text-muted-foreground hover:text-foreground"
       >
         <Users className="w-3.5 h-3.5" aria-hidden="true" />
-        <span>{shiftLabel} capacity</span>
+        <span>{label} capacity</span>
       </Link>
-      {loading ? (
-        <span className="text-muted-foreground">…</span>
-      ) : noStaffing ? (
-        <span className="text-muted-foreground">no nurse count</span>
-      ) : (
+
+      {physical ? (
+        <span
+          className={`inline-flex items-center gap-1 rounded-full border px-2 min-h-8 tabular-nums ${countTone(physical.vacant, reassuring)}`}
+          title={physical.withheld ? `${physical.withheld} occupied bed(s) with details withheld` : undefined}
+        >
+          <BedIcon className="w-3.5 h-3.5" aria-hidden="true" />
+          Beds free <span className="font-semibold">{physical.vacant}/{physical.total}</span>
+        </span>
+      ) : null}
+
+      {nursing.state === "ok" ? (
         <>
-          <Level label="L3" slots={block.level3_slots} level={3} />
-          <Level label="L2" slots={block.level2_slots} level={2} />
-          <Level label="L1/0" slots={block.level1_slots} level={1} />
-          <span className="text-muted-foreground">
-            · spare{" "}
-            <span
-              className={`tabular-nums font-semibold ${
-                (block.spare ?? 0) < 0
-                  ? "text-destructive"
-                  : (block.spare ?? 0) === 0
-                    ? "text-amber-700 dark:text-amber-400"
-                    : "text-emerald-700 dark:text-emerald-400"
-              }`}
-            >
-              {block.spare?.toFixed(2)}
-            </span>
-          </span>
+          <span className="sr-only">Nursing room:</span>
+          <Level text="L3" slots={nursing.level3_slots ?? 0} level={3} />
+          <Level text="L2" slots={nursing.level2_slots ?? 0} level={2} />
+          <Level text="L1/0" slots={nursing.level1_slots ?? 0} level={1} />
         </>
+      ) : nursing.state === "no_staffing" ? (
+        <span className={`rounded-full border px-2 min-h-8 inline-flex items-center ${TONE.warn}`}>
+          No nurse count for this shift
+        </span>
+      ) : nursing.reason === "loading" ? (
+        <span className="text-muted-foreground px-1">Loading…</span>
+      ) : (
+        <span
+          className={`rounded-full border px-2 min-h-8 inline-flex items-center ${TONE.warn}`}
+          title={nursing.message}
+        >
+          Nursing room unknown
+        </span>
       )}
+
+      <CapacityFreshness view={view} compact />
     </div>
   );
 }

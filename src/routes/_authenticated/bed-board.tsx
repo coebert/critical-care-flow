@@ -26,14 +26,12 @@ import { BedGridSkeleton } from "@/components/bed-board/bed-grid-skeleton";
 import { formatDistanceToNowStrict, formatDistanceStrict } from "date-fns";
 import { toast } from "sonner";
 import {
-  getPartnerBedBoard,
   updatePartnerPatient,
   type PartnerBedSlot,
   type PartnerOccupant,
   type UpdatePartnerPatientInput,
 } from "@/lib/partner-bed-board.functions";
 import {
-  getPatientAcuity,
   setPatientAcuity,
   type AcuityLevel,
 } from "@/lib/patient-acuity.functions";
@@ -94,12 +92,20 @@ import {
 } from "@/components/ui/collapsible";
 
 
-const QK = ["partner-bed-board"] as const;
-const AQK = ["patient-acuity"] as const;
+import {
+  PARTNER_BOARD_QK as QK,
+  ACUITY_QK,
+  useUnitCapacity,
+  usePatientAcuityRows,
+  usePartnerBedBoard,
+} from "@/hooks/use-unit-capacity";
+import { CapacityFreshness, failureText } from "@/components/capacity/capacity-status";
+import { formatUnitTime } from "@/lib/shift-clock";
+import { getAdmissionSourceContext } from "@/lib/admission-source.functions";
+import { parseBedBoardSearch, hasLegacyIdentifierParams } from "@/lib/bed-board-search";
 
 import { LEVEL_TONE, LEVEL_LABEL, computeUnitAcuity } from "@/lib/acuity";
 import { NurseCapacityPanel } from "@/components/bed-board/nurse-capacity-panel";
-import type { Occupancy } from "@/lib/bed-capacity";
 
 export const Route = createFileRoute("/_authenticated/bed-board")({
   head: () => ({
@@ -112,55 +118,10 @@ export const Route = createFileRoute("/_authenticated/bed-board")({
       },
     ],
   }),
-  // Preserved for backwards compatibility with callers that still deep-link
-  // referral/postop context or nurse-capacity alerts. This page no longer
-  // owns the admit flow (writes go through ICU Handover Hub), so we display
-  // a lightweight breadcrumb banner instead of a prefilled dialog.
-  validateSearch: (s: Record<string, unknown>) => {
-    const str = (v: unknown): string | undefined =>
-      typeof v === "string" && v.trim().length ? v.trim() : undefined;
-    const parseShift = (v: unknown): "day" | "night" | undefined => {
-      const t = str(v)?.toLowerCase();
-      return t === "day" || t === "night" ? t : undefined;
-    };
-    const parseLevel = (v: unknown): 1 | 2 | 3 | undefined => {
-      const t = str(v);
-      if (!t) return undefined;
-      const n = Number(t);
-      if (!Number.isFinite(n) || Math.trunc(n) !== n) return undefined;
-      return n === 1 || n === 2 || n === 3 ? (n as 1 | 2 | 3) : undefined;
-    };
-    const parsed: {
-      source_referral_id?: string;
-      source_postop_booking_id?: string;
-      hospital_number?: string;
-      patient_initials?: string;
-      admitting_consultant?: string;
-      level?: 1 | 2 | 3;
-      source_label?: string;
-      focus_shift?: "day" | "night";
-      focus_level?: 1 | 2 | 3;
-    } = {};
-    const sourceReferralId = str(s.source_referral_id);
-    const sourcePostopBookingId = str(s.source_postop_booking_id);
-    const hospitalNumber = str(s.hospital_number);
-    const patientInitials = str(s.patient_initials);
-    const admittingConsultant = str(s.admitting_consultant);
-    const level = parseLevel(s.level);
-    const sourceLabel = str(s.source_label);
-    const focusShift = parseShift(s.focus_shift);
-    const focusLevel = parseLevel(s.focus_level);
-    if (sourceReferralId) parsed.source_referral_id = sourceReferralId;
-    if (sourcePostopBookingId) parsed.source_postop_booking_id = sourcePostopBookingId;
-    if (hospitalNumber) parsed.hospital_number = hospitalNumber;
-    if (patientInitials) parsed.patient_initials = patientInitials;
-    if (admittingConsultant) parsed.admitting_consultant = admittingConsultant;
-    if (level) parsed.level = level;
-    if (sourceLabel) parsed.source_label = sourceLabel;
-    if (focusShift) parsed.focus_shift = focusShift;
-    if (focusLevel) parsed.focus_level = focusLevel;
-    return parsed;
-  },
+  // Deep-link context. Only OPAQUE ids and a neutral label are accepted —
+  // patient identifiers (hospital number, initials, consultant) are never
+  // read from the URL, and legacy links carrying them are rewritten on load.
+  validateSearch: (s: Record<string, unknown>) => parseBedBoardSearch(s),
   component: BedBoardPage,
 });
 
@@ -413,6 +374,33 @@ function BedCard({
     }
   };
 
+  if (slot.occupied && !occ) {
+    // Hub says the bed is occupied but withheld the occupant's details.
+    // It is NEVER a free bed: not a drop target, not clickable.
+    return (
+      <Card
+        className="p-3 h-full min-h-[120px] flex flex-col justify-between border-dashed bg-muted/40"
+        aria-label={`Bed ${slot.bed} occupied — patient details withheld by ICU Handover Hub`}
+        data-bed-state="occupied-withheld"
+      >
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-1.5 text-sm font-semibold">
+            <BedIcon className="w-4 h-4" aria-hidden="true" />
+            {slot.bed}
+          </div>
+          {slot.is_side_room && (
+            <Badge variant="outline" className="text-[10px]">
+              Side room
+            </Badge>
+          )}
+        </div>
+        <div className="text-center text-xs">
+          <div className="font-semibold">Occupied</div>
+          <div className="text-muted-foreground">Details withheld</div>
+        </div>
+      </Card>
+    );
+  }
   if (!slot.occupied || !occ) {
     return (
       <Card
@@ -745,8 +733,7 @@ function BedBoardPage() {
 
   const search = Route.useSearch();
   const navigate = Route.useNavigate();
-  const fetchBoard = useServerFn(getPartnerBedBoard);
-  const fetchAcuity = useServerFn(getPatientAcuity);
+  const capacity = useUnitCapacity();
   const fetchAirways = useServerFn(getPatientAirways);
   const fetchIsolations = useServerFn(getPatientIsolations);
   const fetchViolence = useServerFn(listViolenceRisk);
@@ -756,22 +743,9 @@ function BedBoardPage() {
   const fetchScanTransfer = useServerFn(listScanTransfer);
   const writeScanTransfer = useServerFn(setScanTransfer);
   const qc = useQueryClient();
-  const { data, isLoading, isFetching, error, refetch } = useQuery({
-    queryKey: QK,
-    queryFn: () => fetchBoard(),
-    staleTime: 5_000,
-    // Partner data is a live snapshot pulled on demand; poll and refetch on
-    // focus to stay close to real time without hammering the partner.
-    refetchInterval: 20_000,
-    refetchIntervalInBackground: false,
-    refetchOnWindowFocus: true,
-  });
-  const { data: acuityRows, refetch: refetchAcuity } = useQuery({
-    queryKey: AQK,
-    queryFn: () => fetchAcuity(),
-    staleTime: 5_000,
-    refetchInterval: 30_000,
-  });
+  const board = usePartnerBedBoard();
+  const { isLoading, isFetching, refetch } = board;
+  const { data: acuityRows } = usePatientAcuityRows();
   type AcuityInfo = { level: AcuityLevel; one_to_one: boolean };
   const acuityMap = useMemo(() => {
     const m = new Map<string, AcuityInfo>();
@@ -1117,29 +1091,50 @@ function BedBoardPage() {
 
   const arrivedFromSource =
     search.source_referral_id || search.source_postop_booking_id;
+  const fetchSourceContext = useServerFn(getAdmissionSourceContext);
+  const sourceContext = useQuery({
+    queryKey: [
+      "admission-source-context",
+      search.source_referral_id ?? null,
+      search.source_postop_booking_id ?? null,
+    ],
+    queryFn: () =>
+      fetchSourceContext({
+        data: search.source_referral_id
+          ? { kind: "referral", id: search.source_referral_id }
+          : { kind: "postop", id: search.source_postop_booking_id! },
+      }),
+    enabled: !!arrivedFromSource,
+    staleTime: 60_000,
+    retry: false,
+  });
   const clearSource = () =>
     navigate({
       search: {
-        source_referral_id: undefined,
-        source_postop_booking_id: undefined,
-        hospital_number: undefined,
-        patient_initials: undefined,
-        admitting_consultant: undefined,
-        level: undefined,
-        source_label: undefined,
         focus_shift: search.focus_shift,
         focus_level: search.focus_level,
       },
       replace: true,
     });
 
-  // If we get an ok:false response, surface it as an error banner but keep the
-  // prior successful payload rendered so the board doesn't blank out on a
-  // transient partner blip.
-  const lastOk = data && data.ok ? data : null;
-  const partnerError = data && !data.ok ? data.error : null;
-  const partnerOutage =
-    data && !data.ok && (data.partner_outage === true);
+  // Legacy links (pre-2026-11) put the hospital number / consultant in the
+  // query string. Rewrite the URL immediately so they don't linger in
+  // history; the identifiers are never read.
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const params = new URLSearchParams(window.location.search);
+    if (hasLegacyIdentifierParams(params)) {
+      navigate({ search: (prev) => ({ ...prev }), replace: true });
+    }
+  }, [navigate]);
+
+  // Keep the last good board on screen through a failed refresh, but label
+  // it as not current.
+  const lastOk = board.lastOk;
+  const partnerFailure = board.latestFailure;
+  const partnerError = partnerFailure ? failureText({ latestFailure: partnerFailure }) : null;
+  const partnerOutage = partnerFailure?.partner_outage === true;
+  const physical = capacity.derivation.physical;
 
   useEffect(() => {
     // No local Realtime subscription: the partner data is fetched over HTTP,
@@ -1155,15 +1150,9 @@ function BedBoardPage() {
       <div className="mb-4 flex items-start justify-between gap-4 flex-wrap">
         <div>
           <h1 className="text-2xl font-semibold tracking-tight">Bed board</h1>
-          <p className="text-sm text-muted-foreground">
-            Live snapshot from ICU Handover Hub
-            {lastOk ? (
-              <>
-                {" "}
-                · updated {formatUpdated(lastOk.fetched_at)}
-              </>
-            ) : null}
-            .
+          <p className="text-sm text-muted-foreground flex flex-wrap items-center gap-x-1">
+            <span>Snapshot from ICU Handover Hub ·</span>
+            <CapacityFreshness view={capacity} compact />
           </p>
         </div>
         <div className="flex items-center gap-2 text-sm">
@@ -1187,9 +1176,10 @@ function BedBoardPage() {
           <Button
             variant="outline"
             size="sm"
-            onClick={() => refetch()}
+            onClick={() => capacity.refresh()}
             disabled={isFetching}
-            className="gap-1"
+            className="gap-1 min-h-9"
+            aria-label={isFetching ? "Refreshing bed board" : "Refresh bed board"}
           >
             <RefreshCcw
               className={`w-4 h-4 ${isFetching ? "animate-spin" : ""}`}
@@ -1210,12 +1200,17 @@ function BedBoardPage() {
         <div className="mb-4 flex items-center justify-between gap-3 rounded-md border border-primary/40 bg-primary/5 px-3 py-2 text-sm">
           <div>
             Arrived from{" "}
-            <span className="font-medium">{search.source_label ?? "referral"}</span>
-            {search.patient_initials ? (
+            <span className="font-medium">
+              {search.source_label ?? (search.source_referral_id ? "referral" : "post-op booking")}
+            </span>
+            {sourceContext.data?.ok && sourceContext.data.patient_initials ? (
               <>
                 {" · "}
-                <span className="font-mono">{search.patient_initials}</span>
+                <span className="font-mono">{sourceContext.data.patient_initials}</span>
               </>
+            ) : null}
+            {sourceContext.data && !sourceContext.data.ok ? (
+              <span className="text-muted-foreground"> (details not available to your account)</span>
             ) : null}
             . Admissions are now recorded in{" "}
             <span className="font-medium">ICU Handover Hub</span>; place the
@@ -1223,8 +1218,9 @@ function BedBoardPage() {
           </div>
           <button
             type="button"
-            className="text-xs text-muted-foreground hover:text-foreground underline underline-offset-2"
+            className="text-xs min-h-8 px-1 text-muted-foreground hover:text-foreground underline underline-offset-2"
             onClick={clearSource}
+            aria-label="Dismiss admission context"
           >
             Dismiss
           </button>
@@ -1232,7 +1228,7 @@ function BedBoardPage() {
       )}
 
 
-      {lastOk && (() => {
+      {lastOk && physical && (() => {
         const allOccupants = [
           ...lastOk.bed_board
             .map((b) => b.occupant)
@@ -1245,10 +1241,6 @@ function BedBoardPage() {
           allOccupants.map((o) => o.id),
           levelMap,
         );
-        const oneToOneCount = allOccupants.reduce(
-          (n, o) => n + (acuityMap.get(o.id)?.one_to_one ? 1 : 0),
-          0,
-        );
 
         return (
           <>
@@ -1257,33 +1249,27 @@ function BedBoardPage() {
               role="status"
               aria-label="Unit capacity"
             >
-              <StatBlock label={lastOk.unit} value={lastOk.stats.total_beds} tone="muted" />
+              <StatBlock label={`${lastOk.unit} beds`} value={physical.total} tone="muted" />
               <StatBlock
                 label="Occupied"
-                value={lastOk.stats.occupied}
-                tone={
-                  lastOk.stats.available === 0
-                    ? "bad"
-                    : lastOk.stats.available <= 1
-                      ? "warn"
-                      : "ok"
-                }
+                value={physical.occupied}
+                tone={physical.vacant === 0 ? "bad" : physical.vacant <= 1 ? "warn" : capacity.freshness === "current" ? "ok" : "muted"}
               />
               <StatBlock
-                label="Free"
-                value={lastOk.stats.available}
-                tone={
-                  lastOk.stats.available === 0
-                    ? "bad"
-                    : lastOk.stats.available <= 1
-                      ? "warn"
-                      : "ok"
-                }
+                label={capacity.freshness === "current" ? "Free" : "Free (not current)"}
+                value={physical.vacant}
+                tone={physical.vacant === 0 ? "bad" : physical.vacant <= 1 ? "warn" : capacity.freshness === "current" ? "ok" : "muted"}
               />
-              {lastOk.stats.unassigned > 0 && (
+              {physical.withheld > 0 && (
+                <Badge variant="outline" className="gap-1">
+                  <ShieldCheck className="w-3.5 h-3.5" aria-hidden="true" />
+                  {physical.withheld} occupied · details withheld
+                </Badge>
+              )}
+              {physical.unassigned > 0 && (
                 <Badge variant="outline" className="gap-1">
                   <AlertTriangle className="w-3.5 h-3.5" aria-hidden="true" />
-                  {lastOk.stats.unassigned} unassigned
+                  {physical.unassigned} awaiting a bed
                 </Badge>
               )}
             </div>
@@ -1319,20 +1305,9 @@ function BedBoardPage() {
               )}
             </div>
             <NurseCapacityPanel
-              occupancies={allOccupants.map<Occupancy>((o) => {
-                const a = acuityMap.get(o.id);
-                return {
-                  id: o.id,
-                  bed_id: o.bed ?? o.id,
-                  discharged_at: null,
-                  predicted_discharge_at: null,
-                  level: a?.level ?? 1,
-                  one_to_one: a?.one_to_one === true,
-                };
-              })}
+              view={capacity}
               focusShift={search.focus_shift}
               focusLevel={search.focus_level}
-              oneToOneCount={oneToOneCount}
             />
 
           </>
@@ -1350,32 +1325,39 @@ function BedBoardPage() {
         >
           <div className="flex items-center gap-2 font-medium">
             <AlertTriangle className="w-4 h-4" aria-hidden="true" />
-            {partnerOutage
-              ? "ICU Handover Hub is currently unavailable"
-              : "Bed board did not refresh"}
+            {partnerError}
           </div>
           <div className="text-xs mt-1 break-words">
-            {partnerOutage
-              ? "The partner service is down or unreachable. The bed board will resume automatically once it is back online."
-              : partnerError}
+            {partnerFailure?.forbidden
+              ? "Ask an administrator to grant a clinical role if you need the bed board."
+              : partnerOutage
+                ? "The partner service is down or unreachable. The bed board retries every 20 seconds and when you return to this tab."
+                : partnerFailure?.indeterminate
+                  ? "The Hub's response could not be trusted, so nothing new is shown. It retries every 20 seconds."
+                  : partnerFailure?.error}
           </div>
           {lastOk && (
-            <div className="text-xs mt-1 text-muted-foreground">
-              Showing last successful snapshot from{" "}
-              {formatUpdated(lastOk.fetched_at)}.
+            <div className="text-xs mt-1 font-medium">
+              Showing the last successful snapshot from {formatUnitTime(lastOk.fetched_at, capacity.now)} (
+              {formatUpdated(lastOk.fetched_at)}) — NOT current.
             </div>
           )}
+          <Button
+            type="button"
+            size="sm"
+            variant="outline"
+            className="mt-2 min-h-9"
+            onClick={() => capacity.refresh()}
+            disabled={isFetching}
+          >
+            <RefreshCcw className={`w-4 h-4 mr-1 ${isFetching ? "motion-safe:animate-spin" : ""}`} aria-hidden="true" />
+            Try again
+          </Button>
         </div>
       )}
 
-      {isLoading && !data && (
+      {isLoading && !lastOk && !partnerFailure && (
         <BedGridSkeleton />
-      )}
-      {error && !data && (
-        <div className="text-sm text-destructive" role="alert">
-          Failed to load bed board:{" "}
-          {error instanceof Error ? error.message : "unknown"}
-        </div>
       )}
 
       {lastOk && (
@@ -1410,7 +1392,10 @@ function BedBoardPage() {
                     ?.partner_patient_id;
                 return (
                   <BedCard
-                    key={slot.bed}
+                    // Key includes the occupant so a bed changing between
+                    // empty / withheld / occupied remounts (the occupied
+                    // branch has extra hooks).
+                    key={`${slot.bed}:${slot.occupant?.id ?? (slot.occupied ? "withheld" : "empty")}`}
                     slot={slot}
                     level={a?.level}
                     oneToOne={a?.one_to_one === true}
@@ -1708,9 +1693,9 @@ function BedBoardPage() {
         onClose={() => setSelected(null)}
         onSaved={(updated) => {
           setSelected(updated);
-          refetch();
+          void refetch();
         }}
-        onAcuityChanged={() => refetchAcuity()}
+        onAcuityChanged={() => void qc.invalidateQueries({ queryKey: ACUITY_QK })}
       />
 
 

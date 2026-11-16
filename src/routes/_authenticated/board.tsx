@@ -1,14 +1,14 @@
 import { createFileRoute, useNavigate, Link } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { useServerFn } from "@tanstack/react-start";
 import { supabase } from "@/integrations/supabase/client";
 import {
-  getPartnerBedBoard,
   type PartnerBedBoardOk,
   type PartnerBedSlot,
 } from "@/lib/partner-bed-board.functions";
-import { getPatientAcuity } from "@/lib/patient-acuity.functions";
+import { ACUITY_QK, useUnitCapacity, usePatientAcuityRows } from "@/hooks/use-unit-capacity";
+import { failureText } from "@/components/capacity/capacity-status";
+import { formatUnitTime } from "@/lib/shift-clock";
 import { listReferralsForList } from "@/lib/referrals.functions";
 import type { Referral } from "@/lib/referrals-list-utils";
 import { formatElapsed } from "@/lib/referrals-list-utils";
@@ -214,18 +214,9 @@ function BoardPage() {
   const p = PALETTES[theme];
 
 
-  const fetchBoard = useServerFn(getPartnerBedBoard);
-  const fetchAcuity = useServerFn(getPatientAcuity);
-  const bedBoard = useQuery({
-    queryKey: ["board", "partner-bed-board"],
-    queryFn: () => fetchBoard(),
-    refetchInterval: 20_000,
-  });
-  const acuity = useQuery({
-    queryKey: ["board", "patient-acuity"],
-    queryFn: () => fetchAcuity(),
-    refetchInterval: 30_000,
-  });
+  // Same shared feed (and cache) as the Bed Board and referral capacity.
+  const capacity = useUnitCapacity();
+  const acuity = usePatientAcuityRows();
   const referrals = useQuery({
     queryKey: ["board", "referrals"],
     queryFn: () => listReferralsForList() as unknown as Promise<Referral[]>,
@@ -239,7 +230,7 @@ function BoardPage() {
         qc.invalidateQueries({ queryKey: ["board", "referrals"] }),
       )
       .on("postgres_changes", { event: "*", schema: "public", table: "patient_acuity_overrides" }, () =>
-        qc.invalidateQueries({ queryKey: ["board", "patient-acuity"] }),
+        qc.invalidateQueries({ queryKey: ACUITY_QK }),
       )
       .subscribe();
     return () => { supabase.removeChannel(ch); };
@@ -255,7 +246,9 @@ function BoardPage() {
     return () => window.removeEventListener("keydown", onKey);
   }, [navigate]);
 
-  const partner = bedBoard.data && bedBoard.data.ok ? bedBoard.data : null;
+  const partner = capacity.board;
+  const physical = capacity.derivation.physical;
+  const notCurrent = capacity.freshness !== "current";
   const acuityMap = new Map<string, { level: number; one_to_one: boolean }>();
   for (const r of acuity.data ?? []) {
     acuityMap.set(r.partner_patient_id, {
@@ -278,14 +271,19 @@ function BoardPage() {
             <div className={`text-sm uppercase tracking-widest ${p.eyebrow}`}>SDH Critical Care</div>
             <div className="text-4xl font-semibold">Live Board</div>
           </div>
-          {partner && (
-            <div className="flex items-center gap-4 text-2xl">
-              <CapCell label="ICU" a={partner.stats.occupied} b={partner.stats.total_beds} p={p} />
+          {partner && physical && (
+            <div className="flex items-center gap-4 text-2xl flex-wrap">
+              <CapCell label="ICU" a={physical.occupied} b={physical.total} p={p} />
               <div className={p.muted}>
-                <span className={`${p.eyebrow} text-base mr-1`}>Available</span>{partner.stats.available}
+                <span className={`${p.eyebrow} text-base mr-1`}>Free{notCurrent ? " (not current)" : ""}</span>{physical.vacant}
               </div>
+              {physical.withheld > 0 && (
+                <div className={p.muted}>
+                  <span className={`${p.eyebrow} text-base mr-1`}>Occupied · details withheld</span>{physical.withheld}
+                </div>
+              )}
               <div className={p.muted}>
-                <span className={`${p.eyebrow} text-base mr-1`}>Unassigned</span>{partner.stats.unassigned}
+                <span className={`${p.eyebrow} text-base mr-1`}>Unassigned</span>{physical.unassigned}
               </div>
               <div className={p.muted}>
                 <span className={`${p.eyebrow} text-base mr-1`}>Pending referrals</span>{pending.length}
@@ -362,10 +360,45 @@ function BoardPage() {
         </div>
       </div>
 
+      {(notCurrent && capacity.latestFailure) && (
+        <div
+          role="status"
+          className={`flex flex-wrap items-center gap-3 px-4 py-2 border-b text-lg font-semibold ${p.border} ${p.capFull}`}
+        >
+          <span>
+            {failureText(capacity)}
+            {capacity.lastSuccessAt
+              ? ` — beds shown are from ${formatUnitTime(capacity.lastSuccessAt, now)} and are NOT current`
+              : " — no bed data available"}
+          </span>
+          <button
+            type="button"
+            onClick={() => capacity.refresh()}
+            disabled={capacity.isFetching}
+            className={`text-base rounded-md border px-3 py-1 ${p.toggle}`}
+          >
+            {capacity.isFetching ? "Retrying…" : "Retry now"}
+          </button>
+        </div>
+      )}
+      {!capacity.latestFailure && capacity.lastSuccessAt && (
+        <div className={`px-4 py-0.5 text-sm ${p.subtle}`}>
+          {notCurrent
+            ? `Not current — last refreshed ${formatUnitTime(capacity.lastSuccessAt, now)}`
+            : `Beds updated ${formatUnitTime(capacity.lastSuccessAt, now)}`}
+        </div>
+      )}
+
       {/* Body */}
       <div className="flex-1 grid grid-cols-1 lg:grid-cols-[3fr_1fr] xl:grid-cols-[4fr_1fr] overflow-hidden">
         <div className={`overflow-auto border-r ${p.border}`}>
-          <BedsColumn data={partner} acuityMap={acuityMap} now={now.getTime()} p={p} />
+          <BedsColumn
+            data={partner}
+            failed={!!capacity.latestFailure}
+            acuityMap={acuityMap}
+            now={now.getTime()}
+            p={p}
+          />
         </div>
         <div className="overflow-auto">
           <PendingColumn rows={pending} now={now.getTime()} p={p} />
@@ -387,16 +420,23 @@ function CapCell({ label, a, b, p }: { label: string; a: number; b: number; p: P
 
 function BedsColumn({
   data,
+  failed,
   acuityMap,
   now,
   p,
 }: {
   data: PartnerBedBoardOk | null;
+  failed: boolean;
   acuityMap: Map<string, { level: number; one_to_one: boolean }>;
   now: number;
   p: Palette;
 }) {
-  if (!data) return <div className={`p-6 ${p.subtle}`}>Loading beds…</div>;
+  if (!data)
+    return (
+      <div className={`p-6 text-xl ${p.subtle}`}>
+        {failed ? "Bed data unavailable — retrying every 20 seconds." : "Loading beds…"}
+      </div>
+    );
   const slots: PartnerBedSlot[] = [...data.bed_board].sort((a, b) =>
     a.bed.localeCompare(b.bed, undefined, { numeric: true }),
   );
@@ -422,7 +462,7 @@ function BedsColumn({
             return (
               <div
                 key={s.bed}
-                className={`rounded border p-3 h-full flex flex-col ${occ ? p.cardFilled : p.borderDashed}`}
+                className={`rounded border p-3 h-full flex flex-col ${s.occupied ? p.cardFilled : p.borderDashed}`}
               >
                 <div className="flex items-baseline justify-between gap-1">
                   <div className={`text-[11px] uppercase tracking-wider ${p.eyebrow}`}>{s.bed}</div>
@@ -450,6 +490,11 @@ function BedsColumn({
                       {occ.dnacpr_decision && <Flag p={p} tone="orange">DNACPR</Flag>}
                       {s.is_side_room && <Flag p={p}>SR</Flag>}
                     </div>
+                  </>
+                ) : s.occupied ? (
+                  <>
+                    <div className="mt-0.5 text-xl leading-tight font-semibold">Occupied</div>
+                    <div className={`text-sm leading-tight ${p.muted}`}>Details withheld</div>
                   </>
                 ) : (
                   <div className={`mt-1 text-base ${p.cardEmpty}`}>Free</div>
