@@ -22,3 +22,4 @@
 - Post-sign-in targets pass src/lib/safe-redirect.ts in validateSearch (key always returned — the router merges raw search) and again before navigate — why: no external or normalised-to-external navigation.
 - Client-only (`ssr:false`) guards that redirect to an SSR page await src/lib/hydration-gate.ts (boundary marker = _authenticated pendingComponent) — why: redirecting mid-hydration is React #418.
 - Optimistic writes, rollbacks and toasts in useMutation options check captureEpochs/epochsCurrent (request-guard.ts) — why: mutation callbacks outlive unmount and must not refill a purged cache.
+- Referrals are never hard-deleted by clients: soft delete/restore only (deleted_at tombstone feeds the Hub), and delete/restore/note-delete server functions audit only when RETURNING confirms a row changed — why: tombstones must reach the Hub and the audit must never record a no-op.

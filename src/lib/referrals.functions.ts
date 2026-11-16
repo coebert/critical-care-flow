@@ -801,8 +801,18 @@ export const deleteNote = createServerFn({ method: "POST" })
       .select("recipient_user_id", { count: "exact", head: true })
       .eq("note_id", data.id);
 
-    const { error } = await supabase.from("referral_notes").delete().eq("id", data.id);
+    // RETURNING the id proves the row was really removed: a policy that
+    // filters the delete (e.g. clinical access revoked mid-request) yields
+    // zero rows, and we must not write a "delete" audit for a no-op.
+    const { data: removed, error } = await supabase
+      .from("referral_notes")
+      .delete()
+      .eq("id", data.id)
+      .select("id");
     if (error) throw safeError("referrals.deleteNote", error, "Failed to delete note.");
+    if (!removed || removed.length === 0) {
+      throw new Error("Note was not deleted — it may already be gone, or your access has changed.");
+    }
 
     await writeAudit({
       user_id: userId,
@@ -1159,12 +1169,19 @@ export const deleteReferral = createServerFn({ method: "POST" })
       throw new Error("Only the creator or an admin can delete this referral");
     }
 
-    const { error } = await supabase
+    // Soft delete only (the row stays as a tombstone the Hub's ?sync=1
+    // import sees). RETURNING proves it happened, so a concurrent delete or a
+    // policy-filtered no-op never produces a false audit entry.
+    const { data: tombstoned, error } = await supabase
       .from("referrals")
       .update({ deleted_at: new Date().toISOString(), deleted_by: userId } as any)
       .eq("id", data.id)
-      .is("deleted_at", null);
+      .is("deleted_at", null)
+      .select("id");
     if (error) throw safeError("referrals.delete", error, "Failed to delete referral.");
+    if (!tombstoned || tombstoned.length === 0) {
+      throw new Error("Referral was not deleted — it may already be deleted, or your access has changed.");
+    }
 
     await writeAudit({
       user_id: userId,
@@ -1237,11 +1254,15 @@ export const restoreReferral = createServerFn({ method: "POST" })
     }
 
 
-    const { error } = await supabase
+    const { data: restored, error } = await supabase
       .from("referrals")
       .update({ deleted_at: null, deleted_by: null, updated_by: userId } as any)
-      .eq("id", data.id);
+      .eq("id", data.id)
+      .select("id");
     if (error) throw safeError("referrals.restore", error, "Failed to restore referral.");
+    if (!restored || restored.length === 0) {
+      throw new Error("Referral was not restored — your access may have changed.");
+    }
 
     await writeAudit({
       user_id: userId,

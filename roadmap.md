@@ -32,6 +32,7 @@ Open (blocked on paired release / Hub):
 - [x] Follow-on A: inbound bridge POST writes (referrals, investigations, microbiology, patients, beds, bed_*) retired with signed 410 refusal; tests
 - [x] Follow-on B: Hub pull `partner_http_error` diagnosed CCC-side (requests never reach CCC); health reports runtime + contract; fix staged in docs/release/hub-inbound-pull-config.md
 - [ ] Hub: set PARTNER_BRIDGE_URL to the CCC published origin at release (Hub-side config, needs approval)
-- [ ] Apply staged SQL `drizzle/staged/0003–0006` at the coordinated release (until then: wardable saves locally only, alerts suppressed)
+- [x] Referral hard-delete lockdown + clinical-access note deletion staged as 0007 (disposable check 61/61); app soft delete/restore/note delete audit only confirmed rows
+- [ ] Apply staged SQL `drizzle/staged/0003–0007` at the coordinated release (until then: wardable saves locally only, alerts suppressed)
 - [ ] Hub deploys `POST /patients/wardable` and the deleted_at tombstone/live import
 - [ ] Publish together with Hub
