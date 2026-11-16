@@ -62,7 +62,7 @@ describe("wardable → Hub fenced transport", () => {
       { id: PT, expected_updated_at: rev, wardable: true, desired_revision: "1" },
     ]);
     expect(others(hub)).toHaveLength(0); // never the generic patient POST
-    expect(w.row(PT)).toMatchObject({ desired_revision: 1, partner_sync_status: "synced", partner_synced_revision: 1 });
+    expect(w.row(PT)).toMatchObject({ desired_revision: "1", partner_sync_status: "synced", partner_synced_revision: "1" });
     expect(hub.store.get(PT)!.wardable).toBe(true);
   });
 
@@ -80,7 +80,7 @@ describe("wardable → Hub fenced transport", () => {
     const o = await old;
     expect(o.ok && o.partner.status).toBe("pending"); // newer local change wins
     expect(hub.store.get(PT)!.wardable).toBe(false);
-    expect(w.row(PT)).toMatchObject({ desired_revision: 2, wardable: false, partner_sync_status: "synced", partner_synced_revision: 2 });
+    expect(w.row(PT)).toMatchObject({ desired_revision: "2", wardable: false, partner_sync_status: "synced", partner_synced_revision: "2" });
   });
 
   it("remote fence: an older POST that reaches the Hub after a newer one is rejected as superseded", async () => {
@@ -97,7 +97,7 @@ describe("wardable → Hub fenced transport", () => {
     expect(o2).toMatchObject({ status: "pending", reason: "newer_local_change", revision: "2", recorded: false });
     expect(hub.audit.filter((a) => a.revision === "2").map((a) => a.result)).toEqual(["superseded"]);
     expect(hub.store.get(PT)!.wardable).toBe(true);
-    expect(w.row(PT)).toMatchObject({ desired_revision: 3, partner_sync_status: "synced", partner_synced_revision: 3 });
+    expect(w.row(PT)).toMatchObject({ desired_revision: "3", partner_sync_status: "synced", partner_synced_revision: "3" });
   });
 
   it("out-of-order responses: a late success for rev1 never marks rev2 synced", async () => {
@@ -112,7 +112,7 @@ describe("wardable → Hub fenced transport", () => {
     expect(r2.ok && r2.partner).toMatchObject({ status: "synced", revision: "2" });
     release();
     expect(await late).toMatchObject({ status: "pending", reason: "newer_local_change", recorded: false });
-    expect(w.row(PT)).toMatchObject({ desired_revision: 2, partner_synced_revision: 2, partner_sync_status: "synced" });
+    expect(w.row(PT)).toMatchObject({ desired_revision: "2", partner_synced_revision: "2", partner_sync_status: "synced" });
     expect(hub.store.get(PT)!.wardable).toBe(false);
   });
 
@@ -130,7 +130,7 @@ describe("wardable → Hub fenced transport", () => {
       actor,
       hub.deps,
     );
-    expect(stale).toEqual({ kind: "conflict", code: "superseded", desired_revision: "1" });
+    expect(stale).toEqual({ kind: "conflict", code: "superseded", desired_revision: "2", requested_revision: "1" });
     expect(hub.store.get(PT)!.wardable).toBe(true);
     expect(await sync()).toMatchObject({ status: "synced", revision: "2" }); // replay is idempotent
   });
@@ -140,7 +140,7 @@ describe("wardable → Hub fenced transport", () => {
     const results = await Promise.all([set(true), set(false), set(true)]);
     const revs = results.map((r) => (r.ok ? Number(r.local.desired_revision) : -1)).sort();
     expect(revs).toEqual([1, 2, 3]);
-    expect(w.row(PT)).toMatchObject({ desired_revision: 3, wardable: true });
+    expect(w.row(PT)).toMatchObject({ desired_revision: "3", wardable: true });
     expect(hub.store.get(PT)!.wardable).toBe(true);
     expect(hub.fence.get(PT)!.reserved).toBe(3n);
   });
@@ -160,7 +160,7 @@ describe("wardable → Hub fenced transport", () => {
     await set(false);
     w.deleteRow(PT); // outbox cleanup / overlay deleted
     const r = await set(true);
-    expect(r.ok && r.local.desired_revision).toBe(3);
+    expect(r.ok && r.local.desired_revision).toBe("3");
     expect(r.ok && r.partner).toMatchObject({ status: "synced", revision: "3" });
     expect(hub.store.get(PT)!.wardable).toBe(true);
   });
@@ -219,7 +219,7 @@ describe("wardable → Hub fenced transport", () => {
     const b = setup();
     b.hub.control.beforeWardable = () => void b.hub.unshare(PT);
     const rb = await b.set(true);
-    expect(rb.ok && rb.partner).toMatchObject({ status: "not_shared", reason: "target_changed" });
+    expect(rb.ok && rb.partner).toMatchObject({ status: "not_shared", reason: "not_shared" });
   });
 
   it("missing Hub endpoint fails closed with no generic patient POST fallback", async () => {
@@ -266,7 +266,7 @@ describe("wardable → Hub fenced transport", () => {
     const hub = fakeHub([{ id: PT, wardable: false }]);
     const r = await runSetWardable(w.db, w.db, { partner_patient_id: PT, wardable: true }, actor, hub.deps);
     expect(r).toMatchObject({ ok: true, partner: { status: "failed", reason: "paused_until_release" } });
-    expect(w.row(PT)).toMatchObject({ wardable: true, desired_revision: 1, partner_sync_status: "failed" });
+    expect(w.row(PT)).toMatchObject({ wardable: true, desired_revision: "1", partner_sync_status: "failed" });
     expect(hub.calls).toHaveLength(0);
     const f = fakeWardableDb({ clinical: false });
     expect(await runSetWardable(f.db, f.db, { partner_patient_id: PT, wardable: true }, actor, hub.deps)).toMatchObject({ ok: false, code: "forbidden" });
@@ -282,11 +282,11 @@ describe("wardable → Hub fenced transport", () => {
   });
 
   it("mismatch is reconstructed after reload from the saved outcome or the Hub's actual flag", () => {
-    const synced = { wardable: true, desired_revision: 3, partner_sync_status: "synced" as const, partner_synced_revision: 3 };
+    const synced = { wardable: true, desired_revision: "3", partner_sync_status: "synced" as const, partner_synced_revision: "3" };
     expect(wardableMismatch(synced, undefined).mismatch).toBe(false);
     expect(wardableMismatch(synced, false)).toEqual({ mismatch: true, reason: "hub_differs" });
     expect(wardableMismatch({ ...synced, partner_sync_status: "failed" }, undefined)).toEqual({ mismatch: true, reason: "failed" });
-    expect(wardableMismatch({ ...synced, partner_synced_revision: 2 }, undefined).mismatch).toBe(true);
+    expect(wardableMismatch({ ...synced, partner_synced_revision: "2" }, undefined).mismatch).toBe(true);
     expect(wardableMismatch({ ...synced, partner_sync_status: "failed" }, true).mismatch).toBe(false);
   });
 });

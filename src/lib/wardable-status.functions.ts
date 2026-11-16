@@ -2,6 +2,7 @@ import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { safeError } from "./safe-error";
+import { isDesiredRevision, normalizeWardableRow } from "./wardable-revision";
 
 export type PartnerSyncStatus = "synced" | "failed" | "not_configured" | "conflict" | "not_shared";
 
@@ -12,10 +13,11 @@ export type WardableStatus = {
   /** LOCAL discharge-timing stamp for analytics. Not a Hub discharge. */
   discharged_at: string | null;
   updated_at: string;
-  desired_revision: number;
+  /** Canonical decimal string (bigint in storage; never a JS number). */
+  desired_revision: string;
   partner_sync_status: PartnerSyncStatus | "pending" | null;
   partner_sync_checked_at: string | null;
-  partner_synced_revision: number | null;
+  partner_synced_revision: string | null;
 };
 
 export type PartnerSyncReason =
@@ -62,7 +64,34 @@ export type WardableRetryReview = {
 const COLS =
   "partner_patient_id, wardable, wardable_at, discharged_at, updated_at, desired_revision, partner_sync_status, partner_sync_checked_at, partner_synced_revision";
 
-const idSchema = z.string().uuid();
+/** Hub patient ids are canonical lowercase UUID text everywhere. */
+const idSchema = z.string().uuid().transform((s) => s.toLowerCase());
+
+/** Revisions are read through the text projection when it exists. */
+const VIEW = "patient_wardable_status_v";
+const MISSING_RELATION = new Set(["42P01", "PGRST205", "PGRST200"]);
+
+function toStatus(raw: unknown): WardableStatus {
+  const row = normalizeWardableRow(raw);
+  if (!row) throw new Error("Could not read wardable status safely");
+  return row as WardableStatus;
+}
+
+async function readStatusRows(supabase: any, id?: string): Promise<WardableStatus[]> {
+  const run = (rel: string) => {
+    let q = supabase.from(rel).select(COLS);
+    if (id) q = q.eq("partner_patient_id", id);
+    return q;
+  };
+  let { data, error } = await run(VIEW);
+  if (error && MISSING_RELATION.has(String(error.code))) {
+    // Pre-release schema: bigint arrives as a JSON number; normalisation
+    // rejects anything that is not a safe integer.
+    ({ data, error } = await run("patient_wardable_status"));
+  }
+  if (error) throw safeError("wardable", error, "Could not load wardable status");
+  return ((data ?? []) as unknown[]).map(toStatus);
+}
 
 async function requireClinical(context: { supabase: any; userId: string }) {
   const { data, error } = await context.supabase.rpc("has_clinical_access", { _user_id: context.userId });
@@ -82,9 +111,7 @@ async function serverDeps(context: { userId: string; claims: unknown }) {
 export const listWardableStatus = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
   .handler(async ({ context }): Promise<WardableStatus[]> => {
-    const { data, error } = await context.supabase.from("patient_wardable_status").select(COLS);
-    if (error) throw safeError("wardable", error, "Could not load wardable status");
-    return (data ?? []) as unknown as WardableStatus[];
+    return readStatusRows(context.supabase);
   });
 
 const setSchema = z.object({
@@ -105,7 +132,7 @@ export const setWardableStatus = createServerFn({ method: "POST" })
     const { actor, admin, core } = await serverDeps(context);
     const r = await core.runSetWardable(context.supabase as never, admin, data, actor);
     if (!r.ok) throw new Error(r.error);
-    return { local: r.local as unknown as WardableStatus, partner: r.partner };
+    return { local: r.local as WardableStatus, partner: r.partner };
   });
 
 /** Show what a retry would send next to what the Hub currently shows. */
@@ -122,7 +149,9 @@ export const reviewWardableRetry = createServerFn({ method: "POST" })
 export const retryWardableSync = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((d: unknown) =>
-    z.object({ partner_patient_id: idSchema, reviewed_revision: z.string().regex(/^[1-9]\d{0,18}$/) }).parse(d),
+    z
+      .object({ partner_patient_id: idSchema, reviewed_revision: z.string().refine(isDesiredRevision, "invalid revision") })
+      .parse(d),
   )
   .handler(async ({ data, context }): Promise<PartnerSyncOutcome> => {
     await requireClinical(context);
@@ -172,10 +201,12 @@ export const dischargePatient = createServerFn({ method: "POST" })
         .from("patient_wardable_status")
         .update({ discharged_at: nowIso, updated_by: context.userId })
         .eq("partner_patient_id", data.partner_patient_id)
-        .select(COLS)
+        .select("partner_patient_id")
         .single();
-      if (error) throw safeError("wardable", error, "Could not record discharge time");
-      return row as unknown as WardableStatus;
+      if (error || !row) throw safeError("wardable", error, "Could not record discharge time");
+      const [fresh] = await readStatusRows(context.supabase, data.partner_patient_id);
+      if (!fresh) throw new Error("Could not record discharge time");
+      return fresh;
     }
     const { data: row, error } = await context.supabase
       .from("patient_wardable_status")
@@ -187,10 +218,12 @@ export const dischargePatient = createServerFn({ method: "POST" })
         updated_by: context.userId,
         updated_at: nowIso,
       })
-      .select(COLS)
+      .select("partner_patient_id")
       .single();
-    if (error) throw safeError("wardable", error, "Could not record discharge time");
-    return row as unknown as WardableStatus;
+    if (error || !row) throw safeError("wardable", error, "Could not record discharge time");
+    const [fresh] = await readStatusRows(context.supabase, data.partner_patient_id);
+    if (!fresh) throw new Error("Could not record discharge time");
+    return fresh;
   });
 
 /** Undo a recorded discharge time — clears the local `discharged_at` stamp. */
@@ -202,10 +235,12 @@ export const clearDischarge = createServerFn({ method: "POST" })
       .from("patient_wardable_status")
       .update({ discharged_at: null, updated_by: context.userId })
       .eq("partner_patient_id", data.partner_patient_id)
-      .select(COLS)
+      .select("partner_patient_id")
       .maybeSingle();
     if (error) throw safeError("wardable", error, "Could not clear discharge time");
-    return (row ?? null) as unknown as WardableStatus | null;
+    if (!row) return null;
+    const [fresh] = await readStatusRows(context.supabase, data.partner_patient_id);
+    return fresh ?? null;
   });
 
 /**

@@ -21,6 +21,12 @@
  *  - Discharge timing stamps are local analytics only and are never sent.
  */
 import {
+  canonicalPatientId,
+  normalizeWardableRow,
+  revisionString,
+  type WardableRow,
+} from "./wardable-revision";
+import {
   fetchHubPatient,
   isDesiredRevision,
   postHubWardable,
@@ -59,7 +65,9 @@ export type PartnerSyncOutcome = {
   message: string;
 };
 
-export type WardableDb = { from: (t: "patient_wardable_status") => any };
+/** Lossless read projection (staged 0003): revisions as decimal TEXT. */
+export const WARDABLE_VIEW = "patient_wardable_status_v";
+export type WardableDb = { from: (t: "patient_wardable_status" | typeof WARDABLE_VIEW) => any };
 export type WardableRpcDb = WardableDb & {
   rpc: (fn: "set_wardable_desired_state", args: { _partner_patient_id: string; _wardable: boolean }) => PromiseLike<{
     data: unknown;
@@ -70,7 +78,7 @@ export type WardableRpcDb = WardableDb & {
 type LocalRow = {
   partner_patient_id: string;
   wardable: boolean;
-  desired_revision: number | string | null;
+  desired_revision: string | null;
   partner_sync_status: string | null;
 };
 
@@ -79,7 +87,7 @@ const MESSAGE: Record<Exclude<PartnerSyncReason, null> | "synced", string> = {
   superseded: "ICU Handover Hub already has a newer wardable change — review before retrying",
   revision_conflict: "The patient changed in ICU Handover Hub at the same time — review and retry",
   intent_conflict: "ICU Handover Hub holds a different value for this change — review before retrying",
-  target_changed: "This patient is no longer the same shared patient in ICU Handover Hub",
+  target_changed: "The wardable value was changed directly in ICU Handover Hub after the last update — review before retrying",
   endpoint_unavailable: "Saved here, but ICU Handover Hub cannot accept wardable updates yet",
   forbidden: "Saved here, but ICU Handover Hub refused the update",
   unavailable: "Saved here, but ICU Handover Hub could not be reached",
@@ -106,21 +114,26 @@ const outcome = (
   message: status === "synced" ? MESSAGE.synced : MESSAGE[(reason ?? "invalid") as Exclude<PartnerSyncReason, null>],
 });
 
-/** Canonical decimal string for a stored bigint revision, or null. */
-export function revisionString(v: unknown): string | null {
-  if (typeof v === "number" && Number.isSafeInteger(v) && v > 0) return String(v);
-  if (typeof v === "string" && isDesiredRevision(v)) return v;
-  return null;
-}
+export { revisionString, canonicalPatientId, normalizeWardableRow } from "./wardable-revision";
+export type { WardableRow } from "./wardable-revision";
 
 async function readLocal(db: WardableDb, id: string): Promise<LocalRow | null | "error"> {
+  // Only the text projection is trusted for revisions (no number rounding).
   const { data, error } = await db
-    .from("patient_wardable_status")
+    .from(WARDABLE_VIEW)
     .select("partner_patient_id, wardable, desired_revision, partner_sync_status")
     .eq("partner_patient_id", id)
     .maybeSingle();
   if (error) return "error";
-  return (data as LocalRow | null) ?? null;
+  if (!data) return null;
+  const row = data as Record<string, unknown>;
+  if (typeof row.desired_revision !== "string") return "error";
+  return {
+    partner_patient_id: String(row.partner_patient_id),
+    wardable: row.wardable === true,
+    desired_revision: row.desired_revision,
+    partner_sync_status: (row.partner_sync_status as string | null) ?? null,
+  };
 }
 
 /** Save an outcome ONLY if `rev` is still the current desired revision. */
@@ -136,10 +149,11 @@ async function record(
     .update({
       partner_sync_status: status,
       partner_sync_checked_at: nowIso,
-      ...(status === "synced" ? { partner_synced_revision: Number(rev) } : {}),
+      // Decimal strings: PostgREST casts them to bigint losslessly.
+      ...(status === "synced" ? { partner_synced_revision: rev } : {}),
     })
     .eq("partner_patient_id", id)
-    .eq("desired_revision", Number(rev))
+    .eq("desired_revision", rev)
     .select("partner_patient_id");
   if (error) return "error";
   return Array.isArray(data) && data.length > 0 ? "recorded" : "moved_on";
@@ -169,6 +183,9 @@ export async function syncWardableToHub(
   deps: HubDeps & { now?: () => Date } = {},
 ): Promise<PartnerSyncOutcome> {
   const nowIso = () => (deps.now ?? (() => new Date()))().toISOString();
+  const canonical = canonicalPatientId(partnerPatientId);
+  if (!canonical) return outcome("failed", "invalid", null);
+  partnerPatientId = canonical;
   const local = await readLocal(db, partnerPatientId);
   if (local === "error") return outcome("failed", "read_failed", null);
   const rev = revisionString(local?.desired_revision);
@@ -200,9 +217,11 @@ export async function syncWardableToHub(
     case "already_applied":
       return finish(db, partnerPatientId, rev, "synced", null, nowIso());
     case "conflict":
-      return res.code === "target_changed"
-        ? finish(db, partnerPatientId, rev, "not_shared", "target_changed", nowIso())
-        : finish(db, partnerPatientId, rev, "conflict", res.code, nowIso());
+      // Every conflict (incl. target_changed: the Hub's value was changed
+      // natively after an applied intent) needs the user to review.
+      return finish(db, partnerPatientId, rev, "conflict", res.code, nowIso());
+    case "not_shared":
+      return finish(db, partnerPatientId, rev, "not_shared", "not_shared", nowIso());
     case "not_configured":
       return finish(db, partnerPatientId, rev, "not_configured", "not_configured", nowIso());
     case "endpoint_unavailable":
@@ -215,18 +234,6 @@ export async function syncWardableToHub(
       return finish(db, partnerPatientId, rev, "failed", "invalid", nowIso());
   }
 }
-
-export type WardableRow = {
-  partner_patient_id: string;
-  wardable: boolean;
-  wardable_at: string | null;
-  discharged_at: string | null;
-  updated_at: string;
-  desired_revision: number;
-  partner_sync_status: string | null;
-  partner_sync_checked_at: string | null;
-  partner_synced_revision: number | null;
-};
 
 export type SetWardableCoreResult =
   | { ok: true; local: WardableRow; partner: PartnerSyncOutcome }
@@ -245,6 +252,9 @@ export async function runSetWardable(
   actor: HubActor,
   deps: HubDeps & { now?: () => Date } = {},
 ): Promise<SetWardableCoreResult> {
+  const id = canonicalPatientId(input.partner_patient_id);
+  if (!id) return { ok: false, code: "failed", error: "Invalid patient id — nothing was changed" };
+  input = { ...input, partner_patient_id: id };
   const { data, error } = await userDb.rpc("set_wardable_desired_state", {
     _partner_patient_id: input.partner_patient_id,
     _wardable: input.wardable,
@@ -260,8 +270,11 @@ export async function runSetWardable(
     if (error.code === "42501") return { ok: false, code: "forbidden", error: "forbidden: clinical role required" };
     return { ok: false, code: "failed", error: "Could not save the wardable change — nothing was changed" };
   }
-  const row = (Array.isArray(data) ? data[0] : data) as WardableRow | undefined;
-  if (!row || !revisionString(row.desired_revision)) {
+  const raw = (Array.isArray(data) ? data[0] : data) as Record<string, unknown> | undefined;
+  // The RPC returns revisions as TEXT; a number here means an unexpected
+  // (lossy) shape — only safe integers are tolerated.
+  const row = normalizeWardableRow(raw);
+  if (!row || !revisionString(row.desired_revision) || row.partner_patient_id !== id) {
     return { ok: false, code: "failed", error: "Could not confirm the wardable change was saved" };
   }
   let partner: PartnerSyncOutcome;
@@ -286,12 +299,16 @@ async function legacyLocalOnly(
     .maybeSingle();
   if (readErr) return { ok: false, code: "failed", error: "Could not save the wardable change — nothing was changed" };
   const nowIso = new Date().toISOString();
-  const ex = existing as WardableRow | null;
+  const ex = existing ? normalizeWardableRow(existing) : null;
+  // Legacy rows arrive as JSON numbers; refuse anything that may be rounded.
+  if (existing && !ex) return { ok: false, code: "failed", error: "Could not save the wardable change — nothing was changed" };
+  const current = ex ? BigInt(ex.desired_revision) : 0n;
+  const next = (current + 1n).toString();
   const patch = {
     wardable: input.wardable,
     wardable_at: input.wardable ? (ex?.wardable && ex.wardable_at ? ex.wardable_at : nowIso) : null,
     discharged_at: null,
-    desired_revision: Number(ex?.desired_revision ?? 0) + 1,
+    desired_revision: next,
     partner_sync_status: "failed",
     partner_sync_checked_at: nowIso,
   };
@@ -300,11 +317,11 @@ async function legacyLocalOnly(
         .from("patient_wardable_status")
         .update(patch)
         .eq("partner_patient_id", input.partner_patient_id)
-        .eq("desired_revision", Number(ex.desired_revision ?? 0))
+        .eq("desired_revision", ex.desired_revision)
         .select(COLS)
     : db.from("patient_wardable_status").insert({ partner_patient_id: input.partner_patient_id, ...patch }).select(COLS);
   const { data, error } = await q;
-  const row = (Array.isArray(data) ? data[0] : data) as WardableRow | undefined;
+  const row = normalizeWardableRow(Array.isArray(data) ? data[0] : data);
   if (error || !row) return { ok: false, code: "failed", error: "Could not save the wardable change — try again" };
   return { ok: true, local: row, partner: outcome("failed", "paused_until_release", revisionString(row.desired_revision), true) };
 }
@@ -323,6 +340,9 @@ export async function reviewWardableRetry(
   actor: HubActor,
   deps: HubDeps = {},
 ): Promise<WardableRetryReview> {
+  const canonical = canonicalPatientId(partnerPatientId);
+  if (!canonical) return { local: null, hub: { state: "invalid" } };
+  partnerPatientId = canonical;
   const local = await readLocal(db, partnerPatientId);
   const rev = local && local !== "error" ? revisionString(local.desired_revision) : null;
   const hub = await fetchHubPatient(partnerPatientId, actor, deps);
@@ -353,6 +373,9 @@ export async function retryReviewedWardable(
   deps: HubDeps & { now?: () => Date } = {},
 ): Promise<PartnerSyncOutcome> {
   if (!isDesiredRevision(reviewedRevision)) return outcome("failed", "invalid", null);
+  const canonical = canonicalPatientId(partnerPatientId);
+  if (!canonical) return outcome("failed", "invalid", null);
+  partnerPatientId = canonical;
   const local = await readLocal(db, partnerPatientId);
   if (local === "error") return outcome("failed", "read_failed", null);
   const rev = revisionString(local?.desired_revision);

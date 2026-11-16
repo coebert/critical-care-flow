@@ -11,8 +11,14 @@ Done (synthetic tests pass, not published):
 - [x] 7. Bed board "Load latest" rebases form and target revision
 - [x] 8. Full tests, typecheck, build, synthetic phone/tablet/desktop flows; ward-round page made reachable
 
+Final correction pass (on 6dbb4c0):
+- [ ] A. Clear/unmount all clinical UI state on denial/logout/identity change; stale-reply guards for edit/acuity/prefill/retry; referrals in purge roots; shared denial gate
+- [ ] B. Wardable revisions as lossless decimal strings end-to-end; canonical lowercase patient ids; protected durable counter (staged SQL + disposable SQL checks)
+- [ ] C. Hub wire semantics: 409 revision rules, PG bigint max, 404 not_found = not shared, target_changed = review conflict; optional outlier/transfer feeds shown as not provided
+- [ ] D. Functional handler tests for Hub patient writes (sanitised, private errors, scope/revoked, partial update, stale CAS)
+- [ ] Full tests, typecheck, build, phone/tablet/desktop checks, commit
+
 Open (blocked on paired release / Hub):
 - [ ] Apply staged SQL `drizzle/staged/0003–0005` at the coordinated release (until then: wardable saves locally only, alerts suppressed)
 - [ ] Hub deploys `POST /patients/wardable` and the deleted_at tombstone/live import
-- [ ] Confirm Hub patient link path `<Hub site>/patients/<id>`
 - [ ] Publish together with Hub

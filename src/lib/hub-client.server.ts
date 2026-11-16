@@ -143,7 +143,9 @@ export async function fetchHubPatient(id: string, actor: HubActor, deps: HubDeps
   if (body.patients.length === 0) return { kind: "not_shared" };
   if (body.patients.length !== 1) return { kind: "invalid", message: "Hub returned more than one patient for an id lookup" };
   const p = body.patients[0] as Record<string, unknown> | null;
-  if (!p || typeof p !== "object" || p.id !== id) return { kind: "invalid", message: "Hub returned a different patient than requested" };
+  if (!p || typeof p !== "object" || typeof p.id !== "string" || p.id.toLowerCase() !== id.toLowerCase()) {
+    return { kind: "invalid", message: "Hub returned a different patient than requested" };
+  }
   if (typeof p.updated_at !== "string" || !Number.isFinite(Date.parse(p.updated_at))) {
     return { kind: "invalid", message: "Hub patient has no revision (updated_at)" };
   }
@@ -214,8 +216,8 @@ export function actorFor(userId: string, claims: Record<string, unknown> | undef
 // There is deliberately NO fallback to the generic patient POST.
 // ---------------------------------------------------------------------------
 
-const REVISION_RE = /^[1-9]\d{0,18}$/;
-export const isDesiredRevision = (v: unknown): v is string => typeof v === "string" && REVISION_RE.test(v);
+import { isDesiredRevision } from "./wardable-revision";
+export { isDesiredRevision, PG_BIGINT_MAX } from "./wardable-revision";
 
 export type HubWardableConflict = "superseded" | "revision_conflict" | "intent_conflict" | "target_changed";
 
@@ -225,7 +227,16 @@ export type HubWardableOutcome =
       desired_revision: string;
       patient: { id: string; wardable: boolean; wardable_at: string | null; updated_at: string };
     }
-  | { kind: "conflict"; code: HubWardableConflict; desired_revision: string }
+  | {
+      kind: "conflict";
+      code: HubWardableConflict;
+      /** Revision the Hub reported (for `superseded`: its highest reserved one). */
+      desired_revision: string;
+      /** Revision this request carried. */
+      requested_revision: string;
+    }
+  /** Opaque Hub 404 {ok:false, code:"not_found"}: absent, unshared, revoked or other-unit patient. */
+  | { kind: "not_shared" }
   | { kind: "forbidden" }
   | { kind: "endpoint_unavailable" }
   | { kind: "unavailable"; message: string }
@@ -266,17 +277,34 @@ export async function postHubWardable(
     if (r.status === 409) {
       const b = r.json as { ok?: unknown; code?: unknown; desired_revision?: unknown } | null;
       if (
-        b &&
-        b.ok === false &&
-        CONFLICT_CODES.includes(b.code as HubWardableConflict) &&
-        b.desired_revision === req.desired_revision
+        !b ||
+        b.ok !== false ||
+        !CONFLICT_CODES.includes(b.code as HubWardableConflict) ||
+        !isDesiredRevision(b.desired_revision)
       ) {
-        return { kind: "conflict", code: b.code as HubWardableConflict, desired_revision: req.desired_revision };
+        return { kind: "invalid", message: "ICU Handover Hub returned an unrecognised conflict" };
       }
-      return { kind: "invalid", message: "ICU Handover Hub returned an unrecognised conflict" };
+      const returned = BigInt(b.desired_revision);
+      const requested = BigInt(req.desired_revision);
+      // superseded: the Hub already reserved a HIGHER revision.
+      // Other conflicts: the Hub's highest reserved revision is >= ours.
+      const consistent = b.code === "superseded" ? returned > requested : returned >= requested;
+      if (!consistent) return { kind: "invalid", message: "ICU Handover Hub returned an inconsistent conflict revision" };
+      return {
+        kind: "conflict",
+        code: b.code as HubWardableConflict,
+        desired_revision: b.desired_revision,
+        requested_revision: req.desired_revision,
+      };
     }
-    // Missing endpoint (Hub not yet upgraded): fail closed, never fall back.
-    if (r.status === 404 || r.status === 405 || r.status === 501) return { kind: "endpoint_unavailable" };
+    if (r.status === 404) {
+      const b = r.json as { ok?: unknown; code?: unknown } | null;
+      // The Hub's opaque patient 404 — never evidence that the route is missing.
+      if (b && b.ok === false && b.code === "not_found") return { kind: "not_shared" };
+      // Any other 404 (e.g. Hub not yet upgraded): fail closed, never fall back.
+      return { kind: "endpoint_unavailable" };
+    }
+    if (r.status === 405 || r.status === 501) return { kind: "endpoint_unavailable" };
     if (r.status === 401 || r.status === 403) return { kind: "forbidden" };
     return { kind: "unavailable", message: `ICU Handover Hub returned HTTP ${r.status}` };
   }
@@ -293,7 +321,8 @@ export async function postHubWardable(
     (b.status !== "applied" && b.status !== "already_applied") ||
     b.desired_revision !== req.desired_revision ||
     !p ||
-    p.id !== req.id ||
+    typeof p.id !== "string" ||
+    p.id.toLowerCase() !== req.id.toLowerCase() ||
     typeof p.wardable !== "boolean" ||
     !(p.wardable_at === null || (typeof p.wardable_at === "string" && Number.isFinite(Date.parse(p.wardable_at)))) ||
     typeof p.updated_at !== "string" ||

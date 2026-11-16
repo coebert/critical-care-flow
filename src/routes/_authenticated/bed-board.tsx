@@ -521,7 +521,7 @@ function BedBoardPage() {
           const now = new Date().toISOString();
           const next: WardableStatus = {
             ...(existing ?? {
-              desired_revision: 0,
+              desired_revision: "0",
               partner_sync_checked_at: null,
               partner_synced_revision: null,
             }),
@@ -584,7 +584,7 @@ function BedBoardPage() {
           const now = new Date().toISOString();
           const existing = idx >= 0 ? list[idx] : undefined;
           const next: WardableStatus = {
-            desired_revision: 0,
+            desired_revision: "0",
             partner_sync_status: null,
             partner_sync_checked_at: null,
             partner_synced_revision: null,
