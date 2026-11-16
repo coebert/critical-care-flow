@@ -1,264 +1,312 @@
 /**
- * "Keep me signed in" retention for the browser-held auth session.
+ * "Keep me signed in" as a dedicated auth storage adapter.
  *
- * The generated auth client always persists its session through the same
- * storage (`localStorage`, or the editor preview broker that mirrors it) and
- * re-reads that storage on every `getSession()` and token refresh. Moving the
- * token elsewhere therefore signs the tab out immediately and the next token
- * refresh writes it straight back. Instead, a tab-only choice is enforced
- * around that storage:
+ * The generated auth client stores its session through
+ * `brokeredPreviewStorage()` (`localStorage`, or the editor preview broker
+ * that mirrors it). `installSessionRetention()` swaps the client's storage
+ * for {@link RetentionStorage} before the client first reads it:
  *
- * - While any tab of the tab-only session is open, the token stays where the
- *   auth client reads it, so reloads, refreshes and new sibling tabs work.
- * - Each open tab registers in a heartbeat table. When the last open tab is
- *   hidden for good (`pagehide`), the token is moved into that tab's own
- *   `sessionStorage`, which the browser discards on close. A same-tab reload
- *   puts it back before the auth client first reads storage.
- * - On start-up, a tab-only session with no live tab and nothing stashed in
- *   this tab's `sessionStorage` (browser closed, crashed or killed) is wiped,
- *   including the editor preview broker copy, before anything can read it.
+ * - Persistent sign-in ("Keep me signed in" ticked): every read and write is
+ *   delegated unchanged to the generated broker/localStorage storage.
+ * - Temporary sign-in (unticked): the session lives only in this tab's
+ *   `sessionStorage`. It is never written to `localStorage` and never sent to
+ *   the editor broker, so nothing outside this tab can hand it back.
+ *
+ * Choosing a temporary sign-in, signing out, or any removal by the auth client
+ * also revokes the persistent copy. Because a broker removal can be lost (the
+ * editor may be busy or gone), revoked keys are remembered in
+ * `localStorage` and read as signed-out — without asking the broker — until a
+ * new persistent session is written. A stale persistent session therefore
+ * cannot come back after a temporary choice or a sign-out.
+ *
+ * Nothing here depends on `pagehide`, heartbeats or work during unload. The
+ * browser decides how long `sessionStorage` lives: closing the tab normally
+ * discards it, but "reopen closed tabs" / session restore can bring it back,
+ * so the UI does not promise an end at browser close.
  *
  * Stored values are never logged or sent anywhere.
  */
+import {
+  brokeredPreviewStorage,
+  type PreviewAuthStorage,
+} from "@/integrations/supabase/previewAuthStorage";
+import { supabase } from "@/integrations/supabase/client";
 
-export const RETENTION_FLAG_KEY = "sdh-auth-retention";
-export const TAB_MARK_KEY = "sdh-auth-tab";
-export const TAB_STASH_KEY = "sdh-auth-tab-stash";
-export const LIVE_TABS_KEY = "sdh-auth-live-tabs";
-/** Background tabs may beat only once a minute (timer throttling). */
-export const LIVE_TAB_TTL_MS = 120_000;
-const HEARTBEAT_MS = 20_000;
+/** Per-tab marker (sessionStorage): this tab's sign-in is temporary. */
+export const TAB_MODE_KEY = "sdh-auth-mode";
+/** Shared (localStorage): auth keys whose persistent copy was revoked. */
+export const REVOKED_KEY = "sdh-auth-revoked";
+
+/** Keys written by the retired heartbeat/stash implementation. */
+const LEGACY_FLAG_KEY = "sdh-auth-retention";
+const LEGACY_LOCAL_KEYS = [LEGACY_FLAG_KEY, "sdh-auth-live-tabs"];
+const LEGACY_SESSION_KEYS = ["sdh-auth-tab", "sdh-auth-tab-stash"];
 
 const AUTH_KEY = /^sb-[A-Za-z0-9_-]+-auth-token(?:-code-verifier|-user)?$/;
 
+/** Storage keys the auth client uses for a given base storage key. */
+export function authKeysFor(storageKey: string): string[] {
+  return [storageKey, `${storageKey}-code-verifier`, `${storageKey}-user`];
+}
+
+/** Same derivation as the auth client's default `storageKey`. */
+export function defaultStorageKey(supabaseUrl: string): string {
+  return `sb-${new URL(supabaseUrl).hostname.split(".")[0]}-auth-token`;
+}
+
 export interface RetentionEnv {
-  local: Storage;
-  session: Storage;
-  now: () => number;
-  /** Revoke the editor preview broker's copy of a key (no-op off-preview). */
-  revokeBroker?: (key: string) => void;
+  /** Shared browser storage (null when blocked). */
+  local: Storage | null;
+  /** This tab's storage (null when blocked; an in-memory map is used then). */
+  session: Storage | null;
+  /** The generated broker/localStorage storage, used for persistent sessions. */
+  persistent: PreviewAuthStorage;
+  /** Base auth storage key, e.g. `sb-<ref>-auth-token`. */
+  storageKey: string;
 }
 
-function browserEnv(): RetentionEnv | null {
-  if (typeof window === "undefined") return null;
+function memoryStorage(): Storage {
+  const m = new Map<string, string>();
+  return {
+    get length() {
+      return m.size;
+    },
+    clear: () => m.clear(),
+    getItem: (k) => (m.has(k) ? (m.get(k) as string) : null),
+    key: (i) => Array.from(m.keys())[i] ?? null,
+    removeItem: (k) => void m.delete(k),
+    setItem: (k, v) => void m.set(k, String(v)),
+  };
+}
+
+function safe<T>(fn: () => T, fallback: T): T {
   try {
-    return {
-      local: window.localStorage,
-      session: window.sessionStorage,
-      now: () => Date.now(),
-      revokeBroker: revokeBrokerCopy,
-    };
+    return fn();
   } catch {
-    return null; // storage blocked
+    return fallback;
   }
 }
 
-function revokeBrokerCopy(key: string): void {
-  // Only meaningful inside the editor preview frame, where the broker keeps
-  // its own copy of the session. Fire-and-forget: the removal message is
-  // posted synchronously, ahead of any later read request.
-  if (window.parent === window) return;
-  void import("@/integrations/supabase/previewAuthStorage")
-    .then(({ brokeredPreviewStorage }) => {
-      const s = brokeredPreviewStorage();
-      if (s && s !== window.localStorage) return s.removeItem(key);
-    })
-    .catch(() => undefined);
-}
-
-function authKeys(store: Storage): string[] {
-  const keys: string[] = [];
-  for (let i = 0; i < store.length; i++) {
-    const k = store.key(i);
-    if (k && AUTH_KEY.test(k)) keys.push(k);
-  }
-  return keys;
-}
-
-function readTabs(env: RetentionEnv): Record<string, number> {
-  try {
-    const raw = env.local.getItem(LIVE_TABS_KEY);
-    const parsed: unknown = raw ? JSON.parse(raw) : {};
-    if (!parsed || typeof parsed !== "object") return {};
-    const out: Record<string, number> = {};
-    const cutoff = env.now() - LIVE_TAB_TTL_MS;
-    for (const [id, ts] of Object.entries(parsed as Record<string, unknown>)) {
-      // Future timestamps (clock moved back) are treated as dead, not alive.
-      if (typeof ts === "number" && ts >= cutoff && ts <= env.now() + HEARTBEAT_MS) out[id] = ts;
+function authKeysIn(store: Storage | null): string[] {
+  if (!store) return [];
+  return safe(() => {
+    const out: string[] = [];
+    for (let i = 0; i < store.length; i++) {
+      const k = store.key(i);
+      if (k && AUTH_KEY.test(k)) out.push(k);
     }
     return out;
-  } catch {
-    return {};
+  }, []);
+}
+
+export class RetentionStorage implements PreviewAuthStorage {
+  private readonly local: Storage | null;
+  private readonly session: Storage;
+  private readonly persistent: PreviewAuthStorage;
+  private readonly keys: string[];
+  /** Used when localStorage is blocked, so revocation still holds in this tab. */
+  private readonly revokedFallback = new Set<string>();
+  /** Broker removals re-sent at most once per key per page load. */
+  private readonly resent = new Set<string>();
+
+  constructor(env: RetentionEnv) {
+    this.local = env.local;
+    this.session = env.session ?? memoryStorage();
+    this.persistent = env.persistent;
+    this.keys = authKeysFor(env.storageKey);
   }
-}
 
-function writeTabs(env: RetentionEnv, tabs: Record<string, number>): void {
-  if (Object.keys(tabs).length === 0) env.local.removeItem(LIVE_TABS_KEY);
-  else env.local.setItem(LIVE_TABS_KEY, JSON.stringify(tabs));
-}
-
-function newTabId(): string {
-  return `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
-}
-
-function wipe(env: RetentionEnv): void {
-  for (const k of authKeys(env.local)) {
-    env.local.removeItem(k);
-    env.revokeBroker?.(k);
+  /** True when this tab's sign-in is temporary (tab-only). */
+  isTemporary(): boolean {
+    return safe(() => this.session.getItem(TAB_MODE_KEY) === "tab", false);
   }
-  env.local.removeItem(RETENTION_FLAG_KEY);
-  env.local.removeItem(LIVE_TABS_KEY);
-  env.session.removeItem(TAB_STASH_KEY);
-  env.session.removeItem(TAB_MARK_KEY);
-}
 
-function restoreStash(env: RetentionEnv): void {
-  const raw = env.session.getItem(TAB_STASH_KEY);
-  env.session.removeItem(TAB_STASH_KEY);
-  if (!raw) return;
-  try {
-    const stash = JSON.parse(raw) as Record<string, unknown>;
-    for (const [k, v] of Object.entries(stash)) {
-      // A sibling tab may hold a newer refreshed token: never overwrite it.
-      if (AUTH_KEY.test(k) && typeof v === "string" && env.local.getItem(k) === null) {
-        env.local.setItem(k, v);
+  private revoked(): Set<string> {
+    const raw = this.local ? safe(() => this.local!.getItem(REVOKED_KEY), null) : null;
+    const out = new Set(this.revokedFallback);
+    if (raw) {
+      const parsed = safe(() => JSON.parse(raw) as unknown, null);
+      if (Array.isArray(parsed)) for (const k of parsed) if (typeof k === "string") out.add(k);
+    }
+    return out;
+  }
+
+  private writeRevoked(set: Set<string>): void {
+    this.revokedFallback.clear();
+    for (const k of set) this.revokedFallback.add(k);
+    if (!this.local) return;
+    safe(() => {
+      if (set.size === 0) this.local!.removeItem(REVOKED_KEY);
+      else this.local!.setItem(REVOKED_KEY, JSON.stringify([...set]));
+    }, undefined);
+  }
+
+  /**
+   * Revoke the persistent copy of `keys` (and, with `allLocal`, every auth
+   * key in localStorage). The revocation is recorded first, so it holds even
+   * if the broker never answers; local copies are removed synchronously.
+   */
+  private async revokePersistent(keys: string[], allLocal: boolean): Promise<void> {
+    const set = this.revoked();
+    for (const k of keys) set.add(k);
+    this.writeRevoked(set);
+    const pending = keys.map((k) =>
+      Promise.resolve(safe(() => this.persistent.removeItem(k), undefined)).catch(() => undefined),
+    );
+    const localKeys = allLocal ? new Set([...keys, ...authKeysIn(this.local)]) : new Set(keys);
+    for (const k of localKeys) if (this.local) safe(() => this.local!.removeItem(k), undefined);
+    await Promise.all(pending);
+  }
+
+  private clearTabCopies(): void {
+    for (const k of new Set([...this.keys, ...authKeysIn(this.session)])) {
+      safe(() => this.session.removeItem(k), undefined);
+    }
+  }
+
+  // ---- auth client storage interface --------------------------------------
+
+  getItem(key: string): string | null | Promise<string | null> {
+    if (this.isTemporary()) return safe(() => this.session.getItem(key), null);
+    if (this.revoked().has(key)) {
+      if (!this.resent.has(key)) {
+        this.resent.add(key);
+        return Promise.resolve(safe(() => this.persistent.removeItem(key), undefined))
+          .catch(() => undefined)
+          .then(() => null);
       }
+      return null;
     }
-  } catch {
-    /* corrupt stash: drop it */
+    return this.persistent.getItem(key);
   }
-}
 
-export type StartupOutcome = "persistent" | "continued" | "adopted" | "ended";
-
-/**
- * Apply the retention choice before the auth client first reads storage.
- * Synchronous and safe to call more than once.
- */
-export function enforceSessionRetention(env: RetentionEnv | null = browserEnv()): StartupOutcome {
-  if (!env) return "persistent";
-  try {
-    if (env.local.getItem(RETENTION_FLAG_KEY) !== "tab") {
-      env.session.removeItem(TAB_STASH_KEY);
-      env.session.removeItem(TAB_MARK_KEY);
-      return "persistent";
-    }
-    const tabs = readTabs(env);
-    let id = env.session.getItem(TAB_MARK_KEY);
-    let outcome: StartupOutcome;
-    if (id) {
-      outcome = "continued"; // same-tab reload / restore
-    } else if (Object.keys(tabs).length > 0 && authKeys(env.local).length > 0) {
-      id = newTabId(); // a sibling tab of the same browser session is open
-      env.session.setItem(TAB_MARK_KEY, id);
-      outcome = "adopted";
-    } else {
-      wipe(env); // browser was closed (or crashed): the session ends here
-      return "ended";
-    }
-    restoreStash(env);
-    tabs[id] = env.now();
-    writeTabs(env, tabs);
-    return outcome;
-  } catch {
-    return "persistent";
-  }
-}
-
-/** Record the user's choice right before a sign-in attempt. */
-export function chooseSessionRetention(
-  keepSignedIn: boolean,
-  env: RetentionEnv | null = browserEnv(),
-): void {
-  if (!env) return;
-  try {
-    env.session.removeItem(TAB_STASH_KEY);
-    if (keepSignedIn) {
-      env.local.removeItem(RETENTION_FLAG_KEY);
-      env.local.removeItem(LIVE_TABS_KEY);
-      env.session.removeItem(TAB_MARK_KEY);
+  setItem(key: string, value: string): void | Promise<void> {
+    if (this.isTemporary()) {
+      this.session.setItem(key, value);
       return;
     }
-    const id = env.session.getItem(TAB_MARK_KEY) ?? newTabId();
-    env.session.setItem(TAB_MARK_KEY, id);
-    env.local.setItem(RETENTION_FLAG_KEY, "tab");
-    writeTabs(env, { ...readTabs(env), [id]: env.now() });
-  } catch {
-    /* storage blocked: nothing persisted either */
+    const set = this.revoked();
+    if (set.delete(key)) this.writeRevoked(set);
+    this.resent.delete(key);
+    return this.persistent.setItem(key, value);
   }
-}
 
-/** Forget any retention state on sign-out. */
-export function clearSessionRetention(env: RetentionEnv | null = browserEnv()): void {
-  if (!env) return;
-  try {
-    env.local.removeItem(RETENTION_FLAG_KEY);
-    env.local.removeItem(LIVE_TABS_KEY);
-    env.session.removeItem(TAB_STASH_KEY);
-    env.session.removeItem(TAB_MARK_KEY);
-  } catch {
-    /* ignore */
+  removeItem(key: string): void | Promise<void> {
+    if (this.isTemporary()) safe(() => this.session.removeItem(key), undefined);
+    return this.revokePersistent([key], false);
   }
-}
 
-/** Keep this tab's heartbeat fresh. */
-export function heartbeat(env: RetentionEnv | null = browserEnv()): void {
-  if (!env) return;
-  try {
-    if (env.local.getItem(RETENTION_FLAG_KEY) !== "tab") return;
-    const id = env.session.getItem(TAB_MARK_KEY);
-    if (!id) return;
-    writeTabs(env, { ...readTabs(env), [id]: env.now() });
-  } catch {
-    /* ignore */
-  }
-}
+  // ---- retention choice ----------------------------------------------------
 
-/**
- * This tab is going away (close, navigate off-site, reload). If it was the
- * last live tab of a tab-only session, take the token out of shared storage
- * and keep it only in this tab's sessionStorage, which the browser discards
- * when it closes and a reload restores.
- */
-export function onTabHidden(env: RetentionEnv | null = browserEnv()): void {
-  if (!env) return;
-  try {
-    if (env.local.getItem(RETENTION_FLAG_KEY) !== "tab") return;
-    const id = env.session.getItem(TAB_MARK_KEY);
-    const tabs = readTabs(env);
-    if (id) delete tabs[id];
-    writeTabs(env, tabs);
-    if (Object.keys(tabs).length > 0) return;
-    const stash: Record<string, string> = {};
-    for (const k of authKeys(env.local)) {
-      const v = env.local.getItem(k);
-      if (v !== null) stash[k] = v;
-      env.local.removeItem(k);
+  /**
+   * Apply the "Keep me signed in" choice. Must run (and be awaited) before a
+   * password or passkey sign-in writes the new session.
+   */
+  async choose(keepSignedIn: boolean): Promise<void> {
+    this.clearTabCopies();
+    if (keepSignedIn) {
+      safe(() => this.session.removeItem(TAB_MODE_KEY), undefined);
+      return;
     }
-    if (Object.keys(stash).length > 0) env.session.setItem(TAB_STASH_KEY, JSON.stringify(stash));
-  } catch {
-    /* ignore */
+    this.session.setItem(TAB_MODE_KEY, "tab");
+    // A temporary sign-in replaces any persistent session on this device.
+    await this.revokePersistent(this.keys, true);
+  }
+
+  /** Sign-out: forget this tab's session and revoke the persistent copy. */
+  async clear(): Promise<void> {
+    this.clearTabCopies();
+    safe(() => this.session.removeItem(TAB_MODE_KEY), undefined);
+    await this.revokePersistent(this.keys, true);
+  }
+
+  /**
+   * One-off clean-up of the retired heartbeat/stash implementation. A session
+   * it marked tab-only is ended (never restored from its stash).
+   */
+  migrateLegacy(): void {
+    const wasTabOnly = this.local ? safe(() => this.local!.getItem(LEGACY_FLAG_KEY) === "tab", false) : false;
+    for (const k of LEGACY_LOCAL_KEYS) if (this.local) safe(() => this.local!.removeItem(k), undefined);
+    for (const k of LEGACY_SESSION_KEYS) safe(() => this.session.removeItem(k), undefined);
+    if (wasTabOnly) void this.revokePersistent(this.keys, true);
   }
 }
 
-let installed = false;
+// ---- browser wiring ---------------------------------------------------------
+
+let browserStorage: RetentionStorage | null = null;
 
 /**
- * Browser start-up hook: enforce the choice now (before the auth client
- * reads storage) and keep this tab registered while it is open.
+ * Replace the generated auth client's storage with {@link RetentionStorage}.
+ * Called from `getRouter()` before anything reads the session. The auth
+ * client only starts reading storage after an async lock, so the swap made
+ * synchronously right after the client is created is in place for its very
+ * first read (guarded by session-retention.test.ts against the installed
+ * auth library).
  */
-export function installSessionRetention(): void {
-  if (installed || typeof window === "undefined") return;
-  installed = true;
-  enforceSessionRetention();
-  const beat = () => heartbeat();
-  window.setInterval(beat, HEARTBEAT_MS);
-  document.addEventListener("visibilitychange", () => {
-    if (document.visibilityState === "visible") beat();
+export function attachRetentionStorage(auth: unknown, storage: PreviewAuthStorage): boolean {
+  const target = auth as { storage?: unknown; persistSession?: unknown } | null;
+  if (!target || typeof target !== "object" || !("storage" in target)) return false;
+  target.storage = storage;
+  return target.storage === storage;
+}
+
+export function installSessionRetention(): RetentionStorage | null {
+  return installWith(supabase.auth, brokeredPreviewStorage);
+}
+
+/** Install against a given auth client (exported for tests). */
+export function installWith(
+  auth: unknown,
+  makePersistent: () => PreviewAuthStorage | undefined,
+): RetentionStorage | null {
+  if (browserStorage) return browserStorage;
+  if (typeof window === "undefined") return null;
+  const url = import.meta.env.VITE_SUPABASE_URL as string | undefined;
+  const persistent = makePersistent();
+  if (!url || !persistent) return null;
+  const storage = new RetentionStorage({
+    local: safe(() => window.localStorage, null),
+    session: safe(() => window.sessionStorage, null),
+    persistent,
+    storageKey: defaultStorageKey(url),
   });
-  window.addEventListener("pagehide", () => onTabHidden());
-  window.addEventListener("pageshow", (e) => {
-    // Back/forward cache restore: re-enter the session like a reload.
-    if ((e as PageTransitionEvent).persisted) enforceSessionRetention();
-  });
+  storage.migrateLegacy();
+  if (!attachRetentionStorage(auth, storage)) {
+    console.warn("[auth] keep-me-signed-in storage could not be attached");
+    return null;
+  }
+  browserStorage = storage;
+  return storage;
+}
+
+export class TemporarySignInUnavailableError extends Error {
+  constructor() {
+    super(
+      "This browser can't keep a sign-in to this tab only. Tick \"Keep me signed in\" or use a private window, and sign out when you finish.",
+    );
+    this.name = "TemporarySignInUnavailableError";
+  }
+}
+
+/**
+ * Record the user's choice right before a sign-in attempt. Fails closed: an
+ * unticked choice that cannot be honoured refuses to sign in.
+ */
+export async function chooseSessionRetention(keepSignedIn: boolean): Promise<void> {
+  if (!browserStorage) {
+    if (!keepSignedIn && typeof window !== "undefined") throw new TemporarySignInUnavailableError();
+    return;
+  }
+  await browserStorage.choose(keepSignedIn);
+}
+
+/** Forget this tab's session and the persistent copy on sign-out. */
+export async function clearSessionRetention(): Promise<void> {
+  await browserStorage?.clear();
+}
+
+/** Test hook: forget the installed browser storage. */
+export function __resetSessionRetentionForTests(): void {
+  browserStorage = null;
 }

@@ -5,7 +5,8 @@ import { routeTree } from "./routeTree.gen";
 import { installSessionRetention } from "./lib/session-retention";
 
 export const getRouter = () => {
-  // Apply "Keep me signed in" before the auth client first reads storage.
+  // Swap in the "Keep me signed in" auth storage before the auth client
+  // first reads it (see session-retention.ts).
   if (typeof window !== "undefined") installSessionRetention();
   // Any authoritative clinical-role denial seen by any query or mutation
   // closes the shared clinical gate (browser only; see session-scope.ts).

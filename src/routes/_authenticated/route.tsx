@@ -138,8 +138,13 @@ function AuthedShell() {
       const { useE2ESession } = await import("@/hooks/use-e2e-session");
       useE2ESession.getState().clear();
     } catch { /* non-fatal */ }
-    await supabase.auth.signOut();
-    clearSessionRetention();
+    try {
+      await supabase.auth.signOut();
+    } finally {
+      // Even if sign-out could not reach the server, this device forgets the
+      // session and revokes any persistent/broker copy.
+      await clearSessionRetention();
+    }
     router.invalidate();
     if (reason === "timeout") {
       toast.message("Signed out for inactivity", {

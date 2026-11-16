@@ -25,7 +25,8 @@ Final correction pass (on 6dbb4c0):
 
 Open (blocked on paired release / Hub):
 - [x] Re-audit 6472350: /auth hydration #418 (signed-out "/" redirect mid-hydration) fixed via hydration gate
-- [x] "Keep me signed in" off: honoured on password + passkey, reload, refresh, browser close, sign-out
+- [x] "Keep me signed in" off: honoured on password + passkey, reload, refresh, sign-out (tab-only storage adapter; no browser-close promise)
+- [x] Fix broker resurrection of temporary sessions (reported regression at 7a22d2d)
 - [x] Post-sign-in redirect: strict internal-path validation (router merged raw search; external nav possible)
 - [x] Expired reset link: keyboard way back to sign-in
 - [x] Bed board: late rollback/toast after denial; older confirm closing newer review; clock-back capacity freshness; truthful unknown Hub outcome text

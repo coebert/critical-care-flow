@@ -112,8 +112,8 @@ function AuthPage() {
           lockedToast(gate.retry_after_seconds);
           return;
         }
-        // Record the retention choice before the session is first stored.
-        chooseSessionRetention(rememberMe);
+        // Apply the retention choice before the session is first stored.
+        await chooseSessionRetention(rememberMe);
         const { error } = await retrySupabaseCall(
           () => supabase.auth.signInWithPassword({ email, password }),
           {
@@ -165,7 +165,7 @@ function AuthPage() {
     }
     setPasskeyBusy(true);
     try {
-      chooseSessionRetention(rememberMe);
+      await chooseSessionRetention(rememberMe);
       await signInWithPasskey(trimmed);
       toast.success("Signed in with passkey");
       navigate({ href: postAuthTarget, replace: true });
@@ -244,7 +244,7 @@ function AuthPage() {
                     Keep me signed in
                   </Label>
                   <p className="text-[11px] text-muted-foreground">
-                    Stay logged in on this device. Uncheck on shared computers — your session will end when you close the browser.
+                    Stays signed in on this device, including in new tabs. On a shared computer, untick this and always sign out when you finish — the sign-in is then kept to this tab, but some browsers can bring it back when they reopen closed tabs.
                   </p>
                 </div>
               </div>
