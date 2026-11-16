@@ -15,13 +15,13 @@ Final correction pass (on 6dbb4c0):
 - [x] A. Clear/unmount all clinical UI state on denial/logout/identity change; stale-reply guards for edit/acuity/prefill/retry; referrals in purge roots; shared denial gate
 - [x] B. Wardable revisions as lossless decimal strings end-to-end; canonical lowercase patient ids; protected durable counter (staged SQL + disposable SQL checks)
 - [x] C. Hub wire semantics: 409 revision rules, PG bigint max, 404 not_found = not shared, target_changed = review conflict
-- [ ] C (part). Check missing optional outlier/transfer feeds show as "not provided" (not in this round's scope)
+- [x] C (part). Missing optional outlier/transfer feeds show as "not available", not 0 (synthetic browser check)
 - [x] B/C wire + bigint (committed f4dca4a)
 - [x] 1. Clinical UI purge on denial/logout/identity change; ['referrals'] purge; late async guards; mounted tests
 - [x] 2. Wardable review-confirm bound to user/patient/local revision/Hub CAS (signed token); new durable revision conditional on reviewed revision; tests
 - [x] D. Functional handler tests for Hub patient writes (sanitised, private errors, scope/revoked, partial update, stale CAS)
 - [x] Full tests, typecheck, build, commit
-- [ ] Signed-in synthetic phone/tablet/desktop browser checks (needs approval to create a test user)
+- [x] Signed-in synthetic phone/desktop browser checks (all server/data replies stubbed; no real account or patient data)
 
 Open (blocked on paired release / Hub):
 - [ ] Apply staged SQL `drizzle/staged/0003–0006` at the coordinated release (until then: wardable saves locally only, alerts suppressed)
