@@ -273,6 +273,36 @@ export type CapacityInput = {
   latestFailed?: boolean;
 };
 
+/**
+ * Device clock changes must never make held data look younger. For each
+ * input we remember, the first time we see a given source time, how old it
+ * already was and a monotonic timestamp; afterwards its age is at least that
+ * plus the monotonic time elapsed — so moving the wall clock back cannot
+ * turn stale data "current". A forward jump only makes data look older
+ * (fail-safe). Future source times are passed through unchanged so they are
+ * still rejected as invalid.
+ */
+export type SourceAgeTracker = Map<string, { key: string; ageAtReceipt: number; monoAt: number }>;
+export function monotonicSourceAt(
+  tracker: SourceAgeTracker,
+  name: string,
+  sourceAt: string | number | null,
+  wallNow: number,
+  monoNow: number,
+): string | number | null {
+  if (sourceAt == null) return sourceAt;
+  const t = typeof sourceAt === "number" ? sourceAt : Date.parse(sourceAt);
+  if (!Number.isFinite(t) || t <= 0 || t - wallNow > MAX_FUTURE_SKEW_MS) return sourceAt;
+  const key = String(sourceAt);
+  let r = tracker.get(name);
+  if (!r || r.key !== key) {
+    r = { key, ageAtReceipt: Math.max(0, wallNow - t), monoAt: monoNow };
+    tracker.set(name, r);
+  }
+  const monoAge = r.ageAtReceipt + Math.max(0, monoNow - r.monoAt);
+  return Math.min(t, wallNow - monoAge);
+}
+
 export function inputFreshness(i: CapacityInput, now: number): InputFreshness {
   if (i.state === "forbidden") return "forbidden";
   if (i.state === "pending") return "pending";

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { getPartnerBedBoard } from "@/lib/partner-bed-board.functions";
@@ -17,6 +17,8 @@ import {
   combinedFreshness,
   deriveUnitCapacity,
   isReassuring,
+  monotonicSourceAt,
+  type SourceAgeTracker,
   type CapacityDerivation,
   type CapacityInputName,
   type Freshness,
@@ -48,6 +50,10 @@ const liveQueryOpts = {
   refetchOnWindowFocus: true,
   refetchOnReconnect: true,
 } as const;
+
+function monoClock(): number {
+  return typeof performance !== "undefined" && typeof performance.now === "function" ? performance.now() : Date.now();
+}
 
 /** Re-render every `ms` so "x min ago" / staleness / shift boundaries update. */
 export function useNow(ms = 10_000): Date {
@@ -159,6 +165,9 @@ function toState<T>(q: { status: string; data: T | undefined; error: unknown }):
 /** The one hook every capacity surface uses. */
 export function useUnitCapacity(): UnitCapacityView {
   const now = useNow(10_000);
+  // Monotonic reading taken with each wall-clock tick (see monotonicSourceAt).
+  const monoNow = useMemo(() => monoClock(), [now]);
+  const ageTracker = useRef<SourceAgeTracker>(new Map()).current;
   const shift = currentShift(now);
   const qc = useQueryClient();
   const board = usePartnerBedBoard();
@@ -188,23 +197,26 @@ export function useUnitCapacity(): UnitCapacityView {
   const lastSuccessAt = boardSourceTime(board.lastOk);
   // Every required input is aged: a fresh board over a two-minute-old
   // acuity/staffing cache (e.g. a hanging refresh) is NOT current.
+  const wallNow = now.getTime();
+  const aged = (name: string, at: string | number | null) =>
+    monotonicSourceAt(ageTracker, name, at, wallNow, monoNow);
   const { freshness, inputs } = combinedFreshness(
     {
       board: board.forbidden
         ? { state: "forbidden", sourceAt: null }
         : board.lastOk
-          ? { state: "ok", sourceAt: lastSuccessAt, latestFailed: board.latestFailure !== null }
+          ? { state: "ok", sourceAt: aged("board", lastSuccessAt), latestFailed: board.latestFailure !== null }
           : { state: board.latestFailure ? "error" : "pending", sourceAt: null },
       acuity:
         acuity.data === undefined
           ? { state: acuity.status === "error" ? "error" : "pending", sourceAt: null }
-          : { state: "ok", sourceAt: acuity.dataUpdatedAt, latestFailed: acuity.status === "error" },
+          : { state: "ok", sourceAt: aged("acuity", acuity.dataUpdatedAt), latestFailed: acuity.status === "error" },
       staffing:
         staffing.data === undefined
           ? { state: staffing.status === "error" ? "error" : "pending", sourceAt: null }
-          : { state: "ok", sourceAt: staffing.dataUpdatedAt, latestFailed: staffing.status === "error" },
+          : { state: "ok", sourceAt: aged("staffing", staffing.dataUpdatedAt), latestFailed: staffing.status === "error" },
     },
-    now.getTime(),
+    wallNow,
   );
 
   return {

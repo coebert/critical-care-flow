@@ -69,6 +69,21 @@ export class RequestGuard {
   }
 }
 
+/**
+ * Session + clinical epochs at the start of a request. Mutation callbacks
+ * declared on `useMutation` run even after the component unmounts, so any
+ * optimistic write, rollback or toast must check these are still current —
+ * otherwise a late failure can write a pre-denial snapshot back into a
+ * cache that was just purged.
+ */
+export type ScopeEpochs = { readonly session: number; readonly clinical: number };
+export function captureEpochs(): ScopeEpochs {
+  return { session: currentSessionEpoch(), clinical: currentClinicalEpoch() };
+}
+export function epochsCurrent(e: ScopeEpochs | null | undefined): boolean {
+  return !!e && e.session === currentSessionEpoch() && e.clinical === currentClinicalEpoch();
+}
+
 /** One guard per mounted component, bound to the current selection key. */
 export function useRequestGuard(scope: string): RequestGuard {
   const ref = useRef<RequestGuard | null>(null);

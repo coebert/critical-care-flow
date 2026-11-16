@@ -153,3 +153,46 @@ describe("freshness and recovery", () => {
     expect(isReassuring(d, "current")).toBe(true);
   });
 });
+
+describe("monotonicSourceAt — device clock changes", () => {
+  it("moving the clock back cannot make 90 s old data current", async () => {
+    const { monotonicSourceAt, inputFreshness } = await import("./unit-capacity");
+    const tracker = new Map();
+    const fetchedAt = 1_000_000_000_000;
+    // Seen right after the fetch.
+    monotonicSourceAt(tracker, "acuity", fetchedAt, fetchedAt, 0);
+    // 90 s pass (refresh hangs), then the wall clock is moved back 60 s.
+    const wall = fetchedAt + 90_000 - 60_000;
+    const at = monotonicSourceAt(tracker, "acuity", fetchedAt, wall, 90_000);
+    expect(inputFreshness({ state: "ok", sourceAt: fetchedAt }, wall)).toBe("current"); // the old defect
+    expect(inputFreshness({ state: "ok", sourceAt: at }, wall)).toBe("stale");
+  });
+
+  it("keeps the age the data already had when first seen", async () => {
+    const { monotonicSourceAt, inputFreshness } = await import("./unit-capacity");
+    const tracker = new Map();
+    const generated = 1_000_000_000_000;
+    monotonicSourceAt(tracker, "board", new Date(generated).toISOString(), generated + 50_000, 0);
+    const wall = generated + 50_000 - 30_000; // clock moved back 30 s
+    const at = monotonicSourceAt(tracker, "board", new Date(generated).toISOString(), wall, 15_000);
+    expect(inputFreshness({ state: "ok", sourceAt: at }, wall)).toBe("stale"); // 65 s old
+  });
+
+  it("fresh data stays current and a new fetch resets the age", async () => {
+    const { monotonicSourceAt, inputFreshness } = await import("./unit-capacity");
+    const tracker = new Map();
+    const t0 = 1_000_000_000_000;
+    monotonicSourceAt(tracker, "staffing", t0, t0, 0);
+    const t1 = t0 + 70_000;
+    const at = monotonicSourceAt(tracker, "staffing", t1, t1 + 1_000, 71_000);
+    expect(inputFreshness({ state: "ok", sourceAt: at }, t1 + 1_000)).toBe("current");
+  });
+
+  it("future source times are still rejected", async () => {
+    const { monotonicSourceAt, inputFreshness } = await import("./unit-capacity");
+    const tracker = new Map();
+    const now = 1_000_000_000_000;
+    const at = monotonicSourceAt(tracker, "board", now + 10 * 60_000, now, 0);
+    expect(inputFreshness({ state: "ok", sourceAt: at }, now)).toBe("invalid_time");
+  });
+});

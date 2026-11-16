@@ -98,7 +98,10 @@ const MESSAGE: Record<Exclude<PartnerSyncReason, null> | "synced", string> = {
   target_changed: "The wardable value was changed directly in ICU Handover Hub after the last update — review before retrying",
   endpoint_unavailable: "Saved here, but ICU Handover Hub cannot accept wardable updates yet",
   forbidden: "Saved here, but ICU Handover Hub refused the update",
-  unavailable: "Saved here, but ICU Handover Hub could not be reached",
+  // Covers refused connections and timeouts after the request was sent, so
+  // it must not claim the Hub did not apply it. Review & retry re-checks the
+  // Hub first and resends the same revision (idempotent).
+  unavailable: "Saved here, but ICU Handover Hub did not confirm the update — it may not have been applied. Use Review & retry",
   invalid: "Saved here, but ICU Handover Hub gave an unexpected answer",
   newer_local_change: "A newer wardable change is being sent instead",
   read_failed: "Could not read the saved wardable state — the Hub was not updated",

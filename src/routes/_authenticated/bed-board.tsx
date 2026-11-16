@@ -82,7 +82,7 @@ import { parseBedBoardSearch, hasLegacyIdentifierParams } from "@/lib/bed-board-
 import { LEVEL_TONE, LEVEL_LABEL, computeUnitAcuity } from "@/lib/acuity";
 import { NurseCapacityPanel } from "@/components/bed-board/nurse-capacity-panel";
 import { EditOccupantDialog } from "@/components/bed-board/edit-occupant-dialog";
-import { useRequestGuard, type RequestTicket } from "@/lib/request-guard";
+import { useRequestGuard, type RequestTicket, captureEpochs, epochsCurrent } from "@/lib/request-guard";
 
 export const Route = createFileRoute("/_authenticated/bed-board")({
   head: () => ({
@@ -238,9 +238,11 @@ function BedBoardPage() {
   }, [violenceRows]);
 
   const violenceMutation = useMutation({
+    onMutate: () => ({ epochs: captureEpochs() }),
     mutationFn: (v: { partner_patient_id: string; violence_risk: boolean }) =>
       writeViolence({ data: v }),
-    onSuccess: (_r, vars) => {
+    onSuccess: (_r, vars, ctx) => {
+      if (!epochsCurrent(ctx?.epochs)) return;
       toast.success(
         vars.violence_risk
           ? "Flagged as potentially violent / aggressive"
@@ -248,7 +250,8 @@ function BedBoardPage() {
       );
       qc.invalidateQueries({ queryKey: ["patient-violence-risk"] });
     },
-    onError: (err) =>
+    onError: (err, _v, ctx) =>
+      epochsCurrent(ctx?.epochs) &&
       toast.error(err instanceof Error ? err.message : "Could not update flag"),
   });
   const handleToggleViolence = (occupantId: string, next: boolean) => {
@@ -271,9 +274,11 @@ function BedBoardPage() {
   }, [endOfLifeRows]);
 
   const endOfLifeMutation = useMutation({
+    onMutate: () => ({ epochs: captureEpochs() }),
     mutationFn: (v: { partner_patient_id: string; end_of_life: boolean }) =>
       writeEndOfLife({ data: v }),
-    onSuccess: (_r, vars) => {
+    onSuccess: (_r, vars, ctx) => {
+      if (!epochsCurrent(ctx?.epochs)) return;
       toast.success(
         vars.end_of_life
           ? "Flagged as receiving end-of-life care"
@@ -281,7 +286,8 @@ function BedBoardPage() {
       );
       qc.invalidateQueries({ queryKey: ["patient-end-of-life"] });
     },
-    onError: (err) =>
+    onError: (err, _v, ctx) =>
+      epochsCurrent(ctx?.epochs) &&
       toast.error(err instanceof Error ? err.message : "Could not update flag"),
   });
   const handleToggleEndOfLife = (occupantId: string, next: boolean) => {
@@ -304,11 +310,13 @@ function BedBoardPage() {
   }, [scanTransferRows]);
 
   const scanTransferMutation = useMutation({
+    onMutate: () => ({ epochs: captureEpochs() }),
     mutationFn: (v: {
       partner_patient_id: string;
       needs_scan_transfer: boolean;
     }) => writeScanTransfer({ data: v }),
-    onSuccess: (_r, vars) => {
+    onSuccess: (_r, vars, ctx) => {
+      if (!epochsCurrent(ctx?.epochs)) return;
       toast.success(
         vars.needs_scan_transfer
           ? "Flagged as needing transfer for a scan"
@@ -316,7 +324,8 @@ function BedBoardPage() {
       );
       qc.invalidateQueries({ queryKey: ["patient-scan-transfer"] });
     },
-    onError: (err) =>
+    onError: (err, _v, ctx) =>
+      epochsCurrent(ctx?.epochs) &&
       toast.error(err instanceof Error ? err.message : "Could not update flag"),
   });
   const handleToggleScanTransfer = (occupantId: string, next: boolean) => {
@@ -329,11 +338,13 @@ function BedBoardPage() {
   // Isolation cycle (user-toggleable, writes to bed_occupancies.isolation).
   const writeIsolation = useServerFn(setPatientIsolation);
   const isolationMutation = useMutation({
+    onMutate: () => ({ epochs: captureEpochs() }),
     mutationFn: (v: {
       partner_patient_id: string;
       isolation: "none" | "contact" | "droplet" | "airborne";
     }) => writeIsolation({ data: v }),
-    onSuccess: (_r, vars) => {
+    onSuccess: (_r, vars, ctx) => {
+      if (!epochsCurrent(ctx?.epochs)) return;
       toast.success(
         vars.isolation === "none"
           ? "Isolation cleared"
@@ -341,7 +352,8 @@ function BedBoardPage() {
       );
       qc.invalidateQueries({ queryKey: ["patient-isolations"] });
     },
-    onError: (err) =>
+    onError: (err, _v, ctx) =>
+      epochsCurrent(ctx?.epochs) &&
       toast.error(err instanceof Error ? err.message : "Could not update isolation"),
   });
   const handleCycleIsolation = (
@@ -356,12 +368,14 @@ function BedBoardPage() {
 
   const moveBed = useServerFn(updatePartnerPatient);
   const moveMutation = useMutation({
+    onMutate: () => ({ epochs: captureEpochs() }),
     mutationFn: (input: {
       id: string;
       expected_updated_at: string | null;
       bed: string;
     }) => moveBed({ data: input }),
-    onSuccess: (result, vars) => {
+    onSuccess: (result, vars, ctx) => {
+      if (!epochsCurrent(ctx?.epochs)) return;
       if (result.ok) {
         toast.success(`Moved patient to bed ${vars.bed}`);
         refetch();
@@ -372,7 +386,8 @@ function BedBoardPage() {
         toast.error(result.error || "Could not move patient");
       }
     },
-    onError: (err) =>
+    onError: (err, _v, ctx) =>
+      epochsCurrent(ctx?.epochs) &&
       toast.error(err instanceof Error ? err.message : "Could not move patient"),
   });
 
@@ -436,7 +451,8 @@ function BedBoardPage() {
   const retryMutation = useMutation({
     // Only the signed token of the review on screen is sent — it binds the
     // patient, the local revision/value and the Hub state that were shown.
-    mutationFn: (v: { review_token: string; id: string; t: RequestTicket }) => retrySync({ data: { review_token: v.review_token } }),
+    mutationFn: (v: { review_token: string; id: string; t: RequestTicket; reviewT: RequestTicket }) =>
+      retrySync({ data: { review_token: v.review_token } }),
     onSuccess: (p, v) => {
       if (pageGuard.isCurrent(v.t)) reportPartner(p, "Wardable state");
     },
@@ -445,7 +461,9 @@ function BedBoardPage() {
     },
     onSettled: (_d, _e, v) => {
       if (!pageGuard.isCurrent(v.t)) return;
-      setRetryReview(null);
+      // Close only the review that was confirmed — never a newer review the
+      // user opened while this confirmation was in flight.
+      setRetryReview((cur) => (cur && cur.t === v.reviewT ? null : cur));
       void qc.invalidateQueries({ queryKey: ["patient-wardable-status"] });
       void refetch();
     },
@@ -455,9 +473,13 @@ function BedBoardPage() {
     mutationFn: (input: { partner_patient_id: string; wardable: boolean }): Promise<SetWardableResult> =>
       setWardable({ data: input }),
     onMutate: async (input) => {
+      // Captured before awaiting: a denial / sign-out during the await
+      // must not let this optimistic write land in the purged cache.
+      const epochs = captureEpochs();
       // Optimistic update so the timer starts ticking the instant the user
       // clicks — the round-trip to the partner shouldn't delay the stamp.
       await qc.cancelQueries({ queryKey: ["patient-wardable-status"] });
+      if (!epochsCurrent(epochs)) return { previous: undefined, epochs };
       const previous = qc.getQueryData<WardableStatus[]>([
         "patient-wardable-status",
       ]);
@@ -492,16 +514,22 @@ function BedBoardPage() {
           return list;
         },
       );
-      return { previous };
+      return { previous, epochs };
     },
     onError: (err, _input, ctx) => {
+      // A late failure after a denial / account change must not restore
+      // the pre-denial snapshot or surface a message on the next screen.
+      if (!epochsCurrent(ctx?.epochs)) return;
       if (ctx?.previous) {
         qc.setQueryData(["patient-wardable-status"], ctx.previous);
       }
       toast.error(err instanceof Error ? err.message : "Could not update wardable status");
     },
-    onSuccess: (r, input) => reportPartner(r.partner, input.wardable ? "Marked wardable" : "Wardable cleared"),
-    onSettled: () => {
+    onSuccess: (r, input, ctx) =>
+      epochsCurrent(ctx?.epochs) &&
+      reportPartner(r.partner, input.wardable ? "Marked wardable" : "Wardable cleared"),
+    onSettled: (_d, _e, _v, ctx) => {
+      if (!epochsCurrent(ctx?.epochs)) return;
       // Invalidate (not refetch) so every observer of this key — other
       // panels and other tabs — also picks the change up.
       void qc.invalidateQueries({ queryKey: ["patient-wardable-status"] });
@@ -521,7 +549,11 @@ function BedBoardPage() {
         ? clearDischargeFn({ data: { partner_patient_id: input.partner_patient_id } })
         : dischargeFn({ data: { partner_patient_id: input.partner_patient_id } }),
     onMutate: async (input) => {
+      // Captured before awaiting: a denial / sign-out during the await
+      // must not let this optimistic write land in the purged cache.
+      const epochs = captureEpochs();
       await qc.cancelQueries({ queryKey: ["patient-wardable-status"] });
+      if (!epochsCurrent(epochs)) return { previous: undefined, epochs };
       const previous = qc.getQueryData<WardableStatus[]>([
         "patient-wardable-status",
       ]);
@@ -551,15 +583,19 @@ function BedBoardPage() {
           return list;
         },
       );
-      return { previous };
+      return { previous, epochs };
     },
     onError: (err, _input, ctx) => {
+      // A late failure after a denial / account change must not restore
+      // the pre-denial snapshot or surface a message on the next screen.
+      if (!epochsCurrent(ctx?.epochs)) return;
       if (ctx?.previous) {
         qc.setQueryData(["patient-wardable-status"], ctx.previous);
       }
       toast.error(err instanceof Error ? err.message : "Could not record discharge time");
     },
-    onSuccess: (_r, input) => {
+    onSuccess: (_r, input, ctx) => {
+      if (!epochsCurrent(ctx?.epochs)) return;
       if (input.undo) toast.success("Recorded discharge time cleared");
       else
         toast.success("Discharge time recorded here", {
@@ -567,7 +603,8 @@ function BedBoardPage() {
             "Timing only. The bed stays occupied until the patient is discharged in ICU Handover Hub.",
         });
     },
-    onSettled: () => {
+    onSettled: (_d, _e, _v, ctx) => {
+      if (!epochsCurrent(ctx?.epochs)) return;
       // Invalidate (not refetch) so every observer of this key — other
       // panels and other tabs — also picks the change up.
       void qc.invalidateQueries({ queryKey: ["patient-wardable-status"] });
@@ -1257,11 +1294,13 @@ function BedBoardPage() {
                 disabled={retryMutation.isPending}
                 onClick={() =>
                   retryReview.review.confirm &&
+                  (pageGuard.begin("wardable-review"), // drop any older review reply still in flight
                   retryMutation.mutate({
                     review_token: retryReview.review.confirm.token,
                     id: retryReview.id,
                     t: pageGuard.begin("wardable-confirm"),
-                  })
+                    reviewT: retryReview.t,
+                  }))
                 }
               >
                 Send “{retryReview.review.local.wardable ? "Wardable" : "Not wardable"}” to Hub
