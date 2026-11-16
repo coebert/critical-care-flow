@@ -105,15 +105,6 @@ const timeFmt = new Intl.DateTimeFormat("en-GB", {
   minute: "2-digit",
   hourCycle: "h23",
 });
-const dateTimeFmt = new Intl.DateTimeFormat("en-GB", {
-  timeZone: UNIT_TIME_ZONE,
-  day: "2-digit",
-  month: "2-digit",
-  hour: "2-digit",
-  minute: "2-digit",
-  hourCycle: "h23",
-});
-
 /** HH:mm in unit time; prefixes dd/MM when not on the same London day as `now`. */
 export function formatUnitTime(isoTs: string | null | undefined, now: Date = new Date()): string {
   if (!isoTs) return "—";

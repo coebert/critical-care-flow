@@ -21,7 +21,10 @@ export function ageText(iso: string | null, now: Date): string | null {
   if (!iso) return null;
   const t = new Date(iso);
   if (!Number.isFinite(t.getTime())) return null;
-  return formatDistanceStrict(t, now, { addSuffix: true });
+  // `now` only ticks every few seconds; never let it read "in 0 seconds".
+  const ref = new Date(Math.max(now.getTime(), Date.now()));
+  if (ref.getTime() - t.getTime() < 60_000) return "under a minute ago";
+  return formatDistanceStrict(t, ref, { addSuffix: true });
 }
 
 /** Plain-language reason the latest refresh failed. */
