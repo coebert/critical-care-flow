@@ -173,7 +173,8 @@ export async function patchHubPatient(
 ): Promise<HubPatchOutcome> {
   if (!isUuid(id)) return { kind: "rejected", status: 400 };
   if (!expectedUpdatedAt) return { kind: "rejected", status: 400 };
-  for (const k of ["id", "expected_updated_at", "full_name"]) {
+  // Wardable state goes ONLY through the fenced POST /patients/wardable.
+  for (const k of ["id", "expected_updated_at", "full_name", "wardable", "wardable_at", "wardable_by", "desired_revision"]) {
     if (k in patch) return { kind: "rejected", status: 400 };
   }
   const r = await hubRequest(
@@ -199,4 +200,114 @@ export async function patchHubPatient(
 export function actorFor(userId: string, claims: Record<string, unknown> | undefined): HubActor {
   const email = claims && typeof claims.email === "string" ? claims.email : undefined;
   return { id: userId, email, role: "clinician" };
+}
+
+// ---------------------------------------------------------------------------
+// Fenced wardable update: POST /patients/wardable (agreed contract).
+//   body { id, expected_updated_at, wardable, desired_revision: "<bigint>" }
+//   200 { ok:true, status:'applied'|'already_applied', desired_revision,
+//         patient:{ id, wardable, wardable_at, updated_at } }
+//   409 { ok:false, code:'superseded'|'revision_conflict'|'intent_conflict'|'target_changed',
+//         desired_revision }
+// The Hub reserves the latest desired revision per patient and rejects
+// older ones, so a delayed older push can never overwrite a newer toggle.
+// There is deliberately NO fallback to the generic patient POST.
+// ---------------------------------------------------------------------------
+
+const REVISION_RE = /^[1-9]\d{0,18}$/;
+export const isDesiredRevision = (v: unknown): v is string => typeof v === "string" && REVISION_RE.test(v);
+
+export type HubWardableConflict = "superseded" | "revision_conflict" | "intent_conflict" | "target_changed";
+
+export type HubWardableOutcome =
+  | {
+      kind: "applied" | "already_applied";
+      desired_revision: string;
+      patient: { id: string; wardable: boolean; wardable_at: string | null; updated_at: string };
+    }
+  | { kind: "conflict"; code: HubWardableConflict; desired_revision: string }
+  | { kind: "forbidden" }
+  | { kind: "endpoint_unavailable" }
+  | { kind: "unavailable"; message: string }
+  | { kind: "invalid"; message: string }
+  | { kind: "not_configured"; message: string };
+
+const CONFLICT_CODES: readonly HubWardableConflict[] = ["superseded", "revision_conflict", "intent_conflict", "target_changed"];
+
+export async function postHubWardable(
+  req: { id: string; expected_updated_at: string; wardable: boolean; desired_revision: string },
+  actor: HubActor,
+  deps: HubDeps = {},
+): Promise<HubWardableOutcome> {
+  if (!isUuid(req.id)) return { kind: "invalid", message: "patient id must be a UUID" };
+  if (!isDesiredRevision(req.desired_revision)) return { kind: "invalid", message: "desired revision must be a positive integer string" };
+  if (typeof req.wardable !== "boolean") return { kind: "invalid", message: "wardable must be boolean" };
+  if (!req.expected_updated_at || !Number.isFinite(Date.parse(req.expected_updated_at))) {
+    return { kind: "invalid", message: "expected_updated_at is required" };
+  }
+  const r = await hubRequest(
+    {
+      method: "POST",
+      path: "/patients/wardable",
+      body: {
+        id: req.id,
+        expected_updated_at: req.expected_updated_at,
+        wardable: req.wardable,
+        desired_revision: req.desired_revision,
+      },
+      actor,
+    },
+    deps,
+  );
+  if (r.kind === "not_configured") return r;
+  if (r.kind === "timeout" || r.kind === "network") return { kind: "unavailable", message: r.message };
+  if (r.kind === "invalid_json") return { kind: "invalid", message: "ICU Handover Hub returned an unreadable response" };
+  if (r.kind === "http_error") {
+    if (r.status === 409) {
+      const b = r.json as { ok?: unknown; code?: unknown; desired_revision?: unknown } | null;
+      if (
+        b &&
+        b.ok === false &&
+        CONFLICT_CODES.includes(b.code as HubWardableConflict) &&
+        b.desired_revision === req.desired_revision
+      ) {
+        return { kind: "conflict", code: b.code as HubWardableConflict, desired_revision: req.desired_revision };
+      }
+      return { kind: "invalid", message: "ICU Handover Hub returned an unrecognised conflict" };
+    }
+    // Missing endpoint (Hub not yet upgraded): fail closed, never fall back.
+    if (r.status === 404 || r.status === 405 || r.status === 501) return { kind: "endpoint_unavailable" };
+    if (r.status === 401 || r.status === 403) return { kind: "forbidden" };
+    return { kind: "unavailable", message: `ICU Handover Hub returned HTTP ${r.status}` };
+  }
+  const b = r.json as {
+    ok?: unknown;
+    status?: unknown;
+    desired_revision?: unknown;
+    patient?: { id?: unknown; wardable?: unknown; wardable_at?: unknown; updated_at?: unknown } | null;
+  } | null;
+  const p = b?.patient;
+  if (
+    !b ||
+    b.ok !== true ||
+    (b.status !== "applied" && b.status !== "already_applied") ||
+    b.desired_revision !== req.desired_revision ||
+    !p ||
+    p.id !== req.id ||
+    typeof p.wardable !== "boolean" ||
+    !(p.wardable_at === null || (typeof p.wardable_at === "string" && Number.isFinite(Date.parse(p.wardable_at)))) ||
+    typeof p.updated_at !== "string" ||
+    !Number.isFinite(Date.parse(p.updated_at))
+  ) {
+    return { kind: "invalid", message: "ICU Handover Hub returned an unexpected wardable response" };
+  }
+  if (p.wardable !== req.wardable) {
+    // A success that doesn't match what we asked for is not a success.
+    return { kind: "invalid", message: "ICU Handover Hub reported a different wardable state" };
+  }
+  return {
+    kind: b.status,
+    desired_revision: req.desired_revision,
+    patient: { id: p.id, wardable: p.wardable, wardable_at: (p.wardable_at as string | null) ?? null, updated_at: p.updated_at },
+  };
 }

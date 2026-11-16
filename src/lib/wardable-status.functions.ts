@@ -18,17 +18,44 @@ export type WardableStatus = {
   partner_synced_revision: number | null;
 };
 
+export type PartnerSyncReason =
+  | "superseded"
+  | "revision_conflict"
+  | "intent_conflict"
+  | "target_changed"
+  | "endpoint_unavailable"
+  | "forbidden"
+  | "unavailable"
+  | "invalid"
+  | "newer_local_change"
+  | "read_failed"
+  | "no_state"
+  | "not_configured"
+  | "not_shared"
+  | "changed_since_review"
+  | null;
+
+/** Mirrors PartnerSyncOutcome in wardable-status.server.ts. */
 export type PartnerSyncOutcome = {
-  status: PartnerSyncStatus;
-  revision: number | null;
+  status: PartnerSyncStatus | "pending";
+  reason: PartnerSyncReason;
+  revision: string | null;
+  recorded: boolean;
   message: string;
 };
 
 export type SetWardableResult = {
-  /** The local save always succeeded if this is returned. */
+  /** The local save succeeded if this is returned. */
   local: WardableStatus;
   /** Separate outcome of updating ICU Handover Hub. */
   partner: PartnerSyncOutcome;
+};
+
+export type WardableRetryReview = {
+  local: { wardable: boolean; desired_revision: string; partner_sync_status: string | null } | null;
+  hub:
+    | { state: "ok"; wardable: boolean | null }
+    | { state: "not_shared" | "unavailable" | "not_configured" | "invalid" };
 };
 
 const COLS =
@@ -42,12 +69,13 @@ async function requireClinical(context: { supabase: any; userId: string }) {
   if (data !== true) throw new Error("forbidden: clinical role required");
 }
 
-async function pushLatest(context: { supabase: any; userId: string; claims: unknown }, id: string) {
-  const [{ syncWardableToHub }, { actorFor }] = await Promise.all([
-    import("./wardable-status.server"),
+async function serverDeps(context: { userId: string; claims: unknown }) {
+  const [{ actorFor }, { supabaseAdmin }, core] = await Promise.all([
     import("./hub-client.server"),
+    import("@/integrations/supabase/client.server"),
+    import("./wardable-status.server"),
   ]);
-  return syncWardableToHub(context.supabase, id, actorFor(context.userId, context.claims as Record<string, unknown>));
+  return { actor: actorFor(context.userId, context.claims as Record<string, unknown>), admin: supabaseAdmin as never, core };
 }
 
 export const listWardableStatus = createServerFn({ method: "GET" })
@@ -64,68 +92,44 @@ const setSchema = z.object({
 });
 
 /**
- * Toggle wardable. Saves locally first (the wardable→discharge timer is
- * owned here), then pushes the LATEST local state to the Hub with a fresh
- * revision. Both outcomes are returned so the UI can say exactly what
- * happened.
+ * Toggle wardable. The database allocates the next durable revision and
+ * records the actor (auth.uid()); then the LATEST desired state is pushed
+ * through the Hub's fenced endpoint. Both outcomes are returned.
  */
 export const setWardableStatus = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((d: unknown) => setSchema.parse(d))
   .handler(async ({ data, context }): Promise<SetWardableResult> => {
     await requireClinical(context);
-    const { data: existing, error: readErr } = await context.supabase
-      .from("patient_wardable_status")
-      .select("wardable, wardable_at, desired_revision")
-      .eq("partner_patient_id", data.partner_patient_id)
-      .maybeSingle();
-    if (readErr) throw safeError("wardable", readErr, "Could not read wardable status");
-
-    const nowIso = new Date().toISOString();
-    const wardable_at = data.wardable
-      ? existing?.wardable && existing.wardable_at
-        ? existing.wardable_at
-        : nowIso
-      : null;
-
-    const { data: row, error } = await context.supabase
-      .from("patient_wardable_status")
-      .upsert(
-        {
-          partner_patient_id: data.partner_patient_id,
-          wardable: data.wardable,
-          wardable_at,
-          discharged_at: null,
-          updated_by: context.userId,
-          updated_at: nowIso,
-          desired_revision: Number(existing?.desired_revision ?? 0) + 1,
-          partner_sync_status: "pending",
-        },
-        { onConflict: "partner_patient_id" },
-      )
-      .select(COLS)
-      .single();
-    if (error) throw safeError("wardable", error, "Could not update wardable status");
-
-    let partner: PartnerSyncOutcome;
-    try {
-      partner = await pushLatest(context, data.partner_patient_id);
-    } catch {
-      partner = { status: "failed", revision: null, message: "Saved here, but ICU Handover Hub could not be updated" };
-    }
-    return { local: row as unknown as WardableStatus, partner };
+    const { actor, admin, core } = await serverDeps(context);
+    const r = await core.runSetWardable(context.supabase as never, admin, data, actor);
+    if (!r.ok) throw new Error(r.error);
+    return { local: r.local as unknown as WardableStatus, partner: r.partner };
   });
 
-/** Re-send the CURRENT saved wardable state (never an older value). */
-export const retryWardableSync = createServerFn({ method: "POST" })
+/** Show what a retry would send next to what the Hub currently shows. */
+export const reviewWardableRetry = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((d: unknown) => z.object({ partner_patient_id: idSchema }).parse(d))
+  .handler(async ({ data, context }): Promise<WardableRetryReview> => {
+    await requireClinical(context);
+    const { actor, admin, core } = await serverDeps(context);
+    return core.reviewWardableRetry(admin, data.partner_patient_id, actor);
+  });
+
+/** Re-send ONLY the reviewed, still-current desired revision. */
+export const retryWardableSync = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d: unknown) =>
+    z.object({ partner_patient_id: idSchema, reviewed_revision: z.string().regex(/^[1-9]\d{0,18}$/) }).parse(d),
+  )
   .handler(async ({ data, context }): Promise<PartnerSyncOutcome> => {
     await requireClinical(context);
+    const { actor, admin, core } = await serverDeps(context);
     try {
-      return await pushLatest(context, data.partner_patient_id);
+      return await core.retryReviewedWardable(admin, data.partner_patient_id, data.reviewed_revision, actor);
     } catch {
-      return { status: "failed", revision: null, message: "ICU Handover Hub could not be updated" };
+      return { status: "failed", reason: "unavailable", revision: null, recorded: false, message: "ICU Handover Hub could not be updated" };
     }
   });
 

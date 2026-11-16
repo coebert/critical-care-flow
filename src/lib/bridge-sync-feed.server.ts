@@ -166,6 +166,9 @@ function mapReferral(row: Record<string, unknown>, readColumns: readonly string[
   }
   const out: Record<string, unknown> = {};
   for (const k of readColumns) if (k !== "deleted_at") out[k] = row[k];
+  // Live records carry an explicit `deleted_at: null` (the Hub consumer
+  // requires the key to tell live records from tombstones).
+  out.deleted_at = null;
   return { ok: true, record: out };
 }
 

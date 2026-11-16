@@ -22,11 +22,53 @@ export function fakeHub(patients: Array<Record<string, unknown> & { id: string }
     /** Called just before a POST is applied (simulate a concurrent edit). */
     beforePost: null as null | (() => void),
     hang: false,
+    /** Hub not yet upgraded: POST /patients/wardable → 404. */
+    noWardableEndpoint: false,
+    /** Called when a wardable POST arrives, before the fence is evaluated. */
+    beforeWardable: null as null | ((body: Record<string, unknown>) => void | Promise<void>),
+    /** Hold wardable POST responses until released (out-of-order tests). */
+    holdWardableResponse: null as null | Promise<void>,
   };
+  /** Hub-side fence per patient: latest reserved revision + intent + applied. */
+  const fence = new Map<string, { reserved: bigint; wardable: boolean; applied: boolean }>();
+  const audit: Array<{ id: string; revision: string; result: string }> = [];
   const bump = (id: string, patch: Record<string, unknown>) => {
     rev += 1;
     const cur = store.get(id)!;
     store.set(id, { ...cur, ...patch, id, updated_at: new Date(Date.parse("2026-11-16T10:00:00.000Z") + rev * 1000).toISOString() });
+  };
+  /** Agreed contract semantics for POST /patients/wardable. */
+  const wardable = (b: Record<string, unknown>): { status: number; body: Record<string, unknown> } => {
+    const id = String(b.id ?? "");
+    const revRaw = String(b.desired_revision ?? "");
+    if (!/^[1-9]\d*$/.test(revRaw) || typeof b.wardable !== "boolean" || typeof b.expected_updated_at !== "string") {
+      return { status: 400, body: { ok: false, error: "invalid_request" } };
+    }
+    const rev = BigInt(revRaw);
+    const want = b.wardable;
+    const conflict = (code: string) => ({ status: 409, body: { ok: false, code, desired_revision: revRaw } });
+    if (!shared.has(id) || !store.has(id)) return conflict("target_changed");
+    const cur = store.get(id)!;
+    const f = fence.get(id);
+    const apply = (status: "applied" | "already_applied") => {
+      if (status === "applied") {
+        bump(id, { wardable: want, wardable_at: want ? "2026-11-16T12:00:00.000Z" : null });
+      }
+      fence.set(id, { reserved: rev, wardable: want, applied: true });
+      const p = store.get(id)!;
+      return { status: 200, body: { ok: true, status, desired_revision: revRaw, patient: { id, wardable: p.wardable, wardable_at: p.wardable_at ?? null, updated_at: p.updated_at } } };
+    };
+    if (f && rev < f.reserved) return conflict("superseded");
+    if (f && rev === f.reserved) {
+      if (f.wardable !== want) return conflict("intent_conflict");
+      if (f.applied) return cur.wardable === want ? apply("already_applied") : conflict("target_changed");
+      if (b.expected_updated_at !== cur.updated_at) return conflict("revision_conflict");
+      return apply("applied");
+    }
+    // Newer revision: reserve it even if the CAS then fails.
+    fence.set(id, { reserved: rev, wardable: want, applied: false });
+    if (b.expected_updated_at !== cur.updated_at) return conflict("revision_conflict");
+    return apply("applied");
   };
   const json = (status: number, body: unknown) =>
     new Response(JSON.stringify(body), { status, headers: { "content-type": "application/json" } });
@@ -42,6 +84,18 @@ export function fakeHub(patients: Array<Record<string, unknown> & { id: string }
       });
     }
     if (control.down) return json(503, { error: "down" });
+    if (url.pathname.endsWith("/patients/wardable") && (init?.method ?? "GET") === "POST") {
+      if (control.noWardableEndpoint) return json(404, { error: "not found" });
+      if (control.beforeWardable) {
+        const h = control.beforeWardable;
+        control.beforeWardable = null;
+        await h(body ?? {});
+      }
+      const resp = wardable(body ?? {});
+      audit.push({ id: String(body?.id), revision: String(body?.desired_revision), result: String((resp.body as any).status ?? (resp.body as any).code) });
+      if (control.holdWardableResponse) await control.holdWardableResponse;
+      return json(resp.status, resp.body);
+    }
     if (!url.pathname.endsWith("/patients")) return json(404, { error: "not found" });
     if ((init?.method ?? "GET") === "GET") {
       const id = url.searchParams.get("id");
@@ -66,6 +120,8 @@ export function fakeHub(patients: Array<Record<string, unknown> & { id: string }
     calls,
     control,
     store,
+    fence,
+    audit,
     unshare: (id: string) => shared.delete(id),
     /** Simulate someone else editing the Hub patient. */
     externalEdit: (id: string, patch: Record<string, unknown>) => bump(id, patch),

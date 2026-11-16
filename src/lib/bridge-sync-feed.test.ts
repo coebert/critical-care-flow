@@ -166,9 +166,48 @@ describe("referrals", () => {
     });
     const r = await page("referrals", cfg, f.db, "");
     const recs = (r.body as any).records;
-    expect(recs[0]).toEqual({ id: uuid(1), age: 70, status: "pending", current_ward: "W1", created_at: ts(0), updated_at: ts(1) });
+    expect(recs[0]).toEqual({ id: uuid(1), age: 70, status: "pending", current_ward: "W1", created_at: ts(0), updated_at: ts(1), deleted_at: null });
     expect(recs[1]).toEqual({ id: uuid(2), updated_at: ts(2), deleted_at: ts(2) });
     expect(JSON.stringify(recs)).not.toMatch(/ct2|CD|_enc/);
+  });
+
+  it("serializes live records with an explicit deleted_at:null and minimal tombstones, exactly, across signed pages", async () => {
+    const rows = Array.from({ length: 5 }, (_, i) => ({
+      id: uuid(i + 1),
+      age: 40 + i,
+      status: "pending",
+      current_ward: `W${i}`,
+      created_at: ts(0),
+      updated_at: ts(1), // identical timestamps: id breaks ties
+      deleted_at: i % 2 === 1 ? ts(1) : null,
+      hospital_number_enc: `ct${i}`,
+      patient_initials: "ZZ",
+    }));
+    const f = fakePostgrest({ referrals: rows });
+    const p1 = await page("referrals", cfg, f.db, "&limit=2");
+    const b1 = p1.body as any;
+    expect(Object.keys(b1).sort()).toEqual(["pagination", "records", "schema_version", "snapshot_at"]);
+    expect(b1.schema_version).toBe(1);
+    expect(b1.snapshot_at).toBe(NOW.toISOString());
+    expect(b1.pagination.complete).toBe(false);
+    expect(typeof b1.pagination.next_cursor).toBe("string");
+    expect(JSON.stringify(b1.records)).toBe(
+      JSON.stringify([
+        { id: uuid(1), age: 40, status: "pending", current_ward: "W0", created_at: ts(0), updated_at: ts(1), deleted_at: null },
+        { id: uuid(2), updated_at: ts(1), deleted_at: ts(1) },
+      ]),
+    );
+    // Tampered cursor is refused; the genuine one continues the same snapshot.
+    const bad = await page("referrals", cfg, f.db, `&limit=2&cursor=${encodeURIComponent(b1.pagination.next_cursor + "x")}`);
+    expect(bad).toMatchObject({ status: 400, body: { error: "invalid_cursor" } });
+    const { all, sizes, snapshot } = await drain("referrals", cfg, f.db, "&limit=2");
+    expect(snapshot).toBe(NOW.toISOString());
+    expect(sizes).toEqual([2, 2, 1]);
+    expect(all.map((r) => r.id)).toEqual(rows.map((r) => r.id));
+    for (const r of all) {
+      if (r.deleted_at === null) expect(Object.keys(r).sort()).toEqual(["age", "created_at", "current_ward", "deleted_at", "id", "status", "updated_at"]);
+      else expect(Object.keys(r).sort()).toEqual(["deleted_at", "id", "updated_at"]);
+    }
   });
 });
 
