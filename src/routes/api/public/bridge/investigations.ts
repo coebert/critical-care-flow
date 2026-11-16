@@ -1,10 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { jsonResponse, preflight } from "@/lib/bridge-cors";
-import {
-  parseBridgeBody,
-  pickAllowed,
-  verifyBridgeRequest,
-} from "@/lib/bridge-verify.server";
+import { refuseRetiredInboundWrite } from "@/lib/bridge-inbound-retired.server";
+import { verifyBridgeRequest } from "@/lib/bridge-verify.server";
 import { handleSyncGet, RESOURCE_CONFIG } from "@/lib/bridge-sync-feed.server";
 
 const INVESTIGATION_COLUMNS = [
@@ -55,84 +52,8 @@ export const Route = createFileRoute("/api/public/bridge/investigations")({
         return jsonResponse({ records: data ?? [] });
       },
 
-      POST: async ({ request }) => {
-        const verified = await verifyBridgeRequest(request, {
-          requireWrite: true,
-        });
-        if (verified instanceof Response) return verified;
-
-        const parsed = parseBridgeBody(verified.rawBody);
-        if ("error" in parsed) {
-          return jsonResponse({ error: parsed.error }, { status: 400 });
-        }
-
-        const picked = pickAllowed(parsed.record, INVESTIGATION_COLUMNS);
-        if ("error" in picked) return jsonResponse(picked, { status: 400 });
-        const record = picked.data;
-
-        for (const required of [
-          "patient_id",
-          "category",
-          "findings",
-          "result_at",
-        ]) {
-          if (!record[required]) {
-            return jsonResponse(
-              { error: `${required}_required` },
-              { status: 400 },
-            );
-          }
-        }
-
-        const { supabaseAdmin } = await import(
-          "@/integrations/supabase/client.server"
-        );
-
-        if (record.id && parsed.expectedUpdatedAt) {
-          const { data: existing } = await supabaseAdmin
-            .from("investigations")
-            .select("id, updated_at")
-            .eq("id", record.id as string)
-            .maybeSingle();
-          if (
-            existing &&
-            existing.updated_at !== parsed.expectedUpdatedAt
-          ) {
-            const { data: full } = await supabaseAdmin
-              .from("investigations")
-              .select("*")
-              .eq("id", record.id as string)
-              .maybeSingle();
-            return jsonResponse(
-              { error: "concurrent_modification", current: full },
-              { status: 409 },
-            );
-          }
-        }
-
-        const { data, error } = await supabaseAdmin
-          .from("investigations")
-          .upsert(record as any, { onConflict: "id" })
-          .select("*")
-          .single();
-        if (error) {
-          return jsonResponse({ error: error.message }, { status: 500 });
-        }
-
-        await supabaseAdmin.from("audit_log").insert({
-          user_id: null,
-          action: "update",
-          entity: "investigation",
-          entity_id: data.id,
-          diff: {
-            source: "handover_bridge",
-            actor: verified.actor,
-            record: record as any,
-          },
-        });
-
-        return jsonResponse({ record: data });
-      },
+      // Inbound mirror writes are retired (see bridge-inbound-retired.server.ts).
+      POST: async ({ request }) => refuseRetiredInboundWrite(request, "investigations"),
     },
   },
 });

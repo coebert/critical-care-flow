@@ -1,10 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { jsonResponse, preflight } from "@/lib/bridge-cors";
-import {
-  parseBridgeBody,
-  pickAllowed,
-  verifyBridgeRequest,
-} from "@/lib/bridge-verify.server";
+import { refuseRetiredInboundWrite } from "@/lib/bridge-inbound-retired.server";
+import { verifyBridgeRequest } from "@/lib/bridge-verify.server";
 import { handleSyncGet, referralResourceConfig } from "@/lib/bridge-sync-feed.server";
 
 // Encrypted columns (_enc, _hash) are intentionally excluded — those payloads
@@ -90,76 +87,8 @@ export const Route = createFileRoute("/api/public/bridge/referrals")({
         return jsonResponse({ records: data ?? [] });
       },
 
-      POST: async ({ request }) => {
-        const verified = await verifyBridgeRequest(request, {
-          requireWrite: true,
-        });
-        if (verified instanceof Response) return verified;
-
-        const parsed = parseBridgeBody(verified.rawBody);
-        if ("error" in parsed) {
-          return jsonResponse({ error: parsed.error }, { status: 400 });
-        }
-        const picked = pickAllowed(parsed.record, REFERRAL_COLUMNS);
-        if ("error" in picked) return jsonResponse(picked, { status: 400 });
-        const record = picked.data;
-
-        if (!record.referral_received_at) {
-          return jsonResponse(
-            { error: "referral_received_at_required" },
-            { status: 400 },
-          );
-        }
-
-        const { supabaseAdmin } = await import(
-          "@/integrations/supabase/client.server"
-        );
-
-        if (record.id && parsed.expectedUpdatedAt) {
-          const { data: existing } = await supabaseAdmin
-            .from("referrals")
-            .select("id, updated_at")
-            .eq("id", record.id as string)
-            .maybeSingle();
-          if (
-            existing &&
-            existing.updated_at !== parsed.expectedUpdatedAt
-          ) {
-            const { data: full } = await supabaseAdmin
-              .from("referrals")
-              .select(REFERRAL_COLUMNS.join(","))
-              .eq("id", record.id as string)
-              .maybeSingle();
-            return jsonResponse(
-              { error: "concurrent_modification", current: full },
-              { status: 409 },
-            );
-          }
-        }
-
-        const { data, error } = await supabaseAdmin
-          .from("referrals")
-          .upsert(record as any, { onConflict: "id" })
-          .select(REFERRAL_COLUMNS.join(","))
-          .single();
-        if (error) {
-          return jsonResponse({ error: error.message }, { status: 500 });
-        }
-
-        await supabaseAdmin.from("audit_log").insert({
-          user_id: null,
-          action: "update",
-          entity: "referral",
-          entity_id: (data as any)?.id,
-          diff: {
-            source: "handover_bridge",
-            actor: verified.actor,
-            record: record as any,
-          } as any,
-        });
-
-        return jsonResponse({ record: data });
-      },
+      // Inbound mirror writes are retired (see bridge-inbound-retired.server.ts).
+      POST: async ({ request }) => refuseRetiredInboundWrite(request, "referrals"),
     },
   },
 });

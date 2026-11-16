@@ -1,10 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { jsonResponse, preflight } from "@/lib/bridge-cors";
-import {
-  parseBridgeBody,
-  pickAllowed,
-  verifyBridgeRequest,
-} from "@/lib/bridge-verify.server";
+import { refuseRetiredInboundWrite } from "@/lib/bridge-inbound-retired.server";
+import { verifyBridgeRequest } from "@/lib/bridge-verify.server";
 
 const BED_COLUMNS = [
   "id",
@@ -47,55 +44,8 @@ export const Route = createFileRoute("/api/public/bridge/beds")({
         return jsonResponse({ records: data ?? [] });
       },
 
-      POST: async ({ request }) => {
-        const verified = await verifyBridgeRequest(request, {
-          requireWrite: true,
-        });
-        if (verified instanceof Response) return verified;
-
-        const parsed = parseBridgeBody(verified.rawBody);
-        if ("error" in parsed) {
-          return jsonResponse({ error: parsed.error }, { status: 400 });
-        }
-
-        const picked = pickAllowed(parsed.record, BED_COLUMNS);
-        if ("error" in picked) return jsonResponse(picked, { status: 400 });
-        const record = picked.data;
-
-        for (const required of ["code", "unit"]) {
-          if (!record[required]) {
-            return jsonResponse(
-              { error: `${required}_required` },
-              { status: 400 },
-            );
-          }
-        }
-
-        const { supabaseAdmin } = await import(
-          "@/integrations/supabase/client.server"
-        );
-
-        const { data, error } = await supabaseAdmin
-          .from("beds")
-          .upsert(record as any, { onConflict: "id" })
-          .select("*")
-          .single();
-        if (error) return jsonResponse({ error: error.message }, { status: 500 });
-
-        await supabaseAdmin.from("audit_log").insert({
-          user_id: null,
-          action: "update",
-          entity: "bed",
-          entity_id: data.id,
-          diff: {
-            source: "handover_bridge",
-            actor: verified.actor,
-            record: record as any,
-          },
-        });
-
-        return jsonResponse({ record: data });
-      },
+      // Inbound mirror writes are retired (see bridge-inbound-retired.server.ts).
+      POST: async ({ request }) => refuseRetiredInboundWrite(request, "beds"),
     },
   },
 });

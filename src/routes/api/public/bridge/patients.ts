@@ -1,10 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { jsonResponse, preflight } from "@/lib/bridge-cors";
-import {
-  parseBridgeBody,
-  pickAllowed,
-  verifyBridgeRequest,
-} from "@/lib/bridge-verify.server";
+import { refuseRetiredInboundWrite } from "@/lib/bridge-inbound-retired.server";
+import { verifyBridgeRequest } from "@/lib/bridge-verify.server";
 import { handleSyncGet, RESOURCE_CONFIG } from "@/lib/bridge-sync-feed.server";
 
 const PATIENT_COLUMNS = [
@@ -83,95 +80,8 @@ export const Route = createFileRoute("/api/public/bridge/patients")({
         return jsonResponse({ records: data ?? [] });
       },
 
-      POST: async ({ request }) => {
-        const verified = await verifyBridgeRequest(request, {
-          requireWrite: true,
-        });
-        if (verified instanceof Response) return verified;
-
-        const parsed = parseBridgeBody(verified.rawBody);
-        if ("error" in parsed) {
-          return jsonResponse({ error: parsed.error }, { status: 400 });
-        }
-
-        const picked = pickAllowed(parsed.record, PATIENT_COLUMNS);
-        if ("error" in picked) {
-          return jsonResponse(picked, { status: 400 });
-        }
-        const record = picked.data as Record<string, unknown>;
-        // Map wire field `patient_initials` onto the local `full_name`
-        // column. If both are present, prefer the new wire field.
-        if (record.patient_initials != null && record.patient_initials !== "") {
-          record.full_name = record.patient_initials;
-        }
-        delete record.patient_initials;
-        if (!record.full_name) {
-          return jsonResponse(
-            { error: "patient_initials_required" },
-            { status: 400 },
-          );
-        }
-
-        const { supabaseAdmin } = await import(
-          "@/integrations/supabase/client.server"
-        );
-
-        // Optimistic concurrency: if id present + expected_updated_at given,
-        // confirm current row's updated_at matches before writing.
-        if (record.id && parsed.expectedUpdatedAt) {
-          const { data: existing, error: readErr } = await supabaseAdmin
-            .from("patients")
-            .select("id, updated_at")
-            .eq("id", record.id as string)
-            .maybeSingle();
-          if (readErr) {
-            return jsonResponse(
-              { error: readErr.message },
-              { status: 500 },
-            );
-          }
-          if (
-            existing &&
-            existing.updated_at !== parsed.expectedUpdatedAt
-          ) {
-            const { data: full } = await supabaseAdmin
-              .from("patients")
-              .select("*")
-              .eq("id", record.id as string)
-              .maybeSingle();
-            return jsonResponse(
-              {
-                error: "concurrent_modification",
-                current: full,
-              },
-              { status: 409 },
-            );
-          }
-        }
-
-        const { data, error } = await supabaseAdmin
-          .from("patients")
-          .upsert(record as any, { onConflict: "id" })
-          .select("*")
-          .single();
-        if (error) {
-          return jsonResponse({ error: error.message }, { status: 500 });
-        }
-
-        await supabaseAdmin.from("audit_log").insert({
-          user_id: null,
-          action: "update",
-          entity: "patient",
-          entity_id: data.id,
-          diff: {
-            source: "handover_bridge",
-            actor: verified.actor,
-            record: record as any,
-          },
-        });
-
-        return jsonResponse({ record: data });
-      },
+      // Inbound mirror writes are retired (see bridge-inbound-retired.server.ts).
+      POST: async ({ request }) => refuseRetiredInboundWrite(request, "patients"),
     },
   },
 });
