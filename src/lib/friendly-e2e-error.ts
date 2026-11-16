@@ -24,6 +24,8 @@ export type E2EErrorContext =
   | "post-note"
   /** Editing an existing encrypted note. */
   | "edit-note"
+  /** Deleting a note. */
+  | "delete-note"
   /** Decrypting a note we received. */
   | "decrypt-note";
 
@@ -205,6 +207,7 @@ export function friendlyE2EError(err: unknown, context: E2EErrorContext): Friend
     "auto-bootstrap": "Encryption setup didn't finish",
     "post-note": "Couldn't post encrypted note",
     "edit-note": "Couldn't update encrypted note",
+    "delete-note": "Couldn't delete note",
     "decrypt-note": "Couldn't read encrypted note",
   };
   return {

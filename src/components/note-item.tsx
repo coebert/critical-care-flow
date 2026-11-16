@@ -98,7 +98,7 @@ export function NoteItem({
     setBusy(true);
     try { await onDelete(); }
     catch (e: any) {
-      const f = friendlyE2EError(e, "edit-note");
+      const f = friendlyE2EError(e, "delete-note");
       toast.error(f.title, { description: f.description, duration: 8000 });
       setBusy(false);
     }
