@@ -49,3 +49,13 @@ describe("bed board URL carries no patient identifiers", () => {
     expect(block).not.toMatch(/hospital_number|patient_initials|admitting_consultant|hospitalNumber|accepting_consultant/);
   });
 });
+
+describe("validated search overrides raw URL values", () => {
+  it("returns every legacy/unvalidated key explicitly so router merging cannot leak raw values", () => {
+    const out = parseBedBoardSearch({ hospital_number: "SYN1", source_label: "referral SYN1" });
+    const raw = { hospital_number: "SYN1", source_label: "referral SYN1" };
+    const merged = { ...raw, ...out };
+    expect(merged.hospital_number).toBeUndefined();
+    expect(merged.source_label).toBeUndefined();
+  });
+});

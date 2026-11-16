@@ -265,21 +265,21 @@ function BoardPage() {
       style={{ zoom }}
     >
       {/* Top bar */}
-      <div className={`flex items-center justify-between px-4 py-2 border-b ${p.border}`}>
-        <div className="flex items-center gap-6">
+      <div className={`flex flex-wrap items-center justify-between gap-x-6 gap-y-2 px-4 py-2 border-b ${p.border}`}>
+        <div className="flex flex-wrap items-center gap-x-6 gap-y-2 min-w-0">
           <div>
             <div className={`text-sm uppercase tracking-widest ${p.eyebrow}`}>SDH Critical Care</div>
-            <div className="text-4xl font-semibold">Live Board</div>
+            <div className="text-2xl sm:text-4xl font-semibold whitespace-nowrap">Live Board</div>
           </div>
           {partner && physical && (
-            <div className="flex items-center gap-4 text-2xl flex-wrap">
+            <div className="flex items-center gap-x-4 gap-y-1 text-lg sm:text-2xl flex-wrap">
               <CapCell label="ICU" a={physical.occupied} b={physical.total} p={p} />
               <div className={p.muted}>
                 <span className={`${p.eyebrow} text-base mr-1`}>Free{notCurrent ? " (not current)" : ""}</span>{physical.vacant}
               </div>
               {physical.withheld > 0 && (
                 <div className={p.muted}>
-                  <span className={`${p.eyebrow} text-base mr-1`}>Occupied · details withheld</span>{physical.withheld}
+                  <span className={`${p.eyebrow} text-base mr-1`} title="Occupied beds whose patient details the Hub withheld">Occupied (withheld)</span>{physical.withheld}
                 </div>
               )}
               <div className={p.muted}>
@@ -291,8 +291,8 @@ function BoardPage() {
             </div>
           )}
         </div>
-        <div className="flex items-center gap-6">
-          <div className="text-6xl font-mono tabular-nums">{now.toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" })}</div>
+        <div className="flex flex-wrap items-center gap-x-6 gap-y-2">
+          <div className="text-4xl sm:text-6xl font-mono tabular-nums">{now.toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" })}</div>
           <div className={`inline-flex items-center rounded-md border overflow-hidden ${p.toggle}`}>
             <button
               onClick={() => setZoom(zoom - ZOOM_STEP)}

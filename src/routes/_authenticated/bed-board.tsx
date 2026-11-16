@@ -1124,8 +1124,19 @@ function BedBoardPage() {
     if (typeof window === "undefined") return;
     const params = new URLSearchParams(window.location.search);
     if (hasLegacyIdentifierParams(params)) {
-      navigate({ search: (prev) => ({ ...prev }), replace: true });
+      navigate({
+        search: {
+          focus_shift: search.focus_shift,
+          focus_level: search.focus_level,
+          source_referral_id: search.source_referral_id,
+          source_postop_booking_id: search.source_postop_booking_id,
+          source_label: search.source_label,
+        },
+        replace: true,
+      });
     }
+    // Run once on arrival; `search` is already the validated value.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [navigate]);
 
   // Keep the last good board on screen through a failed refresh, but label
