@@ -11,7 +11,7 @@ const slot = (bed: string, occupied: boolean, occupant: unknown = null) => ({
 });
 
 function rejected(payload: unknown): string {
-  const r = mapPartnerPayload(payload, AT);
+  const r = mapPartnerPayload({ unit_code: "SDH-RADNOR", ...(payload as object) }, AT);
   expect(r.ok).toBe(false);
   if (r.ok) throw new Error("expected failure");
   expect(r.indeterminate).toBe(true);
@@ -20,7 +20,7 @@ function rejected(payload: unknown): string {
 
 describe("partner bed board contract validation", () => {
   it("accepts an older valid payload without stats/unassigned", () => {
-    const r = mapPartnerPayload({ unit: "U", bed_board: [slot("1", false), slot("2", true, occ("a", "2"))] }, AT);
+    const r = mapPartnerPayload({ unit_code: "SDH-RADNOR", unit: "U", bed_board: [slot("1", false), slot("2", true, occ("a", "2"))] }, AT);
     expect(r.ok).toBe(true);
     if (r.ok) expect(r.stats).toEqual({ total_beds: 2, occupied: 1, available: 1, unassigned: 0 });
   });

@@ -5,6 +5,7 @@ import {
   pickAllowed,
   verifyBridgeRequest,
 } from "@/lib/bridge-verify.server";
+import { handleSyncGet, referralResourceConfig } from "@/lib/bridge-sync-feed.server";
 
 // Encrypted columns (_enc, _hash) are intentionally excluded — those payloads
 // require this app's local encryption keys and cannot flow through the bridge.
@@ -56,6 +57,11 @@ export const Route = createFileRoute("/api/public/bridge/referrals")({
         if (verified instanceof Response) return verified;
 
         const url = new URL(request.url);
+        // Versioned, paginated snapshot feed (Hub sync). Default GET below
+        // is unchanged for older readers.
+        if (url.searchParams.get("sync") === "1") {
+          return handleSyncGet("referrals", referralResourceConfig(REFERRAL_COLUMNS), request, jsonResponse);
+        }
         const status = url.searchParams.get("status");
         const since = url.searchParams.get("since");
         const limit = Math.min(
@@ -68,7 +74,9 @@ export const Route = createFileRoute("/api/public/bridge/referrals")({
         );
         let q = supabaseAdmin
           .from("referrals")
-          .select(REFERRAL_COLUMNS.join(","))
+          // created_at/updated_at are read-only extras (never writable via
+          // POST) so readers can detect updates.
+          .select([...REFERRAL_COLUMNS, "created_at", "updated_at"].join(","))
           .is("deleted_at", null)
           .order("updated_at", { ascending: true })
           .limit(limit);

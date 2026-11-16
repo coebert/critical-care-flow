@@ -13,7 +13,7 @@ const AT = "2026-07-10T09:00:00.000Z";
 const occ = (id: string, bed: string | null) => ({ id, full_name: null, hospital_number: null, bed });
 
 function board(payload: unknown): PartnerBedBoardOk {
-  const r = mapPartnerPayload(payload, AT);
+  const r = mapPartnerPayload({ unit_code: "SDH-RADNOR", ...(payload as object) }, AT);
   if (!r.ok) throw new Error(`expected ok board, got: ${r.error}`);
   return r;
 }
@@ -22,7 +22,7 @@ const ok = <T,>(value: T) => ({ status: "ok" as const, value });
 
 describe("partner contract: occupied with withheld identity", () => {
   const withheld = {
-    unit: "Synthetic Unit",
+    unit: "Radnor Critical Care Unit",
     bed_board: [
       { bed: "1", is_side_room: false, occupied: true, occupant: occ("p1", "1") },
       { bed: "2", is_side_room: false, occupied: true, occupant: null },
@@ -114,11 +114,12 @@ describe("nursing calculation (existing weights)", () => {
     expect(availableNursesFor([{ shift: "day", available_nurses: 0 }], "day")).toBe(0);
     expect(availableNursesFor([{ shift: "night", available_nurses: 4 }], "day")).toBeNull();
 
-    const missing = deriveUnitCapacity({ board: ok(b), acuity: ok([]), staffing: ok(null) });
+    const l1 = [{ partner_patient_id: "p1", level: 1, one_to_one: false }];
+    const missing = deriveUnitCapacity({ board: ok(b), acuity: ok(l1), staffing: ok(null) });
     expect(missing.nursing.state).toBe("no_staffing");
     expect(missing.determinate).toBe(false);
 
-    const zero = deriveUnitCapacity({ board: ok(b), acuity: ok([]), staffing: ok(0) });
+    const zero = deriveUnitCapacity({ board: ok(b), acuity: ok(l1), staffing: ok(0) });
     expect(zero.nursing.state).toBe("ok");
     if (zero.nursing.state === "ok") {
       expect(zero.nursing.available).toBe(0);

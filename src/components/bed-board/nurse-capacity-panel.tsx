@@ -54,13 +54,15 @@ function ShiftRow({
   demandUnknown: string | null;
   reassuring: boolean;
   saving: boolean;
-  onSave: (k: ShiftKey, value: number) => Promise<void>;
+  /** Resolves true on success; false keeps the editor (and draft) open. */
+  onSave: (k: ShiftKey, value: number) => Promise<boolean>;
   focused?: boolean;
   focusLevel?: 1 | 2 | 3;
 }) {
   const shift: Shift = shiftKey.shift;
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState<string>(available == null ? "" : String(available));
+  const [error, setError] = useState<string | null>(null);
   useEffect(() => {
     // Open the editor automatically once we KNOW no count is recorded
     // (not while loading / on error).
@@ -72,12 +74,25 @@ function ShiftRow({
   }, [available, editing]);
 
   const submit = async () => {
-    const n = Number(draft);
-    if (!isFinite(n) || n < 0) {
-      toast.error("Enter a non-negative number");
+    // Blank is "no count", never 0 — refuse to save it.
+    const trimmed = draft.trim();
+    if (trimmed === "") {
+      setError("Enter the number of nurses (0 is allowed). A blank box is not saved.");
       return;
     }
-    await onSave(shiftKey, n);
+    const n = Number(trimmed);
+    if (!isFinite(n) || n < 0) {
+      setError("Enter a number that is 0 or more.");
+      return;
+    }
+    setError(null);
+    const ok = await onSave(shiftKey, n);
+    if (ok) setEditing(false);
+    else setError("Not saved — your number is kept here. Check the connection and try again.");
+  };
+  const cancel = () => {
+    setError(null);
+    setDraft(available == null ? "" : String(available));
     setEditing(false);
   };
 
@@ -120,6 +135,11 @@ function ShiftRow({
         )}
       </div>
 
+      {editing && error && (
+        <div id={`nurses-err-${shiftKey.date}-${shift}`} role="alert" className="text-xs text-destructive">
+          {error}
+        </div>
+      )}
       {editing ? (
         <div className="flex items-end gap-2">
           <div className="flex-1">
@@ -133,26 +153,33 @@ function ShiftRow({
               step="0.5"
               min="0"
               value={draft}
-              onChange={(e) => setDraft(e.target.value)}
+              onChange={(e) => {
+                setDraft(e.target.value);
+                if (error) setError(null);
+              }}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") void submit();
+                if (e.key === "Escape") cancel();
+              }}
               disabled={saving}
               className="h-9"
+              aria-invalid={error ? true : undefined}
+              aria-describedby={error ? `nurses-err-${shiftKey.date}-${shift}` : undefined}
             />
           </div>
           <Button size="sm" className="h-9 min-w-9" onClick={submit} disabled={saving} aria-label={`Save ${label.toLowerCase()} shift nurse count`}>
             <Check className="w-3.5 h-3.5" aria-hidden="true" />
           </Button>
-          {available != null && (
-            <Button
-              size="sm"
-              variant="ghost"
-              className="h-9 min-w-9"
-              onClick={() => setEditing(false)}
-              disabled={saving}
-              aria-label="Cancel editing"
-            >
-              <X className="w-3.5 h-3.5" aria-hidden="true" />
-            </Button>
-          )}
+          <Button
+            size="sm"
+            variant="ghost"
+            className="h-9 min-w-9"
+            onClick={cancel}
+            disabled={saving}
+            aria-label={`Cancel editing ${label.toLowerCase()} shift nurse count`}
+          >
+            <X className="w-3.5 h-3.5" aria-hidden="true" />
+          </Button>
         </div>
       ) : (
         <>
@@ -255,14 +282,16 @@ export function NurseCapacityPanel({
   const demandUnknown =
     nursing.state === "unknown" && nursing.reason !== "loading" ? nursing.message : null;
 
-  const handleSave = async (k: ShiftKey, value: number) => {
+  const handleSave = async (k: ShiftKey, value: number): Promise<boolean> => {
     setSaving(true);
     try {
       await doUpsert({ data: { shift_date: k.date, shift: k.shift, available_nurses: value } });
       toast.success(`${k.shift === "day" ? "Day" : "Night"} shift ${formatShiftDate(k.date)} updated`);
       await qc.invalidateQueries({ queryKey: STAFFING_QK_ROOT });
+      return true;
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "Failed to save");
+      return false;
     } finally {
       setSaving(false);
     }
@@ -324,12 +353,6 @@ export function NurseCapacityPanel({
                   <span className="font-medium tabular-nums">{demand.level_weighted_dependency.toFixed(2)}</span>
                 </div>
               </div>
-              {demand.unscored_count > 0 && (
-                <div className="mt-2 text-[11px] text-amber-900 dark:text-amber-200">
-                  {demand.unscored_count} patient{demand.unscored_count === 1 ? " has" : "s have"} no level of care
-                  recorded — counted at L1/L0 weight.
-                </div>
-              )}
             </>
           ) : (
             <div className="text-sm text-amber-900 dark:text-amber-200 flex items-start gap-1 mt-1">

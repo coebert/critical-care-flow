@@ -10,6 +10,8 @@ import { ACUITY_QK, useUnitCapacity, usePatientAcuityRows } from "@/hooks/use-un
 import { failureText } from "@/components/capacity/capacity-status";
 import { formatUnitTime } from "@/lib/shift-clock";
 import { listReferralsForList } from "@/lib/referrals.functions";
+import { sessionScoped } from "@/lib/session-scope";
+import { PendingReferralsColumn as PendingColumn } from "@/components/board/pending-referrals-column";
 import type { Referral } from "@/lib/referrals-list-utils";
 import { formatElapsed } from "@/lib/referrals-list-utils";
 import { X, Printer, Sun, Moon, Maximize, Minimize, ZoomIn, ZoomOut, Contrast } from "lucide-react";
@@ -219,8 +221,9 @@ function BoardPage() {
   const acuity = usePatientAcuityRows();
   const referrals = useQuery({
     queryKey: ["board", "referrals"],
-    queryFn: () => listReferralsForList() as unknown as Promise<Referral[]>,
+    queryFn: sessionScoped(() => listReferralsForList() as unknown as Promise<Referral[]>),
     refetchInterval: 30_000,
+    retry: 1,
   });
 
   useEffect(() => {
@@ -249,15 +252,30 @@ function BoardPage() {
   const partner = capacity.board;
   const physical = capacity.derivation.physical;
   const notCurrent = capacity.freshness !== "current";
-  const acuityMap = new Map<string, { level: number; one_to_one: boolean }>();
+  const acuityMap = new Map<string, { level: number | null; one_to_one: boolean }>();
   for (const r of acuity.data ?? []) {
     acuityMap.set(r.partner_patient_id, {
-      level: Number(r.level),
+      // null = no level observed — never shown as a level.
+      level: r.level == null ? null : Number(r.level),
       one_to_one: r.one_to_one === true,
     });
   }
-  const pending = (referrals.data ?? []).filter((r) => r.status === "pending" || (r.status === "accepted" && !r.arrived_on_unit_at));
-  pending.sort((a, b) => new Date(a.referral_received_at).getTime() - new Date(b.referral_received_at).getTime());
+  // Levels: distinguish loading / failed (with or without last good) from loaded.
+  const acuityState: "loading" | "ok" | "error" =
+    acuity.status === "error" ? "error" : acuity.data === undefined ? "loading" : "ok";
+  // Pending referrals: loading, true empty, failed (with/without last good).
+  const pending: Referral[] | null = referrals.data
+    ? referrals.data
+        .filter((r) => r.status === "pending" || (r.status === "accepted" && !r.arrived_on_unit_at))
+        .sort((a, b) => new Date(a.referral_received_at).getTime() - new Date(b.referral_received_at).getTime())
+    : null;
+  const referralState = {
+    loading: referrals.data === undefined && referrals.status !== "error",
+    failed: referrals.status === "error",
+    lastLoadedAt: referrals.dataUpdatedAt ? new Date(referrals.dataUpdatedAt).toISOString() : null,
+    retrying: referrals.isFetching,
+    retry: () => void referrals.refetch(),
+  };
 
   return (
     <div
@@ -286,7 +304,9 @@ function BoardPage() {
                 <span className={`${p.eyebrow} text-base mr-1`}>Unassigned</span>{physical.unassigned}
               </div>
               <div className={p.muted}>
-                <span className={`${p.eyebrow} text-base mr-1`}>Pending referrals</span>{pending.length}
+                <span className={`${p.eyebrow} text-base mr-1`}>Pending referrals</span>
+                {pending ? pending.length : "—"}
+                {pending && referralState.failed ? <span className={`${p.eyebrow} text-base ml-1`}>(not current)</span> : null}
               </div>
             </div>
           )}
@@ -381,6 +401,11 @@ function BoardPage() {
           </button>
         </div>
       )}
+      {acuityState === "error" && (
+        <div role="status" className={`px-4 py-1 border-b text-base font-semibold ${p.border} ${p.capFull}`}>
+          Levels of care could not be loaded{acuity.data ? " — levels shown are the last loaded and may be out of date" : " — shown as L?"}. Nursing capacity unknown.
+        </div>
+      )}
       {!capacity.latestFailure && capacity.lastSuccessAt && (
         <div className={`px-4 py-0.5 text-sm ${p.subtle}`}>
           {notCurrent
@@ -401,7 +426,7 @@ function BoardPage() {
           />
         </div>
         <div className="overflow-auto">
-          <PendingColumn rows={pending} now={now.getTime()} p={p} />
+          <PendingColumn rows={pending} state={referralState} now={now} p={p} />
         </div>
       </div>
     </div>
@@ -427,7 +452,7 @@ function BedsColumn({
 }: {
   data: PartnerBedBoardOk | null;
   failed: boolean;
-  acuityMap: Map<string, { level: number; one_to_one: boolean }>;
+  acuityMap: Map<string, { level: number | null; one_to_one: boolean }>;
   now: number;
   p: Palette;
 }) {
@@ -469,7 +494,8 @@ function BedsColumn({
                   {occ && (
                     <div
                       className={`text-xs px-2 py-0.5 rounded font-semibold ${level != null ? LEVEL_PILL[level] ?? p.pill : p.pill}`}
-                      title={level != null ? LEVEL_TITLE[level] ?? `Level ${level}` : "Acuity not set"}
+                      title={level != null ? LEVEL_TITLE[level] ?? `Level ${level}` : "Level of care not recorded"}
+                      aria-label={level != null ? LEVEL_TITLE[level] ?? `Level ${level}` : "Level of care not recorded"}
                     >
                       L{level ?? "?"}{day != null ? ` · d${day}` : ""}
                     </div>
@@ -518,32 +544,3 @@ function Flag({ children, tone, p }: { children: React.ReactNode; tone?: "red" |
   return <span className={`px-1.5 py-0.5 rounded text-sm ${cls}`}>{children}</span>;
 }
 
-function PendingColumn({ rows, now, p }: { rows: Referral[]; now: number; p: Palette }) {
-  return (
-    <div className="p-3">
-      <h2 className={`text-sm uppercase tracking-widest mb-2 ${p.eyebrow}`}>Pending referrals · {rows.length}</h2>
-      {rows.length === 0 && <div className={`text-base ${p.cardEmpty}`}>No pending referrals.</div>}
-      <ul className="space-y-2">
-        {rows.map((r) => {
-          const waitMs = r.status === "pending"
-            ? now - new Date(r.referral_received_at).getTime()
-            : now - new Date(r.decision_at ?? r.updated_at ?? r.referral_received_at).getTime();
-          const critical = waitMs > 4 * 60 * 60 * 1000;
-          return (
-            <li key={r.id} className={`rounded border p-2 ${p.chip}`}>
-              <div className="flex items-center justify-between gap-2">
-                <div className="min-w-0">
-                  <div className="text-xl font-semibold truncate">{r.hospital_number ?? "—"}</div>
-                  <div className={`text-sm truncate ${p.muted}`}>{r.referring_specialty ?? "Unknown"} · {r.current_ward ?? ""}</div>
-                </div>
-                <div className={`text-3xl font-mono tabular-nums ${critical ? p.timerCritical : p.timerWarn}`}>
-                  {formatElapsed(waitMs)}
-                </div>
-              </div>
-            </li>
-          );
-        })}
-      </ul>
-    </div>
-  );
-}

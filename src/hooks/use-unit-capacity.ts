@@ -9,9 +9,11 @@ import type {
 import { getPatientAcuity, type AcuityEntry } from "@/lib/patient-acuity.functions";
 import { getNurseStaffingForDate } from "@/lib/nurse-staffing.functions";
 import { currentShift, type ShiftKey } from "@/lib/shift-clock";
+import { purgeClinicalSnapshots, sessionScoped } from "@/lib/session-scope";
 import {
   CAPACITY_REFRESH_MS,
   availableNursesFor,
+  boardSourceTime,
   deriveUnitCapacity,
   freshnessOf,
   isReassuring,
@@ -55,19 +57,34 @@ export function useNow(ms = 10_000): Date {
   return now;
 }
 
+/**
+ * Cached board state. A denial REPLACES the cached snapshot (so nothing from
+ * before a role revocation can be shown); any other failure throws so React
+ * Query keeps the last good board, labelled as not current.
+ */
+type BoardCache = { kind: "ok"; board: PartnerBedBoardOk } | { kind: "forbidden"; failure: PartnerBedBoardFailure };
+
 export function usePartnerBedBoard() {
   const fetchBoard = useServerFn(getPartnerBedBoard);
+  const qc = useQueryClient();
   const q = useQuery({
     queryKey: PARTNER_BOARD_QK,
-    queryFn: async (): Promise<PartnerBedBoardOk> => {
+    queryFn: sessionScoped(async (): Promise<BoardCache> => {
       const r = await fetchBoard();
-      if (!r.ok) throw new PartnerBoardUnavailableError(r);
-      return r;
-    },
+      if (r.ok) return { kind: "ok", board: r };
+      if (r.forbidden) {
+        // Role revoked / denied: drop every other clinical snapshot too.
+        purgeClinicalSnapshots(qc, PARTNER_BOARD_QK);
+        return { kind: "forbidden", failure: r };
+      }
+      throw new PartnerBoardUnavailableError(r);
+    }),
     // The server already retries transient partner failures.
     retry: false,
     ...liveQueryOpts,
   });
+  const cached = q.data;
+  const forbidden = cached?.kind === "forbidden" ? cached.failure : null;
   const latestFailure: PartnerBedBoardFailure | null =
     q.status === "error"
       ? q.error instanceof PartnerBoardUnavailableError
@@ -77,10 +94,10 @@ export function usePartnerBedBoard() {
             error: q.error instanceof Error ? q.error.message : "Could not reach the bed board service",
             fetched_at: new Date(q.errorUpdatedAt || Date.now()).toISOString(),
           }
-      : null;
+      : forbidden;
   return {
-    /** Last successfully validated board (kept through later failures). */
-    lastOk: q.data ?? null,
+    /** Last successfully validated board (kept through later failures, never through a denial). */
+    lastOk: cached?.kind === "ok" ? cached.board : null,
     latestFailure,
     isLoading: q.isLoading,
     isFetching: q.isFetching,
@@ -92,7 +109,7 @@ export function usePatientAcuityRows() {
   const fetchAcuity = useServerFn(getPatientAcuity);
   return useQuery({
     queryKey: ACUITY_QK,
-    queryFn: (): Promise<AcuityEntry[]> => fetchAcuity(),
+    queryFn: sessionScoped((): Promise<AcuityEntry[]> => fetchAcuity()),
     retry: 1,
     ...liveQueryOpts,
   });
@@ -102,7 +119,7 @@ export function useNurseStaffingRows(shiftDate: string) {
   const fetchStaffing = useServerFn(getNurseStaffingForDate);
   return useQuery({
     queryKey: staffingQK(shiftDate),
-    queryFn: () => fetchStaffing({ data: { shift_date: shiftDate } }),
+    queryFn: sessionScoped(() => fetchStaffing({ data: { shift_date: shiftDate } })),
     retry: 1,
     ...liveQueryOpts,
   });
@@ -114,6 +131,7 @@ export type UnitCapacityView = {
   freshness: Freshness;
   /** True only when determinate AND current — safe for green / "room to admit". */
   reassuring: boolean;
+  /** Time the shown board describes (Hub `generated_at`, else fetch time). */
   lastSuccessAt: string | null;
   latestFailure: PartnerBedBoardFailure | null;
   board: PartnerBedBoardOk | null;
@@ -157,7 +175,8 @@ export function useUnitCapacity(): UnitCapacityView {
     [board.lastOk, board.latestFailure, acuity.status, acuity.data, acuity.error, staffing.status, staffing.data, shift.shift],
   );
 
-  const lastSuccessAt = board.lastOk?.fetched_at ?? null;
+  // Age of the DATA (Hub snapshot time when sent), not of our last fetch.
+  const lastSuccessAt = boardSourceTime(board.lastOk);
   const freshness = freshnessOf({
     lastSuccessAt,
     latestFailed: board.latestFailure !== null,

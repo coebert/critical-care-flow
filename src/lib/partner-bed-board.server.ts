@@ -9,6 +9,7 @@ import {
   type PartnerBedBoardResult,
 } from "./partner-bed-board-contract";
 import { classifyPartnerHttpFailure, classifyPartnerNetworkFailure } from "./partner-outage";
+import { HUB_TIMEOUT_MS } from "./hub-client.server";
 
 export type BoardAccessContext = {
   userId: string;
@@ -64,6 +65,8 @@ export type PartnerFetchDeps = {
   secret?: string;
   sleep?: (ms: number) => Promise<void>;
   maxAttempts?: number;
+  /** Per-attempt timeout; defaults to HUB_TIMEOUT_MS. */
+  timeoutMs?: number;
 };
 
 /**
@@ -111,6 +114,13 @@ export async function fetchPartnerBedBoardSigned(
   let last: PartnerBedBoardFailure = { ok: false, error: "unknown partner error", fetched_at: fetchedAt };
   for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
     let res: Response;
+    const controller = new AbortController();
+    const timeoutMs = deps.timeoutMs ?? HUB_TIMEOUT_MS;
+    let timedOut = false;
+    const timer = setTimeout(() => {
+      timedOut = true;
+      controller.abort();
+    }, timeoutMs);
     try {
       res = await doFetch(url, {
         method: "GET",
@@ -120,9 +130,13 @@ export async function fetchPartnerBedBoardSigned(
           "x-signature": signature,
           "cache-control": "no-store",
         },
+        signal: controller.signal,
       });
     } catch (err) {
-      const cls = classifyPartnerNetworkFailure(err);
+      clearTimeout(timer);
+      const cls = timedOut
+        ? { message: `ICU Handover Hub did not respond within ${Math.round(timeoutMs / 1000)}s`, is_outage: true }
+        : classifyPartnerNetworkFailure(err);
       last = { ok: false, error: cls.message, fetched_at: fetchedAt, partner_outage: cls.is_outage, status: 0 };
       if (attempt < MAX_ATTEMPTS) {
         await backoff(attempt);
@@ -133,13 +147,24 @@ export async function fetchPartnerBedBoardSigned(
 
     if (!res.ok) {
       const body = await res.text().catch(() => "");
+      clearTimeout(timer);
       const cls = classifyPartnerHttpFailure(res.status, body);
+      // The Hub answers an ambiguous roster with an HTTP error carrying
+      // `indeterminate: true` rather than a misleading successful count.
+      let indeterminate = false;
+      try {
+        const j = JSON.parse(body) as { indeterminate?: unknown; stats?: { indeterminate?: unknown } };
+        indeterminate = j?.indeterminate === true || j?.stats?.indeterminate === true;
+      } catch {
+        /* not JSON */
+      }
       last = {
         ok: false,
-        error: cls.message,
+        error: indeterminate ? "ICU Handover Hub could not confirm bed occupancy (indeterminate roster)" : cls.message,
         fetched_at: fetchedAt,
-        partner_outage: cls.is_outage,
+        partner_outage: indeterminate ? false : cls.is_outage,
         status: res.status,
+        ...(indeterminate ? { indeterminate: true } : {}),
       };
       if (isTransientStatus(res.status) && attempt < MAX_ATTEMPTS) {
         await backoff(attempt);
@@ -151,10 +176,12 @@ export async function fetchPartnerBedBoardSigned(
     let payload: unknown;
     try {
       payload = await res.json();
+      clearTimeout(timer);
     } catch (err) {
+      clearTimeout(timer);
       last = {
         ok: false,
-        error: `partner returned invalid JSON: ${(err as Error).message}`,
+        error: timedOut ? "ICU Handover Hub response timed out" : `partner returned invalid JSON: ${(err as Error).message}`,
         fetched_at: fetchedAt,
         partner_outage: false,
         status: res.status,

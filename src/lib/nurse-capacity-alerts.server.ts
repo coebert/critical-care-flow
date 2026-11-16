@@ -134,7 +134,7 @@ export async function checkAndAlertNurseCapacity(
           fetched_at: new Date().toISOString(),
         }),
       ),
-      admin.from("patient_acuity_overrides").select("partner_patient_id, level, one_to_one"),
+      admin.from("patient_acuity_overrides").select("partner_patient_id, level, level_recorded, one_to_one"),
       admin.from("nurse_staffing").select("shift, available_nurses").eq("shift_date", date),
     ]);
 
@@ -142,7 +142,17 @@ export async function checkAndAlertNurseCapacity(
       board: board.ok ? { status: "ok", value: board } : { status: "error", message: board.error },
       acuity: acuityRes.error
         ? { status: "error" }
-        : { status: "ok", value: (acuityRes.data ?? []) as AcuityRow[] },
+        : {
+            status: "ok",
+            // An unrecorded level is never treated as an observed one.
+            value: ((acuityRes.data ?? []) as Array<{ partner_patient_id: string; level: number; level_recorded?: boolean | null; one_to_one: boolean }>).map(
+              (r): AcuityRow => ({
+                partner_patient_id: r.partner_patient_id,
+                level: r.level_recorded === false ? null : r.level,
+                one_to_one: r.one_to_one === true,
+              }),
+            ),
+          },
       staffing: staffingRes.error
         ? { status: "error" }
         : { status: "ok", value: availableNursesFor(staffingRes.data ?? [], shift) },

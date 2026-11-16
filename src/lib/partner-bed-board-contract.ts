@@ -11,6 +11,13 @@
  *     indeterminate (`indeterminate: true`, or `stats.indeterminate: true`)
  *     when its roster query fails or assignments are duplicated.
  *   - Older payloads without `stats`/`unassigned`/`side_rooms` remain valid.
+ *   - `stats.unassigned` counts ALL active unassigned patients; the
+ *     `unassigned` array lists only those whose identity is disclosed. Any
+ *     difference is "hidden unassigned" — nursing demand is then unknown.
+ *   - `generated_at` (ISO) is the Hub's own snapshot time. Staleness is
+ *     judged on it (when present), not on when we happened to fetch.
+ *   - Scope: `unit_code` must equal the configured Radnor code when present;
+ *     older payloads without it must carry the expected unit label.
  *
  * Anything else that is malformed or partial (wrong types, duplicate beds,
  * the same patient in two places, stats that disagree with the roster) is
@@ -41,6 +48,9 @@ export type PartnerOccupant = {
   tep_details?: string | null;
   outstanding_tasks: string | null;
   updated_at: string | null;
+  /** Hub's own wardable flag, when the Hub exposes it (used to detect sync mismatch). */
+  wardable?: boolean | null;
+  wardable_at?: string | null;
 };
 
 export type PartnerBedSlot = {
@@ -61,6 +71,12 @@ export type PartnerBedBoardStats = {
 export type PartnerBedBoardOk = {
   ok: true;
   unit: string;
+  /** Stable Hub unit code (e.g. SDH-RADNOR) when the Hub sends one. */
+  unit_code: string | null;
+  /** Hub snapshot time (ISO) when the Hub sends one. */
+  generated_at: string | null;
+  /** Active unassigned patients whose identity the Hub did not disclose. */
+  hidden_unassigned: number;
   side_rooms: string[];
   bed_board: PartnerBedSlot[];
   unassigned: PartnerOccupant[];
@@ -86,6 +102,19 @@ export type PartnerBedBoardFailure = {
 export type PartnerBedBoardResult = PartnerBedBoardOk | PartnerBedBoardFailure;
 
 export const DEFAULT_UNIT_NAME = "Radnor Critical Care Unit";
+/** The only Hub unit this app may display (configured Radnor scope). */
+export const ALLOWED_UNIT_CODE = "SDH-RADNOR";
+/** Labels accepted from older Hub payloads that predate `unit_code`. */
+export const ALLOWED_UNIT_LABELS: readonly string[] = [DEFAULT_UNIT_NAME];
+/** Hub snapshot times further than this in the future are rejected. */
+export const MAX_FUTURE_SKEW_MS = 2 * 60_000;
+
+export type ContractOptions = {
+  allowedUnitCode?: string;
+  allowedUnitLabels?: readonly string[];
+};
+
+const ISO_RE = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d{1,9})?(Z|[+-]\d{2}:?\d{2})$/;
 
 class ContractError extends Error {
   constructor(
@@ -136,6 +165,8 @@ function validateOccupant(v: unknown, where: string): PartnerOccupant {
   optNumber(v, "age", where);
   optBool(v, "tep_in_place", where);
   optBool(v, "dnacpr_decision", where);
+  optBool(v, "wardable", where);
+  optString(v, "wardable_at", where);
   return {
     full_name: null,
     hospital_number: null,
@@ -160,7 +191,7 @@ function safeMessage(v: unknown, fallback: string): string {
   return typeof v === "string" && v.trim() ? v.trim().slice(0, 200) : fallback;
 }
 
-function validate(payload: unknown, fetchedAt: string): PartnerBedBoardResult {
+function validate(payload: unknown, fetchedAt: string, opts: ContractOptions): PartnerBedBoardResult {
   if (!isObj(payload)) throw new ContractError("partner payload missing bed_board array");
 
   // Explicit failure / indeterminate signals from the Hub.
@@ -185,6 +216,37 @@ function validate(payload: unknown, fetchedAt: string): PartnerBedBoardResult {
 
   if (!Array.isArray(payload.bed_board)) {
     throw new ContractError("partner payload missing bed_board array");
+  }
+
+  // Scope: the Hub must say which unit this is, and it must be ours.
+  const allowedCode = opts.allowedUnitCode ?? ALLOWED_UNIT_CODE;
+  const allowedLabels = (opts.allowedUnitLabels ?? ALLOWED_UNIT_LABELS).map((l) => l.trim().toLowerCase());
+  let unitCode: string | null = null;
+  if (payload.unit_code !== undefined && payload.unit_code !== null) {
+    if (typeof payload.unit_code !== "string" || payload.unit_code.trim() === "") {
+      throw new ContractError("unit_code must be a non-empty string");
+    }
+    if (payload.unit_code.trim() !== allowedCode) {
+      throw new ContractError(`unit_code ${payload.unit_code.slice(0, 40)} is outside the allowed unit scope`, true);
+    }
+    unitCode = payload.unit_code.trim();
+  } else {
+    const label = typeof payload.unit === "string" ? payload.unit.trim().toLowerCase() : "";
+    if (!label || !allowedLabels.includes(label)) {
+      throw new ContractError("unit is missing or outside the allowed unit scope", true);
+    }
+  }
+
+  let generatedAt: string | null = null;
+  if (payload.generated_at !== undefined && payload.generated_at !== null) {
+    const g = payload.generated_at;
+    if (typeof g !== "string" || !ISO_RE.test(g) || !Number.isFinite(Date.parse(g))) {
+      throw new ContractError("generated_at must be an ISO-8601 timestamp");
+    }
+    if (Date.parse(g) - Date.parse(fetchedAt) > MAX_FUTURE_SKEW_MS) {
+      throw new ContractError("generated_at is in the future", true);
+    }
+    generatedAt = g;
   }
 
   const seenBeds = new Set<string>();
@@ -254,15 +316,28 @@ function validate(payload: unknown, fetchedAt: string): PartnerBedBoardResult {
     if (!isObj(statsRaw)) throw new ContractError("stats must be an object");
     for (const k of ["total_beds", "occupied", "available", "unassigned"] as const) {
       if (!isCount(statsRaw[k])) throw new ContractError(`stats.${k} must be a non-negative integer`);
+    }
+    for (const k of ["total_beds", "occupied", "available"] as const) {
       if (statsRaw[k] !== derived[k]) {
         throw new ContractError(`stats.${k} (${statsRaw[k]}) disagrees with the roster (${derived[k]})`);
       }
     }
+    // stats.unassigned counts ALL active unassigned; the array lists only
+    // disclosed identities, so it may be smaller but never larger.
+    if ((statsRaw.unassigned as number) < unassigned.length) {
+      throw new ContractError(
+        `stats.unassigned (${statsRaw.unassigned}) is smaller than the disclosed unassigned list (${unassigned.length})`,
+      );
+    }
+    derived.unassigned = statsRaw.unassigned as number;
   }
 
   const out: PartnerBedBoardOk = {
     ok: true,
     unit: typeof payload.unit === "string" && payload.unit.trim() ? payload.unit : DEFAULT_UNIT_NAME,
+    unit_code: unitCode,
+    generated_at: generatedAt,
+    hidden_unassigned: derived.unassigned - unassigned.length,
     side_rooms: sideRooms,
     bed_board: bedBoard,
     unassigned,
@@ -279,9 +354,13 @@ function validate(payload: unknown, fetchedAt: string): PartnerBedBoardResult {
  * Successful results always carry `stats` derived from (and checked against)
  * the roster itself.
  */
-export function mapPartnerPayload(payload: unknown, fetchedAt: string): PartnerBedBoardResult {
+export function mapPartnerPayload(
+  payload: unknown,
+  fetchedAt: string,
+  opts: ContractOptions = {},
+): PartnerBedBoardResult {
   try {
-    return validate(payload, fetchedAt);
+    return validate(payload, fetchedAt, opts);
   } catch (e) {
     if (e instanceof ContractError) {
       return {
@@ -298,4 +377,9 @@ export function mapPartnerPayload(payload: unknown, fetchedAt: string): PartnerB
 /** Number of occupied beds whose occupant details were withheld by the Hub. */
 export function withheldCount(board: Pick<PartnerBedBoardOk, "bed_board">): number {
   return board.bed_board.filter((b) => b.occupied && !b.occupant).length;
+}
+
+/** The time the board's data describes: Hub snapshot time, else our fetch time. */
+export function sourceTimeOf(board: Pick<PartnerBedBoardOk, "generated_at" | "fetched_at">): string {
+  return board.generated_at ?? board.fetched_at;
 }

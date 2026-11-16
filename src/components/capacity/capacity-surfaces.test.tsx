@@ -27,7 +27,7 @@ import { AdmissionCapacityCallout } from "@/components/referrals/admission-capac
 import { MiniCapacityLink } from "@/components/bed-board/mini-capacity-link";
 import { mapPartnerPayload } from "@/lib/partner-bed-board-contract";
 
-const okBoard = (beds: unknown[]) => mapPartnerPayload({ unit: "Synthetic Unit", bed_board: beds }, new Date().toISOString());
+const okBoard = (beds: unknown[]) => mapPartnerPayload({ unit: "Radnor Critical Care Unit", bed_board: beds }, new Date().toISOString());
 const slot = (bed: string, occupant: unknown, occupied = occupant != null) => ({ bed, is_side_room: false, occupied, occupant });
 
 function renderAll() {

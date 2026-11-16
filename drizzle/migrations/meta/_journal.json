@@ -15,6 +15,13 @@
       "when": 1794829147769,
       "tag": "0001_lock_down_internal_security_definer_rpcs",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1794843787625,
+      "tag": "0002_acuity_level_recorded_and_wardable_sync_state",
+      "breakpoints": true
     }
   ]
 }

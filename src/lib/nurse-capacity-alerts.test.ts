@@ -41,7 +41,7 @@ function fakeAdmin(tables: Record<string, Res>) {
 
 const NOW = new Date("2026-07-10T09:00:00Z"); // 10:00 BST → day shift 2026-07-10
 const boardOf = (payload: unknown) => async (): Promise<PartnerBedBoardResult> =>
-  mapPartnerPayload(payload, NOW.toISOString());
+  mapPartnerPayload({ unit_code: "SDH-RADNOR", ...(payload as object) }, NOW.toISOString());
 
 const ONE_PATIENT = {
   bed_board: [

@@ -940,6 +940,7 @@ export type Database = {
       patient_acuity_overrides: {
         Row: {
           level: number
+          level_recorded: boolean
           one_to_one: boolean
           partner_patient_id: string
           updated_at: string
@@ -947,6 +948,7 @@ export type Database = {
         }
         Insert: {
           level: number
+          level_recorded?: boolean
           one_to_one?: boolean
           partner_patient_id: string
           updated_at?: string
@@ -954,6 +956,7 @@ export type Database = {
         }
         Update: {
           level?: number
+          level_recorded?: boolean
           one_to_one?: boolean
           partner_patient_id?: string
           updated_at?: string
@@ -1035,24 +1038,36 @@ export type Database = {
       }
       patient_wardable_status: {
         Row: {
+          desired_revision: number
           discharged_at: string | null
           partner_patient_id: string
+          partner_sync_checked_at: string | null
+          partner_sync_status: string | null
+          partner_synced_revision: number | null
           updated_at: string
           updated_by: string | null
           wardable: boolean
           wardable_at: string | null
         }
         Insert: {
+          desired_revision?: number
           discharged_at?: string | null
           partner_patient_id: string
+          partner_sync_checked_at?: string | null
+          partner_sync_status?: string | null
+          partner_synced_revision?: number | null
           updated_at?: string
           updated_by?: string | null
           wardable?: boolean
           wardable_at?: string | null
         }
         Update: {
+          desired_revision?: number
           discharged_at?: string | null
           partner_patient_id?: string
+          partner_sync_checked_at?: string | null
+          partner_sync_status?: string | null
+          partner_synced_revision?: number | null
           updated_at?: string
           updated_by?: string | null
           wardable?: boolean

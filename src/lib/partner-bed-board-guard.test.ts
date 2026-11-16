@@ -14,7 +14,7 @@ const ctx = (rpcResult: { data: unknown; error: unknown } | Error) => ({
 
 const okFetch = () =>
   vi.fn(async () =>
-    new Response(JSON.stringify({ unit: "Synthetic", bed_board: [] }), {
+    new Response(JSON.stringify({ unit_code: "SDH-RADNOR", unit: "Radnor Critical Care Unit", bed_board: [] }), {
       status: 200,
       headers: { "content-type": "application/json" },
     }),

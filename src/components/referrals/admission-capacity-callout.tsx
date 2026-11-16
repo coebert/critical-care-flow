@@ -113,12 +113,6 @@ export function AdmissionCapacityCallout() {
             <span>{nursing.message}. Check the bed board before accepting.</span>
           </p>
         )}
-        {(nursing.state === "ok" || nursing.state === "no_staffing") && nursing.unscored_count > 0 && (
-          <p className="mt-1 text-muted-foreground">
-            {nursing.unscored_count} patient{nursing.unscored_count === 1 ? " has" : "s have"} no level of care
-            recorded and {nursing.unscored_count === 1 ? "is" : "are"} counted at L1/L0 weight.
-          </p>
-        )}
       </div>
     </section>
   );

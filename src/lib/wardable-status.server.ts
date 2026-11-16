@@ -1,98 +1,152 @@
 /**
- * Server-only helper: forwards a wardable state change to the partner app
- * over the signed bridge. Keeps HMAC + fetch out of the RPC module so the
- * client bundle stays clean.
+ * Server-only: wardable → ICU Handover Hub transport.
  *
- * Partner contract (`POST /api/public/bridge/patients`, see ICU Handover
- * Hub `src/routes/api/public/bridge.patients.ts`):
- *  - `full_name` is required (min 1) — a wardable-only patch is rejected
- *    with 400 "Invalid patient payload" if it's missing.
- *  - `expected_updated_at` enables optimistic concurrency; when it matches
- *    the partner's current `updated_at` the write goes through, otherwise
- *    a 409 conflict is returned.
- *
- * We hydrate both from our local `patients` mirror (populated by the
- * scheduled bridge pull) so the wardable toggle can push a minimal, valid
- * patch. If the mirror doesn't have the patient yet, we still attempt the
- * push without `expected_updated_at` — the partner will apply it as long
- * as `full_name` is present.
+ * Truthfulness rules:
+ *  - The local save and the Hub update are reported SEPARATELY. A Hub
+ *    failure never hides behind a successful local toggle.
+ *  - Every push uses a FRESH Hub revision (GET /patients?id=) and a partial,
+ *    revision-checked patch (mandatory expected_updated_at). No full_name
+ *    is sent and nothing comes from the stale local patients mirror.
+ *  - The pushed value is always the LATEST local desired state (re-read at
+ *    push time), and the outcome is only recorded against the revision that
+ *    was pushed — an old retry can never overwrite a newer toggle.
+ *  - Discharge timing stamps are local analytics only and are never sent.
  */
-export async function pushWardableToPartner(input: {
+import {
+  fetchHubPatient,
+  patchHubPatient,
+  type HubActor,
+  type HubDeps,
+} from "./hub-client.server";
+
+export type PartnerSyncStatus = "synced" | "failed" | "not_configured" | "conflict" | "not_shared";
+
+export type PartnerSyncOutcome = {
+  status: PartnerSyncStatus;
+  /** Local desired revision this outcome refers to. */
+  revision: number | null;
+  message: string;
+};
+
+type Res<T> = PromiseLike<{ data: T; error: { message: string } | null }>;
+export type WardableDb = { from: (t: "patient_wardable_status") => any };
+
+type LocalRow = {
   partner_patient_id: string;
   wardable: boolean;
   wardable_at: string | null;
-  userId: string;
-  claims: Record<string, unknown>;
-}): Promise<void> {
-  const base = process.env.PARTNER_BRIDGE_URL;
-  if (!base) return; // no bridge configured — local-only is fine
+  desired_revision: number | null;
+};
 
-  const { getBridgeSecrets } = await import("./bridge-hmac.server");
-  const secret = getBridgeSecrets().current;
+const MESSAGES: Record<PartnerSyncStatus, string> = {
+  synced: "ICU Handover Hub updated",
+  failed: "Saved here, but ICU Handover Hub could not be updated",
+  not_configured: "Saved here only — the ICU Handover Hub link is not configured",
+  conflict: "Saved here, but the patient changed in ICU Handover Hub at the same time — retry to update the Hub",
+  not_shared: "Saved here, but this patient is no longer shared by ICU Handover Hub",
+};
 
-  const email =
-    typeof input.claims.email === "string" ? (input.claims.email as string) : undefined;
-  const actor = JSON.stringify({ id: input.userId, email, role: "clinician" });
+async function readLocal(db: WardableDb, id: string): Promise<LocalRow | null | "error"> {
+  const { data, error } = (await db
+    .from("patient_wardable_status")
+    .select("partner_patient_id, wardable, wardable_at, desired_revision")
+    .eq("partner_patient_id", id)
+    .maybeSingle()) as Awaited<Res<LocalRow | null>>;
+  if (error) return "error";
+  return data;
+}
 
-  // Hydrate full_name + expected_updated_at from our local mirror of the
-  // partner's `patients` table — populated by the scheduled bridge pull.
-  let fullName: string | null = null;
-  let expectedUpdatedAt: string | null = null;
-  try {
-    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-    const { data: row } = await supabaseAdmin
-      .from("patients")
-      .select("full_name, updated_at")
-      .eq("id", input.partner_patient_id)
-      .maybeSingle();
-    if (row) {
-      fullName = (row as { full_name: string | null }).full_name ?? null;
-      expectedUpdatedAt = (row as { updated_at: string | null }).updated_at ?? null;
+async function record(db: WardableDb, row: LocalRow, status: PartnerSyncStatus, nowIso: string) {
+  // Only record against the exact desired state we pushed.
+  const rev = row.desired_revision ?? 0;
+  await db
+    .from("patient_wardable_status")
+    .update({
+      partner_sync_status: status,
+      partner_sync_checked_at: nowIso,
+      ...(status === "synced" ? { partner_synced_revision: rev } : {}),
+    })
+    .eq("partner_patient_id", row.partner_patient_id)
+    .eq("desired_revision", rev)
+    .eq("wardable", row.wardable);
+}
+
+/**
+ * Push the latest local wardable state for one patient to the Hub.
+ * Retries a single revision conflict with a fresh Hub revision.
+ */
+export async function syncWardableToHub(
+  db: WardableDb,
+  partnerPatientId: string,
+  actor: HubActor,
+  deps: HubDeps & { now?: () => Date } = {},
+): Promise<PartnerSyncOutcome> {
+  const nowIso = (deps.now ?? (() => new Date()))().toISOString();
+  let lastStatus: PartnerSyncStatus = "failed";
+  let row: LocalRow | null = null;
+  for (let attempt = 0; attempt < 2; attempt++) {
+    const local = await readLocal(db, partnerPatientId);
+    if (local === "error") {
+      return { status: "failed", revision: null, message: "Could not read the saved wardable state — the Hub was not updated" };
     }
-  } catch (err) {
-    console.warn("[wardable] could not read local patient mirror", err);
-  }
+    if (!local) return { status: "failed", revision: null, message: "No saved wardable state to send" };
+    row = local;
+    const rev = local.desired_revision ?? 0;
 
-  if (!fullName) {
-    // Partner requires `full_name` on every upsert. Without it the request
-    // is a guaranteed 400 — bail out and log so the timer/analytics still
-    // work locally.
-    console.warn(
-      `[wardable] skipping partner push for ${input.partner_patient_id}: full_name not in local mirror yet`,
+    const hub = await fetchHubPatient(partnerPatientId, actor, deps);
+    if (hub.kind === "not_configured") {
+      await record(db, local, "not_configured", nowIso);
+      return { status: "not_configured", revision: rev, message: MESSAGES.not_configured };
+    }
+    if (hub.kind === "not_shared" || hub.kind === "forbidden") {
+      await record(db, local, "not_shared", nowIso);
+      return { status: "not_shared", revision: rev, message: MESSAGES.not_shared };
+    }
+    if (hub.kind !== "ok") {
+      await record(db, local, "failed", nowIso);
+      return { status: "failed", revision: rev, message: MESSAGES.failed };
+    }
+
+    if (hub.patient.wardable === local.wardable) {
+      await record(db, local, "synced", nowIso);
+      return { status: "synced", revision: rev, message: MESSAGES.synced };
+    }
+
+    const out = await patchHubPatient(
+      partnerPatientId,
+      hub.patient.updated_at,
+      { wardable: local.wardable, wardable_at: local.wardable ? local.wardable_at : null, wardable_by: actor.id },
+      actor,
+      deps,
     );
-    return;
+    if (out.kind === "ok") {
+      await record(db, local, "synced", nowIso);
+      return { status: "synced", revision: rev, message: MESSAGES.synced };
+    }
+    if (out.kind === "conflict") {
+      lastStatus = "conflict";
+      continue; // fresh revision + latest local state on the next pass
+    }
+    const status: PartnerSyncStatus =
+      out.kind === "not_shared" || out.kind === "forbidden"
+        ? "not_shared"
+        : out.kind === "not_configured"
+          ? "not_configured"
+          : "failed";
+    await record(db, local, status, nowIso);
+    return { status, revision: rev, message: MESSAGES[status] };
   }
+  if (row) await record(db, row, lastStatus, nowIso);
+  return { status: lastStatus, revision: row?.desired_revision ?? null, message: MESSAGES[lastStatus] };
+}
 
-  const bodyObj: Record<string, unknown> = {
-    id: input.partner_patient_id,
-    full_name: fullName,
-    wardable: input.wardable,
-    wardable_at: input.wardable_at,
-    wardable_by: input.userId,
-  };
-  if (expectedUpdatedAt) bodyObj.expected_updated_at = expectedUpdatedAt;
-
-  const rawBody = JSON.stringify(bodyObj);
-  const timestamp = String(Math.floor(Date.now() / 1000));
-  const { createHmac } = await import("node:crypto");
-  const signature = createHmac("sha256", secret)
-    .update(`${timestamp}.${actor}.${rawBody}`)
-    .digest("hex");
-
-  const url = `${base.replace(/\/$/, "")}/patients`;
-  const res = await fetch(url, {
-    method: "POST",
-    headers: {
-      "content-type": "application/json",
-      "x-timestamp": timestamp,
-      "x-actor": actor,
-      "x-signature": signature,
-      "cache-control": "no-store",
-    },
-    body: rawBody,
-  });
-  if (!res.ok) {
-    const text = await res.text().catch(() => "");
-    console.warn(`[wardable] partner responded ${res.status}: ${text.slice(0, 200)}`);
+/** Public origin of the Hub app (derived from the bridge URL), for links. */
+export function hubAppOrigin(): string | null {
+  const base = process.env.PARTNER_BRIDGE_URL;
+  if (!base) return null;
+  try {
+    return new URL(base).origin;
+  } catch {
+    return null;
   }
 }

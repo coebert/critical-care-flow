@@ -1,11 +1,13 @@
-# Roadmap — capacity integrity release (paired with ICU Handover Hub; do not publish)
+# Roadmap — paired integration fixes (CCC only; do not publish)
 
-- [x] 1. Single authoritative capacity model (partner occupancy + CCC acuity + staffing) for Bed Board, TV board, referral badge/callout/mini link and alerts; stale/unknown handling; 20s refresh + focus recovery; alert suppression
-- [x] 2. Strict partner payload validation; occupied-with-withheld-occupant renders occupied everywhere
-- [x] 3. Server-side clinical role guard before signed partner fetch
-- [x] 4. Remove patient identifiers from bed-board links (opaque id + neutral label, guarded context load)
-- [x] 5. Central Europe/London shift clock (day 08–20, night 20–08, prior date before 08:00)
-- [x] 6. UI review (phone/tablet/desktop, labels, non-colour status, loading/error/retry)
-- [x] Tests, typecheck, build, mocked-layout checks, commit
-- [ ] Confirm Hub's indeterminate/failure field names (waiting on Hub contract confirmation)
-- [ ] Publish together with Hub (waiting on paired release)
+Done earlier: shared capacity model, withheld occupant, server role guard, identifier-free links, shift clock, UI review.
+
+- [ ] A. Hub bed contract: generated_at, unit_code SDH-RADNOR / label scope, stats.unassigned hidden → demand unknown, source-stale detection, request timeout, missing level → indeterminate (1:1 known = 1.0)
+- [ ] B. Bridge GET sync=1 envelope (patients, investigations, referrals, microbiology): cursor, snapshot fence, tombstones, referral created_at/updated_at, micro canonical mapping; default GET unchanged
+- [ ] C. BedCard hooks split + test; TV pending referrals loading/empty/error/stale; staffing blank≠0, failed save keeps draft
+- [ ] D. Session-scoped query cache: clear on signout/identity change/role denial; old fetch can't populate new user
+- [ ] E. Handover prefill: fresh Hub GET by id, verified linkage, preview + confirm, revision-bound apply with expected_updated_at, preserve explicit false, no DNACPR/TEP inference, labelled source text
+- [ ] F. setPatientAcuity fail closed + CAS / field merge; acuity save re-evaluates capacity alerts
+- [ ] G. Ward-round print from Hub snapshot with source age/unknown
+- [ ] H. Wardable/discharge truthfulness: typed sync outcome, fresh revision partial patch, mismatch reconstruction, latest-only retry; discharge = local timing only + Hub link
+- [ ] Tests (functional), typecheck, full tests, build, phone/tablet/desktop fixture layouts, commit

@@ -57,11 +57,21 @@ import {
 import {
   listWardableStatus,
   setWardableStatus,
+  retryWardableSync,
+  getHubAppOrigin,
   dischargePatient,
   clearDischarge,
+  wardableMismatch,
   type WardableStatus,
+  type SetWardableResult,
+  type PartnerSyncOutcome,
 } from "@/lib/wardable-status.functions";
-import { prefillPartnerHandoverFromReferral } from "@/lib/partner-handover-prefill.functions";
+import {
+  previewPartnerHandoverPrefill,
+  applyPartnerHandoverPrefill,
+  type PrefillPreviewResult,
+} from "@/lib/partner-handover-prefill.functions";
+import { BedCard } from "@/components/bed-board/bed-card";
 import { toInitials } from "@/lib/patient-initials";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -132,553 +142,6 @@ function formatUpdated(iso: string | null | undefined): string {
   return formatDistanceToNowStrict(d, { addSuffix: true });
 }
 
-function dayOfStay(iso: string | null | undefined): number | null {
-  if (!iso) return null;
-  const t = Date.parse(iso);
-  if (!isFinite(t)) return null;
-  return Math.max(1, Math.floor((Date.now() - t) / 86_400_000) + 1);
-}
-
-function WardableToggle({
-  wardable,
-  wardableAt,
-  pending,
-  onToggle,
-}: {
-  wardable: boolean;
-  wardableAt: string | null;
-  pending: boolean;
-  onToggle: () => void;
-}) {
-  // Live-updating "since" label — tick once a minute while marked wardable.
-  const [, force] = useState(0);
-  useEffect(() => {
-    if (!wardable || !wardableAt) return;
-    const id = setInterval(() => force((n) => n + 1), 60_000);
-    return () => clearInterval(id);
-  }, [wardable, wardableAt]);
-  const elapsed =
-    wardable && wardableAt
-      ? formatDistanceToNowStrict(new Date(wardableAt))
-      : null;
-  const title = wardable && wardableAt
-    ? `Wardable since ${new Date(wardableAt).toLocaleString()} — click to clear`
-    : "Mark ready for discharge to the ward";
-  return (
-    <button
-      type="button"
-      aria-pressed={wardable}
-      onClick={(e) => {
-        e.stopPropagation();
-        if (!pending) onToggle();
-      }}
-      onKeyDown={(e) => e.stopPropagation()}
-      onMouseDown={(e) => e.stopPropagation()}
-      onDragStart={(e) => e.preventDefault()}
-      draggable={false}
-      disabled={pending}
-      title={title}
-      className={
-        "mt-1 inline-flex items-center gap-1 rounded border px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide transition disabled:opacity-60 " +
-        (wardable
-          ? "bg-emerald-500/15 text-emerald-800 border-emerald-500/40 dark:text-emerald-300 dark:border-emerald-400/40 hover:bg-emerald-500/25"
-          : "bg-transparent text-muted-foreground border-dashed hover:bg-accent hover:text-foreground")
-      }
-    >
-      <span aria-hidden="true">{wardable ? "✓" : "○"}</span>
-      <span>
-        {wardable
-          ? elapsed
-            ? `Wardable · ${elapsed}`
-            : "Wardable"
-          : "Wardable"}
-      </span>
-    </button>
-  );
-}
-
-function DischargeControl({
-  wardable,
-  wardableAt,
-  dischargedAt,
-  pending,
-  onDischarge,
-  onClear,
-}: {
-  wardable: boolean;
-  wardableAt: string | null;
-  dischargedAt: string | null;
-  pending: boolean;
-  onDischarge: () => void;
-  onClear: () => void;
-}) {
-  const [, force] = useState(0);
-  useEffect(() => {
-    // Tick while wardable and not yet discharged so the elapsed timer
-    // updates in the corner of the board.
-    if (dischargedAt || !wardable || !wardableAt) return;
-    const id = setInterval(() => force((n) => n + 1), 60_000);
-    return () => clearInterval(id);
-  }, [wardable, wardableAt, dischargedAt]);
-
-  if (dischargedAt) {
-    const window =
-      wardableAt
-        ? formatDistanceStrict(new Date(wardableAt), new Date(dischargedAt))
-        : null;
-    return (
-      <button
-        type="button"
-        onClick={(e) => {
-          e.stopPropagation();
-          if (!pending) onClear();
-        }}
-        onKeyDown={(e) => e.stopPropagation()}
-        onMouseDown={(e) => e.stopPropagation()}
-        disabled={pending}
-        draggable={false}
-        title={`Discharged ${new Date(dischargedAt).toLocaleString()}${
-          window ? ` — ${window} from wardable` : ""
-        }. Click to undo.`}
-        className="mt-1 inline-flex items-center gap-1 rounded border border-sky-500/40 bg-sky-500/15 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-sky-800 dark:text-sky-300 hover:bg-sky-500/25 transition disabled:opacity-60"
-      >
-        <span aria-hidden="true">✓</span>
-        <span>Discharged{window ? ` · ${window}` : ""}</span>
-      </button>
-    );
-  }
-
-  return (
-    <button
-      type="button"
-      onClick={(e) => {
-        e.stopPropagation();
-        if (!pending) onDischarge();
-      }}
-      onKeyDown={(e) => e.stopPropagation()}
-      onMouseDown={(e) => e.stopPropagation()}
-      disabled={pending}
-      draggable={false}
-      title={
-        wardable && wardableAt
-          ? `Record discharge — will log time from wardable (${new Date(wardableAt).toLocaleString()})`
-          : "Record discharge from critical care"
-      }
-      className="mt-1 inline-flex items-center gap-1 rounded border border-dashed px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground hover:bg-accent hover:text-foreground transition disabled:opacity-60"
-    >
-      <span aria-hidden="true">→</span>
-      <span>Discharge</span>
-    </button>
-  );
-}
-
-function BedCard({
-  slot,
-  level,
-  oneToOne,
-  hasTracheostomy,
-  isolation,
-  isolationReason,
-  isolationPending,
-  onCycleIsolation,
-
-  violenceRisk,
-  violencePending,
-  onToggleViolenceRisk,
-  endOfLife,
-  endOfLifePending,
-  onToggleEndOfLife,
-  needsScanTransfer,
-  scanTransferPending,
-  onToggleScanTransfer,
-  wardable,
-  wardableAt,
-  dischargedAt,
-  wardablePending,
-  dischargePending,
-  onToggleWardable,
-  onDischarge,
-  onOccupiedClick,
-  onMove,
-  isDragTarget,
-  onDragStateChange,
-}: {
-  slot: PartnerBedSlot;
-  level: AcuityLevel | undefined;
-  oneToOne: boolean;
-  hasTracheostomy: boolean;
-  isolation: "contact" | "droplet" | "airborne" | null;
-  isolationReason: string | null;
-  isolationPending: boolean;
-  onCycleIsolation: (
-    occupantId: string,
-    next: "none" | "contact" | "droplet" | "airborne",
-  ) => void;
-
-  violenceRisk: boolean;
-  violencePending: boolean;
-  onToggleViolenceRisk: (occupantId: string, next: boolean) => void;
-  endOfLife: boolean;
-  endOfLifePending: boolean;
-  onToggleEndOfLife: (occupantId: string, next: boolean) => void;
-  needsScanTransfer: boolean;
-  scanTransferPending: boolean;
-  onToggleScanTransfer: (occupantId: string, next: boolean) => void;
-  wardable: boolean;
-  wardableAt: string | null;
-  dischargedAt: string | null;
-  wardablePending: boolean;
-  dischargePending: boolean;
-  onToggleWardable: (occupantId: string, next: boolean) => void;
-  onDischarge: (occupantId: string, undo: boolean) => void;
-  onOccupiedClick: (o: PartnerOccupant) => void;
-  onMove: (
-    occupantId: string,
-    expected_updated_at: string | null,
-    sourceBed: string | null,
-    targetBed: string,
-  ) => void;
-  isDragTarget: boolean;
-  onDragStateChange: (dragging: boolean) => void;
-}) {
-
-  const occ = slot.occupant;
-  const [dragOver, setDragOver] = useState(false);
-
-  const handleDragOver = (e: React.DragEvent) => {
-    if (!isDragTarget) return;
-    // Only accept our own payload type.
-    if (!e.dataTransfer.types.includes("application/x-bed-move")) return;
-    e.preventDefault();
-    e.dataTransfer.dropEffect = "move";
-    if (!dragOver) setDragOver(true);
-  };
-  const handleDragLeave = () => setDragOver(false);
-  const handleDrop = (e: React.DragEvent) => {
-    if (!isDragTarget) return;
-    e.preventDefault();
-    setDragOver(false);
-    const raw = e.dataTransfer.getData("application/x-bed-move");
-    if (!raw) return;
-    try {
-      const payload = JSON.parse(raw) as {
-        occupantId: string;
-        updatedAt: string | null;
-        sourceBed: string | null;
-      };
-      if (!payload.occupantId) return;
-      if (payload.sourceBed === slot.bed) return;
-      onMove(payload.occupantId, payload.updatedAt, payload.sourceBed, slot.bed);
-    } catch {
-      /* ignore malformed payload */
-    }
-  };
-
-  if (slot.occupied && !occ) {
-    // Hub says the bed is occupied but withheld the occupant's details.
-    // It is NEVER a free bed: not a drop target, not clickable.
-    return (
-      <Card
-        className="p-3 h-full min-h-[120px] flex flex-col justify-between border-dashed bg-muted/40"
-        aria-label={`Bed ${slot.bed} occupied — patient details withheld by ICU Handover Hub`}
-        data-bed-state="occupied-withheld"
-      >
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-1.5 text-sm font-semibold">
-            <BedIcon className="w-4 h-4" aria-hidden="true" />
-            {slot.bed}
-          </div>
-          {slot.is_side_room && (
-            <Badge variant="outline" className="text-[10px]">
-              Side room
-            </Badge>
-          )}
-        </div>
-        <div className="text-center text-xs">
-          <div className="font-semibold">Occupied</div>
-          <div className="text-muted-foreground">Details withheld</div>
-        </div>
-      </Card>
-    );
-  }
-  if (!slot.occupied || !occ) {
-    return (
-      <Card
-        className={`p-3 flex flex-col justify-between min-h-24 border-dashed bg-muted/20 transition ${
-          dragOver && isDragTarget ? "ring-2 ring-primary bg-primary/10" : ""
-        }`}
-        aria-label={`Empty bed ${slot.bed}${isDragTarget ? " — drop to move patient here" : ""}`}
-        onDragOver={handleDragOver}
-        onDragLeave={handleDragLeave}
-        onDrop={handleDrop}
-      >
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-1.5 text-sm font-semibold text-muted-foreground">
-            <BedIcon className="w-4 h-4" aria-hidden="true" />
-            {slot.bed}
-          </div>
-          {slot.is_side_room && (
-            <Badge variant="outline" className="text-[10px]">
-              Side room
-            </Badge>
-          )}
-        </div>
-        <div className="text-center text-xs text-muted-foreground">
-          {dragOver && isDragTarget ? "Drop to move here" : "Empty"}
-        </div>
-      </Card>
-    );
-  }
-  const day = dayOfStay(occ.admission_date);
-
-  // Row-pulse: briefly highlight the card when the occupant's updated_at
-  // changes so realtime edits from another user don't land silently.
-  const prevUpdatedAt = useRef<string | null | undefined>(occ.updated_at);
-  const [justUpdated, setJustUpdated] = useState(false);
-  useEffect(() => {
-    if (prevUpdatedAt.current && prevUpdatedAt.current !== occ.updated_at) {
-      setJustUpdated(true);
-      const t = window.setTimeout(() => setJustUpdated(false), 1600);
-      return () => window.clearTimeout(t);
-    }
-    prevUpdatedAt.current = occ.updated_at;
-  }, [occ.updated_at]);
-
-  // Shared button wrapper — enforces a 32×32 hit target for toggle badges so
-  // they're comfortable on touch while the visual badge stays compact.
-  const toggleBtnClass =
-    "inline-flex items-center justify-center min-h-8 min-w-8 p-1 rounded focus:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-50";
-
-  return (
-    <Card
-      className={`p-3 min-h-24 hover:bg-accent/40 cursor-grab active:cursor-grabbing transition ${
-        justUpdated ? "motion-safe:animate-bed-pulse ring-2 ring-primary/60" : ""
-      }`}
-      onClick={() => onOccupiedClick(occ)}
-      role="button"
-      tabIndex={0}
-      aria-label={`Bed ${slot.bed} — ${occ.full_name ?? "occupied"} (drag to move to another bed)`}
-      onKeyDown={(e) =>
-        (e.key === "Enter" || e.key === " ") && onOccupiedClick(occ)
-      }
-      draggable
-      onDragStart={(e) => {
-        e.dataTransfer.effectAllowed = "move";
-        e.dataTransfer.setData(
-          "application/x-bed-move",
-          JSON.stringify({
-            occupantId: occ.id,
-            updatedAt: occ.updated_at ?? null,
-            sourceBed: slot.bed,
-          }),
-        );
-        onDragStateChange(true);
-      }}
-      onDragEnd={() => onDragStateChange(false)}
-    >
-      {/* Primary row: bed code + patient identity on the left, acuity + room on the right. */}
-      <div className="flex items-start justify-between gap-2">
-        <div className="min-w-0 flex-1">
-          <div className="flex items-center gap-1.5 text-xs font-semibold text-muted-foreground">
-            <BedIcon className="w-3.5 h-3.5" aria-hidden="true" />
-            <span className="tabular-nums">{slot.bed}</span>
-          </div>
-          <div className="mt-0.5 text-sm font-medium truncate">
-            {occ.full_name || "—"}
-          </div>
-          <div className="text-xs text-muted-foreground truncate">
-            {occ.hospital_number ? `${occ.hospital_number}` : "—"}
-            {occ.age != null ? ` · ${occ.age}y` : ""}
-            {day != null ? ` · Day ${day}` : ""}
-          </div>
-        </div>
-        <div className="flex flex-col items-end gap-1 shrink-0">
-          {level != null && (
-            <Badge
-              variant="outline"
-              className={`text-[10px] font-semibold ${LEVEL_TONE[level]}`}
-              title={LEVEL_LABEL[level]}
-              aria-label={LEVEL_LABEL[level]}
-            >
-              L{level}
-            </Badge>
-          )}
-          {slot.is_side_room && (
-            <Badge variant="outline" className="text-[10px]" title="Side room">
-              SR
-            </Badge>
-          )}
-          {oneToOne && (
-            <Badge
-              variant="outline"
-              className="text-[10px] bg-rose-500/10 text-rose-700 dark:text-rose-400 border-rose-500/30"
-              title="Requires 1:1 nursing"
-              aria-label="Requires 1:1 nursing"
-            >
-              1:1
-            </Badge>
-          )}
-        </div>
-      </div>
-
-      {occ.dnacpr_decision === true && (
-        <div className="mt-1 text-[11px] text-amber-700 dark:text-amber-400 truncate">
-          DNACPR{occ.dnacpr_details ? ` — ${occ.dnacpr_details}` : ""}
-        </div>
-      )}
-
-      {/* Status badge row — fixed order: Isolation → EOL → Violence → Scan → Trache → TEP.
-          Toggleable flags share the same 32×32 touch target. */}
-      <div className="mt-2 flex flex-wrap items-center gap-0.5">
-        {(() => {
-          const cycle = { none: "contact", contact: "droplet", droplet: "airborne", airborne: "none" } as const;
-          const current = isolation ?? "none";
-          const next = cycle[current];
-          const active = isolation != null;
-          const toneClass = active
-            ? "bg-amber-500/10 text-amber-700 dark:text-amber-400 border-amber-500/30"
-            : "bg-transparent text-muted-foreground border-dashed opacity-60";
-          const label = active
-            ? `Isolation: ${isolation}${isolationReason ? ` — ${isolationReason}` : ""}. Tap to change to ${next === "none" ? "no isolation" : next}.`
-            : `Flag as needing isolation (next: contact)`;
-          return (
-            <button
-              type="button"
-              onClick={(e) => {
-                e.stopPropagation();
-                if (!isolationPending) onCycleIsolation(occ.id, next);
-              }}
-              disabled={isolationPending}
-              title={label}
-              aria-pressed={active}
-              aria-label={label}
-              className={toggleBtnClass}
-            >
-              <Badge variant="outline" className={`text-[10px] p-0.5 transition ${toneClass}`}>
-                <Biohazard className="w-3.5 h-3.5" aria-hidden="true" />
-              </Badge>
-            </button>
-          );
-        })()}
-
-        <button
-          type="button"
-          onClick={(e) => {
-            e.stopPropagation();
-            if (!endOfLifePending) onToggleEndOfLife(occ.id, !endOfLife);
-          }}
-          disabled={endOfLifePending}
-          title={endOfLife ? "End-of-life care — tap to clear" : "Flag as receiving end-of-life care"}
-          aria-pressed={endOfLife}
-          aria-label={endOfLife ? "Clear end-of-life-care flag" : "Flag patient as receiving end-of-life care"}
-          className={toggleBtnClass}
-        >
-          <Badge
-            variant="outline"
-            className={`text-[10px] p-0.5 transition ${
-              endOfLife
-                ? "bg-violet-500/15 text-violet-700 dark:text-violet-400 border-violet-500/40"
-                : "bg-transparent text-muted-foreground border-dashed opacity-60"
-            }`}
-          >
-            <Heart className={`w-3.5 h-3.5 ${endOfLife ? "fill-current" : ""}`} aria-hidden="true" />
-          </Badge>
-        </button>
-        <button
-          type="button"
-          onClick={(e) => {
-            e.stopPropagation();
-            if (!violencePending) onToggleViolenceRisk(occ.id, !violenceRisk);
-          }}
-          disabled={violencePending}
-          title={violenceRisk ? "Violence risk flagged — tap to clear" : "Flag as potentially violent or aggressive"}
-          aria-pressed={violenceRisk}
-          aria-label={violenceRisk ? "Clear violence-risk flag" : "Flag patient as potentially violent or aggressive"}
-          className={toggleBtnClass}
-        >
-          <Badge
-            variant="outline"
-            className={`text-[10px] p-0.5 transition ${
-              violenceRisk
-                ? "bg-red-500/15 text-red-700 dark:text-red-400 border-red-500/40"
-                : "bg-transparent text-muted-foreground border-dashed opacity-60"
-            }`}
-          >
-            <Swords className="w-3.5 h-3.5" aria-hidden="true" />
-          </Badge>
-        </button>
-        <button
-          type="button"
-          onClick={(e) => {
-            e.stopPropagation();
-            if (!scanTransferPending) onToggleScanTransfer(occ.id, !needsScanTransfer);
-          }}
-          disabled={scanTransferPending}
-          title={needsScanTransfer ? "Needs transfer for a scan — tap to clear" : "Flag as needing transfer for a scan"}
-          aria-pressed={needsScanTransfer}
-          aria-label={needsScanTransfer ? "Clear scan-transfer flag" : "Flag patient as needing transfer for a scan"}
-          className={toggleBtnClass}
-        >
-          <Badge
-            variant="outline"
-            className={`text-[10px] p-0.5 transition ${
-              needsScanTransfer
-                ? "bg-indigo-500/15 text-indigo-700 dark:text-indigo-400 border-indigo-500/40"
-                : "bg-transparent text-muted-foreground border-dashed opacity-60"
-            }`}
-          >
-            <ScanLine className="w-3.5 h-3.5" aria-hidden="true" />
-          </Badge>
-        </button>
-        {hasTracheostomy && (
-          <span
-            className="inline-flex items-center justify-center min-h-8 min-w-8"
-            title="Tracheostomy in situ"
-            aria-label="Tracheostomy in situ"
-          >
-            <Badge
-              variant="outline"
-              className="text-[10px] p-0.5 bg-sky-500/10 text-sky-700 dark:text-sky-400 border-sky-500/30"
-            >
-              <Stethoscope className="w-3.5 h-3.5" aria-hidden="true" />
-            </Badge>
-          </span>
-        )}
-        {occ.tep_in_place && (
-          <span
-            className="inline-flex items-center justify-center min-h-8 min-w-8"
-            title="Treatment Escalation Plan in place"
-            aria-label="Treatment Escalation Plan in place"
-          >
-            <Badge variant="outline" className="text-[10px] p-0.5 gap-0.5">
-              <ShieldCheck className="w-3.5 h-3.5" aria-hidden="true" />
-              <span className="text-[9px] leading-none">TEP</span>
-            </Badge>
-          </span>
-        )}
-      </div>
-
-      <div className="mt-2 flex flex-wrap items-center gap-1.5">
-        <WardableToggle
-          wardable={wardable}
-          wardableAt={wardableAt}
-          pending={wardablePending}
-          onToggle={() => onToggleWardable(occ.id, !wardable)}
-        />
-        <DischargeControl
-          wardable={wardable}
-          wardableAt={wardableAt}
-          dischargedAt={dischargedAt}
-          pending={dischargePending}
-          onDischarge={() => onDischarge(occ.id, false)}
-          onClear={() => onDischarge(occ.id, true)}
-        />
-      </div>
-    </Card>
-  );
-}
-
-
 
 function StatBlock({
   label,
@@ -746,12 +209,13 @@ function BedBoardPage() {
   const board = usePartnerBedBoard();
   const { isLoading, isFetching, refetch } = board;
   const { data: acuityRows } = usePatientAcuityRows();
-  type AcuityInfo = { level: AcuityLevel; one_to_one: boolean };
+  // level null = no level observed (1:1 may still be recorded).
+  type AcuityInfo = { level: AcuityLevel | null; one_to_one: boolean };
   const acuityMap = useMemo(() => {
     const m = new Map<string, AcuityInfo>();
     for (const r of acuityRows ?? []) {
       m.set(r.partner_patient_id, {
-        level: r.level as AcuityLevel,
+        level: r.level,
         one_to_one: r.one_to_one === true,
       });
     }
@@ -976,8 +440,32 @@ function BedBoardPage() {
   }, [wardableQuery.data]);
 
   const setWardable = useServerFn(setWardableStatus);
+  const retrySync = useServerFn(retryWardableSync);
+  const fetchHubOrigin = useServerFn(getHubAppOrigin);
+  const hubOrigin = useQuery({
+    queryKey: ["hub-app-origin"],
+    queryFn: () => fetchHubOrigin(),
+    staleTime: Infinity,
+    retry: false,
+  });
+  const hubPatientUrl = (id: string) =>
+    hubOrigin.data?.origin ? `${hubOrigin.data.origin}/patients/${encodeURIComponent(id)}` : null;
+
+  // Separate local-save vs Hub-update outcome, said plainly.
+  const reportPartner = (p: PartnerSyncOutcome, savedWhat: string) => {
+    if (p.status === "synced") toast.success(`${savedWhat} · ICU Handover Hub updated`);
+    else if (p.status === "not_configured") toast.info(`${savedWhat} here only — Hub link not configured`);
+    else toast.warning(`${savedWhat} here. ${p.message}`);
+  };
+  const retryMutation = useMutation({
+    mutationFn: (partner_patient_id: string) => retrySync({ data: { partner_patient_id } }),
+    onSuccess: (p) => reportPartner(p, "Wardable state"),
+    onError: () => toast.error("Could not retry the ICU Handover Hub update"),
+    onSettled: () => void qc.invalidateQueries({ queryKey: ["patient-wardable-status"] }),
+  });
+
   const wardableMutation = useMutation({
-    mutationFn: (input: { partner_patient_id: string; wardable: boolean }) =>
+    mutationFn: (input: { partner_patient_id: string; wardable: boolean }): Promise<SetWardableResult> =>
       setWardable({ data: input }),
     onMutate: async (input) => {
       // Optimistic update so the timer starts ticking the instant the user
@@ -996,6 +484,11 @@ function BedBoardPage() {
           const existing = idx >= 0 ? list[idx] : undefined;
           const now = new Date().toISOString();
           const next: WardableStatus = {
+            ...(existing ?? {
+              desired_revision: 0,
+              partner_sync_checked_at: null,
+              partner_synced_revision: null,
+            }),
             partner_patient_id: input.partner_patient_id,
             wardable: input.wardable,
             wardable_at: input.wardable
@@ -1005,6 +498,7 @@ function BedBoardPage() {
               : null,
             discharged_at: null,
             updated_at: now,
+            partner_sync_status: "pending",
           };
           if (idx >= 0) list[idx] = next;
           else list.push(next);
@@ -1019,6 +513,7 @@ function BedBoardPage() {
       }
       toast.error(err instanceof Error ? err.message : "Could not update wardable status");
     },
+    onSuccess: (r, input) => reportPartner(r.partner, input.wardable ? "Marked wardable" : "Wardable cleared"),
     onSettled: () => {
       // Invalidate (not refetch) so every observer of this key — other
       // panels and other tabs — also picks the change up.
@@ -1053,6 +548,11 @@ function BedBoardPage() {
           const now = new Date().toISOString();
           const existing = idx >= 0 ? list[idx] : undefined;
           const next: WardableStatus = {
+            desired_revision: 0,
+            partner_sync_status: null,
+            partner_sync_checked_at: null,
+            partner_synced_revision: null,
+            ...(existing ?? {}),
             partner_patient_id: input.partner_patient_id,
             wardable: existing?.wardable ?? false,
             wardable_at: existing?.wardable_at ?? null,
@@ -1070,10 +570,15 @@ function BedBoardPage() {
       if (ctx?.previous) {
         qc.setQueryData(["patient-wardable-status"], ctx.previous);
       }
-      toast.error(err instanceof Error ? err.message : "Could not record discharge");
+      toast.error(err instanceof Error ? err.message : "Could not record discharge time");
     },
     onSuccess: (_r, input) => {
-      toast.success(input.undo ? "Discharge cleared" : "Discharge recorded");
+      if (input.undo) toast.success("Recorded discharge time cleared");
+      else
+        toast.success("Discharge time recorded here", {
+          description:
+            "Timing only. The bed stays occupied until the patient is discharged in ICU Handover Hub.",
+        });
     },
     onSettled: () => {
       // Invalidate (not refetch) so every observer of this key — other
@@ -1247,7 +752,7 @@ function BedBoardPage() {
           ...lastOk.unassigned,
         ];
         const levelMap = new Map<string, AcuityLevel>();
-        for (const [k, v] of acuityMap) levelMap.set(k, v.level);
+        for (const [k, v] of acuityMap) if (v.level != null) levelMap.set(k, v.level);
         const { counts, unscored, mean } = computeUnitAcuity(
           allOccupants.map((o) => o.id),
           levelMap,
@@ -1349,8 +854,8 @@ function BedBoardPage() {
           </div>
           {lastOk && (
             <div className="text-xs mt-1 font-medium">
-              Showing the last successful snapshot from {formatUnitTime(lastOk.fetched_at, capacity.now)} (
-              {formatUpdated(lastOk.fetched_at)}) — NOT current.
+              Showing the last successful snapshot from {formatUnitTime(capacity.lastSuccessAt, capacity.now)} (
+              {formatUpdated(capacity.lastSuccessAt)}) — NOT current.
             </div>
           )}
           <Button
@@ -1403,12 +908,23 @@ function BedBoardPage() {
                     ?.partner_patient_id;
                 return (
                   <BedCard
-                    // Key includes the occupant so a bed changing between
-                    // empty / withheld / occupied remounts (the occupied
-                    // branch has extra hooks).
-                    key={`${slot.bed}:${slot.occupant?.id ?? (slot.occupied ? "withheld" : "empty")}`}
+                    // BedCard is a hook-free dispatcher, so the same bed can
+                    // change between empty / withheld / occupied safely.
+                    key={slot.bed}
                     slot={slot}
-                    level={a?.level}
+                    level={a?.level ?? undefined}
+                    hubSync={
+                      slot.occupant
+                        ? wardableMismatch(w, slot.occupant.wardable)
+                        : undefined
+                    }
+                    hubSyncPending={
+                      slot.occupant?.id != null &&
+                      retryMutation.isPending &&
+                      retryMutation.variables === slot.occupant.id
+                    }
+                    onRetryHubSync={(id) => retryMutation.mutate(id)}
+                    hubPatientUrl={slot.occupant ? hubPatientUrl(slot.occupant.id) : null}
                     oneToOne={a?.one_to_one === true}
                     hasTracheostomy={
                       slot.occupant?.id != null &&
@@ -1799,17 +1315,18 @@ function EditOccupantDialog({
 }) {
   const save = useServerFn(updatePartnerPatient);
   const saveAcuity = useServerFn(setPatientAcuity);
-  const runPrefill = useServerFn(prefillPartnerHandoverFromReferral);
+  const runPreview = useServerFn(previewPartnerHandoverPrefill);
+  const runApply = useServerFn(applyPartnerHandoverPrefill);
   const acuityMutation = useMutation({
     mutationFn: (level: AcuityLevel | null) =>
       saveAcuity({ data: { partner_patient_id: occupant!.id, level } }),
     onSuccess: (result) => {
       if (result.ok) {
         toast.success("Level of care updated");
-        onAcuityChanged();
       } else {
         toast.error(result.error || "Could not save level");
       }
+      onAcuityChanged();
     },
     onError: (err) => toast.error(err instanceof Error ? err.message : "Could not save level"),
   });
@@ -1819,48 +1336,51 @@ function EditOccupantDialog({
     onSuccess: (result, vars) => {
       if (result.ok) {
         toast.success(vars ? "Marked as 1:1 nursing" : "1:1 nursing cleared");
-        onAcuityChanged();
       } else {
         toast.error(result.error || "Could not update 1:1 nursing");
       }
+      onAcuityChanged();
     },
     onError: (err) =>
       toast.error(err instanceof Error ? err.message : "Could not update 1:1 nursing"),
   });
 
-  const prefillMutation = useMutation({
+  // Prefill is two explicit steps: preview exactly what would be copied,
+  // then apply only after the clinician confirms.
+  const [preview, setPreview] = useState<PrefillPreviewResult | null>(null);
+  const [prefillProblem, setPrefillProblem] = useState<string | null>(null);
+  useEffect(() => {
+    setPreview(null);
+    setPrefillProblem(null);
+  }, [occupant?.id, sourceReferralId]);
+  const previewMutation = useMutation({
     mutationFn: () =>
-      runPrefill({
-        data: {
-          referral_id: sourceReferralId!,
-          partner_patient_id: occupant!.id,
-        },
-      }),
-    onSuccess: (result) => {
-      if (!result.ok) {
-        toast.error(result.error || "Could not prefill handover");
-        return;
-      }
-      if (result.applied_fields.length === 0) {
-        toast.info(
-          result.skipped_fields.length > 0
-            ? "Handover fields already populated — nothing to prefill."
-            : "Referral had no clinical detail to prefill.",
-        );
-        return;
-      }
-      toast.success(
-        `Prefilled ${result.applied_fields.length} handover field${
-          result.applied_fields.length === 1 ? "" : "s"
-        } from the referral`,
-      );
-      onSaved({
-        ...(occupant as PartnerOccupant),
-        updated_at: result.updated_at ?? (occupant as PartnerOccupant).updated_at,
-      });
+      runPreview({ data: { referral_id: sourceReferralId!, partner_patient_id: occupant!.id } }),
+    onMutate: () => setPrefillProblem(null),
+    onSuccess: (r) => {
+      setPreview(r);
+      if (!r.ok) setPrefillProblem(r.message);
     },
-    onError: (err) =>
-      toast.error(err instanceof Error ? err.message : "Prefill failed"),
+    onError: () => setPrefillProblem("Could not load the preview. Nothing was copied."),
+  });
+  const applyMutation = useMutation({
+    mutationFn: (token: string) =>
+      runApply({ data: { referral_id: sourceReferralId!, partner_patient_id: occupant!.id, token } }),
+    onSuccess: (r) => {
+      if (!r.ok) {
+        setPrefillProblem(r.message);
+        setPreview(null);
+        return;
+      }
+      setPreview(null);
+      toast.success(
+        r.applied_fields.length
+          ? `Copied ${r.applied_fields.length} referral field${r.applied_fields.length === 1 ? "" : "s"} into ICU Handover Hub for review`
+          : "Nothing to copy — those Hub fields already have content",
+      );
+      onSaved({ ...(occupant as PartnerOccupant), updated_at: r.updated_at ?? (occupant as PartnerOccupant).updated_at });
+    },
+    onError: () => setPrefillProblem("Could not apply the prefill. Nothing was copied."),
   });
   const initial = useMemo(
     () => (occupant ? occupantToForm(occupant) : null),
@@ -1918,36 +1438,77 @@ function EditOccupantDialog({
             aria-label="Prefill handover from referral"
           >
             <div className="flex items-start gap-2">
-              <Sparkles
-                className="w-4 h-4 mt-0.5 text-primary"
-                aria-hidden="true"
-              />
-              <div className="flex-1">
+              <Sparkles className="w-4 h-4 mt-0.5 text-primary" aria-hidden="true" />
+              <div className="flex-1 min-w-0">
                 <div className="font-medium">Prefill handover from referral</div>
                 <div className="text-xs text-muted-foreground mt-0.5">
-                  Copies TEP / DNACPR status, past medical history, reason for
-                  admission and anticipated management from the linked referral.
-                  Fields that already have content on the partner are left
-                  untouched.
+                  Copies referral text into BLANK Hub fields only, labelled for clinician review.
+                  TEP and DNACPR decisions are never copied or changed.
                 </div>
               </div>
-              <Button
-                type="button"
-                size="sm"
-                onClick={() => prefillMutation.mutate()}
-                disabled={prefillMutation.isPending}
-              >
-                {prefillMutation.isPending ? (
-                  <Loader2
-                    className="w-3.5 h-3.5 mr-1 animate-spin"
-                    aria-hidden="true"
-                  />
-                ) : (
-                  <Sparkles className="w-3.5 h-3.5 mr-1" aria-hidden="true" />
-                )}
-                Prefill
-              </Button>
+              {!(preview && preview.ok) && (
+                <Button
+                  type="button"
+                  size="sm"
+                  className="min-h-9"
+                  onClick={() => previewMutation.mutate()}
+                  disabled={previewMutation.isPending}
+                >
+                  {previewMutation.isPending ? (
+                    <Loader2 className="w-3.5 h-3.5 mr-1 animate-spin" aria-hidden="true" />
+                  ) : null}
+                  {prefillProblem ? "Reload preview" : "Preview"}
+                </Button>
+              )}
             </div>
+            {prefillProblem && (
+              <div className="mt-2 rounded border border-amber-500/40 bg-amber-500/10 px-2 py-1.5 text-xs" role="alert">
+                {prefillProblem}
+              </div>
+            )}
+            {preview && preview.ok && (
+              <div className="mt-2 space-y-2" aria-live="polite">
+                {preview.fields.length === 0 ? (
+                  <div className="text-xs text-muted-foreground">
+                    Nothing to copy — the matching Hub fields already have content or the referral has none.
+                  </div>
+                ) : (
+                  <ul className="space-y-1.5">
+                    {preview.fields.map((f) => (
+                      <li key={f.field} className="rounded border bg-background px-2 py-1.5">
+                        <div className="text-xs font-medium">{f.label} (currently blank in Hub)</div>
+                        <pre className="mt-0.5 whitespace-pre-wrap break-words font-sans text-xs text-muted-foreground">{f.value}</pre>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+                {preview.skipped_fields.length > 0 && (
+                  <div className="text-[11px] text-muted-foreground">
+                    Left unchanged (already filled in Hub): {preview.skipped_fields.join(", ").replaceAll("_", " ")}
+                  </div>
+                )}
+                <div className="text-[11px] text-muted-foreground">
+                  Patient match confirmed by {preview.link_basis === "source_referral" ? "the Hub referral link" : "an exact hospital-number match"}.
+                </div>
+                <div className="flex flex-wrap justify-end gap-2">
+                  <Button type="button" variant="ghost" size="sm" className="min-h-9" onClick={() => setPreview(null)}>
+                    Cancel
+                  </Button>
+                  {preview.fields.length > 0 && (
+                    <Button
+                      type="button"
+                      size="sm"
+                      className="min-h-9"
+                      onClick={() => applyMutation.mutate(preview.token)}
+                      disabled={applyMutation.isPending}
+                    >
+                      {applyMutation.isPending && <Loader2 className="w-3.5 h-3.5 mr-1 animate-spin" aria-hidden="true" />}
+                      Confirm and copy {preview.fields.length} field{preview.fields.length === 1 ? "" : "s"}
+                    </Button>
+                  )}
+                </div>
+              </div>
+            )}
           </div>
         )}
 

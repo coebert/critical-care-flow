@@ -5,6 +5,7 @@ import {
   pickAllowed,
   verifyBridgeRequest,
 } from "@/lib/bridge-verify.server";
+import { handleSyncGet, RESOURCE_CONFIG } from "@/lib/bridge-sync-feed.server";
 
 const PATIENT_COLUMNS = [
   "id",
@@ -52,6 +53,11 @@ export const Route = createFileRoute("/api/public/bridge/patients")({
         if (verified instanceof Response) return verified;
 
         const url = new URL(request.url);
+        // Versioned, paginated snapshot feed (Hub sync). Default GET below
+        // is unchanged for older readers.
+        if (url.searchParams.get("sync") === "1") {
+          return handleSyncGet("patients", RESOURCE_CONFIG.patients, request, jsonResponse);
+        }
         const status = url.searchParams.get("status");
         const since = url.searchParams.get("since");
         const limit = Math.min(

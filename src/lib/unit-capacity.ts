@@ -10,9 +10,10 @@
  *   - nurses available for the current shift: CCC `nurse_staffing`
  *
  * Nurse weights are the existing ones in `nurse-capacity.ts`
- * (1:1 = 1, L3 = 1, L2 = 0.5, L1/L0 = 0.25). Patients with no acuity score
- * keep the existing bed-board default of L1 weighting and are counted in
- * `unscored_count` so the UI can say so.
+ * (1:1 = 1, L3 = 1, L2 = 0.5, L1/L0 = 0.25). A missing level is NOT an
+ * observed L1: if any active patient has neither a recorded level nor a
+ * 1:1 flag, nursing demand is indeterminate. A 1:1 patient's demand is
+ * known (1.0) even without a level, without claiming any level.
  *
  * Safety rules:
  *   - Physical vacancies and nursing slots are reported separately.
@@ -24,7 +25,7 @@
  *     "room to admit" styling.
  */
 
-import type { PartnerBedBoardOk } from "./partner-bed-board-contract";
+import { sourceTimeOf, type PartnerBedBoardOk } from "./partner-bed-board-contract";
 import {
   admissionSlots,
   computeDependency,
@@ -33,14 +34,13 @@ import {
 import type { Occupancy } from "./bed-capacity";
 import type { ShiftKey } from "./shift-clock";
 
-/** Default level used for patients without an acuity score (existing behaviour). */
-export const UNSCORED_DEFAULT_LEVEL = 1;
 /** Partner data older than this is "not current", even without a fetch error. */
 export const STALE_AFTER_MS = 60_000;
 /** Shared polling cadence for every capacity surface. */
 export const CAPACITY_REFRESH_MS = 20_000;
 
-export type AcuityRow = { partner_patient_id: string; level: number; one_to_one: boolean };
+/** `level: null` = no level observed (e.g. only 1:1 recorded). */
+export type AcuityRow = { partner_patient_id: string; level: number | null; one_to_one: boolean };
 
 export type LoadState<T> =
   | { status: "ok"; value: T }
@@ -53,8 +53,10 @@ export type PhysicalCapacity = {
   vacant: number;
   /** Occupied beds whose occupant details the Hub withheld. */
   withheld: number;
-  /** Active patients with no bed assigned (still need nursing). */
+  /** ALL active patients with no bed assigned (Hub stats; still need nursing). */
   unassigned: number;
+  /** Of those, how many the Hub did not disclose. */
+  hidden_unassigned: number;
   side_rooms_vacant: number;
 };
 
@@ -64,6 +66,7 @@ export type NursingDemand = {
   one_to_one_count: number;
   one_to_one_dependency: number;
   level_weighted_dependency: number;
+  /** Active disclosed patients with neither a recorded level nor 1:1. */
   unscored_count: number;
 };
 
@@ -71,6 +74,8 @@ export type UnknownReason =
   | "loading"
   | "board_unavailable"
   | "withheld"
+  | "unassigned_withheld"
+  | "acuity_missing"
   | "acuity_unavailable"
   | "staffing_unavailable";
 
@@ -90,6 +95,8 @@ const UNKNOWN_MESSAGE: Record<UnknownReason, string> = {
   loading: "Loading capacity…",
   board_unavailable: "Bed occupancy unavailable from ICU Handover Hub",
   withheld: "Some occupied beds have patient details withheld — nursing demand unknown",
+  unassigned_withheld: "Some patients awaiting a bed are not disclosed by ICU Handover Hub — nursing demand unknown",
+  acuity_missing: "Some patients have no level of care recorded — nursing demand unknown",
   acuity_unavailable: "Patient acuity could not be loaded — nursing demand unknown",
   staffing_unavailable: "Nurse staffing could not be loaded — nursing capacity unknown",
 };
@@ -106,7 +113,8 @@ export function physicalFrom(board: PartnerBedBoardOk): PhysicalCapacity {
     occupied,
     vacant: total - occupied,
     withheld: board.bed_board.filter((b) => b.occupied && !b.occupant).length,
-    unassigned: board.unassigned.length,
+    unassigned: board.stats.unassigned,
+    hidden_unassigned: board.hidden_unassigned ?? 0,
     side_rooms_vacant: board.bed_board.filter((b) => b.is_side_room && !b.occupied).length,
   };
 }
@@ -123,24 +131,29 @@ export function nursingDemandFrom(
   let unscored = 0;
   const occs: Occupancy[] = patients.map((p) => {
     const a = byId.get(p.id);
-    const valid = a && [0, 1, 2, 3].includes(Number(a.level));
-    if (!valid) unscored += 1;
+    const oneToOne = a?.one_to_one === true;
+    const lvl = a?.level;
+    const observed = lvl !== null && lvl !== undefined && [0, 1, 2, 3].includes(Number(lvl));
+    // 1:1 demand is known regardless of level; otherwise a level is required.
+    if (!oneToOne && !observed) unscored += 1;
     return {
       id: p.id,
       bed_id: p.bed ?? p.id,
       discharged_at: null,
       predicted_discharge_at: null,
-      level: valid ? Number(a!.level) : UNSCORED_DEFAULT_LEVEL,
-      one_to_one: a?.one_to_one === true,
+      // Only used for non-1:1 patients with an observed level; never an
+      // invented default for patients without one (they make demand unknown).
+      level: observed ? Number(lvl) : (null as unknown as number),
+      one_to_one: oneToOne,
     };
   });
   return { ...computeDependency(occs), unscored_count: unscored };
 }
 
-const unknown = (reason: UnknownReason): NursingCapacity => ({
+const unknown = (reason: UnknownReason, message?: string): NursingCapacity => ({
   state: "unknown",
   reason,
-  message: UNKNOWN_MESSAGE[reason],
+  message: message ?? UNKNOWN_MESSAGE[reason],
 });
 
 export function deriveUnitCapacity(input: {
@@ -161,6 +174,9 @@ export function deriveUnitCapacity(input: {
   if (physical.withheld > 0) {
     return { physical, nursing: unknown("withheld"), determinate: false };
   }
+  if (physical.hidden_unassigned > 0) {
+    return { physical, nursing: unknown("unassigned_withheld"), determinate: false };
+  }
   if (acuity.status !== "ok") {
     return {
       physical,
@@ -176,6 +192,17 @@ export function deriveUnitCapacity(input: {
     };
   }
   const demand = nursingDemandFrom(board.value, acuity.value);
+  if (demand.unscored_count > 0) {
+    const n = demand.unscored_count;
+    return {
+      physical,
+      nursing: unknown(
+        "acuity_missing",
+        `${n} patient${n === 1 ? " has" : "s have"} no level of care recorded — nursing demand unknown until scored`,
+      ),
+      determinate: false,
+    };
+  }
   const available = staffing.value;
   if (available == null || !Number.isFinite(available)) {
     return { physical, nursing: { state: "no_staffing", ...demand }, determinate: false };
@@ -190,6 +217,11 @@ export function deriveUnitCapacity(input: {
 
 export type Freshness = "current" | "stale" | "none";
 
+/**
+ * `lastSuccessAt` must be the time the DATA describes (Hub `generated_at`
+ * when present — see `boardSourceTime`), so a fresh fetch of an old Hub
+ * snapshot is still "stale".
+ */
 export function freshnessOf(input: {
   lastSuccessAt: string | null;
   latestFailed: boolean;
@@ -216,4 +248,9 @@ export function availableNursesFor(
 /** Can this view be shown as "room to admit" (green / reassuring)? */
 export function isReassuring(d: CapacityDerivation, freshness: Freshness): boolean {
   return d.determinate && freshness === "current";
+}
+
+/** Time the board describes — Hub snapshot time when sent, else fetch time. */
+export function boardSourceTime(board: PartnerBedBoardOk | null | undefined): string | null {
+  return board ? sourceTimeOf(board) : null;
 }

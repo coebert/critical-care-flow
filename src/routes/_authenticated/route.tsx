@@ -21,6 +21,8 @@ import { Sheet, SheetContent, SheetTrigger, SheetTitle, SheetHeader } from "@/co
 import { VisuallyHidden } from "@radix-ui/react-visually-hidden";
 import { toast } from "sonner";
 import { CommandPalette, useCommandPaletteHotkey } from "@/components/command-palette";
+import { useQueryClient } from "@tanstack/react-query";
+import { resetSessionScope } from "@/lib/session-scope";
 import { Breadcrumbs } from "@/components/breadcrumbs";
 import { GlobalBannerSlot } from "@/components/global-banner-slot";
 
@@ -66,6 +68,7 @@ function AuthedShell() {
   const { hasAccess: canAccessReferrals } = useClinicalAccess();
   const router = useRouter();
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
   const [signingOut, setSigningOut] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
   const [paletteOpen, setPaletteOpen] = useState(false);
@@ -106,6 +109,9 @@ function AuthedShell() {
 
   const handleSignOut = async (reason?: "timeout") => {
     setSigningOut(true);
+    // Drop every cached clinical snapshot and cancel in-flight fetches
+    // synchronously, before anything else renders for the next user.
+    resetSessionScope(queryClient, null);
     // Wipe the persisted E2E session so the next user on this device can't
     // resume the previous user's unlocked private key.
     try {

@@ -11,6 +11,7 @@ import { useEffect, type ReactNode } from "react";
 
 import appCss from "../styles.css?url";
 import { reportLovableError } from "../lib/lovable-error-reporting";
+import { observeSessionIdentity } from "../lib/session-scope";
 
 function NotFoundComponent() {
   return (
@@ -129,6 +130,28 @@ function RootShell({ children }: { children: ReactNode }) {
 
 function RootComponent() {
   const { queryClient } = Route.useRouteContext();
+
+  // Session-scoped cache: drop every cached clinical snapshot the moment the
+  // signed-in identity changes (sign-out, or a different account), before
+  // the next screen renders. Same-user token refreshes are ignored.
+  useEffect(() => {
+    let unsub: (() => void) | undefined;
+    let cancelled = false;
+    void import("@/integrations/supabase/client").then(({ supabase }) => {
+      if (cancelled) return;
+      void supabase.auth.getSession().then(({ data }) => {
+        observeSessionIdentity(queryClient, data.session?.user?.id ?? null);
+      });
+      const { data } = supabase.auth.onAuthStateChange((_event, session) => {
+        observeSessionIdentity(queryClient, session?.user?.id ?? null);
+      });
+      unsub = () => data.subscription.unsubscribe();
+    });
+    return () => {
+      cancelled = true;
+      unsub?.();
+    };
+  }, [queryClient]);
 
   // Startup sanity check: verify the libsodium build ships Argon2 password
   // hashing. If a future dep change ever swaps back to the slim build,

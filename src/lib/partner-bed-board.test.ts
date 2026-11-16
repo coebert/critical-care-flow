@@ -64,6 +64,9 @@ describe("mapPartnerPayload", () => {
     const payload: PartnerBedBoardOk = {
       ok: true,
       unit: "Radnor Critical Care Unit",
+      unit_code: null,
+      generated_at: null,
+      hidden_unassigned: 0,
       side_rooms: ["SR1", "SR2"],
       bed_board: [
         { bed: "1", is_side_room: false, occupied: true, occupant: jane },
@@ -108,7 +111,7 @@ describe("mapPartnerPayload", () => {
   it("derives stats from bed_board when partner omits them", () => {
     const r = mapPartnerPayload(
       {
-        unit: "ICU",
+        unit: "Radnor Critical Care Unit",
         bed_board: [
           { bed: "1", is_side_room: false, occupied: true, occupant: occupant() },
           { bed: "2", is_side_room: false, occupied: true, occupant: occupant({ id: "p-2" }) },
@@ -127,9 +130,16 @@ describe("mapPartnerPayload", () => {
     });
   });
 
-  it("defaults unit, side_rooms and unassigned when partner omits them", () => {
+  it("rejects a payload that names no unit (scope cannot be verified)", () => {
+    const r = mapPartnerPayload({ bed_board: [] }, FETCHED_AT);
+    expect(r.ok).toBe(false);
+    if (r.ok) return;
+    expect(r.indeterminate).toBe(true);
+  });
+
+  it("defaults side_rooms and unassigned when partner omits them (unit_code scope)", () => {
     const r = mapPartnerPayload(
-      { bed_board: [] },
+      { unit_code: "SDH-RADNOR", bed_board: [] },
       FETCHED_AT,
     );
     expect(r.ok).toBe(true);
@@ -154,6 +164,7 @@ describe("mapPartnerPayload", () => {
     });
     const r = mapPartnerPayload(
       {
+        unit_code: "SDH-RADNOR",
         bed_board: [
           { bed: "1", is_side_room: false, occupied: true, occupant: partial },
         ],
