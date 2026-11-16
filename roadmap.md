@@ -27,6 +27,7 @@ Open (blocked on paired release / Hub):
 - [x] Re-audit 6472350: /auth hydration #418 (signed-out "/" redirect mid-hydration) fixed via hydration gate
 - [x] "Keep me signed in" off: honoured on password + passkey, reload, refresh, browser close, sign-out
 - [x] Post-sign-in redirect: strict internal-path validation (router merged raw search; external nav possible)
+- [x] Expired reset link: keyboard way back to sign-in
 - [x] Bed board: late rollback/toast after denial; older confirm closing newer review; clock-back capacity freshness; truthful unknown Hub outcome text
 - [ ] Apply staged SQL `drizzle/staged/0003–0006` at the coordinated release (until then: wardable saves locally only, alerts suppressed)
 - [ ] Hub deploys `POST /patients/wardable` and the deleted_at tombstone/live import

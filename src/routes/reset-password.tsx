@@ -1,4 +1,4 @@
-import { createFileRoute, useNavigate } from "@tanstack/react-router";
+import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
@@ -117,8 +117,14 @@ function ResetPage() {
         </p>
 
         {recoveryError ? (
-          <div className="rounded-md border border-destructive/50 bg-destructive/10 p-4 text-sm text-destructive">
-            {recoveryError}
+          <div className="space-y-4">
+            <div role="alert" className="rounded-md border border-destructive/50 bg-destructive/10 p-4 text-sm text-destructive">
+              {recoveryError}
+            </div>
+            {/* A keyboard/screen-reader user needs a way forward from here. */}
+            <Button asChild variant="outline" className="w-full">
+              <Link to="/auth">Back to sign in to request a new link</Link>
+            </Button>
           </div>
         ) : !verified ? (
           <p className="text-sm text-muted-foreground">Verifying reset link…</p>
