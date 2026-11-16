@@ -14,7 +14,8 @@ Done (synthetic tests pass, not published):
 Final correction pass (on 6dbb4c0):
 - [x] A. Clear/unmount all clinical UI state on denial/logout/identity change; stale-reply guards for edit/acuity/prefill/retry; referrals in purge roots; shared denial gate
 - [x] B. Wardable revisions as lossless decimal strings end-to-end; canonical lowercase patient ids; protected durable counter (staged SQL + disposable SQL checks)
-- [x] C. Hub wire semantics: 409 revision rules, PG bigint max, 404 not_found = not shared, target_changed = review conflict; optional outlier/transfer feeds shown as not provided
+- [x] C. Hub wire semantics: 409 revision rules, PG bigint max, 404 not_found = not shared, target_changed = review conflict
+- [ ] C (part). Check missing optional outlier/transfer feeds show as "not provided" (not in this round's scope)
 - [x] B/C wire + bigint (committed f4dca4a)
 - [x] 1. Clinical UI purge on denial/logout/identity change; ['referrals'] purge; late async guards; mounted tests
 - [x] 2. Wardable review-confirm bound to user/patient/local revision/Hub CAS (signed token); new durable revision conditional on reviewed revision; tests
