@@ -6,7 +6,7 @@ import { describe, it, expect } from "vitest";
 import { fakeHub } from "@/test-utils/fake-hub";
 import { fakeWardableDb } from "@/test-utils/fake-wardable-db";
 import {
-  retryReviewedWardable,
+  confirmReviewedWardable,
   reviewWardableRetry,
   runSetWardable,
   syncWardableToHub,
@@ -17,6 +17,16 @@ import { deriveUnitCapacity } from "./unit-capacity";
 
 const PT = "77777777-7777-4777-8777-777777777777";
 const actor = { id: "88888888-8888-4888-8888-888888888888", role: "clinician" as const };
+
+const caller = { userId: actor.id, actor };
+const SECRET = "synthetic-review-secret";
+type W = ReturnType<typeof fakeWardableDb>;
+type H = ReturnType<typeof fakeHub>;
+const review = (w: W, hub: H, deps: Record<string, unknown> = {}) =>
+  reviewWardableRetry(w.db, PT, caller, { ...hub.deps, reviewSecret: SECRET, ...deps });
+const confirm = (w: W, hub: H, token: unknown, deps: Record<string, unknown> = {}) =>
+  confirmReviewedWardable(w.db, w.db, token, caller, { ...hub.deps, reviewSecret: SECRET, ...deps });
+const reviewAndConfirm = async (w: W, hub: H) => confirm(w, hub, (await review(w, hub)).confirm?.token);
 
 const others = (hub: ReturnType<typeof fakeHub>) =>
   hub.calls.filter((c) => c.method === "POST" && !c.url.pathname.endsWith("/patients/wardable"));
@@ -169,12 +179,13 @@ describe("wardable → Hub fenced transport", () => {
     const { w, hub } = setup();
     await w.db.rpc("set_wardable_desired_state", { _partner_patient_id: PT, _wardable: true }); // crash before push
     expect(w.row(PT)!.partner_sync_status).toBe("pending");
-    const review = await reviewWardableRetry(w.db, PT, actor, hub.deps);
-    expect(review).toEqual({
+    const rv = await review(w, hub);
+    expect(rv).toEqual({
       local: { wardable: true, desired_revision: "1", partner_sync_status: "pending" },
       hub: { state: "ok", wardable: false },
+      confirm: { token: expect.any(String), mode: "resend", expires_at: expect.any(String) },
     });
-    expect(await retryReviewedWardable(w.db, PT, "1", actor, hub.deps)).toMatchObject({ status: "synced", revision: "1" });
+    expect(await confirm(w, hub, rv.confirm!.token)).toMatchObject({ status: "synced", revision: "1" });
   });
 
   it("crash after the Hub applied but before the outcome was saved: retry reports already_applied → synced", async () => {
@@ -183,7 +194,7 @@ describe("wardable → Hub fenced transport", () => {
     const { postHubWardable } = await import("./hub-client.server");
     await postHubWardable({ id: PT, expected_updated_at: hub.store.get(PT)!.updated_at, wardable: true, desired_revision: "1" }, actor, hub.deps);
     expect(w.row(PT)!.partner_sync_status).toBe("pending");
-    expect(await retryReviewedWardable(w.db, PT, "1", actor, hub.deps)).toMatchObject({ status: "synced" });
+    expect(await reviewAndConfirm(w, hub)).toMatchObject({ status: "synced" });
     expect(hub.audit.map((a) => a.result)).toEqual(["applied", "already_applied"]);
   });
 
@@ -194,11 +205,11 @@ describe("wardable → Hub fenced transport", () => {
     expect(r.ok && r.partner).toMatchObject({ status: "conflict", reason: "revision_conflict", recorded: true });
     expect(wardablePosts(hub)).toHaveLength(1); // no automatic second attempt
     expect(w.row(PT)!.partner_sync_status).toBe("conflict");
-    // A retry for a revision the user did not review is refused.
-    expect(await retryReviewedWardable(w.db, PT, "7", actor, hub.deps)).toMatchObject({ status: "pending", reason: "changed_since_review" });
+    // Without a valid signed review nothing is sent.
+    expect(await confirm(w, hub, "not-a-review")).toMatchObject({ status: "failed", reason: "review_invalid" });
     expect(wardablePosts(hub)).toHaveLength(1);
-    // After review, the same revision applies with a fresh Hub revision.
-    expect(await retryReviewedWardable(w.db, PT, "1", actor, hub.deps)).toMatchObject({ status: "synced", revision: "1" });
+    // After review, the same revision applies with the reviewed Hub revision.
+    expect(await reviewAndConfirm(w, hub)).toMatchObject({ status: "synced", revision: "1" });
     expect(hub.store.get(PT)!.wardable).toBe(true);
   });
 
@@ -237,10 +248,12 @@ describe("wardable → Hub fenced transport", () => {
     const r = await set(true);
     expect(r.ok && r.partner).toMatchObject({ status: "failed", reason: "unavailable" });
     hub.control.down = false;
+    const rv = await review(w, hub);
     hub.control.hang = true;
-    expect(await retryReviewedWardable(w.db, PT, "1", actor, hub.deps)).toMatchObject({ status: "failed", reason: "unavailable" });
+    expect(await confirm(w, hub, rv.confirm!.token)).toMatchObject({ status: "failed", reason: "unavailable" });
     hub.control.hang = false;
-    expect(await retryReviewedWardable(w.db, PT, "1", actor, hub.deps)).toMatchObject({ status: "synced" });
+    // Unknown transport outcome: the same reviewed intent is retried as-is.
+    expect(await confirm(w, hub, rv.confirm!.token)).toMatchObject({ status: "synced", revision: "1" });
   });
 
   it("a Hub success that echoes a different revision, patient or boolean is not accepted", async () => {

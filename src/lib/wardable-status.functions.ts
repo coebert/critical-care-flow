@@ -2,7 +2,7 @@ import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { safeError } from "./safe-error";
-import { isDesiredRevision, normalizeWardableRow } from "./wardable-revision";
+import { normalizeWardableRow } from "./wardable-revision";
 
 export type PartnerSyncStatus = "synced" | "failed" | "not_configured" | "conflict" | "not_shared";
 
@@ -36,6 +36,9 @@ export type PartnerSyncReason =
   | "not_shared"
   | "changed_since_review"
   | "paused_until_release"
+  | "review_invalid"
+  | "review_expired"
+  | "local_forbidden"
   | null;
 
 /** Mirrors PartnerSyncOutcome in wardable-status.server.ts. */
@@ -59,6 +62,8 @@ export type WardableRetryReview = {
   hub:
     | { state: "ok"; wardable: boolean | null }
     | { state: "not_shared" | "unavailable" | "not_configured" | "invalid" };
+  /** Signed, expiring confirmation for exactly this review (null = cannot confirm). */
+  confirm: { token: string; mode: "resend" | "new_revision"; expires_at: string } | null;
 };
 
 const COLS =
@@ -108,6 +113,16 @@ async function serverDeps(context: { userId: string; claims: unknown }) {
   return { actor: actorFor(context.userId, context.claims as Record<string, unknown>), admin: supabaseAdmin as never, core };
 }
 
+/** Key for signing review confirmations (server-only bridge secret). */
+async function reviewSecret(): Promise<string> {
+  try {
+    const { getBridgeSecrets } = await import("./bridge-hmac.server");
+    return getBridgeSecrets().current || "";
+  } catch {
+    return "";
+  }
+}
+
 export const listWardableStatus = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
   .handler(async ({ context }): Promise<WardableStatus[]> => {
@@ -135,29 +150,42 @@ export const setWardableStatus = createServerFn({ method: "POST" })
     return { local: r.local as WardableStatus, partner: r.partner };
   });
 
-/** Show what a retry would send next to what the Hub currently shows. */
+/**
+ * Show what a confirmation would send next to what the Hub currently shows,
+ * with a signed, expiring token bound to this user, patient, local revision
+ * and value, and the Hub's updated_at and value.
+ */
 export const reviewWardableRetry = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((d: unknown) => z.object({ partner_patient_id: idSchema }).parse(d))
   .handler(async ({ data, context }): Promise<WardableRetryReview> => {
     await requireClinical(context);
     const { actor, admin, core } = await serverDeps(context);
-    return core.reviewWardableRetry(admin, data.partner_patient_id, actor);
+    return core.reviewWardableRetry(admin, data.partner_patient_id, { userId: context.userId, actor }, {
+      reviewSecret: await reviewSecret(),
+    });
   });
 
-/** Re-send ONLY the reviewed, still-current desired revision. */
+const confirmSchema = z.object({ review_token: z.string().min(1).max(4096) });
+
+/**
+ * Confirm exactly the reviewed state: the reviewed Hub CAS is sent
+ * unchanged; stale local state is refused before any write.
+ */
 export const retryWardableSync = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((d: unknown) =>
-    z
-      .object({ partner_patient_id: idSchema, reviewed_revision: z.string().refine(isDesiredRevision, "invalid revision") })
-      .parse(d),
-  )
+  .inputValidator((d: unknown) => confirmSchema.parse(d))
   .handler(async ({ data, context }): Promise<PartnerSyncOutcome> => {
     await requireClinical(context);
     const { actor, admin, core } = await serverDeps(context);
     try {
-      return await core.retryReviewedWardable(admin, data.partner_patient_id, data.reviewed_revision, actor);
+      return await core.confirmReviewedWardable(
+        context.supabase as never,
+        admin,
+        data.review_token,
+        { userId: context.userId, actor },
+        { reviewSecret: await reviewSecret() },
+      );
     } catch {
       return { status: "failed", reason: "unavailable", revision: null, recorded: false, message: "ICU Handover Hub could not be updated" };
     }

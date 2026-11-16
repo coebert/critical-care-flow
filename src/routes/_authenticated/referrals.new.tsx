@@ -59,8 +59,20 @@ import { validateReferralOutcome, type ReferralOutcome } from "@/lib/referral-ou
 export const Route = createFileRoute("/_authenticated/referrals/new")({
   head: () => ({ meta: [{ title: "New referral — SDH Critical Care" }] }),
   errorComponent: ({ error }) => <ReferralRouteError error={error} label="New referral" />,
-  component: NewReferralPage,
+  component: GatedNewReferralPage,
 });
+
+/**
+ * Gate OUTSIDE the component that holds patient state, so an authoritative
+ * denial or account change unmounts it (decrypted fields, drafts, selection).
+ */
+function GatedNewReferralPage() {
+  return (
+    <ClinicalAccessGate>
+      <NewReferralPage />
+    </ClinicalAccessGate>
+  );
+}
 
 function NewReferralPage() {
   const navigate = useNavigate();
@@ -319,7 +331,6 @@ function NewReferralPage() {
   };
 
   return (
-    <ClinicalAccessGate>
     <div className="p-4 sm:p-6 max-w-3xl lg:max-w-5xl mx-auto">
       <div className="flex items-end justify-between mb-6 gap-4 flex-wrap">
         <h1 className="text-2xl font-semibold tracking-tight">New referral</h1>
@@ -575,6 +586,5 @@ function NewReferralPage() {
         priors={priors}
       />
     </div>
-    </ClinicalAccessGate>
   );
 }

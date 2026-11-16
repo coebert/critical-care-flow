@@ -1,12 +1,13 @@
 import { createFileRoute, Outlet, redirect, Link, useRouter, useNavigate, useRouterState } from "@tanstack/react-router";
 import { usePush } from "@/hooks/use-push";
 import { useShiftStatus } from "@/hooks/use-shift-status";
-import { useEffect, useState } from "react";
+import { Fragment, useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useE2ESession, initKeyStatusCrossTabSync } from "@/hooks/use-e2e-session";
 import { Activity, BarChart3, ListChecks, Shield, LogOut, Plus, Menu, Bell, BellRing, Inbox, PanelLeftClose, PanelLeftOpen, CalendarClock, UserCircle, Bed as BedIcon, RefreshCw, Search, ClipboardList } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useAuth, useRole, useClinicalAccess } from "@/hooks/use-auth";
+import { useClinicalScope } from "@/hooks/use-clinical-scope";
 import { NotificationBell } from "@/components/notification-bell";
 import { AlertToggle } from "@/components/alert-toggle";
 import { useNewReferralAlert } from "@/hooks/use-new-referral-alert";
@@ -66,6 +67,9 @@ function AuthedShell() {
   // `has_clinical_access` predicate, so this only hides the entries for
   // signed-in users with no clinical role.
   const { hasAccess: canAccessReferrals } = useClinicalAccess();
+  // Every page remounts on identity change or clinical denial/recovery so no
+  // patient selection, draft, decrypted record or open dialog survives it.
+  const clinicalScope = useClinicalScope();
   const router = useRouter();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
@@ -293,7 +297,9 @@ function AuthedShell() {
         <PushPermissionPrompt visible={supported && permission !== "granted" && atWork === true} />
         <E2EUnlockBanner />
         <main className="flex-1 overflow-auto">
-          <Outlet />
+          <Fragment key={`${user?.id ?? "anon"}:${clinicalScope.epoch}`}>
+            <Outlet />
+          </Fragment>
         </main>
       </div>
       <CommandPalette open={paletteOpen} onOpenChange={setPaletteOpen} />

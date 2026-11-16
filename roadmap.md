@@ -12,13 +12,17 @@ Done (synthetic tests pass, not published):
 - [x] 8. Full tests, typecheck, build, synthetic phone/tablet/desktop flows; ward-round page made reachable
 
 Final correction pass (on 6dbb4c0):
-- [ ] A. Clear/unmount all clinical UI state on denial/logout/identity change; stale-reply guards for edit/acuity/prefill/retry; referrals in purge roots; shared denial gate
-- [ ] B. Wardable revisions as lossless decimal strings end-to-end; canonical lowercase patient ids; protected durable counter (staged SQL + disposable SQL checks)
-- [ ] C. Hub wire semantics: 409 revision rules, PG bigint max, 404 not_found = not shared, target_changed = review conflict; optional outlier/transfer feeds shown as not provided
-- [ ] D. Functional handler tests for Hub patient writes (sanitised, private errors, scope/revoked, partial update, stale CAS)
-- [ ] Full tests, typecheck, build, phone/tablet/desktop checks, commit
+- [x] A. Clear/unmount all clinical UI state on denial/logout/identity change; stale-reply guards for edit/acuity/prefill/retry; referrals in purge roots; shared denial gate
+- [x] B. Wardable revisions as lossless decimal strings end-to-end; canonical lowercase patient ids; protected durable counter (staged SQL + disposable SQL checks)
+- [x] C. Hub wire semantics: 409 revision rules, PG bigint max, 404 not_found = not shared, target_changed = review conflict; optional outlier/transfer feeds shown as not provided
+- [x] B/C wire + bigint (committed f4dca4a)
+- [x] 1. Clinical UI purge on denial/logout/identity change; ['referrals'] purge; late async guards; mounted tests
+- [x] 2. Wardable review-confirm bound to user/patient/local revision/Hub CAS (signed token); new durable revision conditional on reviewed revision; tests
+- [x] D. Functional handler tests for Hub patient writes (sanitised, private errors, scope/revoked, partial update, stale CAS)
+- [x] Full tests, typecheck, build, commit
+- [ ] Signed-in synthetic phone/tablet/desktop browser checks (needs approval to create a test user)
 
 Open (blocked on paired release / Hub):
-- [ ] Apply staged SQL `drizzle/staged/0003–0005` at the coordinated release (until then: wardable saves locally only, alerts suppressed)
+- [ ] Apply staged SQL `drizzle/staged/0003–0006` at the coordinated release (until then: wardable saves locally only, alerts suppressed)
 - [ ] Hub deploys `POST /patients/wardable` and the deleted_at tombstone/live import
 - [ ] Publish together with Hub

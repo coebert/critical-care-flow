@@ -94,7 +94,7 @@ export const Route = createFileRoute("/_authenticated/referrals/$id")({
       </Link>
     </div>
   ),
-  component: ReferralDetail,
+  component: GatedReferralDetail,
 });
 
 function toLocal(iso: string | null) {
@@ -102,6 +102,18 @@ function toLocal(iso: string | null) {
   const d = new Date(iso);
   d.setMinutes(d.getMinutes() - d.getTimezoneOffset());
   return d.toISOString().slice(0, 16);
+}
+
+/**
+ * Gate OUTSIDE the component that holds patient state, so an authoritative
+ * denial or account change unmounts it (decrypted fields, drafts, selection).
+ */
+function GatedReferralDetail() {
+  return (
+    <ClinicalAccessGate>
+      <ReferralDetail />
+    </ClinicalAccessGate>
+  );
 }
 
 function ReferralDetail() {
@@ -336,7 +348,6 @@ function ReferralDetail() {
   };
 
   return (
-    <ClinicalAccessGate>
     <div className="p-4 sm:p-6 max-w-5xl mx-auto">
       <div className="flex items-center justify-between gap-2 mb-6 flex-wrap">
         <Button variant="ghost" size="sm" onClick={() => navigate({ to: "/" })}>
@@ -647,6 +658,5 @@ function ReferralDetail() {
         )}
       </div>
     </div>
-    </ClinicalAccessGate>
   );
 }

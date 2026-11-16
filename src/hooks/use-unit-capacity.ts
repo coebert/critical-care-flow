@@ -9,7 +9,7 @@ import type {
 import { getPatientAcuity, type AcuityEntry } from "@/lib/patient-acuity.functions";
 import { getNurseStaffingForDate } from "@/lib/nurse-staffing.functions";
 import { currentShift, type ShiftKey } from "@/lib/shift-clock";
-import { purgeClinicalSnapshots, sessionScoped } from "@/lib/session-scope";
+import { purgeClinicalSnapshots, reportClinicalDenial, sessionScoped } from "@/lib/session-scope";
 import {
   CAPACITY_REFRESH_MS,
   availableNursesFor,
@@ -75,8 +75,11 @@ export function usePartnerBedBoard() {
       const r = await fetchBoard();
       if (r.ok) return { kind: "ok", board: r };
       if (r.forbidden) {
-        // Role revoked / denied: drop every other clinical snapshot too.
-        purgeClinicalSnapshots(qc, PARTNER_BOARD_QK);
+        // Role revoked / denied: drop every other clinical snapshot too. An
+        // authoritative 403 also closes the shared clinical gate so every
+        // open patient dialog / selection unmounts (not only this query).
+        if (r.status === 403) reportClinicalDenial(qc, PARTNER_BOARD_QK);
+        else purgeClinicalSnapshots(qc, PARTNER_BOARD_QK);
         return { kind: "forbidden", failure: r };
       }
       throw new PartnerBoardUnavailableError(r);

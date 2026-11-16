@@ -1,6 +1,10 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 import type { Session, User } from "@supabase/supabase-js";
 import { supabase } from "@/integrations/supabase/client";
+import { clearClinicalDenial, currentClinicalEpoch, getClinicalScope } from "@/lib/session-scope";
+import { useClinicalScope } from "./use-clinical-scope";
+export { useClinicalScope };
 
 export interface AuthState {
   user: User | null;
@@ -115,8 +119,24 @@ export function useRole(role: "admin" | "clinician") {
  */
 export function useClinicalAccess() {
   const { user, loading: authLoading } = useAuth();
+  const qc = useQueryClient();
+  const scope = useClinicalScope();
   const [hasAccess, setHasAccess] = useState<boolean>(false);
   const [loading, setLoading] = useState(true);
+  const [rechecking, setRechecking] = useState(false);
+
+  /**
+   * Fresh, authoritative server check (the same predicate the server uses).
+   * Only a check that STARTED after a denial may clear it.
+   */
+  const freshCheck = useCallback(
+    async (userId: string, startedAt: number): Promise<boolean> => {
+      const { data, error } = await supabase.rpc("has_clinical_access", { _user_id: userId });
+      if (error || data !== true) return false;
+      return clearClinicalDenial(qc, startedAt);
+    },
+    [qc],
+  );
 
   useEffect(() => {
     if (authLoading) {
@@ -131,15 +151,19 @@ export function useClinicalAccess() {
 
     let cancelled = false;
     const check = async () => {
+      const startedAt = currentClinicalEpoch();
       const { data } = await supabase
         .from("user_roles")
         .select("role")
         .eq("user_id", user.id)
         .in("role", ["admin", "clinician"]);
-      if (!cancelled) {
-        setHasAccess(Array.isArray(data) && data.length > 0);
-        setLoading(false);
-      }
+      if (cancelled) return;
+      const roleRows = Array.isArray(data) && data.length > 0;
+      // A role row alone never overrides an authoritative denial.
+      if (roleRows && getClinicalScope().denied) await freshCheck(user.id, startedAt);
+      if (cancelled) return;
+      setHasAccess(roleRows);
+      setLoading(false);
     };
 
     setLoading(true);
@@ -166,9 +190,28 @@ export function useClinicalAccess() {
       cancelled = true;
       void supabase.removeChannel(channel);
     };
-  }, [user, authLoading]);
+  }, [user, authLoading, freshCheck]);
 
-  return { hasAccess, loading };
+  /** "Check again" after a denial: a fresh server check, never a cached role. */
+  const recheck = useCallback(async () => {
+    if (!user) return false;
+    const startedAt = currentClinicalEpoch();
+    setRechecking(true);
+    try {
+      return await freshCheck(user.id, startedAt);
+    } finally {
+      setRechecking(false);
+    }
+  }, [user, freshCheck]);
+
+  return {
+    hasAccess: hasAccess && !scope.denied,
+    loading,
+    denied: scope.denied,
+    recheck,
+    rechecking,
+    userId: user?.id ?? null,
+  };
 }
 
 /**

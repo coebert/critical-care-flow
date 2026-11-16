@@ -21,7 +21,7 @@ export type {
   PartnerBedBoardResult,
 } from "./partner-bed-board-contract";
 export { mapPartnerPayload } from "./partner-bed-board-contract";
-import { occupantDtoOrNull, type PartnerOccupant, type PartnerBedBoardResult } from "./partner-bed-board-contract";
+import type { PartnerOccupant, PartnerBedBoardResult } from "./partner-bed-board-contract";
 import type { BoardAccessContext } from "./partner-bed-board.server";
 
 /**
@@ -124,122 +124,22 @@ export const updatePartnerPatient = createServerFn({ method: "POST" })
     } satisfies UpdatePartnerPatientInput;
   })
   .handler(async ({ data, context }): Promise<UpdatePartnerPatientResult> => {
-    const base = process.env.PARTNER_BRIDGE_URL;
-    if (!base) return { ok: false, error: "PARTNER_BRIDGE_URL is not configured" };
-
-    // Only clinicians/admins on our side may write across the bridge.
-    const { data: allowed, error: roleErr } = await context.supabase.rpc(
-      "has_clinical_access",
-      { _user_id: context.userId },
-    );
-    if (roleErr) return { ok: false, error: "Permission check failed — nothing was changed" };
-    if (!allowed) return { ok: false, error: "forbidden: clinical role required", status: 403 };
-
-    let secret: string;
+    const { writePartnerPatient } = await import("./partner-patient-write.server");
+    let secret = "";
     try {
       const { getBridgeSecrets } = await import("@/lib/bridge-hmac.server");
       secret = getBridgeSecrets().current;
     } catch {
-      return { ok: false, error: "ICU Handover Hub link is not configured" };
+      secret = "";
     }
-
-    // Forward the caller's identity as the actor. Partner authorize() treats
-    // the actor as authentic because it is inside the HMAC envelope.
-    const claims = context.claims as Record<string, unknown>;
-    const email = typeof claims.email === "string" ? claims.email : undefined;
-    const actor = JSON.stringify({ id: context.userId, email, role: "clinician" });
-
-    const bodyObj: Record<string, unknown> = { id: data.id };
-    if (data.expected_updated_at) bodyObj.expected_updated_at = data.expected_updated_at;
-    for (const key of [
-      "full_name",
-      "hospital_number",
-      "age",
-      "bed",
-      "status",
-      "tep_in_place",
-      "tep_details",
-      "dnacpr_decision",
-      "dnacpr_details",
-      "outstanding_tasks",
-      "past_medical_history",
-      "current_admission",
-      "current_management",
-    ] as const) {
-      const v = (data as Record<string, unknown>)[key];
-      if (v !== undefined) bodyObj[key] = v;
-    }
-    const rawBody = JSON.stringify(bodyObj);
-
-    const timestamp = String(Math.floor(Date.now() / 1000));
-    const { createHmac } = await import("node:crypto");
-    const signature = createHmac("sha256", secret)
-      .update(`${timestamp}.${actor}.${rawBody}`)
-      .digest("hex");
-
-    const url = `${base.replace(/\/$/, "")}/patients`;
-    let res: Response;
-    try {
-      res = await fetch(url, {
-        method: "POST",
-        headers: {
-          "content-type": "application/json",
-          "x-timestamp": timestamp,
-          "x-actor": actor,
-          "x-signature": signature,
-          "cache-control": "no-store",
-        },
-        body: rawBody,
-        signal: AbortSignal.timeout(8_000),
-      });
-    } catch {
-      return { ok: false, error: "ICU Handover Hub could not be reached — nothing was changed" };
-    }
-
-    let payload: unknown = null;
-    try {
-      payload = await res.json();
-    } catch {
-      /* keep null */
-    }
-
-    if (res.status === 409) {
-      const p = (payload ?? {}) as { current?: unknown; your_expected_updated_at?: unknown };
-      // Strict DTO; a "current" row for a different patient is discarded.
-      const current = occupantDtoOrNull(p.current);
-      return {
-        ok: false,
-        status: 409,
-        error: "This patient was modified in ICU Handover Hub since you loaded it.",
-        conflict:
-          current && current.id === data.id
-            ? {
-                current,
-                your_expected_updated_at:
-                  typeof p.your_expected_updated_at === "string" ? p.your_expected_updated_at : null,
-              }
-            : undefined,
-      };
-    }
-
-    if (!res.ok) {
-      // Fixed text per status class; upstream bodies are never echoed.
-      const error =
-        res.status === 401 || res.status === 403
-          ? "ICU Handover Hub refused the update (no access to this patient)"
-          : res.status === 404
-            ? "This patient is no longer shared by ICU Handover Hub"
-            : res.status >= 500
-              ? "ICU Handover Hub is unavailable — nothing was changed"
-              : "ICU Handover Hub rejected the update";
-      return { ok: false, status: res.status, error };
-    }
-
-    const patient = occupantDtoOrNull((payload as { patient?: unknown } | null)?.patient);
-    if (!patient || patient.id !== data.id) {
-      return { ok: false, error: "ICU Handover Hub returned an unexpected response" };
-    }
-    return { ok: true, patient };
+    return writePartnerPatient(data, {
+      userId: context.userId,
+      claims: context.claims as Record<string, unknown>,
+      checkClinical: async () => {
+        const { data: allowed, error } = await context.supabase.rpc("has_clinical_access", { _user_id: context.userId });
+        return error ? "error" : allowed === true;
+      },
+    }, { baseUrl: process.env.PARTNER_BRIDGE_URL, secret });
   });
 
 

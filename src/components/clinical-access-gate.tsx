@@ -1,6 +1,8 @@
 import { Link } from "@tanstack/react-router";
 import { ShieldAlert } from "lucide-react";
+import { Fragment } from "react";
 import { useClinicalAccess } from "@/hooks/use-auth";
+import { useClinicalScope } from "@/hooks/use-clinical-scope";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 
@@ -16,7 +18,9 @@ import { Skeleton } from "@/components/ui/skeleton";
  * This component gives them a clear "no access" screen instead.
  */
 export function ClinicalAccessGate({ children }: { children: React.ReactNode }) {
-  const { hasAccess, loading } = useClinicalAccess();
+  const access = useClinicalAccess();
+  const { hasAccess, loading } = access;
+  const scope = useClinicalScope();
 
   if (loading) {
     return (
@@ -36,16 +40,27 @@ export function ClinicalAccessGate({ children }: { children: React.ReactNode }) 
             <h1 className="text-lg font-semibold">Access restricted</h1>
           </div>
           <p className="text-sm text-muted-foreground">
-            Referrals contain patient-identifiable information and are only
-            available to members of the critical care team. Your account
-            doesn't currently have clinical access.
+            Referrals and the bed board contain patient-identifiable
+            information and are only available to members of the critical
+            care team. Your account doesn't currently have clinical access.
           </p>
           <p className="text-sm text-muted-foreground">
             If you believe this is a mistake, please ask a critical care
             administrator to grant you the clinician role.
           </p>
-          <div className="flex gap-2">
-            <Button asChild variant="outline" size="sm">
+          <div className="flex flex-wrap gap-2">
+            {access.denied && access.recheck && (
+              <Button
+                type="button"
+                size="sm"
+                className="min-h-9"
+                disabled={access.rechecking}
+                onClick={() => void access.recheck()}
+              >
+                {access.rechecking ? "Checking…" : "Check access again"}
+              </Button>
+            )}
+            <Button asChild variant="outline" size="sm" className="min-h-9">
               <Link to="/profile">Go to profile</Link>
             </Button>
           </div>
@@ -54,5 +69,7 @@ export function ClinicalAccessGate({ children }: { children: React.ReactNode }) 
     );
   }
 
-  return <>{children}</>;
+  // Keyed by identity + clinical epoch: a denial, recovery or account
+  // change unmounts every selection, draft, decrypted record and dialog.
+  return <Fragment key={`${access.userId ?? "anon"}:${scope.epoch}`}>{children}</Fragment>;
 }

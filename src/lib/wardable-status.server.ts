@@ -20,6 +20,7 @@
  *    POST fallback; a missing endpoint fails closed.
  *  - Discharge timing stamps are local analytics only and are never sent.
  */
+import { createHmac, timingSafeEqual } from "node:crypto";
 import {
   canonicalPatientId,
   normalizeWardableRow,
@@ -52,6 +53,9 @@ export type PartnerSyncReason =
   | "not_shared"
   | "changed_since_review"
   | "paused_until_release"
+  | "review_invalid"
+  | "review_expired"
+  | "local_forbidden"
   | null;
 
 export type PartnerSyncOutcome = {
@@ -69,7 +73,10 @@ export type PartnerSyncOutcome = {
 export const WARDABLE_VIEW = "patient_wardable_status_v";
 export type WardableDb = { from: (t: "patient_wardable_status" | typeof WARDABLE_VIEW) => any };
 export type WardableRpcDb = WardableDb & {
-  rpc: (fn: "set_wardable_desired_state", args: { _partner_patient_id: string; _wardable: boolean }) => PromiseLike<{
+  rpc: (
+    fn: "set_wardable_desired_state" | "confirm_wardable_reviewed_intent",
+    args: { _partner_patient_id: string; _wardable: boolean; _reviewed_revision?: string },
+  ) => PromiseLike<{
     data: unknown;
     error: { message?: string; code?: string } | null;
   }>;
@@ -80,6 +87,7 @@ type LocalRow = {
   wardable: boolean;
   desired_revision: string | null;
   partner_sync_status: string | null;
+  partner_synced_revision: string | null;
 };
 
 const MESSAGE: Record<Exclude<PartnerSyncReason, null> | "synced", string> = {
@@ -99,6 +107,9 @@ const MESSAGE: Record<Exclude<PartnerSyncReason, null> | "synced", string> = {
   not_shared: "Saved here, but this patient is no longer shared by ICU Handover Hub",
   changed_since_review: "The wardable state changed since you reviewed it — review again",
   paused_until_release: "Saved here only — ICU Handover Hub wardable updates start with the coordinated release",
+  review_invalid: "That review could not be confirmed — nothing was sent. Review again",
+  review_expired: "That review has expired — nothing was sent. Review again",
+  local_forbidden: "Your account does not have clinical access — nothing was sent",
 };
 
 const outcome = (
@@ -121,18 +132,20 @@ async function readLocal(db: WardableDb, id: string): Promise<LocalRow | null | 
   // Only the text projection is trusted for revisions (no number rounding).
   const { data, error } = await db
     .from(WARDABLE_VIEW)
-    .select("partner_patient_id, wardable, desired_revision, partner_sync_status")
+    .select("partner_patient_id, wardable, desired_revision, partner_sync_status, partner_synced_revision")
     .eq("partner_patient_id", id)
     .maybeSingle();
   if (error) return "error";
   if (!data) return null;
   const row = data as Record<string, unknown>;
   if (typeof row.desired_revision !== "string") return "error";
+  if (row.partner_synced_revision != null && typeof row.partner_synced_revision !== "string") return "error";
   return {
     partner_patient_id: String(row.partner_patient_id),
     wardable: row.wardable === true,
     desired_revision: row.desired_revision,
     partner_sync_status: (row.partner_sync_status as string | null) ?? null,
+    partner_synced_revision: (row.partner_synced_revision as string | null) ?? null,
   };
 }
 
@@ -143,6 +156,7 @@ async function record(
   rev: string,
   status: PartnerSyncStatus,
   nowIso: string,
+  appliedByHub = false,
 ): Promise<"recorded" | "moved_on" | "error"> {
   const { data, error } = await db
     .from("patient_wardable_status")
@@ -150,7 +164,7 @@ async function record(
       partner_sync_status: status,
       partner_sync_checked_at: nowIso,
       // Decimal strings: PostgREST casts them to bigint losslessly.
-      ...(status === "synced" ? { partner_synced_revision: rev } : {}),
+      ...(appliedByHub ? { partner_synced_revision: rev } : {}),
     })
     .eq("partner_patient_id", id)
     .eq("desired_revision", rev)
@@ -166,8 +180,9 @@ async function finish(
   status: PartnerSyncStatus,
   reason: PartnerSyncReason,
   nowIso: string,
+  appliedByHub = false,
 ): Promise<PartnerSyncOutcome> {
-  const r = await record(db, id, rev, status, nowIso);
+  const r = await record(db, id, rev, status, nowIso, appliedByHub);
   if (r === "moved_on") return outcome("pending", "newer_local_change", rev, false);
   return outcome(status, reason, rev, r === "recorded");
 }
@@ -212,26 +227,38 @@ export async function syncWardableToHub(
     actor,
     deps,
   );
+  return settle(db, partnerPatientId, rev, res, nowIso());
+}
+
+/** Map a fenced Hub reply to the recorded outcome for `rev`. */
+async function settle(
+  db: WardableDb,
+  id: string,
+  rev: string,
+  res: Awaited<ReturnType<typeof postHubWardable>>,
+  nowIso: string,
+): Promise<PartnerSyncOutcome> {
   switch (res.kind) {
     case "applied":
     case "already_applied":
-      return finish(db, partnerPatientId, rev, "synced", null, nowIso());
+      return finish(db, id, rev, "synced", null, nowIso, true);
     case "conflict":
-      // Every conflict (incl. target_changed: the Hub's value was changed
-      // natively after an applied intent) needs the user to review.
-      return finish(db, partnerPatientId, rev, "conflict", res.code, nowIso());
+      // Every conflict needs the user to review. target_changed means the
+      // Hub DID apply this revision and its value was changed natively
+      // after — recorded as applied so a confirmation needs a new revision.
+      return finish(db, id, rev, "conflict", res.code, nowIso, res.code === "target_changed");
     case "not_shared":
-      return finish(db, partnerPatientId, rev, "not_shared", "not_shared", nowIso());
+      return finish(db, id, rev, "not_shared", "not_shared", nowIso);
     case "not_configured":
-      return finish(db, partnerPatientId, rev, "not_configured", "not_configured", nowIso());
+      return finish(db, id, rev, "not_configured", "not_configured", nowIso);
     case "endpoint_unavailable":
-      return finish(db, partnerPatientId, rev, "failed", "endpoint_unavailable", nowIso());
+      return finish(db, id, rev, "failed", "endpoint_unavailable", nowIso);
     case "forbidden":
-      return finish(db, partnerPatientId, rev, "failed", "forbidden", nowIso());
+      return finish(db, id, rev, "failed", "forbidden", nowIso);
     case "unavailable":
-      return finish(db, partnerPatientId, rev, "failed", "unavailable", nowIso());
+      return finish(db, id, rev, "failed", "unavailable", nowIso);
     default:
-      return finish(db, partnerPatientId, rev, "failed", "invalid", nowIso());
+      return finish(db, id, rev, "failed", "invalid", nowIso);
   }
 }
 
@@ -326,62 +353,194 @@ async function legacyLocalOnly(
   return { ok: true, local: row, partner: outcome("failed", "paused_until_release", revisionString(row.desired_revision), true) };
 }
 
+export type WardableReviewMode = "resend" | "new_revision";
+
 export type WardableRetryReview = {
   local: { wardable: boolean; desired_revision: string; partner_sync_status: string | null } | null;
   hub:
     | { state: "ok"; wardable: boolean | null }
     | { state: "not_shared" | "unavailable" | "not_configured" | "invalid" };
+  /**
+   * Present only when this exact review may be confirmed. `token` is signed
+   * and binds the user, patient, local desired revision + value and the
+   * Hub's updated_at + value that were shown, and expires.
+   *  - "resend": the same durable revision is sent again (idempotent).
+   *  - "new_revision": the reviewed revision was already applied by the Hub
+   *    and the Hub value changed natively since, so confirming records a
+   *    NEW durable revision (only if the local revision is still the
+   *    reviewed one) and sends that.
+   */
+  confirm: { token: string; mode: WardableReviewMode; expires_at: string } | null;
 };
 
-/** What a retry would send, next to what the Hub currently shows. */
+export type ReviewCaller = { userId: string; actor: HubActor };
+export type ReviewDeps = HubDeps & { now?: () => Date; reviewSecret?: string; reviewTtlMs?: number };
+
+type ReviewTokenBody = {
+  v: 1;
+  /** Signed-in user who saw the review. */
+  sub: string;
+  /** Canonical patient id. */
+  pt: string;
+  /** Local desired revision (decimal string) and value shown. */
+  lr: string;
+  lw: boolean;
+  /** Hub updated_at (the CAS sent unchanged) and value shown. */
+  hu: string;
+  hw: boolean | null;
+  m: WardableReviewMode;
+  exp: number;
+};
+
+export const REVIEW_TTL_MS = 2 * 60_000;
+const reviewKey = (secret: string) => `${secret}:wardable-review-confirm:v1`;
+
+export function signReviewToken(body: ReviewTokenBody, secret: string): string {
+  const payload = Buffer.from(JSON.stringify(body), "utf8").toString("base64url");
+  const sig = createHmac("sha256", reviewKey(secret)).update(payload).digest().toString("base64url");
+  return `${payload}.${sig}`;
+}
+
+export function verifyReviewToken(token: unknown, secret: string): ReviewTokenBody | null {
+  if (typeof token !== "string" || token.length > 4096 || !secret) return null;
+  const [payload, sig, extra] = token.split(".");
+  if (!payload || !sig || extra !== undefined) return null;
+  const expected = createHmac("sha256", reviewKey(secret)).update(payload).digest();
+  const given = Buffer.from(sig, "base64url");
+  if (given.length !== expected.length || !timingSafeEqual(given, expected)) return null;
+  try {
+    const b = JSON.parse(Buffer.from(payload, "base64url").toString("utf8")) as ReviewTokenBody;
+    if (
+      b?.v !== 1 ||
+      typeof b.sub !== "string" ||
+      canonicalPatientId(b.pt) !== b.pt ||
+      !isDesiredRevision(b.lr) ||
+      typeof b.lw !== "boolean" ||
+      typeof b.hu !== "string" ||
+      !b.hu ||
+      !(b.hw === null || typeof b.hw === "boolean") ||
+      (b.m !== "resend" && b.m !== "new_revision") ||
+      typeof b.exp !== "number"
+    ) {
+      return null;
+    }
+    return b;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Review step: what a confirmation would send, next to what the Hub shows.
+ * A confirm token is issued only after a successful Hub read.
+ */
 export async function reviewWardableRetry(
   db: WardableDb,
   partnerPatientId: string,
-  actor: HubActor,
-  deps: HubDeps = {},
+  caller: ReviewCaller,
+  deps: ReviewDeps = {},
 ): Promise<WardableRetryReview> {
   const canonical = canonicalPatientId(partnerPatientId);
-  if (!canonical) return { local: null, hub: { state: "invalid" } };
+  if (!canonical) return { local: null, hub: { state: "invalid" }, confirm: null };
   partnerPatientId = canonical;
   const local = await readLocal(db, partnerPatientId);
   const rev = local && local !== "error" ? revisionString(local.desired_revision) : null;
-  const hub = await fetchHubPatient(partnerPatientId, actor, deps);
-  return {
-    local:
-      local && local !== "error" && rev
-        ? { wardable: local.wardable === true, desired_revision: rev, partner_sync_status: local.partner_sync_status }
-        : null,
-    hub:
-      hub.kind === "ok"
-        ? { state: "ok", wardable: typeof hub.patient.wardable === "boolean" ? hub.patient.wardable : null }
-        : hub.kind === "forbidden" || hub.kind === "not_shared"
-          ? { state: "not_shared" }
-          : hub.kind === "not_configured"
-            ? { state: "not_configured" }
-            : hub.kind === "unavailable"
-              ? { state: "unavailable" }
-              : { state: "invalid" },
-  };
+  const hub = await fetchHubPatient(partnerPatientId, caller.actor, deps);
+  const shownLocal =
+    local && local !== "error" && rev
+      ? { wardable: local.wardable === true, desired_revision: rev, partner_sync_status: local.partner_sync_status }
+      : null;
+  const shownHub: WardableRetryReview["hub"] =
+    hub.kind === "ok"
+      ? { state: "ok", wardable: typeof hub.patient.wardable === "boolean" ? hub.patient.wardable : null }
+      : hub.kind === "forbidden" || hub.kind === "not_shared"
+        ? { state: "not_shared" }
+        : hub.kind === "not_configured"
+          ? { state: "not_configured" }
+          : hub.kind === "unavailable"
+            ? { state: "unavailable" }
+            : { state: "invalid" };
+
+  let confirm: WardableRetryReview["confirm"] = null;
+  const hubUpdatedAt = hub.kind === "ok" && typeof hub.patient.updated_at === "string" ? hub.patient.updated_at : "";
+  if (shownLocal && local && local !== "error" && hub.kind === "ok" && hubUpdatedAt && deps.reviewSecret && caller.userId) {
+    const hubWardable = shownHub.state === "ok" ? shownHub.wardable : null;
+    // The Hub already applied this revision (synced, or target_changed):
+    // re-sending it can never change the Hub again.
+    const appliedByHub = local.partner_synced_revision === rev;
+    const nothingToSend = appliedByHub && hubWardable === shownLocal.wardable;
+    if (!nothingToSend) {
+      const mode: WardableReviewMode = appliedByHub ? "new_revision" : "resend";
+      const exp = (deps.now ?? (() => new Date()))().getTime() + (deps.reviewTtlMs ?? REVIEW_TTL_MS);
+      const token = signReviewToken(
+        { v: 1, sub: caller.userId, pt: partnerPatientId, lr: rev!, lw: shownLocal.wardable, hu: hubUpdatedAt, hw: hubWardable, m: mode, exp },
+        deps.reviewSecret,
+      );
+      confirm = { token, mode, expires_at: new Date(exp).toISOString() };
+    }
+  }
+  return { local: shownLocal, hub: shownHub, confirm };
 }
 
-/** Explicit retry: only the revision the user reviewed may be sent. */
-export async function retryReviewedWardable(
-  db: WardableDb,
-  partnerPatientId: string,
-  reviewedRevision: string,
-  actor: HubActor,
-  deps: HubDeps & { now?: () => Date } = {},
+/**
+ * Confirm exactly what was reviewed. The reviewed Hub updated_at is sent
+ * unchanged (no re-read / rebase). A changed local state is refused before
+ * any write; a changed Hub state comes back as a Hub conflict.
+ */
+export async function confirmReviewedWardable(
+  userDb: WardableRpcDb,
+  syncDb: WardableDb,
+  token: unknown,
+  caller: ReviewCaller,
+  deps: ReviewDeps = {},
 ): Promise<PartnerSyncOutcome> {
-  if (!isDesiredRevision(reviewedRevision)) return outcome("failed", "invalid", null);
-  const canonical = canonicalPatientId(partnerPatientId);
-  if (!canonical) return outcome("failed", "invalid", null);
-  partnerPatientId = canonical;
-  const local = await readLocal(db, partnerPatientId);
+  const nowMs = (deps.now ?? (() => new Date()))().getTime();
+  const nowIso = () => new Date((deps.now ?? (() => new Date()))().getTime()).toISOString();
+  const t = verifyReviewToken(token, deps.reviewSecret ?? "");
+  if (!t || t.sub !== caller.userId) return outcome("failed", "review_invalid", null);
+  if (t.exp <= nowMs) return outcome("pending", "review_expired", null);
+  const id = t.pt;
+
+  const local = await readLocal(syncDb, id);
   if (local === "error") return outcome("failed", "read_failed", null);
   const rev = revisionString(local?.desired_revision);
   if (!local || !rev) return outcome("failed", "no_state", null);
-  if (rev !== reviewedRevision) return outcome("pending", "changed_since_review", rev);
-  return syncWardableToHub(db, partnerPatientId, actor, deps);
+  if (rev !== t.lr || local.wardable !== t.lw) return outcome("pending", "changed_since_review", rev);
+
+  let sendRev = t.lr;
+  if (t.m === "new_revision") {
+    const { data, error } = await userDb.rpc("confirm_wardable_reviewed_intent", {
+      _partner_patient_id: id,
+      _reviewed_revision: t.lr,
+      _wardable: t.lw,
+    });
+    if (error) {
+      if (error.code === "PGRST202" || error.code === "42883") return outcome("failed", "paused_until_release", rev);
+      if (error.code === "42501") return outcome("failed", "local_forbidden", rev);
+      return outcome("failed", "read_failed", rev);
+    }
+    const raw = (Array.isArray(data) ? data[0] : data) as Record<string, unknown> | undefined;
+    // Zero rows = the local revision moved on between our read and the
+    // atomic conditional allocation.
+    if (!raw) return outcome("pending", "changed_since_review", rev);
+    const row = normalizeWardableRow(raw);
+    if (!row || row.partner_patient_id !== id || row.wardable !== t.lw || !(BigInt(row.desired_revision) > BigInt(t.lr))) {
+      return outcome("failed", "invalid", rev);
+    }
+    sendRev = row.desired_revision;
+  }
+
+  let res: Awaited<ReturnType<typeof postHubWardable>>;
+  try {
+    res = await postHubWardable(
+      { id, expected_updated_at: t.hu, wardable: t.lw, desired_revision: sendRev },
+      caller.actor,
+      deps,
+    );
+  } catch {
+    return finish(syncDb, id, sendRev, "failed", "unavailable", nowIso());
+  }
+  return settle(syncDb, id, sendRev, res, nowIso());
 }
 
 /** Public origin of the Hub app (derived from the bridge URL), for links. */

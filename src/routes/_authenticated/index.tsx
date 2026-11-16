@@ -109,8 +109,20 @@ export const Route = createFileRoute("/_authenticated/")({
 
   pendingComponent: ReferralsListPending,
   errorComponent: ReferralsListError,
-  component: ReferralsList,
+  component: GatedReferralsList,
 });
+
+/**
+ * Gate OUTSIDE the component that holds patient state, so an authoritative
+ * denial or account change unmounts it (decrypted fields, drafts, selection).
+ */
+function GatedReferralsList() {
+  return (
+    <ClinicalAccessGate>
+      <ReferralsList />
+    </ClinicalAccessGate>
+  );
+}
 
 function ReferralsList() {
   const search = Route.useSearch();
@@ -238,7 +250,6 @@ function ReferralsList() {
   );
 
   return (
-    <ClinicalAccessGate>
     <div className="p-4 sm:p-6 max-w-7xl mx-auto">
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-6">
         <div className="min-w-0">
@@ -317,6 +328,5 @@ function ReferralsList() {
       />
 
     </div>
-    </ClinicalAccessGate>
   );
 }

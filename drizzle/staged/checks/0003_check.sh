@@ -4,6 +4,7 @@
 set -euo pipefail
 HERE="$(cd "$(dirname "$0")" && pwd)"
 MIG="$HERE/../0003_wardable_revision_fence.sql"
+MIG6="$HERE/../0006_wardable_reviewed_intent.sql"
 WORK="$(mktemp -d /tmp/pg0003.XXXXXX)"
 PORT="${PORT:-55433}"
 PGBIN="$(dirname "$(command -v initdb)")"
@@ -135,6 +136,43 @@ a=$(grep -E '^[0-9]+$' "$WORK/a.out"); b=$(grep -E '^[0-9]+$' "$WORK/b.out")
 eqv "second toggle waited for the first (row lock)" "$waited" "1"
 eqv "concurrent toggles get consecutive revisions" "$a,$b" "$((before+1)),$((before+2))"
 eqv "latest toggle wins locally" "$("${PSQL[@]}" -d main -c "SELECT desired_revision || '|' || wardable FROM patient_wardable_status WHERE partner_patient_id='$P'")" "$((before+2))|false"
+
+# --- F. 0006 reviewed re-confirmation -----------------------------------------
+"${PSQL[@]}" -1 -d main -f "$MIG6"
+ok "0006 applies in one transaction"
+S="dddddddd-dddd-4ddd-8ddd-dddddddddddd"
+"${PSQL[@]}" -d main -c "INSERT INTO patient_wardable_revision_counters VALUES ('$S', 9007199254740992)"
+"${PSQL[@]}" -d main -c "$AS_CLIN SELECT * FROM set_wardable_desired_state('$S', true)" >/dev/null   # rev 2^53+1
+eqv "stale reviewed revision writes nothing" \
+  "$("${PSQL[@]}" -d main -c "$AS_CLIN SELECT count(*) FROM confirm_wardable_reviewed_intent('$S', '9007199254740992', true)")" "0"
+eqv "reviewed value mismatch writes nothing" \
+  "$("${PSQL[@]}" -d main -c "$AS_CLIN SELECT count(*) FROM confirm_wardable_reviewed_intent('$S', '9007199254740993', false)")" "0"
+eqv "stale confirm left revision and counter unchanged" \
+  "$("${PSQL[@]}" -d main -c "SELECT w.desired_revision || '|' || c.last_revision FROM patient_wardable_status w JOIN patient_wardable_revision_counters c USING (partner_patient_id) WHERE partner_patient_id='$S'")" \
+  "9007199254740993|9007199254740993"
+"${PSQL[@]}" -d main -c "SET ROLE service_role; UPDATE patient_wardable_status SET partner_sync_status='conflict', partner_synced_revision='9007199254740993' WHERE partner_patient_id='$S'"
+eqv "exact reviewed revision (above 2^53) allocates the next one as text" \
+  "$("${PSQL[@]}" -d main -c "$AS_CLIN SELECT (row_to_json(r)->>'desired_revision') || '|' || json_typeof(row_to_json(r)->'desired_revision') || '|' || r.wardable || '|' || r.partner_sync_status FROM confirm_wardable_reviewed_intent(upper('$S'), '9007199254740993', true) r")" \
+  "9007199254740994|string|true|pending"
+eqv "counter advanced with the overlay" "$("${PSQL[@]}" -d main -c "SELECT last_revision FROM patient_wardable_revision_counters WHERE partner_patient_id='$S'")" "9007199254740994"
+eqv "replayed confirm of the old review writes nothing" \
+  "$("${PSQL[@]}" -d main -c "$AS_CLIN SELECT count(*) FROM confirm_wardable_reviewed_intent('$S', '9007199254740993', true)")" "0"
+must_fail "reviewed revision above bigint max fails" main "$AS_CLIN SELECT * FROM confirm_wardable_reviewed_intent('$S', '9223372036854775808', true)" "out of range"
+must_fail "non-decimal reviewed revision rejected" main "$AS_CLIN SELECT * FROM confirm_wardable_reviewed_intent('$S', '1e3', true)" "invalid reviewed revision"
+must_fail "non-clinician cannot confirm" main "$AS_NON SELECT * FROM confirm_wardable_reviewed_intent('$S', '9007199254740994', true)" "forbidden"
+must_fail "anon cannot confirm" main "SET ROLE anon; SELECT * FROM confirm_wardable_reviewed_intent('$S', '9007199254740994', true)" "permission denied"
+eqv "confirm records the signed-in actor" "$("${PSQL[@]}" -d main -c "SELECT updated_by FROM patient_wardable_status WHERE partner_patient_id='$S'")" "$U"
+# Two confirmations of the SAME review race: exactly one allocates.
+( "${PSQL[@]}" -d main -c "BEGIN; $AS_CLIN SELECT count(*) FROM confirm_wardable_reviewed_intent('$S', '9007199254740994', true); SELECT pg_sleep(1.2); COMMIT;" > "$WORK/c.out" ) &
+sleep 0.4
+"${PSQL[@]}" -d main -c "$AS_CLIN SELECT count(*) FROM confirm_wardable_reviewed_intent('$S', '9007199254740994', true)" > "$WORK/d.out"
+wait
+eqv "racing confirms of one review: one wins, one writes nothing" "$(grep -E '^[0-9]+$' "$WORK/c.out"),$(grep -E '^[0-9]+$' "$WORK/d.out")" "1,0"
+eqv "only one new revision allocated" "$("${PSQL[@]}" -d main -c "SELECT desired_revision FROM patient_wardable_status WHERE partner_patient_id='$S'")" "9007199254740995"
+# A toggle racing a confirm of the pre-toggle review: confirm writes nothing.
+"${PSQL[@]}" -d main -c "$AS_CLIN SELECT * FROM set_wardable_desired_state('$S', false)" >/dev/null
+eqv "confirm after a newer toggle writes nothing" \
+  "$("${PSQL[@]}" -d main -c "$AS_CLIN SELECT count(*) FROM confirm_wardable_reviewed_intent('$S', '9007199254740995', true)")" "0"
 
 echo "RESULT pass=$pass fail=$fail"
 [ "$fail" = "0" ]

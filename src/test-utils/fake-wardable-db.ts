@@ -42,6 +42,8 @@ export function fakeWardableDb(
   const hooks = {
     readError: false,
     beforeMutation: null as null | (() => void),
+    beforeConfirm: null as null | (() => void),
+    rpcCalls: [] as Array<{ fn: string; args: Record<string, unknown> }>,
     writes: [] as Array<{ op: string; rel: string; patch?: Record<string, unknown>; filters: Array<[string, unknown]> }>,
   };
   let clock = Date.parse("2026-11-16T11:00:00.000Z");
@@ -122,7 +124,8 @@ export function fakeWardableDb(
       insert: (row: Record<string, unknown>) => builder(rel, "insert", row),
       update: (patch: Record<string, unknown>) => builder(rel, "update", patch),
     }),
-    rpc: async (fn: string, args: { _partner_patient_id: string; _wardable: boolean }) => {
+    rpc: async (fn: string, args: { _partner_patient_id: string; _wardable: boolean; _reviewed_revision?: string }) => {
+      if (!opts.rpcMissing && fn === "confirm_wardable_reviewed_intent") return confirmReviewed(args);
       if (opts.rpcMissing || fn !== "set_wardable_desired_state") {
         return { data: null, error: { code: "PGRST202", message: "function not found" } };
       }
@@ -151,6 +154,29 @@ export function fakeWardableDb(
       return { data: [project(r, VIEW)], error: null }; // RPC returns revisions ::text
     },
   };
+  /** Mirrors drizzle/staged/0006: new revision only if still the reviewed one. */
+  function confirmReviewed(args: { _partner_patient_id: string; _wardable: boolean; _reviewed_revision?: string }) {
+    hooks.rpcCalls.push({ fn: "confirm_wardable_reviewed_intent", args });
+    hooks.beforeConfirm?.();
+    hooks.beforeConfirm = null;
+    if (opts.clinical === false) return { data: null, error: { code: "42501", message: "forbidden" } };
+    if (!UUID_RE.test(args._partner_patient_id)) return { data: null, error: { code: "22023", message: "invalid patient id" } };
+    if (!/^[1-9][0-9]{0,18}$/.test(args._reviewed_revision ?? "")) return { data: null, error: { code: "22023", message: "invalid reviewed revision" } };
+    const reviewed = BigInt(args._reviewed_revision!);
+    if (reviewed > 9223372036854775807n) return { data: null, error: { code: "22003", message: "bigint out of range" } };
+    const id = args._partner_patient_id.toLowerCase();
+    const r = rows.find((x) => x.partner_patient_id === id);
+    if (!r || r.desired_revision !== reviewed || r.wardable !== args._wardable) return { data: [], error: null };
+    const c = counters.get(id) ?? 0n;
+    const next = (c > r.desired_revision ? c : r.desired_revision) + 1n;
+    if (next > 9223372036854775807n) return { data: null, error: { code: "22003", message: "bigint out of range" } };
+    counters.set(id, next);
+    r.desired_revision = next;
+    r.partner_sync_status = "pending";
+    r.partner_sync_checked_at = null;
+    r.updated_at = new Date((clock += 1000)).toISOString();
+    return { data: [project(r, VIEW)], error: null };
+  }
   const row = (id: string) => {
     const r = rows.find((x) => x.partner_patient_id === id);
     return r ? project(r, VIEW) : undefined;
