@@ -19,6 +19,12 @@ import {
   signInWithPasskey,
 } from "@/lib/passkeys";
 import { listMyPasskeys } from "@/lib/webauthn.functions";
+import {
+  beginPasswordSignIn,
+  recordPasswordSignInSuccess,
+  requestPasswordReset,
+} from "@/lib/auth-throttle.functions";
+import { useServerFn } from "@tanstack/react-start";
 import { PasskeyEnrollPrompt } from "@/components/passkey-enroll-prompt";
 
 // When "Keep me signed in" is unchecked, move the persisted Supabase auth token
@@ -83,6 +89,9 @@ function AuthPage() {
   // After they complete password sign-in we force-open the enrolment modal so
   // they can set one up in the same flow.
   const [enrollAfterSignIn, setEnrollAfterSignIn] = useState(false);
+  const beginSignIn = useServerFn(beginPasswordSignIn);
+  const recordSuccess = useServerFn(recordPasswordSignInSuccess);
+  const sendReset = useServerFn(requestPasswordReset);
 
   useEffect(() => {
     setPasskeySupported(isPasskeySupported());
@@ -111,28 +120,17 @@ function AuthPage() {
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
-    const attemptType: "signin" | "reset" = mode === "signin" ? "signin" : "reset";
     let notifiedRetry = false;
-    let attemptId: number | null = null;
     try {
-      // Atomic check + reserve. Concurrent submissions for the same email serialize
-      // server-side via pg_advisory_xact_lock; only attempts under the threshold get
-      // an attempt_id back, the rest are told they're locked out.
-      const { data: beginData, error: beginErr } = await supabase.rpc("begin_auth_attempt", {
-        _email: email,
-        _attempt_type: attemptType,
-      });
-      if (beginErr) throw beginErr;
-      const begin = beginData as { locked: boolean; attempt_id: number | null; retry_after_seconds?: number };
-      if (begin?.locked) {
-        const secs = begin.retry_after_seconds ?? 0;
-        const mins = Math.max(1, Math.ceil(secs / 60));
-        toast.error(`Too many failed attempts. Try again in ${mins} minute${mins === 1 ? "" : "s"}.`);
-        return;
-      }
-      attemptId = begin?.attempt_id ?? null;
-
+      // Throttle checks run server-side: the browser never picks an attempt
+      // ID or reports its own success. A reserved slot stays a failure unless
+      // a verified session for this email later proves success.
       if (mode === "signin") {
+        const gate = await beginSignIn({ data: { email } });
+        if (gate.locked) {
+          lockedToast(gate.retry_after_seconds);
+          return;
+        }
         const { error } = await retrySupabaseCall(
           () => supabase.auth.signInWithPassword({ email, password }),
           {
@@ -145,17 +143,8 @@ function AuthPage() {
             },
           },
         );
-        if (error) {
-          if (attemptId !== null) {
-            await supabase.rpc("finalize_auth_attempt", { _attempt_id: attemptId, _success: false });
-          }
-          attemptId = null;
-          throw error;
-        }
-        if (attemptId !== null) {
-          await supabase.rpc("finalize_auth_attempt", { _attempt_id: attemptId, _success: true });
-        }
-        attemptId = null;
+        if (error) throw error;
+        await recordSuccess().catch(() => undefined);
         if (!rememberMe) downgradeSessionToTabOnly();
         // Automatically issue a recipient keypair on first successful sign-in.
         await ensureRecipientKey(password);
@@ -169,22 +158,17 @@ function AuthPage() {
         }
         navigate({ to: postAuthTarget, replace: true });
       } else {
-        const { error } = await retrySupabaseCall(() =>
-          supabase.auth.resetPasswordForEmail(email, {
-            redirectTo: window.location.origin + "/reset-password",
-          }),
-        );
-        if (attemptId !== null) {
-          await supabase.rpc("finalize_auth_attempt", { _attempt_id: attemptId, _success: !error });
+        const res = await sendReset({ data: { email } });
+        if (res.locked) {
+          lockedToast(res.retry_after_seconds);
+          return;
         }
-        attemptId = null;
-        if (error) throw error;
         toast.success("If that email exists, a password reset link has been sent.");
         setMode("signin");
       }
     } catch (err: any) {
-      // If we reserved a slot but never finalized (e.g. network error during auth),
-      // leave it as failed — better to over-count than under-count during a brute-force burst.
+      // A reserved slot that is never proven successful stays counted as a
+      // failure — better to over-count than under-count during a brute-force burst.
       toast.error(err?.message ?? "Something went wrong");
     } finally {
       setLoading(false);
@@ -346,6 +330,11 @@ function AuthPage() {
       <Toaster />
     </div>
   );
+}
+
+function lockedToast(retryAfterSeconds: number) {
+  const mins = Math.max(1, Math.ceil(retryAfterSeconds / 60));
+  toast.error(`Too many failed attempts. Try again in ${mins} minute${mins === 1 ? "" : "s"}.`);
 }
 
 async function shouldPromptForPasskey(): Promise<boolean> {
