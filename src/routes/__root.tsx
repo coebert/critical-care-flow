@@ -12,6 +12,7 @@ import { useEffect, type ReactNode } from "react";
 import appCss from "../styles.css?url";
 import { reportLovableError } from "../lib/lovable-error-reporting";
 import { observeSessionIdentity } from "../lib/session-scope";
+import { markShellHydrated } from "../lib/hydration-gate";
 
 function NotFoundComponent() {
   return (
@@ -130,6 +131,11 @@ function RootShell({ children }: { children: ReactNode }) {
 
 function RootComponent() {
   const { queryClient } = Route.useRouteContext();
+
+  // First commit after hydration: client-only guards may now redirect.
+  useEffect(() => {
+    markShellHydrated();
+  }, []);
 
   // Session-scoped cache: drop every cached clinical snapshot the moment the
   // signed-in identity changes (sign-out, or a different account), before

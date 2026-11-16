@@ -24,6 +24,8 @@ import { toast } from "sonner";
 import { CommandPalette, useCommandPaletteHotkey } from "@/components/command-palette";
 import { useQueryClient } from "@tanstack/react-query";
 import { resetSessionScope } from "@/lib/session-scope";
+import { clearSessionRetention } from "@/lib/session-retention";
+import { afterHydration, markBoundaryHydrated } from "@/lib/hydration-gate";
 import { Breadcrumbs } from "@/components/breadcrumbs";
 import { GlobalBannerSlot } from "@/components/global-banner-slot";
 
@@ -44,6 +46,10 @@ export const Route = createFileRoute("/_authenticated")({
     // Server functions re-validate the bearer via requireSupabaseAuth.
     const { data } = await supabase.auth.getSession();
     if (!data.session?.user) {
+      // On a cold load this guard runs while React is still hydrating the
+      // server HTML; redirecting to the server-rendered /auth page before
+      // hydration finishes is a hydration mismatch (React #418).
+      await afterHydration();
       // Preserve the intended deep link (e.g. /referrals/{id} from a push
       // notification) so the user lands there after signing in.
       const target = `${location.pathname}${location.searchStr ?? ""}`;
@@ -55,7 +61,17 @@ export const Route = createFileRoute("/_authenticated")({
     return { user: data.session.user };
   },
   component: AuthedShell,
+  // Rendered by the server for this client-only subtree and hydrated by the
+  // client; its first effect tells the auth guard hydration has finished.
+  pendingComponent: AuthedPending,
 });
+
+function AuthedPending() {
+  useEffect(() => {
+    markBoundaryHydrated();
+  }, []);
+  return <div className="min-h-dvh bg-background" aria-busy="true" />;
+}
 
 function AuthedShell() {
   const { user } = useAuth();
@@ -123,6 +139,7 @@ function AuthedShell() {
       useE2ESession.getState().clear();
     } catch { /* non-fatal */ }
     await supabase.auth.signOut();
+    clearSessionRetention();
     router.invalidate();
     if (reason === "timeout") {
       toast.message("Signed out for inactivity", {

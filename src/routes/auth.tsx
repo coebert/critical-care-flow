@@ -26,28 +26,8 @@ import {
 } from "@/lib/auth-throttle.functions";
 import { useServerFn } from "@tanstack/react-start";
 import { PasskeyEnrollPrompt } from "@/components/passkey-enroll-prompt";
-
-// When "Keep me signed in" is unchecked, move the persisted Supabase auth token
-// from localStorage to sessionStorage so the session ends when the browser closes.
-function downgradeSessionToTabOnly() {
-  if (typeof window === "undefined") return;
-  try {
-    for (let i = 0; i < window.localStorage.length; i++) {
-      const key = window.localStorage.key(i);
-      if (!key) continue;
-      if (key.startsWith("sb-") && key.endsWith("-auth-token")) {
-        const value = window.localStorage.getItem(key);
-        if (value !== null) {
-          window.sessionStorage.setItem(key, value);
-          window.localStorage.removeItem(key);
-        }
-        break;
-      }
-    }
-  } catch {
-    // Storage access can fail in private modes — best-effort only.
-  }
-}
+import { chooseSessionRetention } from "@/lib/session-retention";
+import { safeInternalRedirect } from "@/lib/safe-redirect";
 
 export const Route = createFileRoute("/auth")({
   // No `ssr: false`. The component is SSR-safe (all window/supabase access is
@@ -55,12 +35,12 @@ export const Route = createFileRoute("/auth")({
   // while the client rendered the full tree, producing a React 19 hydration
   // mismatch that briefly flashes unauthenticated UI.
   validateSearch: (search: Record<string, unknown>) => {
-    const raw = typeof search.redirect === "string" ? search.redirect : "";
-    // Only accept same-origin relative paths to prevent open redirects.
-    const safe = raw.startsWith("/") && !raw.startsWith("//") ? raw : "";
-    const parsed: { redirect?: string } = {};
-    if (safe) parsed.redirect = safe;
-    return parsed;
+    // Only plain same-origin paths survive (see safe-redirect.ts). The key
+    // is always returned: the router merges validated search over the raw
+    // query string, so omitting it would let the raw value through.
+    return { redirect: safeInternalRedirect(search.redirect) ?? undefined } as {
+      redirect?: string;
+    };
   },
   head: () => ({
     meta: [
@@ -76,7 +56,8 @@ export const Route = createFileRoute("/auth")({
 function AuthPage() {
   const navigate = useNavigate();
   const { redirect: redirectTo } = Route.useSearch();
-  const postAuthTarget = redirectTo || "/";
+  // Re-checked here too, so no other search source can smuggle a target.
+  const postAuthTarget = safeInternalRedirect(redirectTo) ?? "/";
   const [mode, setMode] = useState<"signin" | "forgot">("signin");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -107,7 +88,7 @@ function AuthPage() {
       return r.data;
     }))
       .then((data) => {
-        if (!cancelled && data.session) navigate({ to: postAuthTarget, replace: true });
+        if (!cancelled && data.session) navigate({ href: postAuthTarget, replace: true });
       })
       .catch(() => {
         // Transient failure restoring session — let the user sign in manually.
@@ -131,6 +112,8 @@ function AuthPage() {
           lockedToast(gate.retry_after_seconds);
           return;
         }
+        // Record the retention choice before the session is first stored.
+        chooseSessionRetention(rememberMe);
         const { error } = await retrySupabaseCall(
           () => supabase.auth.signInWithPassword({ email, password }),
           {
@@ -145,7 +128,6 @@ function AuthPage() {
         );
         if (error) throw error;
         await recordSuccess().catch(() => undefined);
-        if (!rememberMe) downgradeSessionToTabOnly();
         // Automatically issue a recipient keypair on first successful sign-in.
         await ensureRecipientKey(password);
         toast.success("Signed in");
@@ -156,7 +138,7 @@ function AuthPage() {
           setEnrollPromptOpen(true);
           return; // navigation deferred until the modal closes
         }
-        navigate({ to: postAuthTarget, replace: true });
+        navigate({ href: postAuthTarget, replace: true });
       } else {
         const res = await sendReset({ data: { email } });
         if (res.locked) {
@@ -183,10 +165,10 @@ function AuthPage() {
     }
     setPasskeyBusy(true);
     try {
+      chooseSessionRetention(rememberMe);
       await signInWithPasskey(trimmed);
-      if (!rememberMe) downgradeSessionToTabOnly();
       toast.success("Signed in with passkey");
-      navigate({ to: postAuthTarget, replace: true });
+      navigate({ href: postAuthTarget, replace: true });
     } catch (err: unknown) {
       const code = (err as { code?: string } | null)?.code;
       if (code === NO_PASSKEY_REGISTERED) {
@@ -213,7 +195,7 @@ function AuthPage() {
 
   const finishAfterEnroll = () => {
     setEnrollPromptOpen(false);
-    navigate({ to: postAuthTarget, replace: true });
+    navigate({ href: postAuthTarget, replace: true });
   };
 
 
