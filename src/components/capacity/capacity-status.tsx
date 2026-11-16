@@ -37,6 +37,19 @@ export function failureText(view: Pick<UnitCapacityView, "latestFailure">): stri
   return "Bed board did not refresh";
 }
 
+const INPUT_LABEL = { acuity: "levels of care", staffing: "nurse staffing" } as const;
+
+/** Why the view is not current when the board itself is fine. */
+function otherInputsText(view: UnitCapacityView): string | null {
+  const parts: string[] = [];
+  for (const k of ["acuity", "staffing"] as const) {
+    const f = view.inputs?.[k];
+    if (!f || f === "current" || f === "pending") continue;
+    parts.push(`${INPUT_LABEL[k]} ${f === "stale" ? "not refreshed" : "unavailable"}`);
+  }
+  return parts.length ? parts.join(", ") : null;
+}
+
 /**
  * One line of freshness text + a refresh button, shared by every capacity
  * surface. Delayed data is always labelled "not current" with its time.
@@ -53,12 +66,15 @@ export function CapacityFreshness({
   const { freshness, lastSuccessAt, now, isFetching } = view;
   const at = formatUnitTime(lastSuccessAt, now);
   const ago = ageText(lastSuccessAt, now);
-  const reason = failureText(view);
+  const reason = failureText(view) ?? otherInputsText(view);
 
   let text: string;
   if (freshness === "current") text = compact ? `Live · ${at}` : `Live · updated ${at}`;
   else if (freshness === "stale")
-    text = `Not current — last refreshed ${at}${ago ? ` (${ago})` : ""}`;
+    text =
+      view.inputs?.board === "current"
+        ? "Not current"
+        : `Not current — last refreshed ${at}${ago ? ` (${ago})` : ""}`;
   else if (reason) text = reason;
   else text = "Loading…";
 

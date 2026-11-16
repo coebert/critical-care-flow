@@ -5,7 +5,7 @@ import { z } from "zod";
 import { useUnitCapacity, usePatientAcuityRows } from "@/hooks/use-unit-capacity";
 import { WardRoundList, wardRoundIsCurrent } from "@/components/board/ward-round-list";
 
-export const Route = createFileRoute("/_authenticated/board/ward-round")({
+export const Route = createFileRoute("/_authenticated/board_/ward-round")({
   head: () => ({
     meta: [
       { title: "Ward round list — SDH Critical Care" },

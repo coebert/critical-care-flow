@@ -86,8 +86,8 @@ export async function fetchPartnerBedBoardSigned(
     try {
       const { getBridgeSecrets } = await import("./bridge-hmac.server");
       secret = getBridgeSecrets().current;
-    } catch (err) {
-      return { ok: false, error: (err as Error).message, fetched_at: fetchedAt };
+    } catch {
+      return { ok: false, error: "Bridge signing secret is not configured", fetched_at: fetchedAt };
     }
   }
   const doFetch = deps.fetchImpl ?? fetch;
@@ -137,7 +137,8 @@ export async function fetchPartnerBedBoardSigned(
       const cls = timedOut
         ? { message: `ICU Handover Hub did not respond within ${Math.round(timeoutMs / 1000)}s`, is_outage: true }
         : classifyPartnerNetworkFailure(err);
-      last = { ok: false, error: cls.message, fetched_at: fetchedAt, partner_outage: cls.is_outage, status: 0 };
+      // Fixed text: raw network error strings never reach clients.
+      last = { ok: false, error: timedOut ? cls.message : "ICU Handover Hub could not be reached", fetched_at: fetchedAt, partner_outage: cls.is_outage, status: 0 };
       if (attempt < MAX_ATTEMPTS) {
         await backoff(attempt);
         continue;
@@ -160,7 +161,12 @@ export async function fetchPartnerBedBoardSigned(
       }
       last = {
         ok: false,
-        error: indeterminate ? "ICU Handover Hub could not confirm bed occupancy (indeterminate roster)" : cls.message,
+        // Fixed text: upstream response bodies are never passed to clients.
+        error: indeterminate
+          ? "ICU Handover Hub could not confirm bed occupancy (indeterminate roster)"
+          : cls.class === "outage"
+            ? `ICU Handover Hub is unavailable (HTTP ${res.status})`
+            : `ICU Handover Hub returned HTTP ${res.status}`,
         fetched_at: fetchedAt,
         partner_outage: indeterminate ? false : cls.is_outage,
         status: res.status,
@@ -181,7 +187,7 @@ export async function fetchPartnerBedBoardSigned(
       clearTimeout(timer);
       last = {
         ok: false,
-        error: timedOut ? "ICU Handover Hub response timed out" : `partner returned invalid JSON: ${(err as Error).message}`,
+        error: timedOut ? "ICU Handover Hub response timed out" : "ICU Handover Hub returned an unreadable response",
         fetched_at: fetchedAt,
         partner_outage: false,
         status: res.status,

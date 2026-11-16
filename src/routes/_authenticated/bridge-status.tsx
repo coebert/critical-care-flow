@@ -43,6 +43,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Progress } from "@/components/ui/progress";
 import { toast } from "sonner";
+import { RETIRED_MESSAGE } from "@/lib/bridge-mirror-retired";
 import { useState } from "react";
 import { tzTooltip } from "@/lib/format-timestamp";
 
@@ -177,11 +178,9 @@ function BridgeStatusPage() {
 
   const mutation = useMutation({
     mutationFn: () => runNow(),
-    onSuccess: (res) => {
-      const ok = res.status < 300;
-      const message = `Sync ${ok ? "completed" : "finished with errors"} (HTTP ${res.status})`;
-      if (ok) toast.success(message);
-      else toast.warning(message);
+    onSuccess: () => {
+      // Mirror sync is retired: report that truthfully, never "completed".
+      toast.info(RETIRED_MESSAGE);
       query.refetch();
       attemptsQuery.refetch();
       verifyQuery.refetch();
@@ -193,11 +192,9 @@ function BridgeStatusPage() {
 
   const bedsMutation = useMutation({
     mutationFn: () => runBedsOnly(),
-    onSuccess: (res) => {
-      const ok = res.status < 300;
-      const message = `Beds sync ${ok ? "completed" : "finished with errors"} (HTTP ${res.status})`;
-      if (ok) toast.success(message);
-      else toast.warning(message);
+    onSuccess: () => {
+      // Mirror sync is retired: report that truthfully, never "completed".
+      toast.info(RETIRED_MESSAGE);
       query.refetch();
       attemptsQuery.refetch();
       verifyQuery.refetch();
@@ -230,6 +227,13 @@ function BridgeStatusPage() {
 
   return (
     <div className="max-w-6xl mx-auto p-6 space-y-6">
+      <div role="status" className="rounded-md border border-primary/30 bg-primary/5 px-4 py-3 text-sm">
+        <div className="font-medium">Two-way mirror sync is retired</div>
+        <p className="mt-1 text-muted-foreground">
+          {RETIRED_MESSAGE} The bed board is read live from the Hub. Cursors, attempts and
+          failures below are historical; the sync, retry and reconcile buttons no longer copy anything.
+        </p>
+      </div>
       <div className="flex items-center justify-between gap-4 flex-wrap">
         <div>
           <h1 className="text-2xl font-semibold">Bridge sync status</h1>

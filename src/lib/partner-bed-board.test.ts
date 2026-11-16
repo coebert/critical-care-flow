@@ -95,11 +95,11 @@ describe("mapPartnerPayload", () => {
     expect(r.bed_board[2].is_side_room).toBe(true);
 
     // occupant fields carry through untouched
-    expect(r.bed_board[0].occupant).toEqual(jane);
+    expect(r.bed_board[0].occupant).toEqual({ dnacpr_details: null, tep_details: null, ...jane });
     expect(r.bed_board[2].occupant?.hospital_number).toBe("M7654321");
     expect(r.bed_board[2].occupant?.tep_in_place).toBe(false);
 
-    expect(r.unassigned).toEqual([unassigned]);
+    expect(r.unassigned).toEqual([{ dnacpr_details: null, tep_details: null, ...unassigned }]);
     expect(r.stats).toEqual({
       total_beds: 3,
       occupied: 2,
@@ -173,6 +173,6 @@ describe("mapPartnerPayload", () => {
     );
     expect(r.ok).toBe(true);
     if (!r.ok) return;
-    expect(r.bed_board[0].occupant).toEqual(partial);
+    expect(r.bed_board[0].occupant).toEqual({ dnacpr_details: null, tep_details: null, ...partial });
   });
 });

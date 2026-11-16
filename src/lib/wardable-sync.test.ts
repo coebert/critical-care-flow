@@ -261,11 +261,12 @@ describe("wardable → Hub fenced transport", () => {
     }
   });
 
-  it("database without the revision procedure (migration not yet applied) fails closed before any Hub call", async () => {
+  it("database without the revision procedure (staged migration not applied): local timer saved, NO Hub call", async () => {
     const w = fakeWardableDb({ rpcMissing: true });
     const hub = fakeHub([{ id: PT, wardable: false }]);
     const r = await runSetWardable(w.db, w.db, { partner_patient_id: PT, wardable: true }, actor, hub.deps);
-    expect(r).toMatchObject({ ok: false, code: "unavailable" });
+    expect(r).toMatchObject({ ok: true, partner: { status: "failed", reason: "paused_until_release" } });
+    expect(w.row(PT)).toMatchObject({ wardable: true, desired_revision: 1, partner_sync_status: "failed" });
     expect(hub.calls).toHaveLength(0);
     const f = fakeWardableDb({ clinical: false });
     expect(await runSetWardable(f.db, f.db, { partner_patient_id: PT, wardable: true }, actor, hub.deps)).toMatchObject({ ok: false, code: "forbidden" });

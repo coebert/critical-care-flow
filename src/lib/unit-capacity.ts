@@ -25,7 +25,7 @@
  *     "room to admit" styling.
  */
 
-import { sourceTimeOf, type PartnerBedBoardOk } from "./partner-bed-board-contract";
+import { MAX_FUTURE_SKEW_MS, sourceTimeOf, type PartnerBedBoardOk } from "./partner-bed-board-contract";
 import {
   admissionSlots,
   computeDependency,
@@ -236,9 +236,11 @@ export function freshnessOf(input: {
 
 /** Pick the staffing row for a shift; distinguishes "no row" (null) from 0. */
 export function availableNursesFor(
-  rows: ReadonlyArray<{ shift: string; available_nurses: number | string | null }>,
+  rows: ReadonlyArray<{ shift: string; available_nurses: number | string | null }> | null | undefined,
   shift: ShiftKey["shift"],
 ): number | null {
+  // A malformed/empty staffing payload is "not recorded", never a crash or 0.
+  if (!Array.isArray(rows)) return null;
   const row = rows.find((r) => r.shift === shift);
   if (!row || row.available_nurses === null || row.available_nurses === undefined) return null;
   const n = Number(row.available_nurses);
@@ -253,4 +255,53 @@ export function isReassuring(d: CapacityDerivation, freshness: Freshness): boole
 /** Time the board describes — Hub snapshot time when sent, else fetch time. */
 export function boardSourceTime(board: PartnerBedBoardOk | null | undefined): string | null {
   return board ? sourceTimeOf(board) : null;
+}
+
+// ---------------------------------------------------------------------------
+// Freshness of EVERY required input (board, acuity, staffing).
+// ---------------------------------------------------------------------------
+
+export type CapacityInputName = "board" | "acuity" | "staffing";
+export type InputFreshness = "current" | "stale" | "pending" | "error" | "forbidden" | "invalid_time";
+
+export type CapacityInput = {
+  /** ok = we hold a successful same-session result. */
+  state: "ok" | "pending" | "error" | "forbidden";
+  /** Time the held data describes (Hub generated_at / successful read time). */
+  sourceAt: string | number | null;
+  /** The latest refresh failed (data shown is last-known only). */
+  latestFailed?: boolean;
+};
+
+export function inputFreshness(i: CapacityInput, now: number): InputFreshness {
+  if (i.state === "forbidden") return "forbidden";
+  if (i.state === "pending") return "pending";
+  if (i.state === "error" && i.sourceAt == null) return "error";
+  const t = typeof i.sourceAt === "number" ? i.sourceAt : i.sourceAt ? Date.parse(i.sourceAt) : NaN;
+  if (!Number.isFinite(t) || t <= 0) return "invalid_time";
+  if (t - now > MAX_FUTURE_SKEW_MS) return "invalid_time";
+  if (i.latestFailed || i.state === "error") return "stale";
+  return now - t > STALE_AFTER_MS ? "stale" : "current";
+}
+
+/**
+ * Combined freshness: "current" only when EVERY input is current; "none"
+ * when any input has no usable data; otherwise "stale" (not current).
+ */
+export function combinedFreshness(
+  inputs: Record<CapacityInputName, CapacityInput>,
+  now: number,
+): { freshness: Freshness; inputs: Record<CapacityInputName, InputFreshness> } {
+  const each = {
+    board: inputFreshness(inputs.board, now),
+    acuity: inputFreshness(inputs.acuity, now),
+    staffing: inputFreshness(inputs.staffing, now),
+  };
+  const vals = Object.values(each);
+  const freshness: Freshness = vals.every((v) => v === "current")
+    ? "current"
+    : vals.some((v) => v === "pending" || v === "error" || v === "forbidden" || v === "invalid_time")
+      ? "none"
+      : "stale";
+  return { freshness, inputs: each };
 }

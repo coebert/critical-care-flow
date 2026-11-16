@@ -21,7 +21,7 @@ export type {
   PartnerBedBoardResult,
 } from "./partner-bed-board-contract";
 export { mapPartnerPayload } from "./partner-bed-board-contract";
-import type { PartnerOccupant, PartnerBedBoardResult } from "./partner-bed-board-contract";
+import { occupantDtoOrNull, type PartnerOccupant, type PartnerBedBoardResult } from "./partner-bed-board-contract";
 import type { BoardAccessContext } from "./partner-bed-board.server";
 
 /**
@@ -132,15 +132,15 @@ export const updatePartnerPatient = createServerFn({ method: "POST" })
       "has_clinical_access",
       { _user_id: context.userId },
     );
-    if (roleErr) return { ok: false, error: `authz check failed: ${roleErr.message}` };
+    if (roleErr) return { ok: false, error: "Permission check failed — nothing was changed" };
     if (!allowed) return { ok: false, error: "forbidden: clinical role required", status: 403 };
 
     let secret: string;
     try {
       const { getBridgeSecrets } = await import("@/lib/bridge-hmac.server");
       secret = getBridgeSecrets().current;
-    } catch (err) {
-      return { ok: false, error: (err as Error).message };
+    } catch {
+      return { ok: false, error: "ICU Handover Hub link is not configured" };
     }
 
     // Forward the caller's identity as the actor. Partner authorize() treats
@@ -190,9 +190,10 @@ export const updatePartnerPatient = createServerFn({ method: "POST" })
           "cache-control": "no-store",
         },
         body: rawBody,
+        signal: AbortSignal.timeout(8_000),
       });
-    } catch (err) {
-      return { ok: false, error: `partner unreachable: ${(err as Error).message}` };
+    } catch {
+      return { ok: false, error: "ICU Handover Hub could not be reached — nothing was changed" };
     }
 
     let payload: unknown = null;
@@ -203,37 +204,42 @@ export const updatePartnerPatient = createServerFn({ method: "POST" })
     }
 
     if (res.status === 409) {
-      const p = (payload ?? {}) as {
-        current?: PartnerOccupant;
-        your_expected_updated_at?: string | null;
-        message?: string;
-      };
+      const p = (payload ?? {}) as { current?: unknown; your_expected_updated_at?: unknown };
+      // Strict DTO; a "current" row for a different patient is discarded.
+      const current = occupantDtoOrNull(p.current);
       return {
         ok: false,
         status: 409,
-        error: p.message ?? "This patient was modified since you loaded it.",
-        conflict: p.current
-          ? {
-              current: p.current,
-              your_expected_updated_at: p.your_expected_updated_at ?? null,
-            }
-          : undefined,
+        error: "This patient was modified in ICU Handover Hub since you loaded it.",
+        conflict:
+          current && current.id === data.id
+            ? {
+                current,
+                your_expected_updated_at:
+                  typeof p.your_expected_updated_at === "string" ? p.your_expected_updated_at : null,
+              }
+            : undefined,
       };
     }
 
     if (!res.ok) {
-      const msg =
-        (payload as { error?: string; message?: string } | null)?.error ||
-        (payload as { error?: string; message?: string } | null)?.message ||
-        res.statusText;
-      return { ok: false, status: res.status, error: `partner ${res.status}: ${msg}` };
+      // Fixed text per status class; upstream bodies are never echoed.
+      const error =
+        res.status === 401 || res.status === 403
+          ? "ICU Handover Hub refused the update (no access to this patient)"
+          : res.status === 404
+            ? "This patient is no longer shared by ICU Handover Hub"
+            : res.status >= 500
+              ? "ICU Handover Hub is unavailable — nothing was changed"
+              : "ICU Handover Hub rejected the update";
+      return { ok: false, status: res.status, error };
     }
 
-    const p = payload as { patient?: PartnerOccupant } | null;
-    if (!p?.patient) {
-      return { ok: false, error: "partner returned no patient row" };
+    const patient = occupantDtoOrNull((payload as { patient?: unknown } | null)?.patient);
+    if (!patient || patient.id !== data.id) {
+      return { ok: false, error: "ICU Handover Hub returned an unexpected response" };
     }
-    return { ok: true, patient: p.patient };
+    return { ok: true, patient };
   });
 
 

@@ -33,6 +33,7 @@ export type PartnerSyncReason =
   | "not_configured"
   | "not_shared"
   | "changed_since_review"
+  | "paused_until_release"
   | null;
 
 /** Mirrors PartnerSyncOutcome in wardable-status.server.ts. */

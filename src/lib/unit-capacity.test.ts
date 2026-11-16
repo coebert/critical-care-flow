@@ -111,6 +111,8 @@ describe("nursing calculation (existing weights)", () => {
   it("missing nurse count is distinct from a recorded zero", () => {
     const b = board({ bed_board: [{ bed: "1", is_side_room: false, occupied: true, occupant: occ("p1", "1") }] });
     expect(availableNursesFor([], "day")).toBeNull();
+    expect(availableNursesFor(null, "day")).toBeNull();
+    expect(availableNursesFor(undefined, "night")).toBeNull();
     expect(availableNursesFor([{ shift: "day", available_nurses: 0 }], "day")).toBe(0);
     expect(availableNursesFor([{ shift: "night", available_nurses: 4 }], "day")).toBeNull();
 

@@ -199,49 +199,9 @@ export const runBridgeSyncNow = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .handler(async ({ context }) => {
     await assertAdmin(context);
-
-    const url = `${process.env.SUPABASE_URL?.replace(
-      /\.supabase\.co$/,
-      "",
-    ) ? "" : ""}`;
-    // Same-origin invocation of the sync route. We rely on the platform
-    // URL provided by the request; fall back to the published URL.
-    const base =
-      process.env.PUBLIC_APP_URL ??
-      "https://critical-care-flow.lovable.app";
-    void url;
-    const apikey = process.env.SUPABASE_PUBLISHABLE_KEY ?? "";
-    const startedAt = Date.now();
-    const res = await fetch(`${base}/api/public/bridge/sync`, {
-      method: "POST",
-      headers: {
-        "content-type": "application/json",
-        apikey,
-      },
-      body: "{}",
-    });
-    const body = await res.json().catch(() => ({}));
-
-    // DTAC evidence: admin-triggered bridge runs are a privileged action
-    // and must appear in audit_log alongside role/keypair changes.
-    const { supabaseAdmin } = await import(
-      "@/integrations/supabase/client.server"
-    );
-    await supabaseAdmin.from("audit_log").insert({
-      user_id: context.userId,
-      action: "update",
-      entity: "bridge_sync",
-      entity_id: null,
-      diff: {
-        source: "manual",
-        scope: "all",
-        http_status: res.status,
-        duration_ms: Date.now() - startedAt,
-        ok: res.ok,
-      },
-    });
-
-    return { status: res.status, body };
+    // Mirror sync is retired: no fetch, no mutation, no success claim.
+    const { retiredBridgeStatus } = await import("@/lib/bridge-mirror-retired");
+    return { status: 200, body: retiredBridgeStatus() };
   });
 
 /**
@@ -254,43 +214,9 @@ export const runBridgeSyncBedsOnly = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .handler(async ({ context }) => {
     await assertAdmin(context);
-
-    // Call runBridgeSync in-process with a synthetic Request carrying the
-    // anon key so the shared apikey guard passes.
-    const apikey = process.env.SUPABASE_PUBLISHABLE_KEY ?? "";
-    const req = new Request("http://internal/bridge/sync", {
-      method: "POST",
-      headers: { "content-type": "application/json", apikey },
-      body: "{}",
-    });
-    const { runBridgeSync } = await import(
-      "@/routes/api/public/bridge/sync"
-    );
-    const startedAt = Date.now();
-    const res = await runBridgeSync(req, {
-      bedsOnly: true,
-      source: "manual",
-    });
-    const body = await res.json().catch(() => ({}));
-
-    const { supabaseAdmin } = await import(
-      "@/integrations/supabase/client.server"
-    );
-    await supabaseAdmin.from("audit_log").insert({
-      user_id: context.userId,
-      action: "update",
-      entity: "bridge_sync",
-      entity_id: null,
-      diff: {
-        source: "manual",
-        scope: "beds_only",
-        http_status: res.status,
-        duration_ms: Date.now() - startedAt,
-        ok: res.ok,
-      },
-    });
-
-    return { status: res.status, body };
+    // Mirror sync is retired: no fetch, no mutation, no success claim.
+    const { retiredBridgeStatus } = await import("@/lib/bridge-mirror-retired");
+    return { status: 200, body: retiredBridgeStatus() };
   });
 
 
@@ -321,6 +247,8 @@ export const sendBridgeTestPayload = createServerFn({ method: "POST" })
       results: BridgeProbeResult[];
     }> => {
       await assertAdmin(context);
+    // Retired with the mirror sync (no partner writes, no queued jobs).
+    if (Date.now() > 0) throw new Error((await import("@/lib/bridge-mirror-retired")).RETIRED_MESSAGE);
 
       const partner = process.env.PARTNER_BRIDGE_URL;
       if (!partner) throw new Error("PARTNER_BRIDGE_URL not configured");
@@ -704,6 +632,8 @@ export const enqueueBedReconciliation = createServerFn({ method: "POST" })
   })
   .handler(async ({ data, context }): Promise<{ jobId: string }> => {
     await assertAdmin(context);
+    // Retired with the mirror sync (no partner writes, no queued jobs).
+    if (Date.now() > 0) throw new Error((await import("@/lib/bridge-mirror-retired")).RETIRED_MESSAGE);
     const { supabaseAdmin } = await import(
       "@/integrations/supabase/client.server"
     );
@@ -748,6 +678,8 @@ export const cancelBedReconciliationJob = createServerFn({ method: "POST" })
   })
   .handler(async ({ data, context }): Promise<{ cancelled: boolean }> => {
     await assertAdmin(context);
+    // Retired with the mirror sync (no partner writes, no queued jobs).
+    if (Date.now() > 0) throw new Error((await import("@/lib/bridge-mirror-retired")).RETIRED_MESSAGE);
     const { supabaseAdmin } = await import(
       "@/integrations/supabase/client.server"
     );

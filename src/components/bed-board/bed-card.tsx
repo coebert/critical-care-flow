@@ -212,6 +212,7 @@ const SYNC_REASON_TEXT: Record<string, string> = {
   hub_differs: "Hub shows a different wardable state",
 };
 
+
 /**
  * Bed card dispatcher. Holds NO hooks itself: each state (withheld /
  * empty / occupied) is its own component, so the same bed changing state
@@ -627,9 +628,9 @@ function OccupiedBedCard({
                 onRetryHubSync(occ.id);
               }}
               onKeyDown={(e) => e.stopPropagation()}
-              aria-label={`Retry updating ICU Handover Hub for bed ${slot.bed}`}
+              aria-label={`Review and retry updating ICU Handover Hub for bed ${slot.bed}`}
             >
-              {hubSyncPending ? "Retrying…" : "Retry Hub"}
+              {hubSyncPending ? "Checking…" : "Review & retry"}
             </button>
           )}
         </div>

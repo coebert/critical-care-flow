@@ -94,7 +94,7 @@ describe("BedCard", () => {
     const link = screen.getByRole("link", { name: /ICU Handover Hub to discharge/ }) as HTMLAnchorElement;
     expect(link.href).toBe("https://hub.synthetic.test/patients/syn-1");
     expect(screen.getByText(/Hub not updated · wardable saved here/)).toBeTruthy();
-    fireEvent.click(screen.getByRole("button", { name: /Retry updating ICU Handover Hub/ }));
+    fireEvent.click(screen.getByRole("button", { name: /Review and retry updating ICU Handover Hub/ }));
     expect(retry).toHaveBeenCalledWith("syn-1");
   });
 
@@ -111,6 +111,7 @@ function view(): UnitCapacityView {
     shift: currentShift(new Date()),
     derivation,
     freshness: "current",
+    inputs: { board: "current", acuity: "current", staffing: "current" },
     reassuring: false,
     lastSuccessAt: board.fetched_at,
     latestFailure: null,

@@ -167,29 +167,60 @@ function validateOccupant(v: unknown, where: string): PartnerOccupant {
   optBool(v, "dnacpr_decision", where);
   optBool(v, "wardable", where);
   optString(v, "wardable_at", where);
-  return {
-    full_name: null,
-    hospital_number: null,
-    age: null,
-    status: null,
-    bed: null,
-    admission_date: null,
-    tep_in_place: null,
-    dnacpr_decision: null,
-    outstanding_tasks: null,
-    updated_at: null,
-    ...(v as Partial<PartnerOccupant>),
-    id: v.id,
+  return toOccupantDto(v);
+}
+
+const str = (v: unknown): string | null => (typeof v === "string" ? v : null);
+const bool = (v: unknown): boolean | null => (typeof v === "boolean" ? v : null);
+
+/**
+ * Strict occupant DTO: ONLY the approved fields, each type-checked. Unknown
+ * upstream fields are never passed on to clients.
+ */
+export function toOccupantDto(v: Record<string, unknown>): PartnerOccupant {
+  const out: PartnerOccupant = {
+    id: String(v.id),
+    full_name: str(v.full_name),
+    hospital_number: str(v.hospital_number),
+    age: typeof v.age === "number" && Number.isFinite(v.age) ? v.age : null,
+    status: str(v.status),
+    bed: str(v.bed),
+    admission_date: str(v.admission_date),
+    tep_in_place: bool(v.tep_in_place),
+    dnacpr_decision: bool(v.dnacpr_decision),
+    dnacpr_details: str(v.dnacpr_details),
+    tep_details: str(v.tep_details),
+    outstanding_tasks: str(v.outstanding_tasks),
+    updated_at: str(v.updated_at),
   };
+  if (typeof v.wardable === "boolean") out.wardable = v.wardable;
+  if (v.wardable_at === null || typeof v.wardable_at === "string") out.wardable_at = v.wardable_at as string | null;
+  return out;
+}
+
+/** Validated occupant DTO or null (used for Hub write responses / conflicts). */
+export function occupantDtoOrNull(v: unknown): PartnerOccupant | null {
+  try {
+    return validateOccupant(v, "patient");
+  } catch {
+    return null;
+  }
+}
+
+/** Approved fields for the optional outlier / transfer-out sections. */
+function sectionItem(v: unknown): JsonValue | null {
+  if (!isObj(v) || typeof v.id !== "string" || !v.id.trim()) return null;
+  const out: { [k: string]: JsonValue } = { id: v.id };
+  for (const k of ["bed", "ward", "location", "status", "updated_at"]) {
+    if (typeof v[k] === "string") out[k] = v[k] as string;
+  }
+  return out;
 }
 
 function isCount(v: unknown): v is number {
   return typeof v === "number" && Number.isInteger(v) && v >= 0;
 }
 
-function safeMessage(v: unknown, fallback: string): string {
-  return typeof v === "string" && v.trim() ? v.trim().slice(0, 200) : fallback;
-}
 
 function validate(payload: unknown, fetchedAt: string, opts: ContractOptions): PartnerBedBoardResult {
   if (!isObj(payload)) throw new ContractError("partner payload missing bed_board array");
@@ -198,7 +229,8 @@ function validate(payload: unknown, fetchedAt: string, opts: ContractOptions): P
   if (payload.ok === false) {
     return {
       ok: false,
-      error: safeMessage(payload.error ?? payload.message, "ICU Handover Hub reported an error"),
+      // Fixed text: upstream error bodies are never shown to clients.
+      error: "ICU Handover Hub reported an error",
       fetched_at: fetchedAt,
       indeterminate: true,
     };
@@ -227,7 +259,7 @@ function validate(payload: unknown, fetchedAt: string, opts: ContractOptions): P
       throw new ContractError("unit_code must be a non-empty string");
     }
     if (payload.unit_code.trim() !== allowedCode) {
-      throw new ContractError(`unit_code ${payload.unit_code.slice(0, 40)} is outside the allowed unit scope`, true);
+      throw new ContractError("unit_code is outside the allowed unit scope", true);
     }
     unitCode = payload.unit_code.trim();
   } else {
@@ -263,10 +295,12 @@ function validate(payload: unknown, fetchedAt: string, opts: ContractOptions): P
     if (typeof raw.occupied !== "boolean") {
       throw new ContractError(`${where}.occupied must be a boolean`);
     }
-    if (seenBeds.has(raw.bed)) {
-      throw new ContractError(`duplicate bed ${raw.bed} in roster`, true);
+    // Bed keys compare case- and whitespace-insensitively ("sr1" == " SR1 ").
+    const bedKey = raw.bed.trim().toUpperCase();
+    if (seenBeds.has(bedKey)) {
+      throw new ContractError("duplicate bed in roster", true);
     }
-    seenBeds.add(raw.bed);
+    seenBeds.add(bedKey);
     const hasOccupant = raw.occupant !== undefined && raw.occupant !== null;
     if (!raw.occupied && hasOccupant) {
       throw new ContractError(`${where} is marked vacant but has an occupant`, true);
@@ -278,7 +312,7 @@ function validate(payload: unknown, fetchedAt: string, opts: ContractOptions): P
       }
       seenPatients.add(occupant.id);
     }
-    return { bed: raw.bed, is_side_room: raw.is_side_room, occupied: raw.occupied, occupant };
+    return { bed: raw.bed.trim(), is_side_room: raw.is_side_room, occupied: raw.occupied, occupant };
   });
 
   let unassigned: PartnerOccupant[] = [];
@@ -344,8 +378,12 @@ function validate(payload: unknown, fetchedAt: string, opts: ContractOptions): P
     stats: derived,
     fetched_at: fetchedAt,
   };
-  if (Array.isArray(payload.outliers)) out.outliers = payload.outliers as JsonValue[];
-  if (Array.isArray(payload.transfers_out)) out.transfers_out = payload.transfers_out as JsonValue[];
+  if (Array.isArray(payload.outliers)) {
+    out.outliers = payload.outliers.map(sectionItem).filter((x): x is JsonValue => x !== null);
+  }
+  if (Array.isArray(payload.transfers_out)) {
+    out.transfers_out = payload.transfers_out.map(sectionItem).filter((x): x is JsonValue => x !== null);
+  }
   return out;
 }
 

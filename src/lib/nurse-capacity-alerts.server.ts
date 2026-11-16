@@ -259,7 +259,8 @@ export async function checkAndAlertNurseCapacity(
       level3_slots: slotsFor("l3", block),
       level2_slots: slotsFor("l2", block),
       level1_slots: slotsFor("l1", block),
-      spare: block.spare,
+      // Integer column; the exact figure is in the message text.
+      spare: Math.floor(block.spare),
       level3_last_alerted_at: flipped.includes("l3") ? nowIso : lastAlertedAt.l3,
       level2_last_alerted_at: flipped.includes("l2") ? nowIso : lastAlertedAt.l2,
       level1_last_alerted_at: flipped.includes("l1") ? nowIso : lastAlertedAt.l1,

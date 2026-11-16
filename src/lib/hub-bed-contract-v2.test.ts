@@ -104,6 +104,7 @@ describe("missing level is not an observed L1", () => {
     const out = await checkAndAlertNurseCapacity({ from } as never, new Date(AT), {
       fetchBoard: async () => b,
       sendPush: sendPush as never,
+      clock: () => Date.parse(AT),
     });
     expect(out).toEqual({ kind: "suppressed", reason: "acuity_missing" });
     expect(sendPush).not.toHaveBeenCalled();

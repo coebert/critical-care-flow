@@ -3,10 +3,9 @@ import { preflight } from "@/lib/bridge-cors";
 import { runBridgeSync } from "./sync";
 
 /**
- * Retries only the resources currently in a failed state (bridge_sync_state.last_error IS NOT NULL).
- * Each attempt is written to bridge_sync_attempts with source='retry' for admin visibility.
- * Safe to schedule frequently — becomes a no-op when nothing is failing.
- * Auth: same apikey header pattern as /api/public/bridge/sync.
+ * RETIRED mirror retry endpoint. Authenticates the caller, counts resources
+ * with legacy failures, and reports them as not applicable without retrying
+ * or changing their state.
  */
 export const Route = createFileRoute("/api/public/bridge/retry-failed")({
   server: {

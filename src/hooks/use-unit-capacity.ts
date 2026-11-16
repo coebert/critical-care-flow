@@ -14,11 +14,13 @@ import {
   CAPACITY_REFRESH_MS,
   availableNursesFor,
   boardSourceTime,
+  combinedFreshness,
   deriveUnitCapacity,
-  freshnessOf,
   isReassuring,
   type CapacityDerivation,
+  type CapacityInputName,
   type Freshness,
+  type InputFreshness,
   type LoadState,
 } from "@/lib/unit-capacity";
 
@@ -98,6 +100,7 @@ export function usePartnerBedBoard() {
   return {
     /** Last successfully validated board (kept through later failures, never through a denial). */
     lastOk: cached?.kind === "ok" ? cached.board : null,
+    forbidden: forbidden !== null,
     latestFailure,
     isLoading: q.isLoading,
     isFetching: q.isFetching,
@@ -128,8 +131,11 @@ export function useNurseStaffingRows(shiftDate: string) {
 export type UnitCapacityView = {
   shift: ShiftKey;
   derivation: CapacityDerivation;
+  /** "current" only when board, acuity AND staffing are all current. */
   freshness: Freshness;
-  /** True only when determinate AND current — safe for green / "room to admit". */
+  /** Per-input freshness (why the view is not current). */
+  inputs: Record<CapacityInputName, InputFreshness>;
+  /** True only when determinate AND every input current — safe for green / "room to admit". */
   reassuring: boolean;
   /** Time the shown board describes (Hub `generated_at`, else fetch time). */
   lastSuccessAt: string | null;
@@ -177,16 +183,32 @@ export function useUnitCapacity(): UnitCapacityView {
 
   // Age of the DATA (Hub snapshot time when sent), not of our last fetch.
   const lastSuccessAt = boardSourceTime(board.lastOk);
-  const freshness = freshnessOf({
-    lastSuccessAt,
-    latestFailed: board.latestFailure !== null,
-    now: now.getTime(),
-  });
+  // Every required input is aged: a fresh board over a two-minute-old
+  // acuity/staffing cache (e.g. a hanging refresh) is NOT current.
+  const { freshness, inputs } = combinedFreshness(
+    {
+      board: board.forbidden
+        ? { state: "forbidden", sourceAt: null }
+        : board.lastOk
+          ? { state: "ok", sourceAt: lastSuccessAt, latestFailed: board.latestFailure !== null }
+          : { state: board.latestFailure ? "error" : "pending", sourceAt: null },
+      acuity:
+        acuity.data === undefined
+          ? { state: acuity.status === "error" ? "error" : "pending", sourceAt: null }
+          : { state: "ok", sourceAt: acuity.dataUpdatedAt, latestFailed: acuity.status === "error" },
+      staffing:
+        staffing.data === undefined
+          ? { state: staffing.status === "error" ? "error" : "pending", sourceAt: null }
+          : { state: "ok", sourceAt: staffing.dataUpdatedAt, latestFailed: staffing.status === "error" },
+    },
+    now.getTime(),
+  );
 
   return {
     shift,
     derivation,
     freshness,
+    inputs,
     reassuring: isReassuring(derivation, freshness),
     lastSuccessAt,
     latestFailure: board.latestFailure,

@@ -26,6 +26,16 @@ import { BedGridSkeleton } from "@/components/bed-board/bed-grid-skeleton";
 import { formatDistanceToNowStrict, formatDistanceStrict } from "date-fns";
 import { toast } from "sonner";
 import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import {
   updatePartnerPatient,
   type PartnerBedSlot,
   type PartnerOccupant,
@@ -34,6 +44,7 @@ import {
 import {
   setPatientAcuity,
   type AcuityLevel,
+  type SetPatientAcuityResult,
 } from "@/lib/patient-acuity.functions";
 import { getPatientAirways } from "@/lib/patient-airway.functions";
 import {
@@ -58,6 +69,7 @@ import {
   listWardableStatus,
   setWardableStatus,
   retryWardableSync,
+  reviewWardableRetry,
   getHubAppOrigin,
   dischargePatient,
   clearDischarge,
@@ -65,6 +77,7 @@ import {
   type WardableStatus,
   type SetWardableResult,
   type PartnerSyncOutcome,
+  type WardableRetryReview,
 } from "@/lib/wardable-status.functions";
 import {
   previewPartnerHandoverPrefill,
@@ -73,6 +86,15 @@ import {
 } from "@/lib/partner-handover-prefill.functions";
 import { BedCard } from "@/components/bed-board/bed-card";
 import { toInitials } from "@/lib/patient-initials";
+import {
+  applySaveResult,
+  hasChanges,
+  initEditState,
+  loadLatest,
+  saveRequest,
+  type EditForm,
+  type EditState,
+} from "@/components/bed-board/occupant-edit-state";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -210,13 +232,14 @@ function BedBoardPage() {
   const { isLoading, isFetching, refetch } = board;
   const { data: acuityRows } = usePatientAcuityRows();
   // level null = no level observed (1:1 may still be recorded).
-  type AcuityInfo = { level: AcuityLevel | null; one_to_one: boolean };
+  type AcuityInfo = { level: AcuityLevel | null; one_to_one: boolean; updated_at: string };
   const acuityMap = useMemo(() => {
     const m = new Map<string, AcuityInfo>();
     for (const r of acuityRows ?? []) {
       m.set(r.partner_patient_id, {
         level: r.level,
         one_to_one: r.one_to_one === true,
+        updated_at: r.updated_at,
       });
     }
     return m;
@@ -457,11 +480,24 @@ function BedBoardPage() {
     else if (p.status === "not_configured") toast.info(`${savedWhat} here only — Hub link not configured`);
     else toast.warning(`${savedWhat} here. ${p.message}`);
   };
+  // Retry is explicit and reviewed: show the latest local desired state next
+  // to what the Hub currently shows; only that reviewed revision is sent.
+  const reviewRetry = useServerFn(reviewWardableRetry);
+  const [retryReview, setRetryReview] = useState<{ id: string; review: WardableRetryReview } | null>(null);
+  const reviewMutation = useMutation({
+    mutationFn: (partner_patient_id: string) => reviewRetry({ data: { partner_patient_id } }),
+    onSuccess: (review, id) => setRetryReview({ id, review }),
+    onError: () => toast.error("Could not check ICU Handover Hub — nothing was sent"),
+  });
   const retryMutation = useMutation({
-    mutationFn: (partner_patient_id: string) => retrySync({ data: { partner_patient_id } }),
+    mutationFn: (v: { partner_patient_id: string; reviewed_revision: string }) => retrySync({ data: v }),
     onSuccess: (p) => reportPartner(p, "Wardable state"),
     onError: () => toast.error("Could not retry the ICU Handover Hub update"),
-    onSettled: () => void qc.invalidateQueries({ queryKey: ["patient-wardable-status"] }),
+    onSettled: () => {
+      setRetryReview(null);
+      void qc.invalidateQueries({ queryKey: ["patient-wardable-status"] });
+      void refetch();
+    },
   });
 
   const wardableMutation = useMutation({
@@ -919,11 +955,11 @@ function BedBoardPage() {
                         : undefined
                     }
                     hubSyncPending={
-                      slot.occupant?.id != null &&
-                      retryMutation.isPending &&
-                      retryMutation.variables === slot.occupant.id
+                      slot.occupant != null &&
+                      ((reviewMutation.isPending && reviewMutation.variables === slot.occupant.id) ||
+                        (retryMutation.isPending && retryMutation.variables?.partner_patient_id === slot.occupant.id))
                     }
-                    onRetryHubSync={(id) => retryMutation.mutate(id)}
+                    onRetryHubSync={(id) => reviewMutation.mutate(id)}
                     hubPatientUrl={slot.occupant ? hubPatientUrl(slot.occupant.id) : null}
                     oneToOne={a?.one_to_one === true}
                     hasTracheostomy={
@@ -1190,7 +1226,7 @@ function BedBoardPage() {
                       aria-hidden="true"
                     />
                     <div>
-                      Occupancy is mirrored from{" "}
+                      Occupancy is read live from{" "}
                       <span className="font-medium">ICU Handover Hub</span>{" "}
                       every 20 seconds.
                       {!acuityProvided && (
@@ -1212,10 +1248,67 @@ function BedBoardPage() {
         </div>
       )}
 
+      <AlertDialog open={!!retryReview} onOpenChange={(v) => !v && setRetryReview(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Review the ICU Handover Hub update</AlertDialogTitle>
+            <AlertDialogDescription asChild>
+              <div className="space-y-2 text-sm">
+                {retryReview?.review.local ? (
+                  <>
+                    <div>
+                      Saved here (latest change):{" "}
+                      <strong>{retryReview.review.local.wardable ? "Wardable" : "Not wardable"}</strong>
+                    </div>
+                    <div>
+                      ICU Handover Hub now:{" "}
+                      <strong>
+                        {retryReview.review.hub.state === "ok"
+                          ? retryReview.review.hub.wardable === null
+                            ? "not shown by the Hub"
+                            : retryReview.review.hub.wardable
+                              ? "Wardable"
+                              : "Not wardable"
+                          : retryReview.review.hub.state === "not_shared"
+                            ? "patient no longer shared"
+                            : "could not be checked"}
+                      </strong>
+                    </div>
+                    <div className="text-xs text-muted-foreground">
+                      Only the change saved here is sent. If it changes again before you confirm, nothing is sent and you will be asked to review again.
+                    </div>
+                  </>
+                ) : (
+                  <div>There is no saved wardable change to send.</div>
+                )}
+              </div>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            {retryReview?.review.local && retryReview.review.hub.state !== "not_shared" && (
+              <AlertDialogAction
+                disabled={retryMutation.isPending}
+                onClick={() =>
+                  retryReview.review.local &&
+                  retryMutation.mutate({
+                    partner_patient_id: retryReview.id,
+                    reviewed_revision: retryReview.review.local.desired_revision,
+                  })
+                }
+              >
+                Send “{retryReview.review.local.wardable ? "Wardable" : "Not wardable"}” to Hub
+              </AlertDialogAction>
+            )}
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
       <EditOccupantDialog
         occupant={selected}
         currentLevel={selected ? acuityMap.get(selected.id)?.level ?? null : null}
         currentOneToOne={selected ? acuityMap.get(selected.id)?.one_to_one === true : false}
+        currentAcuityRevision={selected ? acuityMap.get(selected.id)?.updated_at ?? null : null}
         sourceReferralId={search.source_referral_id ?? null}
         onClose={() => setSelected(null)}
         onSaved={(updated) => {
@@ -1223,6 +1316,7 @@ function BedBoardPage() {
           void refetch();
         }}
         onAcuityChanged={() => void qc.invalidateQueries({ queryKey: ACUITY_QK })}
+        onConflictReload={() => void refetch()}
       />
 
 
@@ -1230,120 +1324,63 @@ function BedBoardPage() {
   );
 }
 
-type EditForm = {
-  full_name: string;
-  hospital_number: string;
-  age: string;
-  bed: string;
-  status: "referred" | "admitted" | "discharged" | "died";
-  tep_in_place: boolean;
-  tep_details: string;
-  dnacpr_decision: boolean;
-  dnacpr_details: string;
-  outstanding_tasks: string;
-};
-
-function occupantToForm(o: PartnerOccupant): EditForm {
-  const s = (o.status ?? "admitted") as EditForm["status"];
-  return {
-    full_name: o.full_name ?? "",
-    hospital_number: o.hospital_number ?? "",
-    age: o.age != null ? String(o.age) : "",
-    bed: o.bed ?? "",
-    status: ["referred", "admitted", "discharged", "died"].includes(s) ? s : "admitted",
-    tep_in_place: o.tep_in_place === true,
-    tep_details: o.tep_details ?? "",
-    dnacpr_decision: o.dnacpr_decision === true,
-    dnacpr_details: o.dnacpr_details ?? "",
-    outstanding_tasks: o.outstanding_tasks ?? "",
-  };
-}
-
-function buildDiff(
-  initial: EditForm,
-  current: EditForm,
-  id: string,
-  expected_updated_at: string | null,
-): UpdatePartnerPatientInput {
-  const out: UpdatePartnerPatientInput = { id, expected_updated_at };
-  const strKeys = [
-    "full_name",
-    "hospital_number",
-    "bed",
-    "tep_details",
-    "dnacpr_details",
-    "outstanding_tasks",
-  ] as const;
-  for (const k of strKeys) {
-    if (initial[k] !== current[k]) {
-      let value: string | null = current[k] === "" ? null : current[k];
-      // Hard guarantee: the "full_name" field on the partner is used as the
-      // initials carrier. Never let a full name leak across the bridge.
-      if (k === "full_name" && typeof value === "string") {
-        value = toInitials(value) || null;
-      }
-      (out as Record<string, unknown>)[k] = value;
-    }
-  }
-  if (initial.age !== current.age) {
-    out.age = current.age === "" ? null : Number(current.age);
-  }
-  if (initial.status !== current.status) out.status = current.status;
-  if (initial.tep_in_place !== current.tep_in_place) out.tep_in_place = current.tep_in_place;
-  if (initial.dnacpr_decision !== current.dnacpr_decision) {
-    out.dnacpr_decision = current.dnacpr_decision;
-  }
-  return out;
-}
-
 function EditOccupantDialog({
   occupant,
   currentLevel,
   currentOneToOne,
+  currentAcuityRevision,
   sourceReferralId,
   onClose,
   onSaved,
   onAcuityChanged,
+  onConflictReload,
 }: {
   occupant: PartnerOccupant | null;
   currentLevel: AcuityLevel | null;
   currentOneToOne: boolean;
+  /** Exact revision of the acuity row (null = none recorded yet). */
+  currentAcuityRevision: string | null;
   sourceReferralId: string | null;
   onClose: () => void;
   onSaved: (updated: PartnerOccupant) => void;
   onAcuityChanged: () => void;
+  /** Refetch shared Hub data after the user loads the latest revision. */
+  onConflictReload: () => void;
 }) {
   const save = useServerFn(updatePartnerPatient);
   const saveAcuity = useServerFn(setPatientAcuity);
   const runPreview = useServerFn(previewPartnerHandoverPrefill);
   const runApply = useServerFn(applyPartnerHandoverPrefill);
+  // Every acuity save carries the exact revision the clinician saw; the
+  // next save uses the revision returned by the previous one.
+  const [acuityRev, setAcuityRev] = useState<string | null>(currentAcuityRevision);
+  useEffect(() => setAcuityRev(currentAcuityRevision), [currentAcuityRevision, occupant?.id]);
+  const afterAcuity = (result: SetPatientAcuityResult, okText: string) => {
+    if (result.ok) {
+      setAcuityRev(result.entry?.updated_at ?? null);
+      toast.success(okText);
+    } else if (result.conflict) {
+      setAcuityRev(result.entry ? result.entry.updated_at : result.entry === null ? null : acuityRev);
+      toast.warning(result.error);
+    } else {
+      toast.error(result.error || "Could not save level of care");
+    }
+    onAcuityChanged();
+  };
   const acuityMutation = useMutation({
     mutationFn: (level: AcuityLevel | null) =>
-      saveAcuity({ data: { partner_patient_id: occupant!.id, level } }),
-    onSuccess: (result) => {
-      if (result.ok) {
-        toast.success("Level of care updated");
-      } else {
-        toast.error(result.error || "Could not save level");
-      }
-      onAcuityChanged();
-    },
+      saveAcuity({ data: { partner_patient_id: occupant!.id, level, expected_updated_at: acuityRev } }),
+    onSuccess: (result) => afterAcuity(result, "Level of care updated"),
     onError: (err) => toast.error(err instanceof Error ? err.message : "Could not save level"),
   });
   const oneToOneMutation = useMutation({
     mutationFn: (one_to_one: boolean) =>
-      saveAcuity({ data: { partner_patient_id: occupant!.id, one_to_one } }),
-    onSuccess: (result, vars) => {
-      if (result.ok) {
-        toast.success(vars ? "Marked as 1:1 nursing" : "1:1 nursing cleared");
-      } else {
-        toast.error(result.error || "Could not update 1:1 nursing");
-      }
-      onAcuityChanged();
-    },
+      saveAcuity({ data: { partner_patient_id: occupant!.id, one_to_one, expected_updated_at: acuityRev } }),
+    onSuccess: (result, vars) => afterAcuity(result, vars ? "Marked as 1:1 nursing" : "1:1 nursing cleared"),
     onError: (err) =>
       toast.error(err instanceof Error ? err.message : "Could not update 1:1 nursing"),
   });
+  const acuityBusy = acuityMutation.isPending || oneToOneMutation.isPending;
 
   // Prefill is two explicit steps: preview exactly what would be copied,
   // then apply only after the clinician confirms.
@@ -1382,44 +1419,37 @@ function EditOccupantDialog({
     },
     onError: () => setPrefillProblem("Could not apply the prefill. Nothing was copied."),
   });
-  const initial = useMemo(
-    () => (occupant ? occupantToForm(occupant) : null),
-    [occupant],
-  );
-  const [form, setForm] = useState<EditForm | null>(initial);
-  const [conflict, setConflict] = useState<{
-    current: PartnerOccupant;
-    your_expected_updated_at: string | null;
-  } | null>(null);
-
-  // Reset form whenever the selected occupant changes (open/close/switch).
+  // Baseline (Hub revision being edited) + form + conflict, see
+  // occupant-edit-state.ts. Reset whenever the selected occupant changes.
+  const [edit, setEdit] = useState<EditState | null>(occupant ? initEditState(occupant) : null);
   useEffect(() => {
-    setForm(initial);
-    setConflict(null);
-  }, [initial]);
+    setEdit(occupant ? initEditState(occupant) : null);
+  }, [occupant]);
+  const form = edit?.form ?? null;
+  const setForm = (f: EditForm) => setEdit((s) => (s ? { ...s, form: f } : s));
+  const conflict = edit?.conflict ?? null;
 
   const mutation = useMutation({
     mutationFn: (input: UpdatePartnerPatientInput) => save({ data: input }),
     onSuccess: (result) => {
-      if (result.ok) {
+      if (!edit) return;
+      const { state, outcome } = applySaveResult(edit, result);
+      setEdit(state);
+      if (outcome === "saved" && result.ok) {
         toast.success("Patient updated in ICU Handover Hub");
         onSaved(result.patient);
-        return;
+      } else if (outcome === "conflict") {
+        toast.warning("Someone else updated this patient — review the latest values");
+      } else {
+        toast.error(!result.ok && result.error ? result.error : "Update failed");
       }
-      if (result.status === 409 && result.conflict) {
-        setConflict(result.conflict);
-        toast.warning("Someone else updated this patient — review and re-apply");
-        return;
-      }
-      toast.error(result.error || "Update failed");
     },
     onError: (err) => {
       toast.error(err instanceof Error ? err.message : "Update failed");
     },
   });
 
-  const canSubmit =
-    !!occupant && !!form && !!initial && JSON.stringify(form) !== JSON.stringify(initial);
+  const canSubmit = !!occupant && !!edit && hasChanges(edit) && !conflict;
 
   return (
     <Dialog open={!!occupant} onOpenChange={(v) => !v && onClose()}>
@@ -1523,8 +1553,8 @@ function EditOccupantDialog({
               This patient was updated by someone else
             </div>
             <div className="text-xs mt-1 text-muted-foreground">
-              Their latest values are loaded below. Re-apply your changes on top
-              and save again.
+              Your edits are still shown but were not saved. Load the latest
+              Hub values, then re-apply your changes and save again.
             </div>
             <div className="mt-2 flex gap-2">
               <Button
@@ -1532,9 +1562,8 @@ function EditOccupantDialog({
                 size="sm"
                 variant="secondary"
                 onClick={() => {
-                  const fresh = occupantToForm(conflict.current);
-                  setForm(fresh);
-                  setConflict(null);
+                  setEdit((s) => (s ? loadLatest(s) : s));
+                  onConflictReload();
                 }}
               >
                 Load latest
@@ -1551,7 +1580,7 @@ function EditOccupantDialog({
                 <button
                   type="button"
                   className="text-xs text-muted-foreground hover:text-foreground underline underline-offset-2 disabled:opacity-50"
-                  disabled={acuityMutation.isPending}
+                  disabled={acuityBusy}
                   onClick={() => acuityMutation.mutate(null)}
                 >
                   Clear
@@ -1565,7 +1594,7 @@ function EditOccupantDialog({
                   <button
                     key={l}
                     type="button"
-                    disabled={acuityMutation.isPending}
+                    disabled={acuityBusy}
                     onClick={() => acuityMutation.mutate(l)}
                     className={`rounded-md border px-3 py-1.5 text-sm transition disabled:opacity-50 ${
                       selected ? LEVEL_TONE[l] + " ring-2 ring-offset-1 ring-current" : "hover:bg-accent"
@@ -1592,7 +1621,7 @@ function EditOccupantDialog({
               <Switch
                 id="one-to-one-switch"
                 checked={currentOneToOne}
-                disabled={oneToOneMutation.isPending}
+                disabled={acuityBusy}
                 onCheckedChange={(v) => oneToOneMutation.mutate(v === true)}
                 aria-label="Requires 1:1 nursing"
               />
@@ -1611,14 +1640,8 @@ function EditOccupantDialog({
             className="grid grid-cols-2 gap-3"
             onSubmit={(e) => {
               e.preventDefault();
-              if (!initial) return;
-              const diff = buildDiff(
-                initial,
-                form,
-                occupant.id,
-                occupant.updated_at,
-              );
-              mutation.mutate(diff);
+              if (!edit || !canSubmit) return;
+              mutation.mutate(saveRequest(edit));
             }}
           >
             <div className="col-span-2">
@@ -1750,7 +1773,7 @@ function EditOccupantDialog({
 
             <DialogFooter className="col-span-2 mt-2">
               <div className="text-xs text-muted-foreground mr-auto self-center">
-                Last updated {formatUpdated(occupant.updated_at)}
+                Last updated {formatUpdated(edit?.baseline.updated_at ?? occupant.updated_at)}
               </div>
               <Button type="button" variant="ghost" onClick={onClose}>
                 Cancel

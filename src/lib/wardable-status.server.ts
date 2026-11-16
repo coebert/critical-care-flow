@@ -45,6 +45,7 @@ export type PartnerSyncReason =
   | "not_configured"
   | "not_shared"
   | "changed_since_review"
+  | "paused_until_release"
   | null;
 
 export type PartnerSyncOutcome = {
@@ -89,6 +90,7 @@ const MESSAGE: Record<Exclude<PartnerSyncReason, null> | "synced", string> = {
   not_configured: "Saved here only — the ICU Handover Hub link is not configured",
   not_shared: "Saved here, but this patient is no longer shared by ICU Handover Hub",
   changed_since_review: "The wardable state changed since you reviewed it — review again",
+  paused_until_release: "Saved here only — ICU Handover Hub wardable updates start with the coordinated release",
 };
 
 const outcome = (
@@ -249,11 +251,11 @@ export async function runSetWardable(
   });
   if (error) {
     if (error.code === "PGRST202" || error.code === "42883") {
-      return {
-        ok: false,
-        code: "unavailable",
-        error: "Wardable changes are paused until the coordinated database update is applied — nothing was changed",
-      };
+      // Revision procedure not applied yet (staged for the coordinated
+      // release). Keep the LOCAL wardable timer working, but never push to
+      // the Hub without the durable revision fence. The Hub has never seen
+      // a revision before then, so nothing here can be reused against it.
+      return legacyLocalOnly(userDb, input);
     }
     if (error.code === "42501") return { ok: false, code: "forbidden", error: "forbidden: clinical role required" };
     return { ok: false, code: "failed", error: "Could not save the wardable change — nothing was changed" };
@@ -269,6 +271,42 @@ export async function runSetWardable(
     partner = outcome("failed", "unavailable", revisionString(row.desired_revision));
   }
   return { ok: true, local: row, partner };
+}
+
+async function legacyLocalOnly(
+  db: WardableDb,
+  input: { partner_patient_id: string; wardable: boolean },
+): Promise<SetWardableCoreResult> {
+  const COLS =
+    "partner_patient_id, wardable, wardable_at, discharged_at, updated_at, desired_revision, partner_sync_status, partner_sync_checked_at, partner_synced_revision";
+  const { data: existing, error: readErr } = await db
+    .from("patient_wardable_status")
+    .select(COLS)
+    .eq("partner_patient_id", input.partner_patient_id)
+    .maybeSingle();
+  if (readErr) return { ok: false, code: "failed", error: "Could not save the wardable change — nothing was changed" };
+  const nowIso = new Date().toISOString();
+  const ex = existing as WardableRow | null;
+  const patch = {
+    wardable: input.wardable,
+    wardable_at: input.wardable ? (ex?.wardable && ex.wardable_at ? ex.wardable_at : nowIso) : null,
+    discharged_at: null,
+    desired_revision: Number(ex?.desired_revision ?? 0) + 1,
+    partner_sync_status: "failed",
+    partner_sync_checked_at: nowIso,
+  };
+  const q = ex
+    ? db
+        .from("patient_wardable_status")
+        .update(patch)
+        .eq("partner_patient_id", input.partner_patient_id)
+        .eq("desired_revision", Number(ex.desired_revision ?? 0))
+        .select(COLS)
+    : db.from("patient_wardable_status").insert({ partner_patient_id: input.partner_patient_id, ...patch }).select(COLS);
+  const { data, error } = await q;
+  const row = (Array.isArray(data) ? data[0] : data) as WardableRow | undefined;
+  if (error || !row) return { ok: false, code: "failed", error: "Could not save the wardable change — try again" };
+  return { ok: true, local: row, partner: outcome("failed", "paused_until_release", revisionString(row.desired_revision), true) };
 }
 
 export type WardableRetryReview = {

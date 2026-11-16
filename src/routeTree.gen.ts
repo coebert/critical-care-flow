@@ -38,7 +38,7 @@ import { Route as AuthenticatedPostopBookingsNewRouteImport } from './routes/_au
 import { Route as AuthenticatedPostopBookingsCancellationsRouteImport } from './routes/_authenticated/postop-bookings.cancellations'
 import { Route as AuthenticatedPostopBookingsAnalyticsRouteImport } from './routes/_authenticated/postop-bookings.analytics'
 import { Route as AuthenticatedInboxIdRouteImport } from './routes/_authenticated/inbox.$id'
-import { Route as AuthenticatedBoardWardRoundRouteImport } from './routes/_authenticated/board.ward-round'
+import { Route as AuthenticatedBoardWardRoundRouteImport } from './routes/_authenticated/board_.ward-round'
 import { Route as ApiPublicHooksBridgeReconcileWorkerRouteImport } from './routes/api/public/hooks/bridge-reconcile-worker'
 import { Route as ApiPublicBridgeVerifySignatureRouteImport } from './routes/api/public/bridge/verify-signature'
 import { Route as ApiPublicBridgeSyncRouteImport } from './routes/api/public/bridge/sync'
@@ -214,9 +214,9 @@ const AuthenticatedInboxIdRoute = AuthenticatedInboxIdRouteImport.update({
 } as any)
 const AuthenticatedBoardWardRoundRoute =
   AuthenticatedBoardWardRoundRouteImport.update({
-    id: '/ward-round',
-    path: '/ward-round',
-    getParentRoute: () => AuthenticatedBoardRoute,
+    id: '/board_/ward-round',
+    path: '/board/ward-round',
+    getParentRoute: () => AuthenticatedRouteRoute,
   } as any)
 const ApiPublicHooksBridgeReconcileWorkerRoute =
   ApiPublicHooksBridgeReconcileWorkerRouteImport.update({
@@ -322,7 +322,7 @@ export interface FileRoutesByFullPath {
   '/admin': typeof AuthenticatedAdminRoute
   '/analytics': typeof AuthenticatedAnalyticsRoute
   '/bed-board': typeof AuthenticatedBedBoardRoute
-  '/board': typeof AuthenticatedBoardRouteWithChildren
+  '/board': typeof AuthenticatedBoardRoute
   '/bridge-status': typeof AuthenticatedBridgeStatusRoute
   '/inbox': typeof AuthenticatedInboxRouteWithChildren
   '/notifications': typeof AuthenticatedNotificationsRoute
@@ -368,7 +368,7 @@ export interface FileRoutesByTo {
   '/admin': typeof AuthenticatedAdminRoute
   '/analytics': typeof AuthenticatedAnalyticsRoute
   '/bed-board': typeof AuthenticatedBedBoardRoute
-  '/board': typeof AuthenticatedBoardRouteWithChildren
+  '/board': typeof AuthenticatedBoardRoute
   '/bridge-status': typeof AuthenticatedBridgeStatusRoute
   '/inbox': typeof AuthenticatedInboxRouteWithChildren
   '/notifications': typeof AuthenticatedNotificationsRoute
@@ -417,7 +417,7 @@ export interface FileRoutesById {
   '/_authenticated/admin': typeof AuthenticatedAdminRoute
   '/_authenticated/analytics': typeof AuthenticatedAnalyticsRoute
   '/_authenticated/bed-board': typeof AuthenticatedBedBoardRoute
-  '/_authenticated/board': typeof AuthenticatedBoardRouteWithChildren
+  '/_authenticated/board': typeof AuthenticatedBoardRoute
   '/_authenticated/bridge-status': typeof AuthenticatedBridgeStatusRoute
   '/_authenticated/inbox': typeof AuthenticatedInboxRouteWithChildren
   '/_authenticated/notifications': typeof AuthenticatedNotificationsRoute
@@ -427,7 +427,7 @@ export interface FileRoutesById {
   '/_authenticated/profile': typeof AuthenticatedProfileRoute
   '/_authenticated/push-test': typeof AuthenticatedPushTestRoute
   '/_authenticated/': typeof AuthenticatedIndexRoute
-  '/_authenticated/board/ward-round': typeof AuthenticatedBoardWardRoundRoute
+  '/_authenticated/board_/ward-round': typeof AuthenticatedBoardWardRoundRoute
   '/_authenticated/inbox/$id': typeof AuthenticatedInboxIdRoute
   '/_authenticated/postop-bookings/analytics': typeof AuthenticatedPostopBookingsAnalyticsRoute
   '/_authenticated/postop-bookings/cancellations': typeof AuthenticatedPostopBookingsCancellationsRoute
@@ -571,7 +571,7 @@ export interface FileRouteTypes {
     | '/_authenticated/profile'
     | '/_authenticated/push-test'
     | '/_authenticated/'
-    | '/_authenticated/board/ward-round'
+    | '/_authenticated/board_/ward-round'
     | '/_authenticated/inbox/$id'
     | '/_authenticated/postop-bookings/analytics'
     | '/_authenticated/postop-bookings/cancellations'
@@ -829,12 +829,12 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedInboxIdRouteImport
       parentRoute: typeof AuthenticatedInboxRoute
     }
-    '/_authenticated/board/ward-round': {
-      id: '/_authenticated/board/ward-round'
-      path: '/ward-round'
+    '/_authenticated/board_/ward-round': {
+      id: '/_authenticated/board_/ward-round'
+      path: '/board/ward-round'
       fullPath: '/board/ward-round'
       preLoaderRoute: typeof AuthenticatedBoardWardRoundRouteImport
-      parentRoute: typeof AuthenticatedBoardRoute
+      parentRoute: typeof AuthenticatedRouteRoute
     }
     '/api/public/hooks/bridge-reconcile-worker': {
       id: '/api/public/hooks/bridge-reconcile-worker'
@@ -951,17 +951,6 @@ declare module '@tanstack/react-router' {
   }
 }
 
-interface AuthenticatedBoardRouteChildren {
-  AuthenticatedBoardWardRoundRoute: typeof AuthenticatedBoardWardRoundRoute
-}
-
-const AuthenticatedBoardRouteChildren: AuthenticatedBoardRouteChildren = {
-  AuthenticatedBoardWardRoundRoute: AuthenticatedBoardWardRoundRoute,
-}
-
-const AuthenticatedBoardRouteWithChildren =
-  AuthenticatedBoardRoute._addFileChildren(AuthenticatedBoardRouteChildren)
-
 interface AuthenticatedInboxRouteChildren {
   AuthenticatedInboxIdRoute: typeof AuthenticatedInboxIdRoute
 }
@@ -977,7 +966,7 @@ interface AuthenticatedRouteRouteChildren {
   AuthenticatedAdminRoute: typeof AuthenticatedAdminRoute
   AuthenticatedAnalyticsRoute: typeof AuthenticatedAnalyticsRoute
   AuthenticatedBedBoardRoute: typeof AuthenticatedBedBoardRoute
-  AuthenticatedBoardRoute: typeof AuthenticatedBoardRouteWithChildren
+  AuthenticatedBoardRoute: typeof AuthenticatedBoardRoute
   AuthenticatedBridgeStatusRoute: typeof AuthenticatedBridgeStatusRoute
   AuthenticatedInboxRoute: typeof AuthenticatedInboxRouteWithChildren
   AuthenticatedNotificationsRoute: typeof AuthenticatedNotificationsRoute
@@ -987,6 +976,7 @@ interface AuthenticatedRouteRouteChildren {
   AuthenticatedProfileRoute: typeof AuthenticatedProfileRoute
   AuthenticatedPushTestRoute: typeof AuthenticatedPushTestRoute
   AuthenticatedIndexRoute: typeof AuthenticatedIndexRoute
+  AuthenticatedBoardWardRoundRoute: typeof AuthenticatedBoardWardRoundRoute
   AuthenticatedPostopBookingsAnalyticsRoute: typeof AuthenticatedPostopBookingsAnalyticsRoute
   AuthenticatedPostopBookingsCancellationsRoute: typeof AuthenticatedPostopBookingsCancellationsRoute
   AuthenticatedPostopBookingsNewRoute: typeof AuthenticatedPostopBookingsNewRoute
@@ -1001,7 +991,7 @@ const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedAdminRoute: AuthenticatedAdminRoute,
   AuthenticatedAnalyticsRoute: AuthenticatedAnalyticsRoute,
   AuthenticatedBedBoardRoute: AuthenticatedBedBoardRoute,
-  AuthenticatedBoardRoute: AuthenticatedBoardRouteWithChildren,
+  AuthenticatedBoardRoute: AuthenticatedBoardRoute,
   AuthenticatedBridgeStatusRoute: AuthenticatedBridgeStatusRoute,
   AuthenticatedInboxRoute: AuthenticatedInboxRouteWithChildren,
   AuthenticatedNotificationsRoute: AuthenticatedNotificationsRoute,
@@ -1012,6 +1002,7 @@ const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedProfileRoute: AuthenticatedProfileRoute,
   AuthenticatedPushTestRoute: AuthenticatedPushTestRoute,
   AuthenticatedIndexRoute: AuthenticatedIndexRoute,
+  AuthenticatedBoardWardRoundRoute: AuthenticatedBoardWardRoundRoute,
   AuthenticatedPostopBookingsAnalyticsRoute:
     AuthenticatedPostopBookingsAnalyticsRoute,
   AuthenticatedPostopBookingsCancellationsRoute:
